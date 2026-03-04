@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const specialModeMunicipiosMsg = document.getElementById('specialModeMunicipiosMsg');
     const btnCargarEvidencia = document.getElementById('btnCargarEvidencia');
     const inputEvidenciaHoy = document.getElementById('inputEvidenciaHoy');
-    const evidenciaMicrorregionSelector = document.getElementById('evidenciaMicrorregionSelector');
+    const selectedMicrorregionId = Number(app.dataset.selectedMicrorregionId || 0);
     const evidenciaActualBox = document.getElementById('evidenciaActualBox');
     const evidenciaModal = document.getElementById('evidenciaPreviewDeleteModal');
     const evidenciaModalTitle = document.getElementById('evidenciaPreviewDeleteTitle');
@@ -840,8 +840,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function subirUnaEvidencia(archivo) {
         const formData = new FormData();
         formData.append('evidencia', archivo);
-        if (evidenciaMicrorregionSelector && evidenciaMicrorregionSelector.value) {
-            formData.append('microrregion_id', evidenciaMicrorregionSelector.value);
+        if (selectedMicrorregionId > 0) {
+            formData.append('microrregion_id', String(selectedMicrorregionId));
         }
 
         return fetch(guardarEvidenciaHoyUrl, {
@@ -873,8 +873,8 @@ document.addEventListener('DOMContentLoaded', function () {
             evidencia_path: path
         };
 
-        if (evidenciaMicrorregionSelector && evidenciaMicrorregionSelector.value) {
-            payload.microrregion_id = Number(evidenciaMicrorregionSelector.value);
+        if (selectedMicrorregionId > 0) {
+            payload.microrregion_id = selectedMicrorregionId;
         }
 
         return fetch(eliminarEvidenciaHoyUrl, {
@@ -1044,19 +1044,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     btnCargarEvidencia.textContent = textoOriginal;
                     inputEvidenciaHoy.value = '';
                 });
-        });
-    }
-
-    if (evidenciaMicrorregionSelector) {
-        evidenciaMicrorregionSelector.addEventListener('change', function () {
-            const value = String(evidenciaMicrorregionSelector.value || '').trim();
-            if (!value) {
-                return;
-            }
-
-            const url = new URL(window.location.href);
-            url.searchParams.set('microrregion_id', value);
-            window.location.href = url.toString();
         });
     }
 

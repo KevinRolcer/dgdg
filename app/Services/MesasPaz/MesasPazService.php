@@ -35,6 +35,14 @@ class MesasPazService
                 ->get();
         }
 
+        if (count($microrregionIds) > 1) {
+            if ($selectedMicrorregionId === null || !in_array($selectedMicrorregionId, $microrregionIds, true)) {
+                $selectedMicrorregionId = (int) ($microrregionesAsignadas->first()->id ?? 0);
+            }
+        } elseif (count($microrregionIds) === 1) {
+            $selectedMicrorregionId = (int) $microrregionIds[0];
+        }
+
         $microrregionIdsFiltradas = $microrregionIds;
         if ($selectedMicrorregionId !== null && in_array($selectedMicrorregionId, $microrregionIds, true)) {
             $microrregionIdsFiltradas = [$selectedMicrorregionId];
@@ -53,8 +61,8 @@ class MesasPazService
         $microrregionNumero = null;
         $microrregionNombre = 'Sin microrregión asignada';
         if (count($microrregionIdsFiltradas) === 1) {
-            $microrregionNumero = $microrregionIdsFiltradas[0];
-            $micro = DB::table('microrregiones')->where('id', $microrregionNumero)->first();
+            $micro = DB::table('microrregiones')->where('id', $microrregionIdsFiltradas[0])->first();
+            $microrregionNumero = (string) ($micro->microrregion ?? '');
             $microrregionNombre = $micro->cabecera
                 ?? $micro->microrregion
                 ?? 'Sin microrregión asignada';
@@ -107,7 +115,7 @@ class MesasPazService
             'fechaActual' => 'Hoy, '.$fechaHoy->format('d').' de '.ucfirst($fechaHoy->translatedFormat('F')).' de '.$fechaHoy->format('Y'),
             'microrregionNumero' => $microrregionNumero,
             'microrregionNombre' => $microrregionNombre,
-            'microrregionSeleccionadaId' => $microrregionNumero,
+            'microrregionSeleccionadaId' => $selectedMicrorregionId,
             'microrregionesAsignadas' => $microrregionesAsignadas,
             'esAnalistaEnlace' => count($microrregionIds) > 1,
             'municipios' => $municipios,

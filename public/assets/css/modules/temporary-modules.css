@@ -387,12 +387,68 @@
     background: rgba(255, 255, 255, 0.6);
 }
 
+.tm-target-users.tm-target-users-full {
+    grid-column: 1 / -1;
+}
+
 .tm-target-users-title {
     font-size: 0.78rem;
     font-weight: 700;
     color: var(--clr-text-light);
     text-transform: uppercase;
     letter-spacing: 0.02em;
+}
+
+.tm-target-user-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tm-target-user-filters .tm-btn {
+    min-height: 30px;
+    padding: 4px 10px;
+    font-size: 0.76rem;
+}
+
+.tm-target-user-filters .tm-btn.is-active {
+    border-color: transparent;
+    background: var(--clr-secondary);
+    color: #fff;
+}
+
+.tm-target-user-filters .tm-btn.tm-btn-clear {
+    min-width: 34px;
+    width: 34px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-color: rgba(134, 30, 52, 0.35);
+    color: var(--clr-primary-dark);
+    background: rgba(134, 30, 52, 0.08);
+}
+
+.tm-target-user-filters .tm-btn.tm-btn-clear i {
+    font-size: 0.8rem;
+}
+
+.tm-date-with-toggle {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.tm-date-with-toggle .tm-btn {
+    min-height: 36px;
+    white-space: nowrap;
+}
+
+.tm-date-with-toggle .tm-btn.is-active {
+    border-color: transparent;
+    background: var(--clr-secondary);
+    color: #fff;
 }
 
 .tm-target-options .tm-inline-check {
@@ -423,6 +479,7 @@
     overflow-y: auto;
     display: grid;
     gap: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .tm-delegate-list.is-disabled {
@@ -439,6 +496,10 @@
     padding: 7px 8px;
     font-size: 0.78rem;
     color: var(--clr-text-main);
+}
+
+.tm-delegate-item span {
+    min-width: 0;
 }
 
 .tm-delegate-item small {
@@ -1050,6 +1111,18 @@
     }
 
     .tm-target-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .tm-target-user-filters .tm-btn {
+        flex: 1 1 auto;
+    }
+
+    .tm-date-with-toggle {
+        grid-template-columns: 1fr;
+    }
+
+    .tm-delegate-list {
         grid-template-columns: 1fr;
     }
 

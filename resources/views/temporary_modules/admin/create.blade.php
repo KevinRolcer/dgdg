@@ -12,17 +12,13 @@
         @endif
 
         <div class="tm-head tm-head-stack">
-            <div>
-                <h2>Crear módulo temporal</h2>
-                <p>Define nombre, vigencia y campos requeridos para delegados.</p>
-            </div>
             <a href="{{ route('temporary-modules.admin.index') }}" class="tm-btn">Volver</a>
         </div>
 
         <form action="{{ route('temporary-modules.admin.store') }}" method="POST" class="tm-form" id="tmCreateForm">
             @csrf
 
-            <div class="tm-grid tm-grid-3">
+            <div class="tm-grid tm-grid-2">
                 <label>
                     Nombre del módulo
                     <input type="text" name="name" value="{{ old('name') }}" required>
@@ -30,14 +26,14 @@
 
                 <label>
                     Visible hasta
-                    <input type="date" name="expires_at" value="{{ old('expires_at') }}" required>
-                </label>
-
-                <label class="tm-inline-check">
-                    <input type="checkbox" name="is_active" value="1" {{ old('is_active', '1') ? 'checked' : '' }}>
-                    <span>Activo</span>
+                    <div class="tm-date-with-toggle" id="tmDateWithToggle">
+                        <input type="date" id="tmExpiresAt" name="expires_at" value="{{ old('expires_at') }}">
+                        <input type="hidden" id="tmIsIndefinite" name="is_indefinite" value="{{ old('is_indefinite') ? '1' : '0' }}">
+                        <button type="button" class="tm-btn" id="tmIndefiniteBtn" aria-pressed="{{ old('is_indefinite') ? 'true' : 'false' }}">Indefinido</button>
+                    </div>
                 </label>
             </div>
+            <input type="hidden" name="is_active" value="1">
 
             <label>
                 Descripción (opcional)
@@ -46,25 +42,30 @@
 
             <section class="tm-target-box">
                 <h3>Alcance del módulo</h3>
+                <input type="hidden" name="applies_to" value="selected">
                 <div class="tm-target-layout">
-                    <div class="tm-target-selector">
-                        <label class="tm-inline-check tm-target-choice">
-                            <input type="radio" name="applies_to" value="all" {{ old('applies_to', 'all') === 'all' ? 'checked' : '' }}>
-                            <span>Todos</span>
-                        </label>
-                        <label class="tm-inline-check tm-target-choice">
-                            <input type="radio" name="applies_to" value="selected" {{ old('applies_to') === 'selected' ? 'checked' : '' }}>
-                            <span>Selección Específica.</span>
-                        </label>
-                    </div>
-
-                    <div class="tm-target-users">
-                        <div class="tm-target-users-title">Delegados / usuarios</div>
-                        <div class="tm-delegate-list {{ old('applies_to') === 'selected' ? '' : 'is-disabled' }}" id="tmDelegateList">
+                    <div class="tm-target-users tm-target-users-full">
+                        <div class="tm-target-users-title">Filtros de selección</div>
+                        <div class="tm-target-user-filters" id="tmDelegateFilters">
+                            <button type="button" class="tm-btn" data-delegate-filter="enlace">Enlaces</button>
+                            <button type="button" class="tm-btn" data-delegate-filter="delegado">Delegados</button>
+                            <button type="button" class="tm-btn" data-delegate-filter="all">Todos</button>
+                            <button type="button" class="tm-btn tm-btn-clear" data-delegate-filter="clear" aria-label="Desmarcar todos" title="Desmarcar todos">
+                                <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="tm-delegate-list" id="tmDelegateList">
                             @foreach ($delegates as $delegate)
-                                <label class="tm-delegate-item">
-                                    <input type="checkbox" name="delegate_ids[]" value="{{ $delegate->id }}" @checked(in_array($delegate->id, old('delegate_ids', []), true))>
+                                @php
+                                    $scopeText = mb_strtolower((string) ($delegate->scope ?? ''));
+                                    $delegateType = str_contains($scopeText, 'enlace') ? 'enlace' : 'delegado';
+                                @endphp
+                                <label class="tm-delegate-item" data-delegate-item data-original-order="{{ $loop->index }}">
+                                    <input type="checkbox" name="delegate_ids[]" value="{{ $delegate->id }}" data-role-type="{{ $delegateType }}" @checked(in_array($delegate->id, old('delegate_ids', []), true))>
                                     <span>
+                                        @if($delegateType === 'enlace')
+                                            {{ trim((string) ($delegate->first_name ?? '')) !== '' ? $delegate->first_name.' · ' : '' }}
+                                        @endif
                                         {{ $delegate->name }}
                                         <small>
                                             {{ $delegate->scope ?? 'Usuario' }} ·
@@ -146,8 +147,11 @@
         const container = document.getElementById('tmFieldsContainer');
         const addButton = document.getElementById('tmAddFieldBtn');
         const rowTemplate = document.getElementById('tmFieldRowTemplate');
-        const appliesToInputs = Array.from(document.querySelectorAll('input[name="applies_to"]'));
         const delegateList = document.getElementById('tmDelegateList');
+        const delegateFilters = document.getElementById('tmDelegateFilters');
+        const expiresAtInput = document.getElementById('tmExpiresAt');
+        const isIndefiniteInput = document.getElementById('tmIsIndefinite');
+        const indefiniteButton = document.getElementById('tmIndefiniteBtn');
 
         if (!container || !addButton || !rowTemplate) {
             return;
@@ -257,27 +261,130 @@
 
         addButton.addEventListener('click', addRow);
 
-        const toggleDelegates = function () {
+        const reordenarDelegados = function () {
             if (!delegateList) {
                 return;
             }
 
-            const selectedInput = appliesToInputs.find(function (input) {
-                return input.checked;
-            });
-            const isSelectedMode = selectedInput && selectedInput.value === 'selected';
+            const items = Array.from(delegateList.querySelectorAll('[data-delegate-item]'));
+            items.sort(function (itemA, itemB) {
+                const checkA = itemA.querySelector('input[type="checkbox"][name="delegate_ids[]"]');
+                const checkB = itemB.querySelector('input[type="checkbox"][name="delegate_ids[]"]');
+                const selectedA = checkA && checkA.checked ? 1 : 0;
+                const selectedB = checkB && checkB.checked ? 1 : 0;
 
-            delegateList.classList.toggle('is-disabled', !isSelectedMode);
-            delegateList.setAttribute('aria-disabled', isSelectedMode ? 'false' : 'true');
-            delegateList.querySelectorAll('input[type="checkbox"]').forEach(function (input) {
-                input.disabled = !isSelectedMode;
+                if (selectedA !== selectedB) {
+                    return selectedB - selectedA;
+                }
+
+                const orderA = Number(itemA.getAttribute('data-original-order') || 0);
+                const orderB = Number(itemB.getAttribute('data-original-order') || 0);
+                return orderA - orderB;
+            });
+
+            items.forEach(function (item) {
+                delegateList.appendChild(item);
             });
         };
 
-        appliesToInputs.forEach(function (input) {
-            input.addEventListener('change', toggleDelegates);
-        });
-        toggleDelegates();
+        const marcarFiltroActivo = function (activeFilter) {
+            if (!delegateFilters) {
+                return;
+            }
+
+            delegateFilters.querySelectorAll('[data-delegate-filter]').forEach(function (button) {
+                const filter = String(button.getAttribute('data-delegate-filter') || '').toLowerCase();
+                if (filter === 'clear') {
+                    button.classList.remove('is-active');
+                    return;
+                }
+
+                button.classList.toggle('is-active', filter === activeFilter);
+            });
+        };
+
+        const marcarDelegadosPorFiltro = function (filter) {
+            if (!delegateList) {
+                return;
+            }
+
+            const checkboxes = Array.from(delegateList.querySelectorAll('input[type="checkbox"][name="delegate_ids[]"]'));
+            checkboxes.forEach(function (input) {
+                if (input.disabled) {
+                    return;
+                }
+
+                if (filter === 'clear') {
+                    input.checked = false;
+                    return;
+                }
+
+                if (filter === 'all') {
+                    input.checked = true;
+                    return;
+                }
+
+                const roleType = String(input.getAttribute('data-role-type') || '').toLowerCase();
+                input.checked = roleType === filter;
+            });
+
+            reordenarDelegados();
+        };
+
+        if (delegateFilters) {
+            delegateFilters.addEventListener('click', function (event) {
+                const button = event.target.closest('[data-delegate-filter]');
+                if (!button || button.disabled) {
+                    return;
+                }
+
+                const filter = String(button.getAttribute('data-delegate-filter') || '').toLowerCase();
+                if (!filter) {
+                    return;
+                }
+
+                marcarDelegadosPorFiltro(filter);
+                marcarFiltroActivo(filter);
+            });
+        }
+
+        if (delegateList) {
+            delegateList.addEventListener('change', function (event) {
+                const target = event.target;
+                if (!target || target.name !== 'delegate_ids[]') {
+                    return;
+                }
+
+                reordenarDelegados();
+            });
+        }
+
+        reordenarDelegados();
+
+        const actualizarModoIndefinido = function () {
+            if (!expiresAtInput || !isIndefiniteInput || !indefiniteButton) {
+                return;
+            }
+
+            const indefinidoActivo = isIndefiniteInput.value === '1';
+            expiresAtInput.disabled = indefinidoActivo;
+            expiresAtInput.required = !indefinidoActivo;
+            if (indefinidoActivo) {
+                expiresAtInput.value = '';
+            }
+
+            indefiniteButton.classList.toggle('is-active', indefinidoActivo);
+            indefiniteButton.setAttribute('aria-pressed', indefinidoActivo ? 'true' : 'false');
+        };
+
+        if (indefiniteButton && isIndefiniteInput) {
+            indefiniteButton.addEventListener('click', function () {
+                isIndefiniteInput.value = isIndefiniteInput.value === '1' ? '0' : '1';
+                actualizarModoIndefinido();
+            });
+        }
+
+        actualizarModoIndefinido();
 
         addRow();
         addRow();

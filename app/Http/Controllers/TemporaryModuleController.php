@@ -113,7 +113,8 @@ class TemporaryModuleController extends Controller
         $rules = [
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'expires_at' => ['required', 'date', 'after_or_equal:today'],
+            'expires_at' => ['nullable', 'date', 'after_or_equal:today'],
+            'is_indefinite' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'applies_to' => ['required', Rule::in(['all', 'selected'])],
             'delegate_ids' => ['nullable', 'array'],
@@ -131,6 +132,12 @@ class TemporaryModuleController extends Controller
         }
 
         $validated = $request->validate($rules);
+
+        if (!$this->isIndefiniteMode($validated) && empty($validated['expires_at'])) {
+            throw ValidationException::withMessages([
+                'expires_at' => 'Selecciona una fecha límite o activa la opción indefinido.',
+            ]);
+        }
 
         $selectedDelegateIds = collect($validated['delegate_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values()->all();
         if (($validated['applies_to'] ?? 'all') === 'selected' && empty($selectedDelegateIds)) {
@@ -154,7 +161,7 @@ class TemporaryModuleController extends Controller
                 'name' => $validated['name'],
                 'slug' => $slug,
                 'description' => $validated['description'] ?? null,
-                'expires_at' => Carbon::parse($validated['expires_at'])->endOfDay(),
+                'expires_at' => $this->resolveExpiresAt($validated),
                 'is_active' => (bool) ($validated['is_active'] ?? true),
                 'applies_to_all' => ($validated['applies_to'] ?? 'all') === 'all',
                 'created_by' => $request->user()->id,
@@ -179,7 +186,8 @@ class TemporaryModuleController extends Controller
         $rules = [
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'expires_at' => ['required', 'date', 'after_or_equal:today'],
+            'expires_at' => ['nullable', 'date', 'after_or_equal:today'],
+            'is_indefinite' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'applies_to' => ['required', Rule::in(['all', 'selected'])],
             'delegate_ids' => ['nullable', 'array'],
@@ -207,6 +215,12 @@ class TemporaryModuleController extends Controller
         }
 
         $validated = $request->validate($rules);
+
+        if (!$this->isIndefiniteMode($validated) && empty($validated['expires_at'])) {
+            throw ValidationException::withMessages([
+                'expires_at' => 'Selecciona una fecha límite o activa la opción indefinido.',
+            ]);
+        }
 
         $selectedDelegateIds = collect($validated['delegate_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values()->all();
         if (($validated['applies_to'] ?? 'all') === 'selected' && empty($selectedDelegateIds)) {
@@ -323,7 +337,7 @@ class TemporaryModuleController extends Controller
                 'name' => $validated['name'],
                 'slug' => $slug,
                 'description' => $validated['description'] ?? null,
-                'expires_at' => Carbon::parse($validated['expires_at'])->endOfDay(),
+                'expires_at' => $this->resolveExpiresAt($validated),
                 'is_active' => (bool) ($validated['is_active'] ?? true),
                 'applies_to_all' => ($validated['applies_to'] ?? 'all') === 'all',
             ]);
@@ -369,6 +383,25 @@ class TemporaryModuleController extends Controller
         return redirect()
             ->route('temporary-modules.admin.index')
             ->with('status', 'Módulo temporal actualizado correctamente.');
+    }
+
+    private function isIndefiniteMode(array $validated): bool
+    {
+        return (bool) ($validated['is_indefinite'] ?? false);
+    }
+
+    private function resolveExpiresAt(array $validated): ?Carbon
+    {
+        if ($this->isIndefiniteMode($validated)) {
+            return null;
+        }
+
+        $date = $validated['expires_at'] ?? null;
+        if (empty($date)) {
+            return null;
+        }
+
+        return Carbon::parse($date)->endOfDay();
     }
 
     public function delegateIndex(Request $request): View

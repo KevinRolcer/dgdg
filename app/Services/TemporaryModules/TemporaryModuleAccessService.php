@@ -116,6 +116,7 @@ class TemporaryModuleAccessService
                 'u.email',
                 'm.microrregion',
                 'm.cabecera',
+                DB::raw("SUBSTRING_INDEX(TRIM(u.name), ' ', 1) as first_name"),
                 DB::raw("'Delegado' as scope"),
             ])
             ->orderByRaw('CAST(m.microrregion AS UNSIGNED)')
@@ -123,18 +124,15 @@ class TemporaryModuleAccessService
             ->distinct()
             ->get();
 
-        $enlaces = DB::table('users as u')
-            ->join('model_has_roles as mhr', function ($join) {
-                $join->on('mhr.model_id', '=', 'u.id')
-                    ->whereIn('mhr.model_type', ['App\\Models\\User', 'App\\User']);
-            })
-            ->join('roles as r', 'r.id', '=', 'mhr.role_id')
-            ->leftJoin('user_microrregion as um', 'um.user_id', '=', 'u.id')
+        $enlaces = DB::table('user_microrregion as um')
+            ->join('users as u', 'u.id', '=', 'um.user_id')
             ->leftJoin('microrregiones as m', 'm.id', '=', 'um.microrregion_id')
-            ->where('r.name', 'Enlace')
             ->where('u.activo', 1)
-            ->where('u.area_id', 8)
-            ->where('u.cargo_id', 8)
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('delegados as d')
+                    ->whereColumn('d.user_id', 'u.id');
+            })
             ->groupBy('u.id', 'u.name', 'u.email')
             ->select([
                 'u.id',
@@ -142,14 +140,16 @@ class TemporaryModuleAccessService
                 'u.email',
                 DB::raw('NULL as microrregion'),
                 DB::raw("CONCAT('MR ', COALESCE(GROUP_CONCAT(DISTINCT LPAD(m.microrregion, 2, '0') ORDER BY CAST(m.microrregion AS UNSIGNED) SEPARATOR ', '), 'Sin asignación')) as cabecera"),
+                DB::raw("SUBSTRING_INDEX(TRIM(u.name), ' ', 1) as first_name"),
                 DB::raw("'Enlace' as scope"),
             ])
             ->orderBy('u.name')
             ->get();
 
-        return $delegados
-            ->merge($enlaces)
+        return $enlaces
+            ->merge($delegados)
             ->unique('id')
+            ->sortBy('name')
             ->values();
     }
 }

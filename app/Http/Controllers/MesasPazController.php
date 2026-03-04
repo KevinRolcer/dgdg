@@ -35,6 +35,7 @@ class MesasPazController extends Controller
         $viewData = array_merge($this->service->indexData((int) Auth::id()), [
             'pageTitle' => 'Mesas de Paz y Seguridad',
             'pageDescription' => 'Captura diaria de asistencias, acuerdos y evidencias.',
+            'hidePageHeader' => true,
         ]);
 
         return response()

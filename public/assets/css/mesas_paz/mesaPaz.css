@@ -43,6 +43,53 @@
     font-weight: 700;
 }
 
+#mesasPazApp .mesa-micro-pagination-wrap {
+    border: 1px solid var(--clr-border);
+    border-radius: var(--mesa-radius-md);
+    background: var(--clr-card);
+    padding: 10px 12px;
+    display: grid;
+    gap: 8px;
+}
+
+#mesasPazApp .mesa-micro-pagination-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--clr-text-light);
+}
+
+#mesasPazApp .mesa-micro-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+#mesasPazApp .mesa-micro-page {
+    min-height: 34px;
+    border: 1px solid var(--clr-border);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--clr-text-main);
+    text-decoration: none;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 6px 12px;
+    display: inline-flex;
+    align-items: center;
+}
+
+#mesasPazApp .mesa-micro-page:hover {
+    color: var(--clr-accent);
+    border-color: rgba(199, 155, 102, 0.7);
+    background: rgba(199, 155, 102, 0.08);
+}
+
+#mesasPazApp .mesa-micro-page.is-active {
+    border-color: rgba(199, 155, 102, 0.9);
+    background: rgba(199, 155, 102, 0.16);
+    color: var(--clr-accent);
+}
+
 #mesasPazApp .panel-body {
     padding: 14px;
     background: var(--clr-card);

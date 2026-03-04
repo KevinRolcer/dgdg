@@ -25,7 +25,28 @@
     data-evidencias-hoy='@json($evidenciasActuales ?? [])'
     data-max-evidencias-hoy="{{ $maxEvidenciasHoy ?? 3 }}"
     data-csrf-token="{{ csrf_token() }}"
+    data-selected-microrregion-id="{{ (int) ($microrregionSeleccionadaId ?? 0) }}"
 >
+    @if (!empty($esAnalistaEnlace) && isset($microrregionesAsignadas) && $microrregionesAsignadas->count() > 1)
+        <div class="col-12 mb-2">
+            <div class="mesa-micro-pagination-wrap">
+                <div class="mesa-micro-pagination-title">Microrregiones</div>
+                <div class="mesa-micro-pagination" role="tablist" aria-label="Selector de microrregión">
+                    @foreach ($microrregionesAsignadas as $micro)
+                        <a
+                            href="{{ request()->fullUrlWithQuery(['microrregion_id' => $micro->id]) }}"
+                            class="mesa-micro-page @if((int) ($microrregionSeleccionadaId ?? 0) === (int) $micro->id) is-active @endif"
+                            role="tab"
+                            aria-selected="@if((int) ($microrregionSeleccionadaId ?? 0) === (int) $micro->id) true @else false @endif"
+                        >
+                            MR {{ str_pad((string) $micro->microrregion, 2, '0', STR_PAD_LEFT) }} — {{ $micro->cabecera }}
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    @endif
+
     <div class="col-lg-7 order-1 order-lg-1">
         <div class="panel panel-inverse inline-asistencia">
             <div class="panel-heading">
@@ -76,20 +97,6 @@
                 <div id="specialModeMunicipiosMsg" class="alert alert-warning mb-3 d-none">
                     Anexa parte/observaciones y presiona Guardar Parte y Acuerdos para aplicar los cambios a todas las respuestas.
                 </div>
-
-                @if (!empty($esAnalistaEnlace) && isset($microrregionesAsignadas) && $microrregionesAsignadas->count() > 1)
-                    <div class="mesa-micro-filter mb-3">
-                        <label for="microrregionSelectorMesas" class="form-label fw-bold mb-1">Microrregión de trabajo</label>
-                        <select id="microrregionSelectorMesas" class="form-select">
-                            @foreach ($microrregionesAsignadas as $micro)
-                                <option value="{{ $micro->id }}" @selected((int) ($microrregionSeleccionadaId ?? 0) === (int) $micro->id)>
-                                    MR {{ str_pad((string) $micro->microrregion, 2, '0', STR_PAD_LEFT) }} — {{ $micro->cabecera }}
-                                </option>
-                            @endforeach
-                        </select>
-                        <small class="text-muted">Se muestran solo municipios de la microrregión seleccionada.</small>
-                    </div>
-                @endif
 
                 @if ($municipios->isEmpty())
                     <div class="alert alert-warning mb-3" id="municipiosCapturaSection">No hay municipios asignados.</div>
@@ -237,20 +244,6 @@
                             Cargar evidencia
                         </button>
                     </div>
-
-                    @if (!empty($esAnalistaEnlace) && isset($microrregionesAsignadas) && $microrregionesAsignadas->count() > 1)
-                        <div class="mb-3">
-                            <label for="evidenciaMicrorregionSelector" class="form-label fw-bold mb-1">Microrregión para evidencias</label>
-                            <select id="evidenciaMicrorregionSelector" class="form-select">
-                                @foreach ($microrregionesAsignadas as $micro)
-                                    <option value="{{ $micro->id }}" @selected((int) ($microrregionSeleccionadaId ?? 0) === (int) $micro->id)>
-                                        MR {{ str_pad((string) $micro->microrregion, 2, '0', STR_PAD_LEFT) }} — {{ $micro->cabecera }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <small class="text-muted">La evidencia se guarda en la microrregión seleccionada.</small>
-                        </div>
-                    @endif
 
                     <input type="file" id="inputEvidenciaHoy" class="d-none" accept="image/jpeg,image/png,image/webp" multiple>
                     @if(!empty($canEditarEvidenciaHoy))
