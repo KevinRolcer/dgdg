@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             UsuariosSeeder::class,
             DelegadosSeeder::class,
             SupervisorMesasPazSeeder::class,
+            EnlacesSeeder::class,
             AdminTestUserSeeder::class,
         ]);
     }

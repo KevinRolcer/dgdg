@@ -64,7 +64,18 @@
                             @foreach ($delegates as $delegate)
                                 <label class="tm-delegate-item">
                                     <input type="checkbox" name="delegate_ids[]" value="{{ $delegate->id }}" @checked(in_array($delegate->id, old('delegate_ids', []), true))>
-                                    <span>{{ $delegate->name }} <small>{{ $delegate->email }}</small></span>
+                                    <span>
+                                        {{ $delegate->name }}
+                                        <small>
+                                            {{ $delegate->scope ?? 'Usuario' }} ·
+                                            @if(!empty($delegate->microrregion))
+                                                MR {{ str_pad((string) $delegate->microrregion, 2, '0', STR_PAD_LEFT) }} - {{ $delegate->cabecera }}
+                                            @else
+                                                {{ $delegate->cabecera }}
+                                            @endif
+                                            · {{ $delegate->email }}
+                                        </small>
+                                    </span>
                                 </label>
                             @endforeach
                         </div>

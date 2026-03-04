@@ -52,7 +52,11 @@ class MesasPazController extends Controller
         abort_unless($this->canAccessMesasPazRegistro(), 403);
 
         try {
-            $response = $this->service->guardarEvidenciaHoy((int) Auth::id(), $request->file('evidencia'));
+            $selectedMicrorregionId = $request->filled('microrregion_id')
+                ? (int) $request->input('microrregion_id')
+                : null;
+
+            $response = $this->service->guardarEvidenciaHoy((int) Auth::id(), $request->file('evidencia'), $selectedMicrorregionId);
             return response()->json($response);
         } catch (MesasPazServiceException $e) {
             $payload = $e->payload();
@@ -72,7 +76,11 @@ class MesasPazController extends Controller
         abort_unless($this->canAccessMesasPazRegistro(), 403);
 
         try {
-            $response = $this->service->eliminarEvidenciaHoy((int) Auth::id(), (string) $request->input('evidencia_path'));
+            $selectedMicrorregionId = $request->filled('microrregion_id')
+                ? (int) $request->input('microrregion_id')
+                : null;
+
+            $response = $this->service->eliminarEvidenciaHoy((int) Auth::id(), (string) $request->input('evidencia_path'), $selectedMicrorregionId);
             return response()->json($response);
         } catch (MesasPazServiceException $e) {
             $payload = $e->payload();
@@ -161,6 +169,12 @@ class MesasPazController extends Controller
         $user = Auth::user();
         if (!$user || !$user->can('Mesas-Paz')) {
             return false;
+        }
+
+        if ($user->hasRole('Enlace')) {
+            return DB::table('user_microrregion')
+                ->where('user_id', (int) $user->id)
+                ->exists();
         }
 
         return DB::table('delegados')

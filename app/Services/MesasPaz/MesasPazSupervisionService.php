@@ -22,12 +22,16 @@ class MesasPazSupervisionService
             return true;
         }
 
+        if ($usuario->hasRole('Enlace')) {
+            return true;
+        }
+
         return $usuario->can('Tableros')
             || $usuario->can('Tableros-incidencias')
             || $usuario->can('Tablero Incidencias');
     }
 
-    public function construirVistaEvidencias(Request $request): array
+    public function construirVistaEvidencias(Request $request, $usuario = null): array
     {
         $fechaLista = trim((string) $request->query('fecha_lista', Carbon::today()->toDateString()));
         $fechaAnalisis = trim((string) $request->query('fecha_analisis', Carbon::today()->toDateString()));
@@ -130,6 +134,21 @@ class MesasPazSupervisionService
                 ];
             })
             ->values();
+
+        $allowedMicroregionIds = $this->allowedMicrorregionIdsForUser($usuario);
+        if (!empty($allowedMicroregionIds)) {
+            $registrosLista = $registrosLista
+                ->filter(fn ($registro) => in_array((int) $registro->microrregion_id, $allowedMicroregionIds, true))
+                ->values();
+
+            $registrosAnalisisBase = $registrosAnalisisBase
+                ->filter(fn ($registro) => in_array((int) $registro->microrregion_id, $allowedMicroregionIds, true))
+                ->values();
+
+            $microrregionesDisponibles = $microrregionesDisponibles
+                ->filter(fn ($item) => in_array((int) ($item['id'] ?? 0), $allowedMicroregionIds, true))
+                ->values();
+        }
 
         $aplicaFiltroMicrorregionAnalisis = function ($registro) use ($analisisMicrorregionIdInt) {
             if (!empty($analisisMicrorregionIdInt) && (int) $registro->microrregion_id !== (int) $analisisMicrorregionIdInt) {
@@ -606,6 +625,19 @@ class MesasPazSupervisionService
                 'opcionesAsiste' => $opcionesAsiste,
             ],
         ];
+    }
+
+    private function allowedMicrorregionIdsForUser($usuario): array
+    {
+        if (!$usuario || !$usuario->hasRole('Enlace')) {
+            return [];
+        }
+
+        return $usuario->microrregionesAsignadas()
+            ->pluck('microrregiones.id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
     }
 
     private function toLocalPublicUrl(string $pathOrUrl): string

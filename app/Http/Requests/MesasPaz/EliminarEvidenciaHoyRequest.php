@@ -8,6 +8,7 @@ class EliminarEvidenciaHoyRequest extends MesasPazFormRequest
     {
         return [
             'evidencia_path' => ['required', 'string', 'max:1000'],
+            'microrregion_id' => ['nullable', 'integer'],
         ];
     }
 }

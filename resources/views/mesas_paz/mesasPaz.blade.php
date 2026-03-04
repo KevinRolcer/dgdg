@@ -77,6 +77,20 @@
                     Anexa parte/observaciones y presiona Guardar Parte y Acuerdos para aplicar los cambios a todas las respuestas.
                 </div>
 
+                @if (!empty($esAnalistaEnlace) && isset($microrregionesAsignadas) && $microrregionesAsignadas->count() > 1)
+                    <div class="mesa-micro-filter mb-3">
+                        <label for="microrregionSelectorMesas" class="form-label fw-bold mb-1">Microrregión de trabajo</label>
+                        <select id="microrregionSelectorMesas" class="form-select">
+                            @foreach ($microrregionesAsignadas as $micro)
+                                <option value="{{ $micro->id }}" @selected((int) ($microrregionSeleccionadaId ?? 0) === (int) $micro->id)>
+                                    MR {{ str_pad((string) $micro->microrregion, 2, '0', STR_PAD_LEFT) }} — {{ $micro->cabecera }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <small class="text-muted">Se muestran solo municipios de la microrregión seleccionada.</small>
+                    </div>
+                @endif
+
                 @if ($municipios->isEmpty())
                     <div class="alert alert-warning mb-3" id="municipiosCapturaSection">No hay municipios asignados.</div>
                 @else
@@ -89,6 +103,7 @@
                                 class="card mb-3 municipio-card municipio-card-separador"
                                 data-registrado="{{ $registroMunicipio ? 1 : 0 }}"
                                 data-municipio-id="{{ $municipio->id }}"
+                                data-microrregion-id="{{ $municipio->microrregion_id }}"
                             >
                                 <div class="card-header py-2" id="municipioHeading{{ $municipio->id }}">
                                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -222,6 +237,21 @@
                             Cargar evidencia
                         </button>
                     </div>
+
+                    @if (!empty($esAnalistaEnlace) && isset($microrregionesAsignadas) && $microrregionesAsignadas->count() > 1)
+                        <div class="mb-3">
+                            <label for="evidenciaMicrorregionSelector" class="form-label fw-bold mb-1">Microrregión para evidencias</label>
+                            <select id="evidenciaMicrorregionSelector" class="form-select">
+                                @foreach ($microrregionesAsignadas as $micro)
+                                    <option value="{{ $micro->id }}" @selected((int) ($microrregionSeleccionadaId ?? 0) === (int) $micro->id)>
+                                        MR {{ str_pad((string) $micro->microrregion, 2, '0', STR_PAD_LEFT) }} — {{ $micro->cabecera }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <small class="text-muted">La evidencia se guarda en la microrregión seleccionada.</small>
+                        </div>
+                    @endif
+
                     <input type="file" id="inputEvidenciaHoy" class="d-none" accept="image/jpeg,image/png,image/webp" multiple>
                     @if(!empty($canEditarEvidenciaHoy))
                         <small class="text-muted d-block mb-2">Puedes cargar hasta 3 imágenes en la sesión del día actual.</small>
@@ -339,3 +369,25 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const selector = document.getElementById('microrregionSelectorMesas');
+        if (!selector) {
+            return;
+        }
+
+        selector.addEventListener('change', function () {
+            const value = String(selector.value || '').trim();
+            if (!value) {
+                return;
+            }
+
+            const url = new URL(window.location.href);
+            url.searchParams.set('microrregion_id', value);
+            window.location.href = url.toString();
+        });
+    });
+</script>
+@endpush

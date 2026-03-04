@@ -93,36 +93,68 @@
             <section class="profile-info-grid profile-info-grid-single">
                 <article class="profile-info-card profile-info-card-micro">
                     <div class="profile-section-head">
-                        <h3>Microrregión y municipios</h3>
+                        <h3>Microrregiones y municipios</h3>
                         <button type="button" class="profile-open-password-modal" data-open-password-modal>
                             Cambiar contraseña
                         </button>
                     </div>
-                    <div class="profile-quick-grid">
-                        <div class="profile-quick-item profile-quick-item-compact">
-                            <span>Número</span>
-                            <strong>{{ $microrregion->microrregion ?? 'N/D' }}</strong>
-                        </div>
-                        <div class="profile-quick-item profile-quick-item-compact profile-quick-item-wide">
-                            <span>Microrregión</span>
-                            <strong>{{ $microrregion->cabecera ?? 'No asignada' }}</strong>
-                        </div>
-                        <div class="profile-quick-item profile-quick-item-compact">
-                            <span>Municipios</span>
-                            <strong>{{ $municipios->count() }}</strong>
-                        </div>
-                    </div>
 
-                    <ul class="profile-municipios-list">
-                        @forelse ($municipios as $municipio)
-                            <li>
-                                <span class="profile-municipio-dot" aria-hidden="true"></span>
-                                <span>{{ $municipio }}</span>
-                            </li>
-                        @empty
-                            <li>Sin municipios registrados para esta microrregión.</li>
-                        @endforelse
-                    </ul>
+                    @php
+                        $micros = ($microrregionesAsignadas ?? collect())->values();
+                        if ($micros->isEmpty() && $microrregion) {
+                            $micros = collect([
+                                (object) [
+                                    'id' => (int) $microrregion->id,
+                                    'microrregion' => str_pad((string) ($microrregion->microrregion ?? ''), 2, '0', STR_PAD_LEFT),
+                                    'cabecera' => (string) ($microrregion->cabecera ?? ''),
+                                    'municipios' => ($municipios ?? collect())->values()->all(),
+                                ],
+                            ]);
+                        }
+                    @endphp
+
+                    @if ($micros->isNotEmpty())
+                        <div class="profile-micro-chips" role="tablist" aria-label="Microrregiones asignadas">
+                            @foreach ($micros as $micro)
+                                @php $microMunicipios = collect($micro->municipios ?? []); @endphp
+                                <button
+                                    type="button"
+                                    class="profile-micro-chip @if($loop->first) is-active @endif"
+                                    data-profile-micro-chip
+                                    data-target="profileMicroPane{{ $loop->index }}"
+                                    role="tab"
+                                    aria-selected="{{ $loop->first ? 'true' : 'false' }}"
+                                >
+                                    <span class="profile-micro-chip-text">MR {{ $micro->microrregion }} · {{ $micro->cabecera ?: 'Sin cabecera' }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+
+                        <div class="profile-micro-panes">
+                            @foreach ($micros as $micro)
+                                @php $microMunicipios = collect($micro->municipios ?? []); @endphp
+                                <section
+                                    id="profileMicroPane{{ $loop->index }}"
+                                    class="profile-micro-pane @if($loop->first) is-active @endif"
+                                    data-profile-micro-pane
+                                    role="tabpanel"
+                                >
+                                    <ul class="profile-municipios-list profile-municipios-list-fit">
+                                        @forelse ($microMunicipios as $municipio)
+                                            <li>
+                                                <span class="profile-municipio-dot" aria-hidden="true"></span>
+                                                <span>{{ $municipio }}</span>
+                                            </li>
+                                        @empty
+                                            <li>Sin municipios registrados para esta microrregión.</li>
+                                        @endforelse
+                                    </ul>
+                                </section>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="text-muted">Sin microrregiones asignadas.</div>
+                    @endif
                 </article>
             </section>
         </article>
@@ -156,3 +188,48 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const chipsWrap = document.querySelector('.profile-micro-chips');
+        const chips = Array.from(document.querySelectorAll('[data-profile-micro-chip]'));
+        const panes = Array.from(document.querySelectorAll('[data-profile-micro-pane]'));
+
+        if (!chips.length || !panes.length) {
+            return;
+        }
+
+        const activate = function (targetId) {
+            chips.forEach(function (chip) {
+                const isActive = chip.getAttribute('data-target') === targetId;
+                chip.classList.toggle('is-active', isActive);
+                chip.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+
+            panes.forEach(function (pane) {
+                pane.classList.toggle('is-active', pane.id === targetId);
+            });
+        };
+
+        const chipActivoInicial = chips.find(function (chip) {
+            return chip.classList.contains('is-active');
+        }) || chips[0];
+
+        if (chipActivoInicial) {
+            activate(chipActivoInicial.getAttribute('data-target'));
+        }
+
+        if (chipsWrap) {
+            chipsWrap.addEventListener('click', function (event) {
+                const chip = event.target.closest('[data-profile-micro-chip]');
+                if (!chip) {
+                    return;
+                }
+                event.preventDefault();
+                activate(chip.getAttribute('data-target'));
+            });
+        }
+    });
+</script>
+@endpush

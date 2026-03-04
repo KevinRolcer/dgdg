@@ -21,30 +21,60 @@ class MesasPazService
     {
         $fechaHoy = Carbon::now()->locale('es');
         $delegado = $this->delegadoPorUsuario($userId);
+        $selectedMicrorregionId = request()->filled('microrregion_id')
+            ? (int) request()->input('microrregion_id')
+            : null;
 
-        $microrregionNombre = optional($delegado?->microrregion)->cabecera
-            ?? optional($delegado?->microrregion)->microrregion
-            ?? 'Sin microrregión asignada';
-        $microrregionNumero = $delegado?->microrregion_id ?? null;
+        $microrregionIds = $this->microrregionesPermitidasPorUsuario($userId, $delegado);
+        $microrregionesAsignadas = collect();
+        if (!empty($microrregionIds)) {
+            $microrregionesAsignadas = DB::table('microrregiones')
+                ->whereIn('id', $microrregionIds)
+                ->select(['id', 'microrregion', 'cabecera'])
+                ->orderByRaw('CAST(microrregion AS UNSIGNED)')
+                ->get();
+        }
+
+        $microrregionIdsFiltradas = $microrregionIds;
+        if ($selectedMicrorregionId !== null && in_array($selectedMicrorregionId, $microrregionIds, true)) {
+            $microrregionIdsFiltradas = [$selectedMicrorregionId];
+        }
 
         $municipios = collect();
-        if ($delegado && $delegado->microrregion && $delegado->microrregion_id) {
-            $municipios = $delegado->microrregion->municipios()
-                ->select(['id', 'municipio', 'cve_inegi', 'region', 'dl', 'padron'])
-                ->where('microrregion_id', $delegado->microrregion_id)
+        if (!empty($microrregionIdsFiltradas)) {
+            $municipios = DB::table('municipios')
+                ->select(['id', 'municipio', 'cve_inegi', 'region', 'dl', 'padron', 'microrregion_id'])
+                ->whereIn('microrregion_id', $microrregionIdsFiltradas)
                 ->orderBy('municipio')
-                ->limit(100)
+                ->limit(500)
                 ->get();
+        }
+
+        $microrregionNumero = null;
+        $microrregionNombre = 'Sin microrregión asignada';
+        if (count($microrregionIdsFiltradas) === 1) {
+            $microrregionNumero = $microrregionIdsFiltradas[0];
+            $micro = DB::table('microrregiones')->where('id', $microrregionNumero)->first();
+            $microrregionNombre = $micro->cabecera
+                ?? $micro->microrregion
+                ?? 'Sin microrregión asignada';
+        } elseif (count($microrregionIds) > 1) {
+            $microrregionNombre = 'Múltiples microrregiones asignadas ('.count($microrregionIds).')';
         }
 
         $fechaHoyIso = Carbon::today()->toDateString();
         $historialFecha = $fechaHoyIso;
 
-        $registrosHoy = MesaPazAsistencia::with('municipio:id,municipio')
+        $registrosHoyQuery = MesaPazAsistencia::with('municipio:id,municipio')
             ->where('user_id', $userId)
             ->whereDate('fecha_asist', $fechaHoyIso)
-            ->orderBy('municipio_id')
-            ->get();
+            ->orderBy('municipio_id');
+
+        if (!empty($microrregionIdsFiltradas)) {
+            $registrosHoyQuery->whereIn('microrregion_id', $microrregionIdsFiltradas);
+        }
+
+        $registrosHoy = $registrosHoyQuery->get();
 
         $registrosHoyByMunicipio = $registrosHoy->keyBy('municipio_id');
         $modalidadActual = optional($registrosHoy->first())->modalidad;
@@ -77,6 +107,9 @@ class MesasPazService
             'fechaActual' => 'Hoy, '.$fechaHoy->format('d').' de '.ucfirst($fechaHoy->translatedFormat('F')).' de '.$fechaHoy->format('Y'),
             'microrregionNumero' => $microrregionNumero,
             'microrregionNombre' => $microrregionNombre,
+            'microrregionSeleccionadaId' => $microrregionNumero,
+            'microrregionesAsignadas' => $microrregionesAsignadas,
+            'esAnalistaEnlace' => count($microrregionIds) > 1,
             'municipios' => $municipios,
             'historialAgrupado' => $historialAgrupado,
             'historialFecha' => $historialFecha,
@@ -94,12 +127,18 @@ class MesasPazService
         ];
     }
 
-    public function guardarEvidenciaHoy(int $userId, UploadedFile $archivo): array
+    public function guardarEvidenciaHoy(int $userId, UploadedFile $archivo, ?int $selectedMicrorregionId = null): array
     {
         $fechaAsistencia = Carbon::today()->toDateString();
-        $registrosHoy = MesaPazAsistencia::where('user_id', $userId)
-            ->whereDate('fecha_asist', $fechaAsistencia)
-            ->get();
+        $registrosHoyQuery = MesaPazAsistencia::where('user_id', $userId)
+            ->whereDate('fecha_asist', $fechaAsistencia);
+
+        $microrregionId = $this->resolveMicrorregionIdParaEvidencia($userId, $selectedMicrorregionId);
+        if ($microrregionId !== null) {
+            $registrosHoyQuery->where('microrregion_id', $microrregionId);
+        }
+
+        $registrosHoy = $registrosHoyQuery->get();
 
         if ($registrosHoy->isEmpty()) {
             throw new MesasPazServiceException('Primero registra al menos un municipio hoy para adjuntar evidencia.', 422);
@@ -136,6 +175,9 @@ class MesasPazService
 
             MesaPazAsistencia::where('user_id', $userId)
                 ->whereDate('fecha_asist', $fechaAsistencia)
+                ->when($microrregionId !== null, function ($query) use ($microrregionId) {
+                    $query->where('microrregion_id', $microrregionId);
+                })
                 ->update([
                     'evidencia' => $this->encodeEvidencePaths($evidenciasNuevas),
                 ]);
@@ -163,18 +205,25 @@ class MesasPazService
             'success' => true,
             'message' => 'Evidencia guardada correctamente para la sesión de hoy.',
             'fecha_asist' => $fechaAsistencia,
+            'microrregion_id' => $microrregionId,
             'evidencia_url' => $evidencias[0]['url'] ?? null,
             'evidencias' => $evidencias,
             'max_evidencias' => self::MAX_EVIDENCIAS,
         ];
     }
 
-    public function eliminarEvidenciaHoy(int $userId, string $evidenciaPathOrUrl): array
+    public function eliminarEvidenciaHoy(int $userId, string $evidenciaPathOrUrl, ?int $selectedMicrorregionId = null): array
     {
         $fechaAsistencia = Carbon::today()->toDateString();
-        $registrosHoy = MesaPazAsistencia::where('user_id', $userId)
-            ->whereDate('fecha_asist', $fechaAsistencia)
-            ->get();
+        $registrosHoyQuery = MesaPazAsistencia::where('user_id', $userId)
+            ->whereDate('fecha_asist', $fechaAsistencia);
+
+        $microrregionId = $this->resolveMicrorregionIdParaEvidencia($userId, $selectedMicrorregionId);
+        if ($microrregionId !== null) {
+            $registrosHoyQuery->where('microrregion_id', $microrregionId);
+        }
+
+        $registrosHoy = $registrosHoyQuery->get();
 
         if ($registrosHoy->isEmpty()) {
             throw new MesasPazServiceException('No hay sesión registrada hoy para eliminar evidencia.', 422);
@@ -202,6 +251,9 @@ class MesasPazService
         try {
             MesaPazAsistencia::where('user_id', $userId)
                 ->whereDate('fecha_asist', $fechaAsistencia)
+                ->when($microrregionId !== null, function ($query) use ($microrregionId) {
+                    $query->where('microrregion_id', $microrregionId);
+                })
                 ->update([
                     'evidencia' => $this->encodeEvidencePaths($evidenciasNuevas),
                 ]);
@@ -237,16 +289,45 @@ class MesasPazService
             'success' => true,
             'message' => 'Evidencia eliminada correctamente.',
             'fecha_asist' => $fechaAsistencia,
+            'microrregion_id' => $microrregionId,
             'evidencias' => $evidencias,
             'max_evidencias' => self::MAX_EVIDENCIAS,
         ];
     }
 
+    private function resolveMicrorregionIdParaEvidencia(int $userId, ?int $selectedMicrorregionId): ?int
+    {
+        $microrregionIds = $this->microrregionesPermitidasPorUsuario($userId);
+        if (empty($microrregionIds)) {
+            return null;
+        }
+
+        if ($selectedMicrorregionId !== null) {
+            if (!in_array($selectedMicrorregionId, $microrregionIds, true)) {
+                throw new MesasPazServiceException('La microrregión seleccionada no está dentro de tus asignaciones.', 422);
+            }
+
+            return $selectedMicrorregionId;
+        }
+
+        return count($microrregionIds) === 1 ? (int) $microrregionIds[0] : null;
+    }
+
     public function guardarMunicipio(int $userId, array $data): array
     {
         $delegado = $this->delegadoPorUsuario($userId);
-        if (!$delegado || !$delegado->microrregion_id || !$delegado->microrregion) {
+        $microrregionIds = $this->microrregionesPermitidasPorUsuario($userId, $delegado);
+        if (empty($microrregionIds)) {
             throw new MesasPazServiceException('No cuentas con una microrregión válida para registrar asistencias.', 422);
+        }
+
+        $municipio = Municipio::query()
+            ->select(['id', 'microrregion_id'])
+            ->where('id', (int) $data['municipio_id'])
+            ->first();
+
+        if (!$municipio || !in_array((int) $municipio->microrregion_id, $microrregionIds, true)) {
+            throw new MesasPazServiceException('El municipio seleccionado no pertenece a tus microrregiones asignadas.', 422);
         }
 
         $fechaAsistencia = Carbon::today()->toDateString();
@@ -274,8 +355,8 @@ class MesasPazService
 
             $payloadCrear = [
                 'user_id' => $userId,
-                'delegado_id' => $delegado->id,
-                'microrregion_id' => $delegado->microrregion_id,
+                'delegado_id' => $delegado?->id,
+                'microrregion_id' => (int) $municipio->microrregion_id,
                 'municipio_id' => (int) $data['municipio_id'],
                 'fecha_asist' => $fechaAsistencia,
                 'presidente' => $presidente,
@@ -374,16 +455,25 @@ class MesasPazService
 
         if ($override !== null) {
             $delegado = $this->delegadoPorUsuario($userId);
-            if (!$delegado || !$delegado->microrregion_id || !$delegado->microrregion) {
+            $microrregionIds = $this->microrregionesPermitidasPorUsuario($userId, $delegado);
+            if (empty($microrregionIds)) {
                 throw new MesasPazServiceException('No cuentas con una microrregión válida para registrar asistencias.', 422);
             }
 
-            $municipioIds = $this->municipiosPermitidosPorDelegado($delegado);
+            $municipioIds = $this->municipiosPermitidosPorUsuario($userId, $delegado);
             if (empty($municipioIds)) {
                 throw new MesasPazServiceException('No hay municipios asignados para aplicar esta modalidad.', 422);
             }
 
-            DB::transaction(function () use ($municipioIds, $delegado, $userId, $fechaAsistencia, $data, $override, $usarParte, $parteObservacion, $acuerdoObservacion) {
+            $municipioToMicro = Municipio::query()
+                ->whereIn('id', $municipioIds)
+                ->pluck('microrregion_id', 'id')
+                ->mapWithKeys(function ($microId, $municipioId) {
+                    return [(int) $municipioId => (int) $microId];
+                })
+                ->all();
+
+            DB::transaction(function () use ($municipioIds, $municipioToMicro, $delegado, $userId, $fechaAsistencia, $data, $override, $usarParte, $parteObservacion, $acuerdoObservacion) {
                 foreach ($municipioIds as $municipioId) {
                     $registro = MesaPazAsistencia::where('user_id', $userId)
                         ->where('municipio_id', (int) $municipioId)
@@ -405,8 +495,8 @@ class MesasPazService
 
                     $payloadCrear = [
                         'user_id' => $userId,
-                        'delegado_id' => $delegado->id,
-                        'microrregion_id' => $delegado->microrregion_id,
+                        'delegado_id' => $delegado?->id,
+                        'microrregion_id' => (int) ($municipioToMicro[(int) $municipioId] ?? 0),
                         'municipio_id' => (int) $municipioId,
                         'fecha_asist' => $fechaAsistencia,
                         'presidente' => $override['presidente'],
@@ -505,7 +595,8 @@ class MesasPazService
     public function storeAsistencias(int $userId, array $data): array
     {
         $delegado = $this->delegadoPorUsuario($userId);
-        if (!$delegado || !$delegado->microrregion_id || !$delegado->microrregion) {
+        $microrregionIds = $this->microrregionesPermitidasPorUsuario($userId, $delegado);
+        if (empty($microrregionIds)) {
             throw new MesasPazServiceException('No cuentas con una microrregión válida para registrar asistencias.', 422);
         }
 
@@ -526,6 +617,21 @@ class MesasPazService
         $municipioIds = collect($registros)->pluck('municipio_id')->map(function ($id) {
             return (int) $id;
         })->values()->all();
+
+        $municipioToMicro = Municipio::query()
+            ->whereIn('id', $municipioIds)
+            ->pluck('microrregion_id', 'id')
+            ->mapWithKeys(function ($microId, $municipioId) {
+                return [(int) $municipioId => (int) $microId];
+            })
+            ->all();
+
+        foreach ($municipioIds as $municipioId) {
+            $microId = (int) ($municipioToMicro[$municipioId] ?? 0);
+            if ($microId <= 0 || !in_array($microId, $microrregionIds, true)) {
+                throw new MesasPazServiceException('Hay municipios fuera de tus microrregiones asignadas. Verifica la selección.', 422);
+            }
+        }
 
         $municipiosYaRegistrados = MesaPazAsistencia::whereDate('fecha_asist', $fechaAsistencia)
             ->whereIn('municipio_id', $municipioIds)
@@ -551,7 +657,7 @@ class MesasPazService
         }
 
         try {
-            DB::transaction(function () use ($registros, $data, $delegado, $userId, $fechaAsistencia, $usarParte, $parteObservacion, $acuerdoObservacion) {
+            DB::transaction(function () use ($registros, $municipioToMicro, $data, $delegado, $userId, $fechaAsistencia, $usarParte, $parteObservacion, $acuerdoObservacion) {
                 $override = $this->resolverReglaEspecialPorModalidad((string) ($data['modalidad'] ?? ''));
                 $delegadoAsistioGlobal = (string) ($data['delegado_asistio'] ?? '');
 
@@ -570,8 +676,8 @@ class MesasPazService
 
                     $payloadCrear = [
                         'user_id' => $userId,
-                        'delegado_id' => $delegado->id,
-                        'microrregion_id' => $delegado->microrregion_id,
+                        'delegado_id' => $delegado?->id,
+                        'microrregion_id' => (int) ($municipioToMicro[(int) $registro['municipio_id']] ?? 0),
                         'municipio_id' => (int) $registro['municipio_id'],
                         'fecha_asist' => $fechaAsistencia,
                         'presidente' => $presidente,
@@ -615,15 +721,36 @@ class MesasPazService
             ->first();
     }
 
-    private function municipiosPermitidosPorDelegado(Delegado $delegado): array
+    private function microrregionesPermitidasPorUsuario(int $userId, ?Delegado $delegado = null): array
     {
-        if (!$delegado->microrregion_id || !$delegado->microrregion) {
+        if ($delegado && $delegado->microrregion_id && $delegado->microrregion) {
+            return [(int) $delegado->microrregion_id];
+        }
+
+        return DB::table('user_microrregion')
+            ->where('user_id', $userId)
+            ->pluck('microrregion_id')
+            ->map(function ($id) {
+                return (int) $id;
+            })
+            ->filter(function ($id) {
+                return $id > 0;
+            })
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function municipiosPermitidosPorUsuario(int $userId, ?Delegado $delegado = null): array
+    {
+        $microrregionIds = $this->microrregionesPermitidasPorUsuario($userId, $delegado);
+        if (empty($microrregionIds)) {
             return [];
         }
 
-        return $delegado->microrregion->municipios()
-            ->where('microrregion_id', $delegado->microrregion_id)
-            ->pluck('municipios.id')
+        return DB::table('municipios')
+            ->whereIn('microrregion_id', $microrregionIds)
+            ->pluck('id')
             ->map(function ($id) {
                 return (int) $id;
             })

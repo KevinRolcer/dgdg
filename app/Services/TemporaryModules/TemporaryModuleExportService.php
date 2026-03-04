@@ -48,14 +48,19 @@ class TemporaryModuleExportService
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
 
-        $microrregionNames = DB::table('microrregiones')
+        $microrregionMeta = DB::table('microrregiones')
             ->select(['id', 'cabecera', 'microrregion'])
             ->whereIn('id', $temporaryModule->entries->pluck('microrregion_id')->filter()->unique()->values())
             ->get()
             ->mapWithKeys(function ($row) {
-                $label = trim((string) ($row->cabecera ?: $row->microrregion ?: ''));
+                $number = trim((string) ($row->microrregion ?? ''));
+                $name = trim((string) ($row->cabecera ?? ''));
 
-                return [(int) $row->id => $label !== '' ? $label : 'Sin microrregión'];
+                return [(int) $row->id => [
+                    'number' => $number,
+                    'name' => $name,
+                    'label' => $this->buildMicrorregionLabel($number, $name),
+                ]];
             });
 
         if ($mode === 'mr') {
@@ -67,23 +72,28 @@ class TemporaryModuleExportService
 
             if ($groups->isEmpty()) {
                 $sheet->setTitle('Registros');
-                $this->fillSheet($sheet, $temporaryModule, collect(), $microrregionNames);
+                $this->fillSheet($sheet, $temporaryModule, collect(), $microrregionMeta);
             } else {
                 $usedTitles = [];
                 $sheetIndex = 0;
 
                 foreach ($groups as $microrregionId => $entries) {
                     $targetSheet = $sheetIndex === 0 ? $sheet : $spreadsheet->createSheet();
-                    $baseTitle = $this->sheetTitleForMicrorregion((int) $microrregionId, (string) ($microrregionNames[(int) $microrregionId] ?? 'Sin microrregión'));
+                    $meta = $microrregionMeta[(int) $microrregionId] ?? null;
+                    $baseTitle = $this->sheetTitleForMicrorregion(
+                        (int) $microrregionId,
+                        (string) ($meta['number'] ?? ''),
+                        (string) ($meta['name'] ?? '')
+                    );
                     $targetSheet->setTitle($this->uniqueSheetTitle($baseTitle, $usedTitles));
 
-                    $this->fillSheet($targetSheet, $temporaryModule, $entries, $microrregionNames);
+                    $this->fillSheet($targetSheet, $temporaryModule, $entries, $microrregionMeta);
                     $sheetIndex++;
                 }
             }
         } else {
             $sheet->setTitle('Registros');
-            $this->fillSheet($sheet, $temporaryModule, $temporaryModule->entries, $microrregionNames);
+            $this->fillSheet($sheet, $temporaryModule, $temporaryModule->entries, $microrregionMeta);
         }
 
         $writer = new Xlsx($spreadsheet);
@@ -97,7 +107,7 @@ class TemporaryModuleExportService
         ])->deleteFileAfterSend(true);
     }
 
-    private function fillSheet(Worksheet $sheet, TemporaryModule $temporaryModule, Collection $entries, Collection $microrregionNames): void
+    private function fillSheet(Worksheet $sheet, TemporaryModule $temporaryModule, Collection $entries, Collection $microrregionMeta): void
     {
         $headers = ['Ítem', 'Microrregión'];
         foreach ($temporaryModule->fields as $field) {
@@ -124,7 +134,7 @@ class TemporaryModuleExportService
             $itemNumber = 1;
             foreach ($entries as $entry) {
                 $sheet->setCellValue('A'.$rowIndex, $itemNumber);
-                $sheet->setCellValue('B'.$rowIndex, (string) ($microrregionNames[(int) ($entry->microrregion_id ?? 0)] ?? 'Sin microrregión'));
+                $sheet->setCellValue('B'.$rowIndex, (string) (($microrregionMeta[(int) ($entry->microrregion_id ?? 0)]['label'] ?? 'Sin microrregión')));
 
                 $columnIndex = 3;
 
@@ -200,10 +210,10 @@ class TemporaryModuleExportService
         }
     }
 
-    private function sheetTitleForMicrorregion(int $microrregionId, string $microrregionName): string
+    private function sheetTitleForMicrorregion(int $microrregionId, string $microrregionNumber, string $microrregionName): string
     {
-        $base = trim($microrregionName);
-        if ($base === '' || mb_strtolower($base) === 'sin microrregión') {
+        $base = $this->buildMicrorregionLabel($microrregionNumber, $microrregionName);
+        if (mb_strtolower($base) === 'sin microrregión') {
             $base = 'Sin microrregión';
         }
 
@@ -215,6 +225,26 @@ class TemporaryModuleExportService
         }
 
         return mb_substr($sanitized, 0, 31);
+    }
+
+    private function buildMicrorregionLabel(string $microrregionNumber, string $microrregionName): string
+    {
+        $number = trim($microrregionNumber);
+        $name = trim($microrregionName);
+
+        if ($number === '' && $name === '') {
+            return 'Sin microrregión';
+        }
+
+        if ($number === '') {
+            return $name;
+        }
+
+        if ($name === '') {
+            return 'MR '.$number;
+        }
+
+        return 'MR '.$number.' - '.$name;
     }
 
     private function uniqueSheetTitle(string $baseTitle, array &$usedTitles): string

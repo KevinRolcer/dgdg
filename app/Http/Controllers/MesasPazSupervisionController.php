@@ -20,7 +20,7 @@ class MesasPazSupervisionController extends Controller
         $usuario = Auth::user();
         abort_unless($this->service->puedeSupervisarEvidencias($usuario), 403);
 
-        $resultado = $this->service->construirVistaEvidencias($request);
+        $resultado = $this->service->construirVistaEvidencias($request, $usuario);
         if (!$resultado['valid']) {
             return redirect()->route('mesas-paz.evidencias')->withErrors($resultado['errors'])->withInput();
         }

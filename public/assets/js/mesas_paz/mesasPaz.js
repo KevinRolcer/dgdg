@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const specialModeMunicipiosMsg = document.getElementById('specialModeMunicipiosMsg');
     const btnCargarEvidencia = document.getElementById('btnCargarEvidencia');
     const inputEvidenciaHoy = document.getElementById('inputEvidenciaHoy');
+    const evidenciaMicrorregionSelector = document.getElementById('evidenciaMicrorregionSelector');
     const evidenciaActualBox = document.getElementById('evidenciaActualBox');
     const evidenciaModal = document.getElementById('evidenciaPreviewDeleteModal');
     const evidenciaModalTitle = document.getElementById('evidenciaPreviewDeleteTitle');
@@ -839,6 +840,9 @@ document.addEventListener('DOMContentLoaded', function () {
     function subirUnaEvidencia(archivo) {
         const formData = new FormData();
         formData.append('evidencia', archivo);
+        if (evidenciaMicrorregionSelector && evidenciaMicrorregionSelector.value) {
+            formData.append('microrregion_id', evidenciaMicrorregionSelector.value);
+        }
 
         return fetch(guardarEvidenciaHoyUrl, {
             method: 'POST',
@@ -865,6 +869,14 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function eliminarUnaEvidencia(path) {
+        const payload = {
+            evidencia_path: path
+        };
+
+        if (evidenciaMicrorregionSelector && evidenciaMicrorregionSelector.value) {
+            payload.microrregion_id = Number(evidenciaMicrorregionSelector.value);
+        }
+
         return fetch(eliminarEvidenciaHoyUrl, {
             method: 'POST',
             headers: {
@@ -873,9 +885,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 'X-CSRF-TOKEN': csrfToken,
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify({
-                evidencia_path: path
-            })
+            body: JSON.stringify(payload)
         })
         .then(function (response) {
             return response.json().then(function (data) {
@@ -1034,6 +1044,19 @@ document.addEventListener('DOMContentLoaded', function () {
                     btnCargarEvidencia.textContent = textoOriginal;
                     inputEvidenciaHoy.value = '';
                 });
+        });
+    }
+
+    if (evidenciaMicrorregionSelector) {
+        evidenciaMicrorregionSelector.addEventListener('change', function () {
+            const value = String(evidenciaMicrorregionSelector.value || '').trim();
+            if (!value) {
+                return;
+            }
+
+            const url = new URL(window.location.href);
+            url.searchParams.set('microrregion_id', value);
+            window.location.href = url.toString();
         });
     }
 

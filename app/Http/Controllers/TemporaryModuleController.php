@@ -380,6 +380,7 @@ class TemporaryModuleController extends Controller
         }
 
         [, $municipios] = $this->accessService->delegadoMunicipios((int) $user->id);
+        $microrregionesAsignadas = $this->accessService->microrregionesConMunicipiosPorUsuario((int) $user->id);
 
         $modules = TemporaryModule::query()
             ->with(['fields' => function ($query) {
@@ -427,6 +428,7 @@ class TemporaryModuleController extends Controller
             'topbarNotifications' => [],
             'modules' => $modules,
             'municipios' => $municipios,
+            'microrregionesAsignadas' => $microrregionesAsignadas,
             'activeSection' => $activeSection,
         ]);
     }
@@ -440,7 +442,12 @@ class TemporaryModuleController extends Controller
         abort_unless($temporaryModule->isAvailable(), 404);
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
 
-        [$microrregionId, $municipios] = $this->accessService->delegadoMunicipios($request->user()->id);
+        $requestedMicrorregionId = $request->filled('microrregion_id')
+            ? (int) $request->input('microrregion_id')
+            : null;
+
+        [$microrregionId, $municipios] = $this->accessService->delegadoMunicipios($request->user()->id, $requestedMicrorregionId);
+        $microrregionesAsignadas = $this->accessService->microrregionesConMunicipiosPorUsuario((int) $request->user()->id);
 
         $entries = $temporaryModule->entries()
             ->where('user_id', $request->user()->id)
@@ -455,18 +462,30 @@ class TemporaryModuleController extends Controller
             'fields' => $temporaryModule->fields,
             'municipios' => $municipios,
             'microrregionId' => $microrregionId,
+            'microrregionesAsignadas' => $microrregionesAsignadas,
             'entries' => $entries,
             'fieldTypes' => self::FIELD_TYPES,
         ]);
     }
 
-    public function submit(Request $request, int $module): RedirectResponse
+    public function submit(Request $request, int $module)
     {
         $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
         abort_unless($temporaryModule->isAvailable(), 404);
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
 
-        [$microrregionId, $municipios] = $this->accessService->delegadoMunicipios($request->user()->id);
+        $requestedMicrorregionId = $request->filled('selected_microrregion_id')
+            ? (int) $request->input('selected_microrregion_id')
+            : null;
+
+        $microrregionIdsPermitidos = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
+        if ($requestedMicrorregionId !== null && !in_array($requestedMicrorregionId, $microrregionIdsPermitidos, true)) {
+            throw ValidationException::withMessages([
+                'selected_microrregion_id' => 'La microrregión seleccionada no está dentro de tus asignaciones.',
+            ]);
+        }
+
+        [$microrregionId, $municipios] = $this->accessService->delegadoMunicipios($request->user()->id, $requestedMicrorregionId);
 
         $entryId = (int) ($request->input('entry_id') ?? 0);
         $existingEntry = null;
@@ -503,6 +522,7 @@ class TemporaryModuleController extends Controller
         }
 
         $rules['entry_id'] = ['nullable', 'integer'];
+        $rules['selected_microrregion_id'] = ['nullable', 'integer'];
 
         $validated = $request->validate($rules, [], $attributes);
         $values = Arr::get($validated, 'values', []);
@@ -554,6 +574,13 @@ class TemporaryModuleController extends Controller
                 'data' => $values,
                 'main_image_field_key' => null,
                 'submitted_at' => Carbon::now(),
+            ]);
+        }
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Registro guardado correctamente.',
             ]);
         }
 

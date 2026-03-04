@@ -26,6 +26,26 @@
         <form action="{{ route('temporary-modules.submit', $temporaryModule->id) }}" method="POST" enctype="multipart/form-data" class="tm-form tm-entry-form">
             @csrf
 
+            @php
+                $microsAsignadas = ($microrregionesAsignadas ?? collect())->values();
+                $mostrarSelectorMicrorregion = $microsAsignadas->count() > 1;
+            @endphp
+
+            @if ($mostrarSelectorMicrorregion)
+                <label class="tm-col-full">
+                    Microrregión de captura *
+                    <select id="tmMicrorregionSelector" name="selected_microrregion_id" required>
+                        @foreach ($microsAsignadas as $micro)
+                            <option value="{{ $micro->id }}" @selected((int) $microrregionId === (int) $micro->id)>
+                                MR {{ $micro->microrregion }} — {{ $micro->cabecera }}
+                            </option>
+                        @endforeach
+                    </select>
+                </label>
+            @else
+                <input type="hidden" name="selected_microrregion_id" value="{{ $microrregionId }}">
+            @endif
+
             <div class="tm-grid tm-grid-2">
                 @foreach ($fields as $field)
                     @php
@@ -56,7 +76,13 @@
                                 @endforeach
                             </select>
                         @elseif ($field->type === 'municipio')
-                            <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
+                            <select
+                                id="{{ $id }}"
+                                name="{{ $name }}"
+                                class="tm-municipio-select"
+                                data-field-key="{{ $field->key }}"
+                                {{ $field->is_required ? 'required' : '' }}
+                            >
                                 <option value="">Selecciona un municipio</option>
                                 @foreach ($municipios as $municipio)
                                     <option value="{{ $municipio }}" @selected($value === $municipio)>{{ $municipio }}</option>
@@ -151,6 +177,40 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const microrregionSelector = document.getElementById('tmMicrorregionSelector');
+        const municipioSelects = Array.from(document.querySelectorAll('.tm-municipio-select'));
+        const municipiosPorMicrorregion = @json(($microrregionesAsignadas ?? collect())->mapWithKeys(function ($micro) {
+            return [(string) $micro->id => array_values($micro->municipios ?? [])];
+        })->all());
+
+        const renderMunicipios = function (microrregionId) {
+            if (!microrregionId || municipioSelects.length === 0) {
+                return;
+            }
+
+            const municipios = Array.isArray(municipiosPorMicrorregion[microrregionId])
+                ? municipiosPorMicrorregion[microrregionId]
+                : [];
+
+            municipioSelects.forEach(function (select) {
+                const selectedPrevio = select.value;
+                select.innerHTML = '';
+                select.appendChild(new Option('Selecciona un municipio', ''));
+
+                municipios.forEach(function (municipio) {
+                    const option = new Option(municipio, municipio, false, selectedPrevio === municipio);
+                    select.appendChild(option);
+                });
+            });
+        };
+
+        if (microrregionSelector) {
+            renderMunicipios(String(microrregionSelector.value || ''));
+            microrregionSelector.addEventListener('change', function () {
+                renderMunicipios(String(microrregionSelector.value || ''));
+            });
+        }
+
         const imagePreviewButtons = Array.from(document.querySelectorAll('[data-open-image-preview]'));
         const imageModal = document.getElementById('tmImagePreviewModal');
         const imageModalImg = document.getElementById('tmImagePreviewImg');

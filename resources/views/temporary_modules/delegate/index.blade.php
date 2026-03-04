@@ -17,6 +17,8 @@
     @php
         $activeSection = $activeSection ?? 'upload';
         $isUploadSection = $activeSection !== 'records';
+        $microsAsignadas = ($microrregionesAsignadas ?? collect())->values();
+        $mostrarSelectorMicrorregion = $microsAsignadas->count() > 1;
     @endphp
 
     <div class="tm-section-switch" role="tablist" aria-label="Cambiar vista de captura temporal">
@@ -83,6 +85,21 @@
 
                     <form action="{{ route('temporary-modules.submit', $module->id) }}" method="POST" enctype="multipart/form-data" class="tm-form tm-entry-form">
                         @csrf
+                        @if ($mostrarSelectorMicrorregion)
+                            <label class="tm-col-full tm-entry-field">
+                                Microrregión de captura *
+                                <select name="selected_microrregion_id" class="tm-mr-selector" required>
+                                    @foreach ($microsAsignadas as $micro)
+                                        <option value="{{ $micro->id }}" @selected($loop->first)>
+                                            MR {{ $micro->microrregion }} — {{ $micro->cabecera }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </label>
+                        @elseif ($microsAsignadas->isNotEmpty())
+                            <input type="hidden" name="selected_microrregion_id" value="{{ $microsAsignadas->first()->id }}">
+                        @endif
+
                         <div class="tm-grid tm-grid-2 tm-entry-grid">
                             <input type="hidden" name="entry_id" value="">
                             @foreach ($orderedFields as $field)
@@ -122,7 +139,7 @@
                                             @endforeach
                                         </select>
                                     @elseif ($field->type === 'municipio')
-                                        <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
+                                        <select id="{{ $id }}" name="{{ $name }}" class="tm-municipio-select" {{ $field->is_required ? 'required' : '' }}>
                                             <option value="">Selecciona un municipio</option>
                                             @foreach ($municipios as $municipio)
                                                 <option value="{{ $municipio }}" @selected($value === $municipio)>{{ $municipio }}</option>
@@ -424,6 +441,9 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const microrregionesMunicipios = @json(($microrregionesAsignadas ?? collect())->mapWithKeys(function ($micro) {
+            return [(string) $micro->id => array_values($micro->municipios ?? [])];
+        })->all());
         const openButtons = Array.from(document.querySelectorAll('[data-open-module-preview]'));
         const sectionTabs = Array.from(document.querySelectorAll('[data-section-tab]'));
         const sectionPanels = Array.from(document.querySelectorAll('.tm-section-panel'));
@@ -434,6 +454,14 @@
         const imageModalImg = document.getElementById('tmImagePreviewImg');
         const imageModalTitle = document.getElementById('tmImagePreviewTitle');
         const modalOpeners = new Map();
+        const notify = function (title, message, type) {
+            if (typeof window.swal === 'function') {
+                window.swal(title, message, type);
+                return;
+            }
+
+            window.alert((title ? title + ': ' : '') + (message || ''));
+        };
 
         const activateModulePanel = function (targetId) {
             if (!targetId) {
@@ -483,6 +511,27 @@
             modal.classList.add('is-open');
             modal.setAttribute('aria-hidden', 'false');
             document.body.style.overflow = 'hidden';
+        };
+
+        const setMunicipiosForForm = function (form, microrregionId) {
+            if (!form || !microrregionId) {
+                return;
+            }
+
+            const municipios = Array.isArray(microrregionesMunicipios[String(microrregionId)])
+                ? microrregionesMunicipios[String(microrregionId)]
+                : [];
+
+            Array.from(form.querySelectorAll('.tm-municipio-select')).forEach(function (select) {
+                const currentValue = String(select.value || '');
+                select.innerHTML = '';
+                select.appendChild(new Option('Selecciona un municipio', ''));
+
+                municipios.forEach(function (municipio) {
+                    const option = new Option(municipio, municipio, false, currentValue === municipio);
+                    select.appendChild(option);
+                });
+            });
         };
 
         const initializeImagePreview = function (input) {
@@ -580,6 +629,88 @@
                 }
 
                 openModal(modal, button);
+            });
+        });
+
+        Array.from(document.querySelectorAll('.tm-form.tm-entry-form')).forEach(function (form) {
+            const entryIdInput = form.querySelector('input[name="entry_id"]');
+            const isCreateForm = !entryIdInput || !String(entryIdInput.value || '').trim();
+
+            const microrregionSelector = form.querySelector('.tm-mr-selector');
+            if (microrregionSelector) {
+                setMunicipiosForForm(form, microrregionSelector.value);
+                microrregionSelector.addEventListener('change', function () {
+                    setMunicipiosForForm(form, microrregionSelector.value);
+                });
+            }
+
+            if (!isCreateForm) {
+                return;
+            }
+
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                const submitButton = form.querySelector('button[type="submit"]');
+                const originalText = submitButton ? submitButton.textContent : '';
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Guardando...';
+                }
+
+                const formData = new FormData(form);
+
+                fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                })
+                .then(function (response) {
+                    return response.json().then(function (data) {
+                        return { status: response.status, data: data };
+                    });
+                })
+                .then(function (result) {
+                    if (result.status >= 400 || !result.data.success) {
+                        throw result.data;
+                    }
+
+                    notify('Éxito', result.data.message || 'Registro guardado correctamente.', 'success');
+
+                    const selectedMr = microrregionSelector ? String(microrregionSelector.value || '') : '';
+                    form.reset();
+
+                    if (microrregionSelector && selectedMr) {
+                        microrregionSelector.value = selectedMr;
+                        setMunicipiosForForm(form, selectedMr);
+                    }
+
+                    Array.from(form.querySelectorAll('[data-image-preview]')).forEach(function (preview) {
+                        preview.hidden = true;
+                    });
+
+                    Array.from(form.querySelectorAll('[data-image-preview-img]')).forEach(function (img) {
+                        img.removeAttribute('src');
+                    });
+
+                    Array.from(form.querySelectorAll('[data-remove-flag]')).forEach(function (flag) {
+                        flag.value = '0';
+                    });
+                })
+                .catch(function (errorData) {
+                    const backendErrors = errorData && errorData.errors ? Object.values(errorData.errors).flat() : [];
+                    const message = backendErrors[0] || errorData.message || 'No fue posible guardar el registro.';
+                    notify('Error', message, 'error');
+                })
+                .finally(function () {
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = originalText;
+                    }
+                });
             });
         });
 

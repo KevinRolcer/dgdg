@@ -775,6 +775,7 @@
     z-index: 1;
     width: min(1040px, calc(100vw - 28px));
     max-width: calc(100vw - 18px);
+    height: 60vh;
     max-height: calc(100vh - 40px);
     overflow-y: auto;
     overflow-x: hidden;
@@ -783,31 +784,34 @@
     border-radius: 14px;
     background: #fff;
     box-shadow: var(--shadow-soft);
-    padding: 14px;
+    padding: 10px;
     display: grid;
-    gap: 12px;
+    gap: 8px;
 }
 
 .tm-modal-dialog-entry {
-    width: min(940px, calc(100vw - 26px));
+    width: min(780px, calc(100vw - 24px));
+    max-height: calc(100vh - 40px);
     gap: 8px;
 }
 
 .tm-entry-form {
-    gap: 14px;
+    gap: 8px;
 }
 
 .tm-entry-grid {
     align-items: start;
+    gap: 8px;
 }
 
 .tm-entry-field {
-    border: 1px solid var(--clr-border);
-    border-radius: 12px;
-    padding: 10px;
-    background: #fff;
+    border: 0;
+    border-radius: 8px;
+    padding: 3px;
+    background: transparent;
     display: grid;
-    gap: 6px;
+    gap: 4px;
+    justify-items: start;
 }
 
 .tm-entry-field input:not([type='checkbox']):not([type='radio']),
@@ -827,7 +831,7 @@
 }
 
 .tm-entry-field.is-media {
-    background: rgba(72, 71, 71, 0.03);
+    background: transparent;
     align-content: start;
 }
 
@@ -839,9 +843,9 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin: 4px 0 0;
+    margin: 0;
     color: var(--clr-primary-dark);
-    font-size: 0.84rem;
+    font-size: 0.78rem;
     font-weight: 700;
 }
 
@@ -855,7 +859,7 @@
 .tm-entry-form .tm-actions {
     position: sticky;
     bottom: -10px;
-    padding-top: 8px;
+    padding-top: 4px;
     background: #fff;
     border-top: 1px solid var(--clr-border);
 }
@@ -901,6 +905,58 @@
     display: grid;
     gap: 10px;
     min-width: 0;
+}
+
+.tm-modal-dialog-entry .tm-modal-body {
+    max-height: calc(100vh - 185px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+}
+
+.tm-modal-body .tm-entry-grid.tm-grid-2 {
+    grid-template-columns: repeat(auto-fit, minmax(230px, max-content));
+    justify-content: start;
+    column-gap: 20px;
+    row-gap: 10px;
+}
+
+.tm-modal-body .tm-entry-grid .tm-col-full {
+    grid-column: 1 / -1;
+}
+
+.tm-modal-body .tm-entry-field input:not([type='checkbox']):not([type='radio']),
+.tm-modal-body .tm-entry-field select,
+.tm-modal-body .tm-entry-field textarea {
+    min-height: 36px;
+    height: 36px;
+    padding: 6px 9px;
+    font-size: 0.84rem;
+    line-height: 1.2;
+    width: fit-content;
+    min-width: 230px;
+    max-width: min(100%, 420px);
+}
+
+.tm-modal-body .tm-entry-field input[type='file'] {
+    min-height: 36px;
+    height: auto;
+    font-size: 0.82rem;
+    width: fit-content;
+    min-width: 230px;
+    max-width: min(100%, 420px);
+}
+
+.tm-modal-body .tm-entry-field .tm-mr-selector {
+    width: fit-content;
+    min-width: 230px;
+    max-width: min(100%, 420px);
+}
+
+.tm-modal-body .tm-entry-field textarea {
+    min-height: 64px;
+    height: auto;
+    resize: vertical;
 }
 
 .tm-modal-body .tm-form,
@@ -1042,7 +1098,32 @@
     }
 
     .tm-entry-field {
-        padding: 9px;
+        padding: 4px;
+    }
+
+    .tm-modal-body .tm-entry-field input:not([type='checkbox']):not([type='radio']),
+    .tm-modal-body .tm-entry-field select,
+    .tm-modal-body .tm-entry-field textarea {
+        min-height: 34px;
+        height: 34px;
+        padding: 5px 8px;
+        font-size: 0.8rem;
+        width: 100%;
+    }
+
+    .tm-modal-body .tm-entry-field textarea {
+        min-height: 58px;
+        height: auto;
+    }
+
+    .tm-modal-body .tm-entry-field .tm-mr-selector {
+        width: 100%;
+    }
+
+    .tm-modal-dialog-entry .tm-modal-body {
+        max-height: none;
+        overflow: visible;
+        padding-right: 0;
     }
 
     .tm-entry-field input:not([type='checkbox']):not([type='radio']),
