@@ -1,0 +1,244 @@
+#mesasPazApp {
+    --mesa-radius-lg: 14px;
+    --mesa-radius-md: 12px;
+    --mesa-radius-sm: 10px;
+}
+
+#mesasPazApp .panel {
+    background: var(--clr-card);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--mesa-radius-lg);
+    box-shadow: 0 4px 14px rgba(72, 71, 71, 0.08);
+    overflow: hidden;
+}
+
+#mesasPazApp .panel-heading {
+    background: var(--clr-card);
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+#mesasPazApp .mesa-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+#mesasPazApp .mesa-heading-date {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--clr-text-light);
+    background: rgba(72, 71, 71, 0.08);
+    border: 1px solid rgba(72, 71, 71, 0.16);
+    border-radius: 999px;
+    padding: 4px 10px;
+    white-space: nowrap;
+}
+
+#mesasPazApp .panel-title {
+    margin: 0;
+    color: var(--clr-text-main);
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+#mesasPazApp .panel-body {
+    padding: 14px;
+    background: var(--clr-card);
+}
+
+#mesasPazApp .historial-filter .form-control,
+#mesasPazApp .historial-filter .btn,
+#mesasPazApp .inline-asistencia .form-select,
+#mesasPazApp .inline-asistencia .btn {
+    min-height: 38px;
+}
+
+#mesasPazApp .border.rounded,
+#mesasPazApp .card,
+#mesasPazApp .list-group-item {
+    border-color: var(--clr-border) !important;
+    border-radius: var(--mesa-radius-md) !important;
+    background: var(--clr-card);
+}
+
+#mesasPazApp .municipio-card-separador {
+    border: 1px solid var(--clr-border);
+}
+
+#mesasPazApp .card-header {
+    background: rgba(72, 71, 71, 0.04);
+    border-bottom: 1px solid var(--clr-border);
+}
+
+#mesasPazApp .btn-primary,
+#mesasPazApp .btn-outline-primary:hover,
+#mesasPazApp .btn-outline-primary:focus {
+    background: var(--clr-primary);
+    border-color: var(--clr-primary);
+    color: var(--clr-card);
+}
+
+#mesasPazApp .btn-primary:hover {
+    background: var(--clr-primary-dark);
+    border-color: var(--clr-primary-dark);
+}
+
+#mesasPazApp .btn-outline-primary {
+    color: var(--clr-primary-dark);
+    border-color: rgba(199, 155, 102, 0.7);
+    background: rgba(199, 155, 102, 0.1);
+}
+
+#mesasPazApp .btn-outline-secondary {
+    color: var(--clr-text-main);
+    border-color: rgba(72, 71, 71, 0.24);
+    background: rgba(72, 71, 71, 0.05);
+}
+
+#mesasPazApp .btn-link,
+#mesasPazApp .text-primary {
+    color: var(--clr-accent) !important;
+}
+
+#mesasPazApp .form-select,
+#mesasPazApp .form-control {
+    border-color: var(--clr-border);
+    color: var(--clr-text-main);
+    border-radius: var(--mesa-radius-sm);
+}
+
+#mesasPazApp .form-select:focus,
+#mesasPazApp .form-control:focus {
+    border-color: rgba(199, 155, 102, 0.8);
+    box-shadow: 0 0 0 0.18rem rgba(199, 155, 102, 0.2);
+}
+
+#mesasPazApp .alert-info {
+    background: rgba(36, 98, 87, 0.12);
+    border: 1px solid rgba(36, 98, 87, 0.24);
+    color: var(--clr-secondary);
+}
+
+#mesasPazApp .alert-warning {
+    background: rgba(199, 155, 102, 0.16);
+    border: 1px solid rgba(199, 155, 102, 0.34);
+    color: var(--clr-primary-dark);
+}
+
+#mesasPazApp .alert-success {
+    background: rgba(36, 98, 87, 0.14);
+    border: 1px solid rgba(36, 98, 87, 0.26);
+    color: var(--clr-secondary);
+}
+
+#mesasPazApp .badge.bg-success {
+    background: var(--clr-secondary) !important;
+}
+
+#mesasPazApp .presidente-option-input:checked + .btn,
+#mesasPazApp .representante-option-input:checked + .btn {
+    background-color: var(--clr-primary) !important;
+    border-color: var(--clr-primary) !important;
+    color: var(--clr-card) !important;
+}
+
+#mesasPazApp .presidente-option-input:checked + .btn:hover,
+#mesasPazApp .presidente-option-input:checked + .btn:focus,
+#mesasPazApp .presidente-option-input:checked + .btn:active,
+#mesasPazApp .representante-option-input:checked + .btn:hover,
+#mesasPazApp .representante-option-input:checked + .btn:focus,
+#mesasPazApp .representante-option-input:checked + .btn:active {
+    background-color: var(--clr-primary-dark) !important;
+    border-color: var(--clr-primary-dark) !important;
+    color: var(--clr-card) !important;
+}
+
+#mesasPazApp .presidente-option-input:checked + .btn.btn-ninguno-option,
+#mesasPazApp .presidente-option-input:checked + .btn.btn-ninguno-option:hover,
+#mesasPazApp .presidente-option-input:checked + .btn.btn-ninguno-option:focus,
+#mesasPazApp .presidente-option-input:checked + .btn.btn-ninguno-option:active {
+    background-color: var(--clr-secondary) !important;
+    border-color: var(--clr-secondary) !important;
+    color: var(--clr-card) !important;
+}
+
+#mesasPazApp .presidente-option-input:not(:checked) + .btn.btn-outline-secondary:hover,
+#mesasPazApp .presidente-option-input:not(:checked) + .btn.btn-outline-secondary:focus,
+#mesasPazApp .representante-option-input:not(:checked) + .btn.btn-outline-secondary:hover,
+#mesasPazApp .representante-option-input:not(:checked) + .btn.btn-outline-secondary:focus {
+    background: rgba(199, 155, 102, 0.16) !important;
+    border-color: rgba(199, 155, 102, 0.9) !important;
+    color: var(--clr-primary-dark) !important;
+}
+
+#mesasPazApp .presidente-option-input:not(:checked) + .btn.btn-outline-secondary:active,
+#mesasPazApp .representante-option-input:not(:checked) + .btn.btn-outline-secondary:active {
+    background: rgba(72, 71, 71, 0.12) !important;
+    border-color: rgba(72, 71, 71, 0.28) !important;
+    color: var(--clr-primary-dark) !important;
+}
+
+#mesasPazApp .presidente-option-input:disabled + .btn,
+#mesasPazApp .representante-option-input:disabled + .btn {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+#mesasPazApp .evidencias-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.75rem;
+}
+
+#mesasPazApp .evidencia-card {
+    border: 1px solid var(--clr-border);
+    border-radius: var(--mesa-radius-sm);
+    padding: 0.5rem;
+    background: var(--clr-card);
+    position: relative;
+}
+
+#mesasPazApp .evidencia-thumb {
+    width: 100%;
+    height: 110px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--clr-border);
+}
+
+#mesasPazApp .btn-eliminar-evidencia {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.3rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    line-height: 1rem;
+    padding: 0;
+    border-radius: 999px;
+}
+
+#mesasPazApp .modal-content {
+    border: 1px solid var(--clr-border);
+    border-radius: var(--mesa-radius-md);
+}
+
+#mesasPazApp .modal-header {
+    border-bottom-color: var(--clr-border);
+}
+
+@media (max-width: 991.98px) {
+    #mesasPazApp .mesa-heading-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    #mesasPazApp .historial-col {
+        margin-top: 1rem;
+    }
+
+    #mesasPazApp .evidencias-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

@@ -1,0 +1,179 @@
+#supervisionEvidenciasPage {
+    --mesa-radius-lg: 14px;
+    --mesa-radius-md: 12px;
+    --mesa-radius-sm: 10px;
+}
+
+#supervisionEvidenciasPage .panel {
+    background: var(--clr-card);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--mesa-radius-lg);
+    box-shadow: 0 4px 14px rgba(72, 71, 71, 0.08);
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+
+#supervisionEvidenciasPage .panel-heading {
+    background: var(--clr-card);
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+#supervisionEvidenciasPage .panel-title {
+    margin: 0;
+    color: var(--clr-text-main);
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+#supervisionEvidenciasPage .panel-body {
+    padding: 14px;
+    background: var(--clr-card);
+}
+
+#supervisionEvidenciasPage .border.rounded,
+#supervisionEvidenciasPage .card,
+#supervisionEvidenciasPage .accordion-item {
+    border-color: var(--clr-border) !important;
+    border-radius: var(--mesa-radius-md) !important;
+    background: var(--clr-card) !important;
+}
+
+#supervisionEvidenciasPage .btn-primary,
+#supervisionEvidenciasPage .btn-outline-primary:hover,
+#supervisionEvidenciasPage .btn-outline-primary:focus {
+    background: var(--clr-primary);
+    border-color: var(--clr-primary);
+    color: var(--clr-card);
+}
+
+#supervisionEvidenciasPage .btn-outline-primary {
+    color: var(--clr-primary-dark);
+    border-color: rgba(199, 155, 102, 0.7);
+    background: rgba(199, 155, 102, 0.1);
+}
+
+#supervisionEvidenciasPage .btn-outline-secondary {
+    color: var(--clr-text-main);
+    border-color: rgba(72, 71, 71, 0.24);
+    background: rgba(72, 71, 71, 0.05);
+}
+
+#supervisionEvidenciasPage .text-primary,
+#supervisionEvidenciasPage .table thead th {
+    color: var(--clr-primary-dark) !important;
+}
+
+#supervisionEvidenciasPage .badge.bg-primary {
+    background: var(--clr-primary) !important;
+}
+
+#supervisionEvidenciasPage .badge.bg-secondary {
+    background: var(--clr-secondary) !important;
+}
+
+#supervisionEvidenciasPage .badge.bg-warning {
+    background: rgba(199, 155, 102, 0.2) !important;
+    color: var(--clr-primary-dark) !important;
+    border: 1px solid rgba(199, 155, 102, 0.36);
+}
+
+#supervisionEvidenciasPage .form-control,
+#supervisionEvidenciasPage .form-select {
+    border-color: var(--clr-border);
+    color: var(--clr-text-main);
+    border-radius: var(--mesa-radius-sm);
+}
+
+#supervisionEvidenciasPage .form-control:focus,
+#supervisionEvidenciasPage .form-select:focus {
+    border-color: rgba(199, 155, 102, 0.8);
+    box-shadow: 0 0 0 0.18rem rgba(199, 155, 102, 0.2);
+}
+
+#supervisionEvidenciasPage .table > :not(caption) > * > * {
+    border-color: var(--clr-border);
+}
+
+#supervisionEvidenciasPage .table thead {
+    background: rgba(72, 71, 71, 0.06);
+}
+
+#supervisionEvidenciasPage .btn-supervision-mini {
+    padding: 0.15rem 0.4rem;
+    font-size: 0.74rem;
+    line-height: 1.2;
+}
+
+#supervisionEvidenciasPage .supervision-row-compact .delegado-nombre,
+#supervisionEvidenciasPage .supervision-row-compact .micro-label {
+    font-size: 0.88rem;
+    color: var(--clr-text-light);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#supervisionEvidenciasPage .evidencia-thumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+#supervisionEvidenciasPage .evidencia-thumb-mini {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border: 1px solid var(--clr-border);
+    border-radius: 0.35rem;
+    cursor: pointer;
+    transition: transform 0.12s ease-in-out;
+}
+
+#supervisionEvidenciasPage .evidencia-thumb-mini:hover {
+    transform: scale(1.05);
+}
+
+#supervisionEvidenciasPage .supervision-text-xs {
+    font-size: 11px;
+}
+
+#supervisionEvidenciasPage .supervision-progress-thin {
+    height: 6px;
+}
+
+#supervisionEvidenciasPage .modal-content {
+    border: 1px solid var(--clr-border);
+    border-radius: var(--mesa-radius-md);
+}
+
+@media (min-width: 992px) {
+    #supervisionEvidenciasPage .asistentes-micro-scroll {
+        max-height: 300px;
+        overflow-y: auto;
+        padding-right: 0.25rem;
+    }
+
+    #supervisionEvidenciasPage .asistentes-micro-scroll #asistentesMicroPagination {
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+        background: var(--clr-card);
+        border-top: 1px solid var(--clr-border);
+        padding-top: 0.5rem;
+        padding-bottom: 0.25rem;
+    }
+}
+
+@media (max-width: 767.98px) {
+    #supervisionEvidenciasPage .btn-supervision-mini {
+        font-size: 0.75rem;
+        padding: 0.18rem 0.4rem;
+    }
+
+    #supervisionEvidenciasPage .evidencia-thumb-mini {
+        width: 52px;
+        height: 52px;
+    }
+}
