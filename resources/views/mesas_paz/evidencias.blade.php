@@ -42,6 +42,13 @@
                 >
                     Análisis / desglose <i class="fa fa-chevron-down ms-1" aria-hidden="true"></i>
                 </button>
+                <button
+                    type="button"
+                    class="btn btn-success btn-sm"
+                    id="btnAbrirRangoFechasPresentacion"
+                >
+                    Generar Presentación
+                </button>
             </div>
         </form>
 
@@ -504,7 +511,137 @@
 </div>
 @endsection
 
+<div class="modal fade" id="rangoFechasPresentacionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Selecciona el rango de fechas</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formRangoFechasPresentacion" class="d-flex flex-column gap-3">
+                    <div>
+                        <label for="fechaInicioPresentacion" class="form-label">Fecha inicio</label>
+                        <input type="date" id="fechaInicioPresentacion" name="fecha_inicio" class="form-control" required>
+                    </div>
+                    <div>
+                        <label for="fechaFinPresentacion" class="form-label">Fecha fin</label>
+                        <input type="date" id="fechaFinPresentacion" name="fecha_fin" class="form-control" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" id="btnConfirmarRangoFechasPresentacion">Generar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="canvaPresentacionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Enlace a presentación Canva</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="canvaPresentacionModalContent" class="text-center">
+                    <span class="text-muted">Generando...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="canvaPresentacionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Enlace a presentación Canva</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="canvaPresentacionModalContent" class="text-center">
+                    <span class="text-muted">Generando...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 <script src="{{ asset('assets/js/mesas_paz/mesaPazSupervicion.js') }}?v={{ @filemtime(public_path('assets/js/mesas_paz/mesaPazSupervicion.js')) ?: time() }}"></script>
+<script>
+document.getElementById('btnAbrirRangoFechasPresentacion')?.addEventListener('click', function() {
+    const modal = new bootstrap.Modal(document.getElementById('rangoFechasPresentacionModal'));
+    modal.show();
+});
+
+document.getElementById('btnConfirmarRangoFechasPresentacion')?.addEventListener('click', function() {
+    const fechaInicio = document.getElementById('fechaInicioPresentacion')?.value;
+    const fechaFin = document.getElementById('fechaFinPresentacion')?.value;
+    if (!fechaInicio || !fechaFin) {
+        alert('Selecciona ambas fechas para continuar.');
+        return;
+    }
+    // Cierra el modal de rango de fechas
+    bootstrap.Modal.getInstance(document.getElementById('rangoFechasPresentacionModal')).hide();
+    // Abre el modal de presentación y muestra "Generando..."
+    const modalPresentacion = new bootstrap.Modal(document.getElementById('canvaPresentacionModal'));
+    document.getElementById('canvaPresentacionModalContent').innerHTML = '<span class="text-muted">Generando...</span>';
+    modalPresentacion.show();
+    fetch("{{ route('canva.generar-documento') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({ fecha_inicio: fechaInicio, fecha_fin: fechaFin })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.url) {
+            document.getElementById('canvaPresentacionModalContent').innerHTML = `<a href="${data.url}" target="_blank" class="btn btn-primary">Abrir presentación en Canva</a>`;
+        } else {
+            document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-danger">Error: ${data.error || 'No se pudo generar el documento.'}</span>`;
+        }
+    })
+    .catch(err => {
+        document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-danger">Error al generar el documento.</span>`;
+    });
+});
+</script>
+<script>
+document.getElementById('btnGenerarPresentacion')?.addEventListener('click', function() {
+    const fecha = document.getElementById('fecha_lista')?.value;
+    if (!fecha) {
+        alert('Selecciona una fecha para generar la presentación.');
+        return;
+    }
+    const modal = new bootstrap.Modal(document.getElementById('canvaPresentacionModal'));
+    document.getElementById('canvaPresentacionModalContent').innerHTML = '<span class="text-muted">Generando...</span>';
+    modal.show();
+    fetch("{{ route('canva.generar-documento') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({ fecha })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.url) {
+            document.getElementById('canvaPresentacionModalContent').innerHTML = `<a href="${data.url}" target="_blank" class="btn btn-primary">Abrir presentación en Canva</a>`;
+        } else {
+            document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-danger">Error: ${data.error || 'No se pudo generar el documento.'}</span>`;
+        }
+    })
+    .catch(err => {
+        document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-danger">Error al generar el documento.</span>`;
+    });
+});
+</script>
 @endpush

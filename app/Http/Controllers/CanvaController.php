@@ -53,7 +53,25 @@ class CanvaController extends Controller
     {
         $access_token = $request->user()->canva_token ?? null; // Ajusta según cómo guardes el token
         $template_id = env('CANVA_TEMPLATE_ID', 'DAHDHr-bAU4');
-        $fecha = $request->input('fecha'); // Rango de fechas seleccionado
+        $fecha_inicio = $request->input('fecha_inicio');
+        $fecha_fin = $request->input('fecha_fin');
+
+        // Validar que el rango no incluya sábados ni domingos
+        if ($fecha_inicio && $fecha_fin) {
+            $inicio = \Carbon\Carbon::parse($fecha_inicio);
+            $fin = \Carbon\Carbon::parse($fecha_fin);
+            $dias = [];
+            for ($date = $inicio->copy(); $date <= $fin; $date->addDay()) {
+                $dayOfWeek = $date->dayOfWeek;
+                if ($dayOfWeek === 6 || $dayOfWeek === 0) { // 6 = Sábado, 0 = Domingo
+                    return response()->json(['error' => 'El rango de fechas no debe incluir sábados ni domingos.'], 422);
+                }
+                $dias[] = $date->format('Y-m-d');
+            }
+            $rango = $inicio->format('d/m/Y') . ' al ' . $fin->format('d/m/Y');
+        } else {
+            $rango = $fecha_inicio ?: $fecha_fin ?: '';
+        }
 
         // 1. Duplica la plantilla
         $duplicated = Http::withToken($access_token)
@@ -85,7 +103,7 @@ class CanvaController extends Controller
         // 3. Modifica el campo “fecha”
         Http::withToken($access_token)
             ->patch("https://api.canva.com/v1/designs/$design_id/elements/$element_id", [
-                'text' => $fecha
+                'text' => $rango
             ]);
 
         // 4. Devuelve el enlace para editar
