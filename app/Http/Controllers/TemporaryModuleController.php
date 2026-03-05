@@ -152,7 +152,7 @@ class TemporaryModuleController extends Controller
             $slug = Str::slug($validated['name']);
             $baseSlug = $slug;
             $suffix = 2;
-            while (TemporaryModule::query()->where('slug', $slug)->exists()) {
+            while (TemporaryModule::withTrashed()->where('slug', $slug)->exists()) {
                 $slug = $baseSlug.'-'.$suffix;
                 $suffix++;
             }
@@ -328,7 +328,7 @@ class TemporaryModuleController extends Controller
             $slug = Str::slug($validated['name']);
             $baseSlug = $slug;
             $suffix = 2;
-            while (TemporaryModule::query()->where('slug', $slug)->where('id', '!=', $temporaryModule->id)->exists()) {
+            while (TemporaryModule::withTrashed()->where('slug', $slug)->where('id', '!=', $temporaryModule->id)->exists()) {
                 $slug = $baseSlug.'-'.$suffix;
                 $suffix++;
             }

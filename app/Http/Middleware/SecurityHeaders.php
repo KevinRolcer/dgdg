@@ -10,6 +10,14 @@ class SecurityHeaders
 {
     public function handle(Request $request, Closure $next): Response
     {
+        if ($this->mustRedirectToCanonicalHost($request)) {
+            return redirect()->to($this->buildCanonicalUrl($request), 301);
+        }
+
+        if ($this->mustRedirectToHttps($request)) {
+            return redirect()->to('https://'.$request->getHttpHost().$request->getRequestUri(), 301);
+        }
+
         /** @var Response $response */
         $response = $next($request);
 
@@ -26,6 +34,13 @@ class SecurityHeaders
             $response->headers->set('Pragma', 'no-cache');
         }
 
+        // Avoid stale CSRF tokens from browser/CDN cache on the login page.
+        if ($request->isMethod('GET') && $request->routeIs('login')) {
+            $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0, private');
+            $response->headers->set('Pragma', 'no-cache');
+            $response->headers->set('Expires', '0');
+        }
+
         $host = (string) $request->getHost();
         $isLoopbackHost = in_array($host, ['localhost', '127.0.0.1', '::1'], true);
 
@@ -40,6 +55,79 @@ class SecurityHeaders
         }
 
         return $response;
+    }
+
+    private function mustRedirectToHttps(Request $request): bool
+    {
+        if (app()->isLocal() || !config('app.force_https', false)) {
+            return false;
+        }
+
+        if ($request->isSecure()) {
+            return false;
+        }
+
+        $forwardedProto = strtolower((string) $request->header('x-forwarded-proto', ''));
+        if (str_contains($forwardedProto, 'https')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function mustRedirectToCanonicalHost(Request $request): bool
+    {
+        if (app()->isLocal()) {
+            return false;
+        }
+
+        $canonicalHost = $this->getConfiguredHost();
+        if ($canonicalHost === null) {
+            return false;
+        }
+
+        return strcasecmp((string) $request->getHost(), $canonicalHost) !== 0;
+    }
+
+    private function buildCanonicalUrl(Request $request): string
+    {
+        $canonicalHost = $this->getConfiguredHost() ?? (string) $request->getHost();
+        $scheme = $this->resolvePreferredScheme($request);
+
+        return $scheme.'://'.$canonicalHost.$request->getRequestUri();
+    }
+
+    private function resolvePreferredScheme(Request $request): string
+    {
+        if (config('app.force_https', false)) {
+            return 'https';
+        }
+
+        if ($request->isSecure()) {
+            return 'https';
+        }
+
+        $forwardedProto = strtolower((string) $request->header('x-forwarded-proto', ''));
+        if (str_contains($forwardedProto, 'https')) {
+            return 'https';
+        }
+
+        return 'http';
+    }
+
+    private function getConfiguredHost(): ?string
+    {
+        $appUrl = (string) config('app.url', '');
+        if ($appUrl === '') {
+            return null;
+        }
+
+        $host = parse_url($appUrl, PHP_URL_HOST);
+        if (!is_string($host) || trim($host) === '') {
+            return null;
+        }
+
+        return strtolower($host);
     }
 
     private function buildContentSecurityPolicy(Request $request): string

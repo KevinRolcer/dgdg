@@ -153,6 +153,7 @@
                                         </select>
                                     @elseif (in_array($field->type, ['image', 'file'], true))
                                         <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
+                                        <small class="tm-field-help">También puedes pegar una imagen con Ctrl+V.</small>
                                         <div class="tm-image-preview" data-image-preview hidden>
                                             <img src="" alt="Vista previa" data-image-preview-img>
                                             <button type="button" class="tm-image-clear" data-image-remove aria-label="Quitar imagen">&times;</button>
@@ -251,6 +252,7 @@
                                             </select>
                                         @elseif (in_array($field->type, ['image', 'file'], true))
                                             <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" {{ ($field->is_required && !$hasExistingImage) ? 'required' : '' }}>
+                                            <small class="tm-field-help">También puedes pegar una imagen con Ctrl+V.</small>
                                             <input type="hidden" name="remove_images[{{ $field->key }}]" value="0" data-remove-flag>
                                             <div class="tm-image-preview" data-image-preview {{ is_string($value) && $value !== '' ? '' : 'hidden' }}>
                                                 <img
@@ -453,6 +455,8 @@
         const imageModal = document.getElementById('tmImagePreviewModal');
         const imageModalImg = document.getElementById('tmImagePreviewImg');
         const imageModalTitle = document.getElementById('tmImagePreviewTitle');
+        const imageInputSelector = 'input[type="file"][accept="image/*"]';
+        let lastFocusedImageInput = null;
         const modalOpeners = new Map();
         const notify = function (title, message, type) {
             if (typeof window.swal === 'function') {
@@ -540,6 +544,14 @@
                 return;
             }
 
+            input.addEventListener('focus', function () {
+                lastFocusedImageInput = input;
+            });
+
+            input.addEventListener('click', function () {
+                lastFocusedImageInput = input;
+            });
+
             const preview = wrapper.querySelector('[data-image-preview]');
             const previewImg = wrapper.querySelector('[data-image-preview-img]');
             const removeButton = wrapper.querySelector('[data-image-remove]');
@@ -596,9 +608,71 @@
             }
         };
 
-        Array.from(document.querySelectorAll('input[type="file"][accept="image/*"]')).forEach(function (input) {
+        Array.from(document.querySelectorAll(imageInputSelector)).forEach(function (input) {
             initializeImagePreview(input);
         });
+
+        const getPasteTargetInput = function (event) {
+            const eventTarget = event.target instanceof HTMLElement ? event.target : null;
+            if (eventTarget) {
+                const directInput = eventTarget.matches(imageInputSelector)
+                    ? eventTarget
+                    : eventTarget.closest('label')?.querySelector(imageInputSelector);
+
+                if (directInput instanceof HTMLInputElement && !directInput.disabled) {
+                    return directInput;
+                }
+            }
+
+            if (lastFocusedImageInput instanceof HTMLInputElement && document.body.contains(lastFocusedImageInput) && !lastFocusedImageInput.disabled) {
+                return lastFocusedImageInput;
+            }
+
+            const activeElement = document.activeElement;
+            if (activeElement instanceof HTMLInputElement && activeElement.matches(imageInputSelector) && !activeElement.disabled) {
+                return activeElement;
+            }
+
+            const openedModal = document.querySelector('.tm-modal.is-open');
+            if (openedModal instanceof HTMLElement) {
+                const modalInput = openedModal.querySelector(imageInputSelector);
+                if (modalInput instanceof HTMLInputElement && !modalInput.disabled) {
+                    return modalInput;
+                }
+            }
+
+            return null;
+        };
+
+        const getImageFromClipboard = function (event) {
+            const clipboardData = event.clipboardData;
+            if (!clipboardData) {
+                return null;
+            }
+
+            const items = Array.from(clipboardData.items || []);
+            for (let index = 0; index < items.length; index += 1) {
+                const item = items[index];
+                if (!item || item.kind !== 'file' || !String(item.type || '').startsWith('image/')) {
+                    continue;
+                }
+
+                const file = item.getAsFile();
+                if (file) {
+                    return file;
+                }
+            }
+
+            const files = Array.from(clipboardData.files || []);
+            for (let index = 0; index < files.length; index += 1) {
+                const file = files[index];
+                if (file && String(file.type || '').startsWith('image/')) {
+                    return file;
+                }
+            }
+
+            return null;
+        };
 
         const closeModal = function (modal) {
             if (!modal) {
@@ -769,6 +843,31 @@
             Array.from(document.querySelectorAll('.tm-modal.is-open')).forEach(function (modal) {
                 closeModal(modal);
             });
+        });
+
+        document.addEventListener('paste', function (event) {
+            const imageFile = getImageFromClipboard(event);
+            if (!imageFile) {
+                return;
+            }
+
+            const targetInput = getPasteTargetInput(event);
+            if (!targetInput) {
+                return;
+            }
+
+            if (typeof DataTransfer === 'undefined') {
+                notify('Aviso', 'Tu navegador no permite pegar imágenes automáticamente en este campo.', 'warning');
+                return;
+            }
+
+            event.preventDefault();
+            const transfer = new DataTransfer();
+            transfer.items.add(imageFile);
+            targetInput.files = transfer.files;
+            targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+            targetInput.focus();
+            lastFocusedImageInput = targetInput;
         });
     });
 </script>

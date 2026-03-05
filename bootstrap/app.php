@@ -12,8 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Honor reverse-proxy HTTPS headers in shared hosting / CDN setups.
+        $middleware->trustProxies(at: '*');
         $middleware->append(SecurityHeaders::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();
+

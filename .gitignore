@@ -37,8 +37,7 @@ Homestead.yaml
 Thumbs.db
 
 # Documentación local (no subir)
-/README.md
-/SECURITY.md
+/README.md/SECURITY.md
 /SECURE_GEMINI_AWS_PROMPT.md
 /documentacion.md
 /guia-roles-usuarios.md
