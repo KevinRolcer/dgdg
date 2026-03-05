@@ -9,6 +9,7 @@ use App\Http\Controllers\MesasPazController;
 use App\Http\Controllers\MesasPazSupervisionController;
 use App\Http\Controllers\TemporaryModuleController;
 use App\Http\Controllers\AdminSettingsController;
+use App\Http\Controllers\CanvaController;
 
 Route::get('/', function () {
     return redirect('/login');
@@ -93,4 +94,7 @@ Route::middleware('auth')->group(function () {
             ->where('fieldKey', '[A-Za-z0-9_\-]+')
             ->name('temporary-modules.entry-file.preview');
     });
+
+    Route::get('/canva/auth', [CanvaController::class, 'authRedirect'])->name('canva.auth');
+    Route::post('/canva/generar-documento', [CanvaController::class, 'generarDocumento'])->name('canva.generar-documento');
 });
