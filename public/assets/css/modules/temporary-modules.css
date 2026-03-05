@@ -692,6 +692,11 @@
     overflow: auto;
 }
 
+.tm-table-wrap.tm-table-wrap-admin-preview {
+    overflow: hidden;
+    max-width: 100%;
+}
+
 .tm-scroll-panel {
     max-height: min(60vh, 620px);
     overflow: auto;
@@ -862,6 +867,102 @@
 .tm-records-desktop .tm-table {
     width: max-content;
     min-width: 100%;
+}
+
+.tm-admin-preview-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.tm-admin-preview-table th,
+.tm-admin-preview-table td {
+    padding: 5px 4px;
+    font-size: 0.74rem;
+    line-height: 1.2;
+    max-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    vertical-align: top;
+}
+
+.tm-admin-preview-table th {
+    font-size: 0.64rem;
+    white-space: normal;
+    line-height: 1.05;
+}
+
+.tm-admin-preview-table thead th {
+    vertical-align: bottom;
+}
+
+.tm-admin-col-title {
+    display: -webkit-box;
+    line-clamp: 3;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    font-size: clamp(0.56rem, 0.5rem + 0.2vw, 0.66rem);
+    line-height: 1.02;
+    max-height: 3.15em;
+}
+
+.tm-admin-preview-table td:nth-child(1) {
+    width: 11rem;
+}
+
+.tm-admin-preview-table td:nth-child(2) {
+    width: 6.4rem;
+}
+
+.tm-cell-text-wrap.tm-cell-text-wrap-admin {
+    max-width: 100%;
+    display: grid;
+    gap: 3px;
+}
+
+.tm-cell-text-wrap-admin .tm-cell-text {
+    font-size: 0.72rem;
+    line-height: 1.18;
+}
+
+.tm-cell-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tm-cell-expand-toggle {
+    border: 0;
+    background: transparent;
+    color: var(--clr-accent);
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 0;
+    cursor: pointer;
+}
+
+.tm-admin-preview-table td.is-condensed-cell .tm-cell-text {
+    display: -webkit-box;
+    line-clamp: 1;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 0.66rem;
+    opacity: 0.84;
+}
+
+.tm-admin-preview-table td.is-expanded-cell {
+    background: rgba(199, 155, 102, 0.08);
+}
+
+.tm-admin-preview-table td.is-expanded-cell .tm-cell-text {
+    font-size: 0.78rem;
+    line-height: 1.25;
 }
 
 .tm-table th,

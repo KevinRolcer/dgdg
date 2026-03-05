@@ -30,6 +30,15 @@ class AppServiceProvider extends ServiceProvider
                 return false;
             }
 
+            $blockedMesasPazEmails = [
+                'dgdg.admon@gmail.com',
+            ];
+
+            $email = mb_strtolower((string) ($user->email ?? ''));
+            if (in_array($email, $blockedMesasPazEmails, true)) {
+                return false;
+            }
+
             $modelTypes = array_values(array_unique([
                 get_class($user),
                 'App\\Models\\User',

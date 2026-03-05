@@ -8,9 +8,20 @@
         }
 
         $user = auth()->user();
+        $userEmail = mb_strtolower(trim((string) ($user->email ?? '')));
 
         if (isset($item['hidden_if_can']) && $user->can($item['hidden_if_can'])) {
             return false;
+        }
+
+        if (!empty($item['hidden_for_emails']) && is_array($item['hidden_for_emails'])) {
+            $blockedEmails = array_map(static function ($email) {
+                return mb_strtolower(trim((string) $email));
+            }, $item['hidden_for_emails']);
+
+            if ($userEmail !== '' && in_array($userEmail, $blockedEmails, true)) {
+                return false;
+            }
         }
 
         if (!isset($item['permission'])) {

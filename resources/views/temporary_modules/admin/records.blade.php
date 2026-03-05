@@ -122,22 +122,17 @@
                         <p>{{ $moduleDescription }}</p>
                     @endif
 
-                    <h4>Campos definidos</h4>
-                    <ul class="tm-field-preview-list">
-                        @foreach ($module->fields as $field)
-                            <li>{{ $field->label }} <small>({{ $field->type }})</small></li>
-                        @endforeach
-                    </ul>
-
                     <h4>Registros de delegados</h4>
-                    <div class="tm-table-wrap tm-table-wrap-scroll">
-                        <table class="tm-table">
+                    <div class="tm-table-wrap tm-table-wrap-admin-preview">
+                        <table class="tm-table tm-admin-preview-table">
                             <thead>
                                 <tr>
                                     <th>Delegado</th>
                                     <th>Fecha</th>
                                     @foreach ($module->fields as $field)
-                                        <th>{{ $field->label }}</th>
+                                        <th>
+                                            <span class="tm-admin-col-title" title="{{ $field->label }}">{{ $field->label }}</span>
+                                        </th>
                                     @endforeach
                                 </tr>
                             </thead>
@@ -149,8 +144,9 @@
                                         @foreach ($module->fields as $field)
                                             @php
                                                 $cell = $entry->data[$field->key] ?? null;
+                                                $columnIndex = $loop->index + 3;
                                             @endphp
-                                            <td>
+                                            <td data-admin-col="{{ $columnIndex }}">
                                                 @if (in_array($field->type, ['file', 'image'], true) && is_string($cell) && $cell !== '')
                                                     <button
                                                         type="button"
@@ -179,14 +175,24 @@
                                                         $displayText = trim($displayText) !== '' ? $displayText : '-';
                                                         $isLongText = mb_strlen($displayText) > 120;
                                                     @endphp
-                                                    @if ($isLongText)
-                                                        <span class="tm-cell-text-wrap" data-text-wrap>
-                                                            <span class="tm-cell-text is-collapsed" data-text-content>{{ $displayText }}</span>
-                                                            <button type="button" class="tm-cell-text-toggle" data-text-toggle>Ver mas</button>
+                                                    <span class="tm-cell-text-wrap tm-cell-text-wrap-admin" data-text-wrap>
+                                                        <span class="tm-cell-text is-collapsed" data-text-content>{{ $displayText }}</span>
+                                                        <span class="tm-cell-actions">
+                                                            @if ($isLongText)
+                                                                <button type="button" class="tm-cell-text-toggle" data-text-toggle>Ver mas</button>
+                                                            @endif
+                                                            <button
+                                                                type="button"
+                                                                class="tm-cell-expand-toggle"
+                                                                data-cell-expand
+                                                                data-col-index="{{ $columnIndex }}"
+                                                                title="Expandir celda"
+                                                                aria-label="Expandir celda"
+                                                            >
+                                                                <i class="fa-solid fa-left-right" aria-hidden="true"></i>
+                                                            </button>
                                                         </span>
-                                                    @else
-                                                        {{ $displayText }}
-                                                    @endif
+                                                    </span>
                                                 @endif
                                             </td>
                                         @endforeach
@@ -245,6 +251,7 @@
         const clearButtons = Array.from(document.querySelectorAll('[data-clear-module-entries]'));
         const imagePreviewButtons = Array.from(document.querySelectorAll('[data-open-image-preview]'));
         const textToggleButtons = Array.from(document.querySelectorAll('[data-text-toggle]'));
+        const cellExpandButtons = Array.from(document.querySelectorAll('[data-cell-expand]'));
         const exportButtons = Array.from(document.querySelectorAll('[data-open-export-options]'));
         const imageModal = document.getElementById('tmImagePreviewModal');
         const imageModalImg = document.getElementById('tmImagePreviewImg');
@@ -310,6 +317,37 @@
                 const isCollapsed = content.classList.contains('is-collapsed');
                 content.classList.toggle('is-collapsed', !isCollapsed);
                 button.textContent = isCollapsed ? 'Ver menos' : 'Ver mas';
+            });
+        });
+
+        cellExpandButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                const colIndex = parseInt(button.getAttribute('data-col-index') || '', 10);
+                const row = button.closest('tr');
+                if (!row || Number.isNaN(colIndex)) {
+                    return;
+                }
+
+                const targetCell = row.querySelector('td[data-admin-col="' + String(colIndex) + '"]');
+                if (!(targetCell instanceof HTMLTableCellElement)) {
+                    return;
+                }
+
+                const wasExpanded = targetCell.classList.contains('is-expanded-cell');
+                const cells = Array.from(row.querySelectorAll('td[data-admin-col]'));
+
+                cells.forEach(function (cell) {
+                    cell.classList.remove('is-expanded-cell', 'is-condensed-cell');
+                });
+
+                if (!wasExpanded) {
+                    targetCell.classList.add('is-expanded-cell');
+                    cells.forEach(function (cell) {
+                        if (cell !== targetCell) {
+                            cell.classList.add('is-condensed-cell');
+                        }
+                    });
+                }
             });
         });
 

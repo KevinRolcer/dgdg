@@ -12,6 +12,7 @@ return [
             'title' => 'Mesas de Paz y Seguridad',
             'route' => 'mesas-paz',
             'permission' => 'Mesas-Paz',
+            'hidden_for_emails' => ['dgdg.admon@gmail.com'],
         ],
         [
             'icon' => 'fa-solid fa-table-columns',

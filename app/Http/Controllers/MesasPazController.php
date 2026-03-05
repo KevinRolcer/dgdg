@@ -183,6 +183,19 @@ class MesasPazController extends Controller
         }
 
         $user = Auth::user();
-        return (bool) ($user && $user->can('Mesas-Paz'));
+        if (!$user) {
+            return false;
+        }
+
+        $blockedEmails = [
+            'dgdg.admon@gmail.com',
+        ];
+
+        $email = mb_strtolower(trim((string) ($user->email ?? '')));
+        if ($email !== '' && in_array($email, $blockedEmails, true)) {
+            return false;
+        }
+
+        return $user->can('Mesas-Paz');
     }
 }
