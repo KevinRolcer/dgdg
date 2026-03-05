@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,6 +25,53 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::define('Mesas-Paz', function ($user) {
+            if (!$user) {
+                return false;
+            }
+
+            $modelTypes = array_values(array_unique([
+                get_class($user),
+                'App\\Models\\User',
+                'App\\User',
+            ]));
+
+            if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
+                return true;
+            }
+
+            $hasDelegadoOrEnlaceRole = DB::table('model_has_roles as mhr')
+                ->join('roles as r', 'r.id', '=', 'mhr.role_id')
+                ->whereIn('mhr.model_type', $modelTypes)
+                ->where('mhr.model_id', (int) $user->id)
+                ->whereIn('r.name', ['Delegado', 'Enlace'])
+                ->exists();
+
+            if ($hasDelegadoOrEnlaceRole) {
+                return true;
+            }
+
+            // Resolve permission by name across role assignments without guard coupling.
+            $hasRolePermission = DB::table('model_has_roles as mhr')
+                ->join('role_has_permissions as rhp', 'rhp.role_id', '=', 'mhr.role_id')
+                ->join('permissions as p', 'p.id', '=', 'rhp.permission_id')
+                ->whereIn('mhr.model_type', $modelTypes)
+                ->where('mhr.model_id', (int) $user->id)
+                ->where('p.name', 'Mesas-Paz')
+                ->exists();
+
+            if ($hasRolePermission) {
+                return true;
+            }
+
+            return DB::table('model_has_permissions as mhp')
+                ->join('permissions as p', 'p.id', '=', 'mhp.permission_id')
+                ->whereIn('mhp.model_type', $modelTypes)
+                ->where('mhp.model_id', (int) $user->id)
+                ->where('p.name', 'Mesas-Paz')
+                ->exists();
+        });
+
         RateLimiter::for('login', function (Request $request) {
             $email = mb_strtolower((string) $request->input('email', ''));
 

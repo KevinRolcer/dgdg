@@ -36,6 +36,15 @@ class MesasPazService
                 ->select(['id', 'microrregion', 'cabecera'])
                 ->orderByRaw('CAST(microrregion AS UNSIGNED)')
                 ->get();
+
+            // Keep only microrregiones that actually exist to avoid null access downstream.
+            $microrregionIds = $microrregionesAsignadas
+                ->pluck('id')
+                ->map(function ($id) {
+                    return (int) $id;
+                })
+                ->values()
+                ->all();
         }
 
         if (count($microrregionIds) > 1) {
@@ -65,10 +74,12 @@ class MesasPazService
         $microrregionNombre = 'Sin microrregión asignada';
         if (count($microrregionIdsFiltradas) === 1) {
             $micro = DB::table('microrregiones')->where('id', $microrregionIdsFiltradas[0])->first();
-            $microrregionNumero = (string) ($micro->microrregion ?? '');
-            $microrregionNombre = $micro->cabecera
-                ?? $micro->microrregion
-                ?? 'Sin microrregión asignada';
+            if ($micro) {
+                $microrregionNumero = (string) ($micro->microrregion ?? '');
+                $microrregionNombre = $micro->cabecera
+                    ?? $micro->microrregion
+                    ?? 'Sin microrregión asignada';
+            }
         } elseif (count($microrregionIds) > 1) {
             $microrregionNombre = 'Múltiples microrregiones asignadas ('.count($microrregionIds).')';
         }

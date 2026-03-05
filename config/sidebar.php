@@ -12,7 +12,6 @@ return [
             'title' => 'Mesas de Paz y Seguridad',
             'route' => 'mesas-paz',
             'permission' => 'Mesas-Paz',
-            'hidden_if_can' => 'Tableros-incidencias',
         ],
         [
             'icon' => 'fa-solid fa-table-columns',

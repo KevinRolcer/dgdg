@@ -12,7 +12,6 @@ use App\Services\MesasPaz\MesasPazService;
 use App\Services\MesasPaz\MesasPazServiceException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class MesasPazController extends Controller
@@ -184,18 +183,6 @@ class MesasPazController extends Controller
         }
 
         $user = Auth::user();
-        if (!$user || !$user->can('Mesas-Paz')) {
-            return false;
-        }
-
-        if ($user->hasRole('Enlace')) {
-            return DB::table('user_microrregion')
-                ->where('user_id', (int) $user->id)
-                ->exists();
-        }
-
-        return DB::table('delegados')
-            ->where('user_id', (int) $user->id)
-            ->exists();
+        return (bool) ($user && $user->can('Mesas-Paz'));
     }
 }

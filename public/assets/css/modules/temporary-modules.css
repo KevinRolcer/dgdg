@@ -318,6 +318,138 @@
     accent-color: var(--clr-primary);
 }
 
+.tm-file-paste-wrap {
+    display: grid;
+    gap: 6px;
+}
+
+.tm-file-paste-wrap.is-dragover {
+    border-color: rgba(199, 155, 102, 0.85);
+    background: rgba(199, 155, 102, 0.12);
+}
+
+.tm-hidden-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.tm-file-upload-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 170px;
+    gap: 10px;
+    align-items: stretch;
+}
+
+.tm-file-upload-controls {
+    display: grid;
+    gap: 8px;
+}
+
+.tm-file-paste-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.tm-file-paste-actions .tm-btn {
+    min-height: 32px;
+    padding: 4px 10px;
+}
+
+.tm-btn-icon {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+}
+
+.tm-btn-icon i {
+    font-size: 0.95rem;
+}
+
+.tm-file-paste-hint {
+    font-size: 0.73rem;
+    color: var(--clr-text-light);
+    font-weight: 500;
+}
+
+.tm-paste-status {
+    min-height: 18px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--clr-text-light);
+}
+
+.tm-paste-status.is-success {
+    color: #246257;
+}
+
+.tm-paste-status.is-error {
+    color: var(--clr-primary-dark);
+}
+
+.tm-paste-zone {
+    min-height: 56px;
+    border: 2px dashed rgba(199, 155, 102, 0.55);
+    border-radius: 10px;
+    padding: 9px 10px;
+    font-size: 0.78rem;
+    color: var(--clr-text-main);
+    background: rgba(199, 155, 102, 0.08);
+    line-height: 1.25;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    font-weight: 700;
+}
+
+.tm-inline-image-preview {
+    border: 1px solid var(--clr-border);
+    border-radius: 10px;
+    background: #fff;
+    min-height: 56px;
+    min-width: 0;
+    display: grid;
+    place-items: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.tm-inline-image-preview img {
+    width: 100%;
+    max-height: 130px;
+    object-fit: cover;
+    display: block;
+}
+
+.tm-inline-image-preview .tm-image-clear {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+}
+
+.tm-paste-zone:focus {
+    outline: 2px solid rgba(199, 155, 102, 0.35);
+    outline-offset: 1px;
+}
+
+.tm-paste-zone.is-dragover {
+    border-color: rgba(199, 155, 102, 0.85);
+    background: rgba(199, 155, 102, 0.12);
+    color: var(--clr-accent);
+}
+
+@media (max-width: 900px) {
+    .tm-file-upload-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
 .tm-fields-head {
     display: flex;
     align-items: center;
@@ -555,6 +687,49 @@
     overflow-x: auto;
 }
 
+.tm-table-wrap.tm-table-wrap-scroll {
+    max-height: min(62vh, 620px);
+    overflow: auto;
+}
+
+.tm-scroll-panel {
+    max-height: min(60vh, 620px);
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.tm-cell-text-wrap {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: min(360px, 100%);
+}
+
+.tm-cell-text {
+    display: inline-block;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.tm-cell-text.is-collapsed {
+    display: -webkit-box;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.tm-cell-text-toggle {
+    align-self: flex-start;
+    border: 0;
+    background: transparent;
+    color: var(--clr-accent);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0;
+    cursor: pointer;
+}
+
 .tm-records-mobile {
     display: none;
 }
@@ -629,6 +804,17 @@
 
 .tm-records-container {
     gap: 10px;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.tm-module-records-panels,
+.tm-module-records-panel,
+.tm-records-desktop,
+.tm-records-mobile {
+    min-width: 0;
+    max-width: 100%;
 }
 
 .tm-module-filters {
@@ -673,6 +859,11 @@
     min-width: 700px;
 }
 
+.tm-records-desktop .tm-table {
+    width: max-content;
+    min-width: 100%;
+}
+
 .tm-table th,
 .tm-table td {
     border-bottom: 1px solid var(--clr-border);
@@ -681,6 +872,14 @@
     vertical-align: top;
     font-size: 0.82rem;
     color: var(--clr-text-main);
+}
+
+.tm-records-desktop .tm-table th,
+.tm-records-desktop .tm-table td {
+    max-width: 220px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .tm-table th {

@@ -22,7 +22,7 @@
     @endphp
 
     <div class="tm-section-switch" role="tablist" aria-label="Cambiar vista de captura temporal">
-        <button type="button" class="tm-section-tab {{ $isUploadSection ? 'is-active' : '' }}" data-section-tab data-section-target="tmUploadView" role="tab" aria-selected="{{ $isUploadSection ? 'true' : 'false' }}">Subir información</button>
+        <button type="button" class="tm-section-tab {{ $isUploadSection ? 'is-active' : '' }}" data-section-tab data-section-target="tmUploadView" role="tab" aria-selected="{{ $isUploadSection ? 'true' : 'false' }}">Subir informacion</button>
         <button type="button" class="tm-section-tab {{ !$isUploadSection ? 'is-active' : '' }}" data-section-tab data-section-target="tmRecordsView" role="tab" aria-selected="{{ !$isUploadSection ? 'true' : 'false' }}">Ver mis registros</button>
     </div>
 
@@ -32,11 +32,11 @@
                 <article class="content-card tm-card tm-module-card tm-upload-card">
                     <div class="tm-upload-card-head">
                         <h2>{{ $module->name }}</h2>
-                        <p>{{ $module->description ?: 'Sin descripción adicional.' }}</p>
+                        <p>{{ $module->description ?: 'Sin descripcion adicional.' }}</p>
                     </div>
 
                     <div class="tm-upload-meta-row">
-                        <span class="tm-upload-meta-pill"><strong>Vence:</strong> {{ optional($module->expires_at)->format('d/m/Y H:i') ?? 'Sin límite' }}</span>
+                        <span class="tm-upload-meta-pill"><strong>Vence:</strong> {{ optional($module->expires_at)->format('d/m/Y H:i') ?? 'Sin limite' }}</span>
                         <span class="tm-upload-meta-pill"><strong>Mis registros:</strong> {{ $module->my_entries_count }}</span>
                     </div>
 
@@ -46,13 +46,13 @@
                             class="tm-btn tm-btn-primary"
                             data-open-module-preview="delegate-preview-{{ $module->id }}"
                         >
-                            Registrar información
+                            Registrar informacion
                         </button>
                     </div>
                 </article>
             @empty
                 <article class="content-card tm-card">
-                    <p>No hay módulos temporales activos en este momento.</p>
+                    <p>No hay modulos temporales activos en este momento.</p>
                 </article>
             @endforelse
         </div>
@@ -64,14 +64,14 @@
             <div class="tm-modal-dialog tm-modal-dialog-entry">
                 <div class="tm-modal-head">
                     <div class="tm-modal-head-stack">
-                        <h3>Registro de módulo temporal</h3>
+                        <h3>Registro de modulo temporal</h3>
                         <p class="tm-modal-subtitle">{{ $module->name }}</p>
                     </div>
                     <button type="button" class="tm-modal-close" data-close-module-preview>&times;</button>
                 </div>
 
                 <div class="tm-modal-body">
-                    <p class="tm-entry-subtitle">{{ $module->description ?: 'Completa los datos requeridos para este módulo.' }}</p>
+                    <p class="tm-entry-subtitle">{{ $module->description ?: 'Completa los datos requeridos para este modulo.' }}</p>
 
                     @php
                         $savedData = [];
@@ -87,11 +87,11 @@
                         @csrf
                         @if ($mostrarSelectorMicrorregion)
                             <label class="tm-col-full tm-entry-field">
-                                Microrregión de captura *
+                                Microrregion de captura *
                                 <select name="selected_microrregion_id" class="tm-mr-selector" required>
                                     @foreach ($microsAsignadas as $micro)
                                         <option value="{{ $micro->id }}" @selected($loop->first)>
-                                            MR {{ $micro->microrregion }} — {{ $micro->cabecera }}
+                                            MR {{ $micro->microrregion }} - {{ $micro->cabecera }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -108,7 +108,6 @@
                                     $id = 'field_'.$module->id.'_'.$field->key;
                                     $value = old('values.'.$field->key, $savedData[$field->key] ?? null);
                                     $isMediaField = in_array($field->type, ['image', 'file'], true);
-                                    $isLong = $field->type === 'textarea';
                                 @endphp
                                 @if ($isMediaField && !$mediaDividerPrinted)
                                     <div class="tm-form-divider tm-col-full">
@@ -117,7 +116,7 @@
                                     @php $mediaDividerPrinted = true; @endphp
                                 @endif
 
-                                <label class="{{ $isLong ? 'tm-col-full' : '' }} tm-entry-field {{ $isMediaField ? 'is-media' : '' }}">
+                                <label class="tm-entry-field {{ $isMediaField ? 'is-media' : '' }}">
                                     {{ $field->label }} {{ $field->is_required ? '*' : '' }}
                                     @if (!empty($field->comment))
                                         <small class="tm-field-help">{{ $field->comment }}</small>
@@ -133,7 +132,7 @@
                                         <input id="{{ $id }}" type="datetime-local" name="{{ $name }}" value="{{ $value }}" {{ $field->is_required ? 'required' : '' }}>
                                     @elseif ($field->type === 'select')
                                         <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
-                                            <option value="">Selecciona una opción</option>
+                                            <option value="">Selecciona una opcion</option>
                                             @foreach (($field->options ?? []) as $option)
                                                 <option value="{{ $option }}" @selected($value === $option)>{{ $option }}</option>
                                             @endforeach
@@ -148,12 +147,18 @@
                                     @elseif ($field->type === 'boolean')
                                         <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
                                             <option value="">Selecciona</option>
-                                            <option value="1" @selected($value === '1')>Sí</option>
+                                            <option value="1" @selected($value === '1')>Si</option>
                                             <option value="0" @selected($value === '0')>No</option>
                                         </select>
                                     @elseif (in_array($field->type, ['image', 'file'], true))
-                                        <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
-                                        <small class="tm-field-help">También puedes pegar una imagen con Ctrl+V.</small>
+                                        <div class="tm-file-paste-wrap" data-paste-upload-wrap>
+                                            <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
+                                            <div class="tm-file-paste-actions">
+                                                <button type="button" class="tm-btn tm-btn-icon" data-paste-image-button data-target-input="{{ $id }}" aria-label="Pegar imagen" title="Pegar imagen">
+                                                    <i class="fa-regular fa-paste" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                        </div>
                                         <div class="tm-image-preview" data-image-preview hidden>
                                             <img src="" alt="Vista previa" data-image-preview-img>
                                             <button type="button" class="tm-image-clear" data-image-remove aria-label="Quitar imagen">&times;</button>
@@ -206,7 +211,6 @@
                                         $id = 'edit_'.$entry->id.'_'.$field->key;
                                         $value = old('values.'.$field->key, $entry->data[$field->key] ?? null);
                                         $isMediaField = in_array($field->type, ['image', 'file'], true);
-                                        $isLong = $field->type === 'textarea';
                                         $hasExistingImage = is_string($entry->data[$field->key] ?? null) && trim((string) ($entry->data[$field->key] ?? '')) !== '';
                                     @endphp
                                     @if ($isMediaField && !$mediaDividerPrinted)
@@ -216,7 +220,7 @@
                                         @php $mediaDividerPrinted = true; @endphp
                                     @endif
 
-                                    <label class="{{ $isLong ? 'tm-col-full' : '' }} tm-entry-field {{ $isMediaField ? 'is-media' : '' }}">
+                                    <label class="tm-entry-field {{ $isMediaField ? 'is-media' : '' }}">
                                         {{ $field->label }} {{ $field->is_required ? '*' : '' }}
                                         @if (!empty($field->comment))
                                             <small class="tm-field-help">{{ $field->comment }}</small>
@@ -232,7 +236,7 @@
                                             <input id="{{ $id }}" type="datetime-local" name="{{ $name }}" value="{{ $value }}" {{ $field->is_required ? 'required' : '' }}>
                                         @elseif ($field->type === 'select')
                                             <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
-                                                <option value="">Selecciona una opción</option>
+                                                <option value="">Selecciona una opcion</option>
                                                 @foreach (($field->options ?? []) as $option)
                                                     <option value="{{ $option }}" @selected($value === $option)>{{ $option }}</option>
                                                 @endforeach
@@ -247,12 +251,18 @@
                                         @elseif ($field->type === 'boolean')
                                             <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
                                                 <option value="">Selecciona</option>
-                                                <option value="1" @selected((string) $value === '1')>Sí</option>
+                                                <option value="1" @selected((string) $value === '1')>Si</option>
                                                 <option value="0" @selected((string) $value === '0')>No</option>
                                             </select>
                                         @elseif (in_array($field->type, ['image', 'file'], true))
-                                            <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" {{ ($field->is_required && !$hasExistingImage) ? 'required' : '' }}>
-                                            <small class="tm-field-help">También puedes pegar una imagen con Ctrl+V.</small>
+                                            <div class="tm-file-paste-wrap" data-paste-upload-wrap>
+                                                <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" {{ ($field->is_required && !$hasExistingImage) ? 'required' : '' }}>
+                                                <div class="tm-file-paste-actions">
+                                                    <button type="button" class="tm-btn tm-btn-icon" data-paste-image-button data-target-input="{{ $id }}" aria-label="Pegar imagen" title="Pegar imagen">
+                                                        <i class="fa-regular fa-paste" aria-hidden="true"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
                                             <input type="hidden" name="remove_images[{{ $field->key }}]" value="0" data-remove-flag>
                                             <div class="tm-image-preview" data-image-preview {{ is_string($value) && $value !== '' ? '' : 'hidden' }}>
                                                 <img
@@ -280,20 +290,21 @@
         @endforeach
     @endforeach
 
-    <section class="tm-section-panel {{ !$isUploadSection ? 'is-active' : '' }}" id="tmRecordsView" role="tabpanel" aria-hidden="{{ !$isUploadSection ? 'false' : 'true' }}">
+    <section class="tm-section-panel {{ !$isUploadSection ? 'is-active' : '' }}" id="tmRecordsView" role="tabpanel" aria-hidden="{{ !$isUploadSection ? 'false' : 'true' }}" data-records-url="{{ route('temporary-modules.records') }}">
     @if ($modules->isNotEmpty())
         <article class="content-card tm-card tm-records-container">
             <h2>Mis registros</h2>
 
-            <div class="tm-module-filters" role="tablist" aria-label="Filtrar por módulo temporal">
+            <div class="tm-module-filters" role="tablist" aria-label="Filtrar por modulo temporal">
                 @foreach ($modules as $module)
+                    @php $isModuleActive = (int) ($activeModuleId ?? 0) === (int) $module->id || ((int) ($activeModuleId ?? 0) === 0 && $loop->first); @endphp
                     <button
                         type="button"
-                        class="tm-module-chip {{ $loop->first ? 'is-active' : '' }}"
+                        class="tm-module-chip {{ $isModuleActive ? 'is-active' : '' }}"
                         data-module-filter
                         data-module-target="module-records-{{ $module->id }}"
                         role="tab"
-                        aria-selected="{{ $loop->first ? 'true' : 'false' }}"
+                        aria-selected="{{ $isModuleActive ? 'true' : 'false' }}"
                     >
                         {{ $module->name }}
                     </button>
@@ -304,16 +315,17 @@
                 @foreach ($modules as $module)
                     @php
                         $municipioField = $module->fields->firstWhere('type', 'municipio');
+                        $isModuleActive = (int) ($activeModuleId ?? 0) === (int) $module->id || ((int) ($activeModuleId ?? 0) === 0 && $loop->first);
                     @endphp
                     <section
-                        class="tm-module-records-panel {{ $loop->first ? 'is-active' : '' }}"
+                        class="tm-module-records-panel {{ $isModuleActive ? 'is-active' : '' }}"
                         id="module-records-{{ $module->id }}"
                         role="tabpanel"
-                        aria-hidden="{{ $loop->first ? 'false' : 'true' }}"
+                        aria-hidden="{{ $isModuleActive ? 'false' : 'true' }}"
                     >
                         <p class="tm-module-subtitle">{{ $module->name }}</p>
 
-                        <div class="tm-records-mobile">
+                        <div class="tm-records-mobile tm-scroll-panel">
                             @forelse ($module->getRelation('myEntries') as $entry)
                                 @php
                                     $municipioValue = $municipioField ? ($entry->data[$municipioField->key] ?? null) : null;
@@ -346,9 +358,31 @@
                                                             <img class="tm-thumb" src="{{ route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) }}" alt="{{ $field->label }}">
                                                         </button>
                                                     @elseif (is_bool($cell))
-                                                        {{ $cell ? 'Sí' : 'No' }}
+                                                        {{ $cell ? 'Si' : 'No' }}
                                                     @else
-                                                        {{ $cell ?? '—' }}
+                                                        @php
+                                                            if (is_array($cell)) {
+                                                                $displayText = implode(', ', array_map(function ($item) {
+                                                                    return is_scalar($item)
+                                                                        ? (string) $item
+                                                                        : json_encode($item, JSON_UNESCAPED_UNICODE);
+                                                                }, $cell));
+                                                            } elseif (is_scalar($cell)) {
+                                                                $displayText = (string) $cell;
+                                                            } else {
+                                                                $displayText = '-';
+                                                            }
+                                                            $displayText = trim($displayText) !== '' ? $displayText : '-';
+                                                            $isLongText = mb_strlen($displayText) > 120;
+                                                        @endphp
+                                                        @if ($isLongText)
+                                                            <span class="tm-cell-text-wrap" data-text-wrap>
+                                                                <span class="tm-cell-text is-collapsed" data-text-content>{{ $displayText }}</span>
+                                                                <button type="button" class="tm-cell-text-toggle" data-text-toggle>Ver mas</button>
+                                                            </span>
+                                                        @else
+                                                            {{ $displayText }}
+                                                        @endif
                                                     @endif
                                                 </div>
                                             </div>
@@ -364,7 +398,7 @@
                             @endforelse
                         </div>
 
-                        <div class="tm-table-wrap tm-records-desktop">
+                        <div class="tm-table-wrap tm-table-wrap-scroll tm-records-desktop">
                             <table class="tm-table">
                                 <thead>
                                     <tr>
@@ -395,9 +429,31 @@
                                                             <img class="tm-thumb" src="{{ route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) }}" alt="{{ $field->label }}">
                                                         </button>
                                                     @elseif (is_bool($cell))
-                                                        {{ $cell ? 'Sí' : 'No' }}
+                                                        {{ $cell ? 'Si' : 'No' }}
                                                     @else
-                                                        {{ $cell ?? '—' }}
+                                                        @php
+                                                            if (is_array($cell)) {
+                                                                $displayText = implode(', ', array_map(function ($item) {
+                                                                    return is_scalar($item)
+                                                                        ? (string) $item
+                                                                        : json_encode($item, JSON_UNESCAPED_UNICODE);
+                                                                }, $cell));
+                                                            } elseif (is_scalar($cell)) {
+                                                                $displayText = (string) $cell;
+                                                            } else {
+                                                                $displayText = '-';
+                                                            }
+                                                            $displayText = trim($displayText) !== '' ? $displayText : '-';
+                                                            $isLongText = mb_strlen($displayText) > 120;
+                                                        @endphp
+                                                        @if ($isLongText)
+                                                            <span class="tm-cell-text-wrap" data-text-wrap>
+                                                                <span class="tm-cell-text is-collapsed" data-text-content>{{ $displayText }}</span>
+                                                                <button type="button" class="tm-cell-text-toggle" data-text-toggle>Ver mas</button>
+                                                            </span>
+                                                        @else
+                                                            {{ $displayText }}
+                                                        @endif
                                                     @endif
                                                 </td>
                                             @endforeach
@@ -419,7 +475,7 @@
         </article>
     @else
         <article class="content-card tm-card">
-            <p>No hay módulos temporales para mostrar registros.</p>
+            <p>No hay modulos temporales para mostrar registros.</p>
         </article>
     @endif
     </section>
@@ -452,10 +508,15 @@
         const moduleFilterButtons = Array.from(document.querySelectorAll('[data-module-filter]'));
         const modulePanels = Array.from(document.querySelectorAll('.tm-module-records-panel'));
         const imagePreviewButtons = Array.from(document.querySelectorAll('[data-open-image-preview]'));
+        const textToggleButtons = Array.from(document.querySelectorAll('[data-text-toggle]'));
+        const pasteButtons = Array.from(document.querySelectorAll('[data-paste-image-button]'));
+        const pasteUploadAreas = Array.from(document.querySelectorAll('[data-paste-upload-wrap]'));
         const imageModal = document.getElementById('tmImagePreviewModal');
         const imageModalImg = document.getElementById('tmImagePreviewImg');
         const imageModalTitle = document.getElementById('tmImagePreviewTitle');
         const imageInputSelector = 'input[type="file"][accept="image/*"]';
+        const recordsViewPanel = document.getElementById('tmRecordsView');
+        const recordsUrl = recordsViewPanel ? String(recordsViewPanel.getAttribute('data-records-url') || '') : '';
         let lastFocusedImageInput = null;
         const modalOpeners = new Map();
         const notify = function (title, message, type) {
@@ -612,6 +673,59 @@
             initializeImagePreview(input);
         });
 
+        pasteButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                const targetId = button.getAttribute('data-target-input') || '';
+                const input = targetId ? document.getElementById(targetId) : null;
+                if (!(input instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                pasteImageFromClipboardApi(input);
+            });
+        });
+
+        pasteUploadAreas.forEach(function (area) {
+            const input = area.querySelector(imageInputSelector);
+            if (!(input instanceof HTMLInputElement)) {
+                return;
+            }
+
+            area.addEventListener('focusin', function () {
+                lastFocusedImageInput = input;
+            });
+
+            area.addEventListener('dragenter', function (event) {
+                event.preventDefault();
+                area.classList.add('is-dragover');
+            });
+
+            area.addEventListener('dragover', function (event) {
+                event.preventDefault();
+                area.classList.add('is-dragover');
+            });
+
+            area.addEventListener('dragleave', function () {
+                area.classList.remove('is-dragover');
+            });
+
+            area.addEventListener('drop', function (event) {
+                event.preventDefault();
+                area.classList.remove('is-dragover');
+
+                const imageFile = getImageFileFromFileList(event.dataTransfer ? event.dataTransfer.files : []);
+                if (!imageFile) {
+                    notify('Aviso', 'Solo se permiten imagenes al arrastrar.', 'warning');
+                    return;
+                }
+
+                const wasAssigned = setSelectedFileOnInput(input, imageFile);
+                if (!wasAssigned) {
+                    notify('Aviso', 'No se pudo adjuntar la imagen arrastrada.', 'warning');
+                }
+            });
+        });
+
         const getPasteTargetInput = function (event) {
             const eventTarget = event.target instanceof HTMLElement ? event.target : null;
             if (eventTarget) {
@@ -672,6 +786,101 @@
             }
 
             return null;
+        };
+
+        const extensionFromMime = function (mimeType) {
+            if (mimeType === 'image/jpeg') {
+                return 'jpg';
+            }
+
+            if (mimeType === 'image/png') {
+                return 'png';
+            }
+
+            if (mimeType === 'image/webp') {
+                return 'webp';
+            }
+
+            if (mimeType === 'image/gif') {
+                return 'gif';
+            }
+
+            return 'png';
+        };
+
+        const getImageFileFromFileList = function (files) {
+            const list = Array.from(files || []);
+            for (let index = 0; index < list.length; index += 1) {
+                const file = list[index];
+                if (file && String(file.type || '').indexOf('image/') === 0) {
+                    return file;
+                }
+            }
+
+            return null;
+        };
+
+        const setSelectedFileOnInput = function (input, file) {
+            if (!(input instanceof HTMLInputElement) || !file || typeof DataTransfer === 'undefined') {
+                return false;
+            }
+
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            input.files = transfer.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.focus();
+            lastFocusedImageInput = input;
+            return true;
+        };
+
+        const setImageFileOnInput = function (input, blob, mimeType) {
+            if (!(input instanceof HTMLInputElement) || !blob || typeof DataTransfer === 'undefined') {
+                return false;
+            }
+
+            const type = mimeType || blob.type || 'image/png';
+            const fileName = 'pegada_' + Date.now() + '.' + extensionFromMime(type);
+            const file = new File([blob], fileName, {
+                type: type,
+                lastModified: Date.now(),
+            });
+
+            return setSelectedFileOnInput(input, file);
+        };
+
+        const pasteImageFromClipboardApi = async function (targetInput) {
+            if (!(targetInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            if (!window.isSecureContext || !navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
+                notify('Aviso', 'Tu navegador no permite leer portapapeles directo. Usa Ctrl+V.', 'warning');
+                return;
+            }
+
+            try {
+                const clipboardItems = await navigator.clipboard.read();
+                for (const clipboardItem of clipboardItems) {
+                    const imageType = clipboardItem.types.find(function (type) {
+                        return String(type || '').indexOf('image/') === 0;
+                    });
+
+                    if (!imageType) {
+                        continue;
+                    }
+
+                    const blob = await clipboardItem.getType(imageType);
+                    const assigned = setImageFileOnInput(targetInput, blob, imageType);
+                    if (assigned) {
+                        return;
+                    }
+                }
+
+                notify('Aviso', 'No se detecto imagen en el portapapeles.', 'warning');
+            } catch (error) {
+                notify('Aviso', 'No se pudo leer el portapapeles.', 'warning');
+            }
         };
 
         const closeModal = function (modal) {
@@ -752,7 +961,7 @@
                         throw result.data;
                     }
 
-                    notify('Éxito', result.data.message || 'Registro guardado correctamente.', 'success');
+                    notify('Exito', result.data.message || 'Registro guardado correctamente.', 'success');
 
                     const selectedMr = microrregionSelector ? String(microrregionSelector.value || '') : '';
                     form.reset();
@@ -773,6 +982,22 @@
                     Array.from(form.querySelectorAll('[data-remove-flag]')).forEach(function (flag) {
                         flag.value = '0';
                     });
+
+                    const ownerModal = form.closest('.tm-modal');
+                    const ownerModalId = ownerModal ? String(ownerModal.id || '') : '';
+                    const moduleId = ownerModalId.startsWith('delegate-preview-')
+                        ? ownerModalId.replace('delegate-preview-', '')
+                        : '';
+
+                    if (recordsUrl) {
+                        const url = new URL(recordsUrl, window.location.origin);
+                        if (/^\d+$/.test(moduleId)) {
+                            url.searchParams.set('module', moduleId);
+                        }
+
+                        window.location.href = url.toString();
+                        return;
+                    }
                 })
                 .catch(function (errorData) {
                     const backendErrors = errorData && errorData.errors ? Object.values(errorData.errors).flat() : [];
@@ -799,6 +1024,20 @@
             button.addEventListener('click', function () {
                 const targetId = button.getAttribute('data-section-target') || '';
                 activateSectionPanel(targetId);
+            });
+        });
+
+        textToggleButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                const wrap = button.closest('[data-text-wrap]');
+                const content = wrap ? wrap.querySelector('[data-text-content]') : null;
+                if (!(content instanceof HTMLElement)) {
+                    return;
+                }
+
+                const isCollapsed = content.classList.contains('is-collapsed');
+                content.classList.toggle('is-collapsed', !isCollapsed);
+                button.textContent = isCollapsed ? 'Ver menos' : 'Ver mas';
             });
         });
 
@@ -857,17 +1096,12 @@
             }
 
             if (typeof DataTransfer === 'undefined') {
-                notify('Aviso', 'Tu navegador no permite pegar imágenes automáticamente en este campo.', 'warning');
+                notify('Aviso', 'Tu navegador no permite pegar imagenes automaticamente en este campo.', 'warning');
                 return;
             }
 
             event.preventDefault();
-            const transfer = new DataTransfer();
-            transfer.items.add(imageFile);
-            targetInput.files = transfer.files;
-            targetInput.dispatchEvent(new Event('change', { bubbles: true }));
-            targetInput.focus();
-            lastFocusedImageInput = targetInput;
+            setSelectedFileOnInput(targetInput, imageFile);
         });
     });
 </script>

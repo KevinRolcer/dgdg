@@ -26,7 +26,7 @@
             </div>
         </div>
 
-        <div class="tm-table-wrap">
+        <div class="tm-table-wrap tm-table-wrap-scroll">
             <table class="tm-table">
                 <thead>
                     <tr>
@@ -42,7 +42,18 @@
                         <tr>
                             <td>
                                 <strong>{{ $module->name }}</strong>
-                                <small>{{ $module->description ?: 'Sin descripción adicional.' }}</small>
+                                @php
+                                    $moduleDescription = (string) ($module->description ?: 'Sin descripcion adicional.');
+                                    $isLongModuleDescription = mb_strlen($moduleDescription) > 120;
+                                @endphp
+                                @if ($isLongModuleDescription)
+                                    <small class="tm-cell-text-wrap" data-text-wrap>
+                                        <span class="tm-cell-text is-collapsed" data-text-content>{{ $moduleDescription }}</span>
+                                        <button type="button" class="tm-cell-text-toggle" data-text-toggle>Ver mas</button>
+                                    </small>
+                                @else
+                                    <small>{{ $moduleDescription }}</small>
+                                @endif
                             </td>
                             <td>{{ optional($module->expires_at)->format('d/m/Y H:i') ?? 'Sin límite' }}</td>
                             <td>{{ $module->entries_count }}</td>
@@ -98,7 +109,18 @@
                 </div>
 
                 <div class="tm-modal-body">
-                    <p>{{ $module->description ?: 'Sin descripción adicional.' }}</p>
+                    @php
+                        $moduleDescription = (string) ($module->description ?: 'Sin descripcion adicional.');
+                        $isLongModuleDescription = mb_strlen($moduleDescription) > 180;
+                    @endphp
+                    @if ($isLongModuleDescription)
+                        <p class="tm-cell-text-wrap" data-text-wrap>
+                            <span class="tm-cell-text is-collapsed" data-text-content>{{ $moduleDescription }}</span>
+                            <button type="button" class="tm-cell-text-toggle" data-text-toggle>Ver mas</button>
+                        </p>
+                    @else
+                        <p>{{ $moduleDescription }}</p>
+                    @endif
 
                     <h4>Campos definidos</h4>
                     <ul class="tm-field-preview-list">
@@ -108,7 +130,7 @@
                     </ul>
 
                     <h4>Registros de delegados</h4>
-                    <div class="tm-table-wrap">
+                    <div class="tm-table-wrap tm-table-wrap-scroll">
                         <table class="tm-table">
                             <thead>
                                 <tr>
@@ -142,7 +164,29 @@
                                                 @elseif (is_bool($cell))
                                                     {{ $cell ? 'Sí' : 'No' }}
                                                 @else
-                                                    {{ $cell ?? '—' }}
+                                                    @php
+                                                        if (is_array($cell)) {
+                                                            $displayText = implode(', ', array_map(function ($item) {
+                                                                return is_scalar($item)
+                                                                    ? (string) $item
+                                                                    : json_encode($item, JSON_UNESCAPED_UNICODE);
+                                                            }, $cell));
+                                                        } elseif (is_scalar($cell)) {
+                                                            $displayText = (string) $cell;
+                                                        } else {
+                                                            $displayText = '-';
+                                                        }
+                                                        $displayText = trim($displayText) !== '' ? $displayText : '-';
+                                                        $isLongText = mb_strlen($displayText) > 120;
+                                                    @endphp
+                                                    @if ($isLongText)
+                                                        <span class="tm-cell-text-wrap" data-text-wrap>
+                                                            <span class="tm-cell-text is-collapsed" data-text-content>{{ $displayText }}</span>
+                                                            <button type="button" class="tm-cell-text-toggle" data-text-toggle>Ver mas</button>
+                                                        </span>
+                                                    @else
+                                                        {{ $displayText }}
+                                                    @endif
                                                 @endif
                                             </td>
                                         @endforeach
@@ -200,6 +244,7 @@
         const openButtons = Array.from(document.querySelectorAll('[data-open-module-preview]'));
         const clearButtons = Array.from(document.querySelectorAll('[data-clear-module-entries]'));
         const imagePreviewButtons = Array.from(document.querySelectorAll('[data-open-image-preview]'));
+        const textToggleButtons = Array.from(document.querySelectorAll('[data-text-toggle]'));
         const exportButtons = Array.from(document.querySelectorAll('[data-open-export-options]'));
         const imageModal = document.getElementById('tmImagePreviewModal');
         const imageModalImg = document.getElementById('tmImagePreviewImg');
@@ -251,6 +296,20 @@
                 modal.classList.add('is-open');
                 modal.setAttribute('aria-hidden', 'false');
                 document.body.style.overflow = 'hidden';
+            });
+        });
+
+        textToggleButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                const wrap = button.closest('[data-text-wrap]');
+                const content = wrap ? wrap.querySelector('[data-text-content]') : null;
+                if (!(content instanceof HTMLElement)) {
+                    return;
+                }
+
+                const isCollapsed = content.classList.contains('is-collapsed');
+                content.classList.toggle('is-collapsed', !isCollapsed);
+                button.textContent = isCollapsed ? 'Ver menos' : 'Ver mas';
             });
         });
 

@@ -18,7 +18,7 @@
         <div class="tm-head tm-head-stack">
             <div>
                 <h2>{{ $temporaryModule->name }}</h2>
-                <p>{{ $temporaryModule->description ?: 'Completa los datos requeridos para este módulo.' }}</p>
+                <p>{{ $temporaryModule->description ?: 'Completa los datos requeridos para este modulo.' }}</p>
             </div>
             <a href="{{ route('temporary-modules.index') }}" class="tm-btn">Volver</a>
         </div>
@@ -33,11 +33,11 @@
 
             @if ($mostrarSelectorMicrorregion)
                 <label class="tm-col-full">
-                    Microrregión de captura *
+                    Microrregion de captura *
                     <select id="tmMicrorregionSelector" name="selected_microrregion_id" required>
                         @foreach ($microsAsignadas as $micro)
                             <option value="{{ $micro->id }}" @selected((int) $microrregionId === (int) $micro->id)>
-                                MR {{ $micro->microrregion }} — {{ $micro->cabecera }}
+                                MR {{ $micro->microrregion }} - {{ $micro->cabecera }}
                             </option>
                         @endforeach
                     </select>
@@ -52,9 +52,8 @@
                         $name = 'values['.$field->key.']';
                         $id = 'field_'.$field->key;
                         $value = old('values.'.$field->key);
-                        $isLong = in_array($field->type, ['textarea', 'image', 'file'], true);
                     @endphp
-                    <label class="{{ $isLong ? 'tm-col-full' : '' }}">
+                    <label>
                         {{ $field->label }} {{ $field->is_required ? '*' : '' }}
                         @if (!empty($field->comment))
                             <small class="tm-field-help">{{ $field->comment }}</small>
@@ -70,7 +69,7 @@
                             <input id="{{ $id }}" type="datetime-local" name="{{ $name }}" value="{{ $value }}" {{ $field->is_required ? 'required' : '' }}>
                         @elseif ($field->type === 'select')
                             <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
-                                <option value="">Selecciona una opción</option>
+                                <option value="">Selecciona una opcion</option>
                                 @foreach (($field->options ?? []) as $option)
                                     <option value="{{ $option }}" @selected($value === $option)>{{ $option }}</option>
                                 @endforeach
@@ -91,11 +90,43 @@
                         @elseif ($field->type === 'boolean')
                             <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
                                 <option value="">Selecciona</option>
-                                <option value="1" @selected($value === '1')>Sí</option>
+                                <option value="1" @selected($value === '1')>Si</option>
                                 <option value="0" @selected($value === '0')>No</option>
                             </select>
                         @elseif (in_array($field->type, ['image', 'file'], true))
-                            <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
+                            <div class="tm-file-paste-wrap" data-paste-upload-wrap>
+                                <input
+                                    id="{{ $id }}"
+                                    type="file"
+                                    accept="image/*"
+                                    name="{{ $name }}"
+                                    class="tm-hidden-file-input"
+                                    data-paste-upload-input
+                                    {{ $field->is_required ? 'required' : '' }}
+                                >
+                                <div class="tm-file-upload-layout">
+                                    <div class="tm-file-upload-controls">
+                                        <div class="tm-file-paste-actions">
+                                            <button
+                                                type="button"
+                                                class="tm-btn tm-btn-icon"
+                                                data-paste-image-button
+                                                data-target-input="{{ $id }}"
+                                                aria-label="Pegar imagen"
+                                                title="Pegar imagen"
+                                            >
+                                                <i class="fa-regular fa-paste" aria-hidden="true"></i>
+                                            </button>
+                                        </div>
+                                        <div class="tm-paste-zone" contenteditable="true" data-paste-zone data-target-input="{{ $id }}" role="textbox" aria-label="Area para pegar imagen">Pega o arrastra imagen</div>
+                                    </div>
+                                    <div class="tm-inline-image-preview" data-inline-image-preview hidden>
+                                        <img src="" alt="Vista previa" data-inline-image-preview-img>
+                                        <button type="button" class="tm-image-clear" data-inline-image-remove aria-label="Quitar imagen">&times;</button>
+                                    </div>
+                                </div>
+                                <small class="tm-paste-status" id="paste_status_{{ $id }}" aria-live="polite"></small>
+                            </div>
                         @else
                             <input id="{{ $id }}" type="text" name="{{ $name }}" value="{{ $value }}" {{ $field->is_required ? 'required' : '' }}>
                         @endif
@@ -141,16 +172,16 @@
                                             <img class="tm-thumb" src="{{ route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) }}" alt="{{ $field->label }}">
                                         </button>
                                     @elseif (is_bool($cell))
-                                        {{ $cell ? 'Sí' : 'No' }}
+                                        {{ $cell ? 'Si' : 'No' }}
                                     @else
-                                        {{ $cell ?? '—' }}
+                                        {{ $cell ?? '-' }}
                                     @endif
                                 </td>
                             @endforeach
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $fields->count() + 1 }}">Aún no tienes registros en este módulo.</td>
+                            <td colspan="{{ $fields->count() + 1 }}">Aun no tienes registros en este modulo.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -177,6 +208,282 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const pasteButtons = Array.from(document.querySelectorAll('[data-paste-image-button]'));
+        const pasteInputs = Array.from(document.querySelectorAll('[data-paste-upload-input]'));
+        const pasteZones = Array.from(document.querySelectorAll('[data-paste-zone]'));
+        let activePasteInput = null;
+
+        const extensionFromMime = function (mimeType) {
+            if (mimeType === 'image/jpeg') {
+                return 'jpg';
+            }
+
+            if (mimeType === 'image/png') {
+                return 'png';
+            }
+
+            if (mimeType === 'image/webp') {
+                return 'webp';
+            }
+
+            if (mimeType === 'image/gif') {
+                return 'gif';
+            }
+
+            return 'png';
+        };
+
+        const getStatusElement = function (input) {
+            if (!input || !input.id) {
+                return null;
+            }
+
+            return document.getElementById('paste_status_' + input.id);
+        };
+
+        const setStatus = function (statusElement, message, hasError) {
+            if (!statusElement) {
+                return;
+            }
+
+            statusElement.textContent = message;
+            statusElement.classList.toggle('is-error', Boolean(hasError));
+            statusElement.classList.toggle('is-success', !hasError && message !== '');
+        };
+
+        const setFileInInput = function (input, file) {
+            if (!input || !file || typeof DataTransfer === 'undefined') {
+                return false;
+            }
+
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            input.files = transfer.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+        };
+
+        const setPreview = function (input, file) {
+            const wrap = input.closest('[data-paste-upload-wrap]');
+            if (!wrap) {
+                return;
+            }
+
+            const preview = wrap.querySelector('[data-inline-image-preview]');
+            const previewImg = wrap.querySelector('[data-inline-image-preview-img]');
+            if (!(preview instanceof HTMLElement) || !(previewImg instanceof HTMLImageElement)) {
+                return;
+            }
+
+            if (!file) {
+                preview.hidden = true;
+                previewImg.removeAttribute('src');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                previewImg.src = String(event.target && event.target.result ? event.target.result : '');
+                preview.hidden = false;
+            };
+            reader.readAsDataURL(file);
+        };
+
+        const getImageFileFromFileList = function (files) {
+            const list = Array.from(files || []);
+            for (let index = 0; index < list.length; index += 1) {
+                const file = list[index];
+                if (file && String(file.type || '').indexOf('image/') === 0) {
+                    return file;
+                }
+            }
+
+            return null;
+        };
+
+        const assignClipboardFile = function (input, blob) {
+            if (!input || !blob) {
+                return false;
+            }
+
+            const mimeType = blob.type || 'image/png';
+            const extension = extensionFromMime(mimeType);
+            const fileName = 'pegada_' + Date.now() + '.' + extension;
+            const file = new File([blob], fileName, {
+                type: mimeType,
+                lastModified: Date.now(),
+            });
+
+            return setFileInInput(input, file);
+        };
+
+        const handlePasteEvent = function (event, input) {
+            const statusElement = getStatusElement(input);
+            const items = event.clipboardData ? Array.from(event.clipboardData.items || []) : [];
+
+            const imageItem = items.find(function (item) {
+                return item.kind === 'file' && String(item.type || '').indexOf('image/') === 0;
+            });
+
+            if (!imageItem) {
+                setStatus(statusElement, 'No se detecto una imagen en el portapapeles.', true);
+                return;
+            }
+
+            const imageFile = imageItem.getAsFile();
+            const wasAssigned = assignClipboardFile(input, imageFile);
+            if (!wasAssigned) {
+                setStatus(statusElement, 'No se pudo cargar la imagen pegada. Usa seleccionar archivo.', true);
+                return;
+            }
+
+            setStatus(statusElement, 'Imagen pegada correctamente.', false);
+            event.preventDefault();
+        };
+
+        const handlePasteFromButton = async function (input) {
+            const statusElement = getStatusElement(input);
+            activePasteInput = input;
+
+            if (!window.isSecureContext || !navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
+                setStatus(statusElement, 'Portapapeles bloqueado.', true);
+                return;
+            }
+
+            try {
+                const clipboardItems = await navigator.clipboard.read();
+                let assigned = false;
+
+                for (const clipboardItem of clipboardItems) {
+                    const imageType = clipboardItem.types.find(function (type) {
+                        return String(type).indexOf('image/') === 0;
+                    });
+
+                    if (!imageType) {
+                        continue;
+                    }
+
+                    const blob = await clipboardItem.getType(imageType);
+                    assigned = assignClipboardFile(input, blob);
+                    if (assigned) {
+                        break;
+                    }
+                }
+
+                if (!assigned) {
+                    setStatus(statusElement, 'No se detecto una imagen en el portapapeles.', true);
+                    return;
+                }
+
+                setStatus(statusElement, 'Imagen pegada correctamente.', false);
+            } catch (error) {
+                setStatus(statusElement, 'No se pudo leer el portapapeles.', true);
+            }
+        };
+
+        pasteInputs.forEach(function (input) {
+            input.addEventListener('focus', function () {
+                activePasteInput = input;
+            });
+
+            input.addEventListener('click', function () {
+                activePasteInput = input;
+            });
+
+            input.addEventListener('change', function () {
+                const file = input.files && input.files[0] ? input.files[0] : null;
+                setPreview(input, file);
+            });
+
+            const wrap = input.closest('[data-paste-upload-wrap]');
+            if (!wrap) {
+                return;
+            }
+
+            const removeButton = wrap.querySelector('[data-inline-image-remove]');
+            if (removeButton instanceof HTMLButtonElement) {
+                removeButton.addEventListener('click', function () {
+                    input.value = '';
+                    setPreview(input, null);
+                });
+            }
+        });
+
+        pasteButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                const targetInputId = button.getAttribute('data-target-input') || '';
+                const input = targetInputId ? document.getElementById(targetInputId) : null;
+                if (!(input instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                handlePasteFromButton(input);
+            });
+        });
+
+        pasteZones.forEach(function (zone) {
+            const targetInputId = zone.getAttribute('data-target-input') || '';
+            const input = targetInputId ? document.getElementById(targetInputId) : null;
+            if (!(input instanceof HTMLInputElement)) {
+                return;
+            }
+
+            zone.addEventListener('mousedown', function () {
+                input.click();
+            });
+
+            zone.addEventListener('focus', function () {
+                activePasteInput = input;
+            });
+
+            zone.addEventListener('click', function () {
+                activePasteInput = input;
+            });
+
+            zone.addEventListener('input', function () {
+                zone.textContent = 'Pega o arrastra imagen';
+            });
+
+            zone.addEventListener('dragenter', function (event) {
+                event.preventDefault();
+                zone.classList.add('is-dragover');
+            });
+
+            zone.addEventListener('dragover', function (event) {
+                event.preventDefault();
+                zone.classList.add('is-dragover');
+            });
+
+            zone.addEventListener('dragleave', function () {
+                zone.classList.remove('is-dragover');
+            });
+
+            zone.addEventListener('drop', function (event) {
+                event.preventDefault();
+                zone.classList.remove('is-dragover');
+
+                const imageFile = getImageFileFromFileList(event.dataTransfer ? event.dataTransfer.files : []);
+                if (!imageFile) {
+                    setStatus(getStatusElement(input), 'Solo imagenes.', true);
+                    return;
+                }
+
+                const wasAssigned = setFileInInput(input, imageFile);
+                setStatus(getStatusElement(input), wasAssigned ? 'Imagen cargada.' : 'No se pudo adjuntar.', !wasAssigned);
+                if (wasAssigned) {
+                    setPreview(input, imageFile);
+                }
+            });
+        });
+
+        document.addEventListener('paste', function (event) {
+            if (!(activePasteInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            handlePasteEvent(event, activePasteInput);
+        });
+
         const microrregionSelector = document.getElementById('tmMicrorregionSelector');
         const municipioSelects = Array.from(document.querySelectorAll('.tm-municipio-select'));
         const municipiosPorMicrorregion = @json(($microrregionesAsignadas ?? collect())->mapWithKeys(function ($micro) {

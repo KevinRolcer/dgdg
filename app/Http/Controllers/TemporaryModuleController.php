@@ -451,6 +451,15 @@ class TemporaryModuleController extends Controller
                 ->get());
         });
 
+        $requestedModuleId = $request->filled('module')
+            ? (int) $request->query('module')
+            : null;
+
+        $activeModuleId = $requestedModuleId !== null
+            && $modules->contains(fn (TemporaryModule $module) => (int) $module->id === $requestedModuleId)
+            ? $requestedModuleId
+            : (int) ($modules->first()->id ?? 0);
+
         $activeSection = optional($request->route())->getName() === 'temporary-modules.records'
             ? 'records'
             : 'upload';
@@ -463,6 +472,7 @@ class TemporaryModuleController extends Controller
             'municipios' => $municipios,
             'microrregionesAsignadas' => $microrregionesAsignadas,
             'activeSection' => $activeSection,
+            'activeModuleId' => $activeModuleId,
         ]);
     }
 
@@ -618,7 +628,7 @@ class TemporaryModuleController extends Controller
         }
 
         return redirect()
-            ->route('temporary-modules.index')
+            ->route('temporary-modules.records', ['module' => $temporaryModule->id])
             ->with('status', 'Registro guardado correctamente.');
     }
 
