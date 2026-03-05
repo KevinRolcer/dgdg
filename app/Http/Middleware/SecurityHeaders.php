@@ -21,6 +21,11 @@ class SecurityHeaders
         /** @var Response $response */
         $response = $next($request);
 
+        $contentType = strtolower((string) $response->headers->get('Content-Type', ''));
+        if ($contentType === '' || str_contains($contentType, 'text/html')) {
+            $response->headers->set('Content-Type', 'text/html; charset=UTF-8');
+        }
+
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');

@@ -50,8 +50,8 @@ class TemporaryModuleController extends Controller
             ->get();
 
         return view('temporary_modules.admin.index', [
-            'pageTitle' => 'Módulos temporales',
-            'pageDescription' => 'Configura apartados temporales para captura de información por delegados.',
+            'pageTitle' => 'Modulos temporales',
+            'pageDescription' => 'Configura apartados temporales para captura de informacion por delegados.',
             'topbarNotifications' => [],
             'modules' => $modules,
         ]);
@@ -73,7 +73,7 @@ class TemporaryModuleController extends Controller
             ->get();
 
         return view('temporary_modules.admin.records', [
-            'pageTitle' => 'Registros de módulos temporales',
+            'pageTitle' => 'Registros de modulos temporales',
             'pageDescription' => 'Consulta registros de delegados y exporta resultados en Excel.',
             'topbarNotifications' => [],
             'modules' => $modules,
@@ -83,8 +83,8 @@ class TemporaryModuleController extends Controller
     public function create(): View
     {
         return view('temporary_modules.admin.create', [
-            'pageTitle' => 'Crear módulo temporal',
-            'pageDescription' => 'Define nombre, campos requeridos y fecha límite de visualización.',
+            'pageTitle' => 'Crear modulo temporal',
+            'pageDescription' => 'Define nombre, campos requeridos y fecha limite de visualizacion.',
             'topbarNotifications' => [],
             'fieldTypes' => self::FIELD_TYPES,
             'delegates' => $this->accessService->delegates(),
@@ -97,7 +97,7 @@ class TemporaryModuleController extends Controller
         $fieldUsage = $this->fieldService->countFieldDataUsage((int) $temporaryModule->id);
 
         return view('temporary_modules.admin.edit', [
-            'pageTitle' => 'Editar módulo temporal',
+            'pageTitle' => 'Editar modulo temporal',
             'pageDescription' => 'Actualiza vigencia y agrega nuevos campos requeridos.',
             'topbarNotifications' => [],
             'fieldTypes' => self::FIELD_TYPES,
@@ -457,7 +457,7 @@ class TemporaryModuleController extends Controller
 
         return view('temporary_modules.delegate.index', [
             'pageTitle' => 'Capturas temporales',
-            'pageDescription' => 'Registra información solicitada para tus municipios en módulos activos.',
+            'pageDescription' => 'Registra informacion solicitada para tus municipios en modulos activos.',
             'topbarNotifications' => [],
             'modules' => $modules,
             'municipios' => $municipios,
@@ -489,7 +489,7 @@ class TemporaryModuleController extends Controller
 
         return view('temporary_modules.delegate.show', [
             'pageTitle' => $temporaryModule->name,
-            'pageDescription' => 'Captura de información para este módulo temporal.',
+            'pageDescription' => 'Captura de informacion para este modulo temporal.',
             'topbarNotifications' => [],
             'temporaryModule' => $temporaryModule,
             'fields' => $temporaryModule->fields,

@@ -1,8 +1,36 @@
 @extends('layouts.app')
 
+@push('css')
+<style>
+    .admin-settings-wrap {
+        display: flex;
+        justify-content: flex-start;
+    }
+
+    .admin-settings-card {
+        width: min(560px, 92vw);
+        min-width: min(30vw, 92vw);
+        max-height: 78vh;
+        overflow: auto;
+    }
+
+    .admin-settings-summary {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    @media (max-width: 768px) {
+        .admin-settings-summary {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+@endpush
+
 @section('content')
-<section class="home-layout">
-    <article class="content-card home-main-card">
+<section class="home-layout admin-settings-wrap">
+    <article class="content-card home-main-card admin-settings-card">
         @if (session('status'))
             <div class="inline-alert inline-alert-success" role="alert">{{ session('status') }}</div>
         @endif
@@ -12,13 +40,7 @@
         @endif
 
         <h2>Configuracion de imagenes</h2>
-        <p>Desde aqui puedes migrar contenido legado de <code>public/localstorage</code> y <code>storage/app/public/temporary-modules</code> hacia la ruta privada compartida.</p>
-
-        <div class="tm-upload-meta-row" style="margin-top: 12px;">
-            <span class="tm-upload-meta-pill"><strong>Origen legacy:</strong> {{ $legacyLocalStoragePath }}</span>
-            <span class="tm-upload-meta-pill"><strong>Origen módulos temporales:</strong> {{ $legacyTemporaryModulesPath }}</span>
-            <span class="tm-upload-meta-pill"><strong>Destino compartido:</strong> {{ $sharedUploadsPath !== '' ? $sharedUploadsPath : 'No definido en SHARED_UPLOADS_PATH' }}</span>
-        </div>
+        <p>Esta herramienta migra imagenes de Localstorage hacia una ruta privada compartida.</p>
 
         <form method="POST" action="{{ route('admin.settings.images.migrate') }}" style="margin-top: 16px;">
             @csrf
@@ -34,7 +56,7 @@
         @if (is_array($migrationReport ?? null))
             <div style="margin-top: 18px;">
                 <h3 style="margin-bottom: 8px;">Resultado de ultima migracion</h3>
-                <div class="tm-upload-meta-row">
+                <div class="admin-settings-summary">
                     <span class="tm-upload-meta-pill"><strong>Inicio:</strong> {{ $migrationReport['started_at'] ?? '-' }}</span>
                     <span class="tm-upload-meta-pill"><strong>Fin:</strong> {{ $migrationReport['finished_at'] ?? '-' }}</span>
                     <span class="tm-upload-meta-pill"><strong>Copiados:</strong> {{ $migrationReport['files_copied'] ?? 0 }}</span>
