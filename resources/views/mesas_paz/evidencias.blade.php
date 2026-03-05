@@ -592,7 +592,7 @@ document.getElementById('btnConfirmarRangoFechasPresentacion')?.addEventListener
     const modalPresentacion = new bootstrap.Modal(document.getElementById('canvaPresentacionModal'));
     document.getElementById('canvaPresentacionModalContent').innerHTML = '<span class="text-muted">Generando...</span>';
     modalPresentacion.show();
-    fetch("{{ route('canva.generar-documento') }}", {
+    fetch("{{ route('ppt.generar-presentacion') }}", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -603,7 +603,7 @@ document.getElementById('btnConfirmarRangoFechasPresentacion')?.addEventListener
     .then(res => res.json())
     .then(data => {
         if (data.url) {
-            document.getElementById('canvaPresentacionModalContent').innerHTML = `<a href="${data.url}" target="_blank" class="btn btn-primary">Abrir presentación en Canva</a>`;
+            document.getElementById('canvaPresentacionModalContent').innerHTML = `<a href="${data.url}" class="btn btn-success" download>Descargar presentación PowerPoint</a>`;
         } else {
             document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-danger">Error: ${data.error || 'No se pudo generar el documento.'}</span>`;
         }

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\PowerPointController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MesasPazController;
 use App\Http\Controllers\MesasPazSupervisionController;
@@ -33,7 +34,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/mesas-paz/evidencia-hoy', [MesasPazController::class, 'guardarEvidenciaHoy'])->name('mesas-paz.guardar-evidencia-hoy')->middleware('can:Mesas-Paz');
     Route::post('/mesas-paz/evidencia-hoy/eliminar', [MesasPazController::class, 'eliminarEvidenciaHoy'])->name('mesas-paz.eliminar-evidencia-hoy')->middleware('can:Mesas-Paz');
     Route::get('/mesas-paz/evidencia/preview', [MesasPazController::class, 'previewEvidencia'])
-        ->name('mesas-paz.evidencia.preview');
+    Route::post('/ppt/generar-presentacion', [PowerPointController::class, 'generarPresentacion'])->name('ppt.generar-presentacion');
     Route::get('/mesas-paz/historial-detalle', [MesasPazController::class, 'detallePorFecha'])->name('mesas-paz.historial-detalle')->middleware('can:Mesas-Paz');
     Route::get('/mesas-paz/evidencias', [MesasPazSupervisionController::class, 'evidencias'])->name('mesas-paz.evidencias')->middleware('can:Tableros-incidencias');
     Route::get('/mesas-paz/evidencias/pdf', [MesasPazSupervisionController::class, 'descargarPdf'])->name('mesas-paz.evidencias.pdf')->middleware('can:Tableros-incidencias');
