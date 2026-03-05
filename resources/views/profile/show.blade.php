@@ -13,12 +13,12 @@
         $hidePageHeader = true;
         $phoneNumber = $delegado->telefono ?? ($user->telefono ?? 'No registrado');
         $textureOptions = [
-            ['id' => 'blanco', 'tone' => 'blanco', 'label' => 'Blanco', 'url' => asset('images/Texturas_1C-Tláloc_blanco.png')],
-            ['id' => 'rojo-a', 'tone' => 'rojo', 'label' => 'Rojo A', 'url' => asset('images/Texturas_1A-Tláloc_rojo.png')],
-            ['id' => 'verde-a', 'tone' => 'verde', 'label' => 'Verde A', 'url' => asset('images/Texturas_1A-Tláloc_verde.png')],
-            ['id' => 'beige-c', 'tone' => 'amarillo', 'label' => 'Beige C', 'url' => asset('images/Texturas_1C-Tláloc_beige.png')],
-            ['id' => 'rojo-c', 'tone' => 'rojo', 'label' => 'Rojo C', 'url' => asset('images/Texturas_1C-Tláloc_rojo.png')],
-            ['id' => 'verde-c', 'tone' => 'verde', 'label' => 'Verde C', 'url' => asset('images/Texturas_1C-Tláloc_verde.png')],
+            ['id' => 'blanco', 'tone' => 'blanco', 'label' => 'Blanco', 'url' => asset('images/Texturas_1C-Tlaloc_blanco.png')],
+            ['id' => 'rojo-a', 'tone' => 'rojo', 'label' => 'Rojo A', 'url' => asset('images/Texturas_1A-Tlaloc_rojo.png')],
+            ['id' => 'verde-a', 'tone' => 'verde', 'label' => 'Verde A', 'url' => asset('images/Texturas_1A-Tlaloc_verde.png')],
+            ['id' => 'beige-c', 'tone' => 'amarillo', 'label' => 'Beige C', 'url' => asset('images/Texturas_1C-Tlaloc_beige.png')],
+            ['id' => 'rojo-c', 'tone' => 'rojo', 'label' => 'Rojo C', 'url' => asset('images/Texturas_1C-Tlaloc_rojo.png')],
+            ['id' => 'verde-c', 'tone' => 'verde', 'label' => 'Verde C', 'url' => asset('images/Texturas_1C-Tlaloc_verde.png')],
         ];
     @endphp
 
