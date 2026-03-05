@@ -568,7 +568,7 @@ class TemporaryModuleController extends Controller
             if (in_array($field->type, ['file', 'image'], true) && $request->hasFile('values.'.$field->key)) {
                 $storedPath = $request->file('values.'.$field->key)->store(
                     'temporary-modules/'.$temporaryModule->id.'/'.$request->user()->id,
-                    'public'
+                    'secure_shared'
                 );
 
                 if (is_string($existingValue) && trim($existingValue) !== '' && $existingValue !== $storedPath) {

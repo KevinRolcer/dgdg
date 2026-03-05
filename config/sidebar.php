@@ -46,6 +46,11 @@ return [
                     'route' => 'temporary-modules.admin.records',
                     'permission' => 'Modulos-Temporales-Admin',
                 ],
+                [
+                    'title' => 'Configuración',
+                    'route' => 'admin.settings.index',
+                    'permission' => 'Modulos-Temporales-Admin',
+                ],
             ],
         ],
     ],

@@ -646,7 +646,12 @@ class MesasPazSupervisionService
             return $pathOrUrl;
         }
 
-        return '/' . ltrim(str_replace('\\', '/', $pathOrUrl), '/');
+        $normalized = $this->normalizeEvidencePath($pathOrUrl);
+        if ($normalized === null) {
+            return '';
+        }
+
+        return route('mesas-paz.evidencia.preview', ['path' => $this->encodePathForPreview($normalized)]);
     }
 
     private function decodeEvidencePaths($value): array
@@ -671,12 +676,21 @@ class MesasPazSupervisionService
             ->map(function ($item) {
                 $pathOrUrl = (string) $item;
                 if (filter_var($pathOrUrl, FILTER_VALIDATE_URL)) {
+                    $queryPath = (string) parse_url($pathOrUrl, PHP_URL_QUERY);
+                    parse_str($queryPath, $query);
+                    $encoded = isset($query['path']) ? (string) $query['path'] : '';
+                    if ($encoded !== '') {
+                        $decoded = base64_decode(strtr($encoded, '-_', '+/'), true);
+                        if (is_string($decoded) && $decoded !== '') {
+                            return $this->normalizeEvidencePath($decoded);
+                        }
+                    }
+
                     $parsedPath = ltrim((string) parse_url($pathOrUrl, PHP_URL_PATH), '/');
-                    return str_starts_with($parsedPath, 'localstorage/') ? $parsedPath : null;
+                    return $this->normalizeEvidencePath($parsedPath);
                 }
 
-                $path = ltrim(str_replace('\\', '/', $pathOrUrl), '/');
-                return str_starts_with($path, 'localstorage/') ? $path : null;
+                return $this->normalizeEvidencePath($pathOrUrl);
             })
             ->filter(function ($path) {
                 return !empty($path);
@@ -684,5 +698,28 @@ class MesasPazSupervisionService
             ->unique()
             ->values()
             ->all();
+    }
+
+    private function normalizeEvidencePath(string $rawPath): ?string
+    {
+        $path = ltrim(str_replace('\\', '/', trim($rawPath)), '/');
+        if ($path === '' || str_contains($path, '..')) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'localstorage/segob/mesas_paz/evidencias/')) {
+            return $path;
+        }
+
+        if (str_starts_with($path, 'mesas_paz/evidencias/')) {
+            return $path;
+        }
+
+        return null;
+    }
+
+    private function encodePathForPreview(string $path): string
+    {
+        return rtrim(strtr(base64_encode($path), '+/', '-_'), '=');
     }
 }

@@ -9,11 +9,14 @@ use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class MesasPazService
 {
-    private const LOCAL_STORAGE_DIR = 'localstorage/segob/mesas_paz/evidencias';
+    private const LEGACY_PUBLIC_DIR = 'localstorage/segob/mesas_paz/evidencias';
+    private const SHARED_STORAGE_DIR = 'mesas_paz/evidencias';
+    private const SHARED_DISK = 'secure_shared';
     private const MAX_EVIDENCIAS = 3;
     private ?bool $parteColumnAvailable = null;
 
@@ -163,22 +166,17 @@ class MesasPazService
 
         $ext = strtolower((string) $archivo->getClientOriginalExtension());
         $nombreUnico = 'MP_EVID_' . $userId . '_' . str_replace('-', '', $fechaAsistencia) . '_' . time() . '_' . Str::random(6) . '.' . $ext;
-        $rutaRelativa = self::LOCAL_STORAGE_DIR . '/' . $nombreUnico;
+        $rutaRelativa = self::SHARED_STORAGE_DIR . '/' . $nombreUnico;
         $evidenciasNuevas = $evidenciasActuales;
         $evidenciasNuevas[] = $rutaRelativa;
         $evidenciasNuevas = array_values(array_unique($evidenciasNuevas));
 
         DB::beginTransaction();
         try {
-            $directorioDestino = public_path(self::LOCAL_STORAGE_DIR);
-            if (!is_dir($directorioDestino)) {
-                mkdir($directorioDestino, 0755, true);
-            }
-
-            $archivo->move($directorioDestino, $nombreUnico);
-            $rutaCompletaArchivo = public_path($rutaRelativa);
+            Storage::disk(self::SHARED_DISK)->putFileAs(self::SHARED_STORAGE_DIR, $archivo, $nombreUnico);
+            $rutaCompletaArchivo = Storage::disk(self::SHARED_DISK)->path($rutaRelativa);
             if (!is_file($rutaCompletaArchivo)) {
-                throw new \RuntimeException('No se pudo guardar la evidencia en el almacenamiento local.');
+                throw new \RuntimeException('No se pudo guardar la evidencia en el almacenamiento compartido.');
             }
 
             MesaPazAsistencia::where('user_id', $userId)
@@ -194,7 +192,7 @@ class MesasPazService
         } catch (\Throwable $e) {
             DB::rollBack();
             throw new MesasPazServiceException(
-                'No fue posible guardar la evidencia en almacenamiento local. Intenta nuevamente.',
+                'No fue posible guardar la evidencia en almacenamiento compartido. Intenta nuevamente.',
                 500,
                 [
                     'log' => [
@@ -283,13 +281,7 @@ class MesasPazService
             );
         }
 
-        try {
-            $rutaCompleta = public_path($pathObjetivo);
-            if (is_file($rutaCompleta)) {
-                @unlink($rutaCompleta);
-            }
-        } catch (\Throwable $e) {
-        }
+        $this->deleteEvidenceFile($pathObjetivo);
 
         $evidencias = $this->mapEvidenceItems($evidenciasNuevas);
 
@@ -578,9 +570,9 @@ class MesasPazService
             'total' => $registros->count(),
             'registros' => $registros->map(function ($registro) {
                 $evidenciaPaths = $this->decodeEvidencePaths($registro->evidencia);
-                $evidenciaUrls = array_map(function ($path) {
+                $evidenciaUrls = array_filter(array_map(function ($path) {
                     return $this->toLocalPublicUrl((string) $path);
-                }, $evidenciaPaths);
+                }, $evidenciaPaths));
 
                 return [
                     'municipio' => optional($registro->municipio)->municipio,
@@ -938,10 +930,15 @@ class MesasPazService
     {
         return collect($paths)
             ->map(function ($path) {
+                $url = $this->toLocalPublicUrl((string) $path);
+
                 return [
                     'path' => (string) $path,
-                    'url' => $this->toLocalPublicUrl((string) $path),
+                    'url' => $url,
                 ];
+            })
+            ->filter(function ($item) {
+                return !empty($item['path']) && !empty($item['url']);
             })
             ->values()
             ->all();
@@ -953,22 +950,130 @@ class MesasPazService
             return $pathOrUrl;
         }
 
-        return '/' . ltrim(str_replace('\\', '/', $pathOrUrl), '/');
+        $normalized = $this->extractLocalPath($pathOrUrl);
+        if ($normalized === null) {
+            return '';
+        }
+
+        return route('mesas-paz.evidencia.preview', ['path' => $this->encodePathForPreview($normalized)]);
     }
 
     private function extractLocalPath(string $pathOrUrl): ?string
     {
         if (!filter_var($pathOrUrl, FILTER_VALIDATE_URL)) {
-            $path = ltrim(str_replace('\\', '/', $pathOrUrl), '/');
-            return str_starts_with($path, 'localstorage/') ? $path : null;
+            return $this->normalizeEvidencePath($pathOrUrl);
+        }
+
+        $queryPath = (string) parse_url($pathOrUrl, PHP_URL_QUERY);
+        parse_str($queryPath, $query);
+        $encoded = isset($query['path']) ? (string) $query['path'] : '';
+        if ($encoded !== '') {
+            $decoded = base64_decode(strtr($encoded, '-_', '+/'), true);
+            if (is_string($decoded) && $decoded !== '') {
+                $normalized = $this->normalizeEvidencePath($decoded);
+                if ($normalized !== null) {
+                    return $normalized;
+                }
+            }
         }
 
         $path = ltrim((string) parse_url($pathOrUrl, PHP_URL_PATH), '/');
-        if (str_starts_with($path, 'localstorage/')) {
+        $normalized = $this->normalizeEvidencePath($path);
+        if ($normalized !== null) {
+            return $normalized;
+        }
+
+        return null;
+    }
+
+    public function resolveEvidenceFilePath(string $path): ?string
+    {
+        $normalized = $this->normalizeEvidencePath($path);
+        if ($normalized === null) {
+            return null;
+        }
+
+        if (str_starts_with($normalized, self::SHARED_STORAGE_DIR.'/') && Storage::disk(self::SHARED_DISK)->exists($normalized)) {
+            return Storage::disk(self::SHARED_DISK)->path($normalized);
+        }
+
+        $legacyPublicPath = public_path($normalized);
+        if (is_file($legacyPublicPath)) {
+            return $legacyPublicPath;
+        }
+
+        return null;
+    }
+
+    public function canUserPreviewEvidence(int $userId, string $path): bool
+    {
+        $normalized = $this->normalizeEvidencePath($path);
+        if ($normalized === null) {
+            return false;
+        }
+
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        if ($user->can('Tableros-incidencias')) {
+            return MesaPazAsistencia::query()
+                ->whereNotNull('evidencia')
+                ->where('evidencia', 'like', '%'.$normalized.'%')
+                ->exists();
+        }
+
+        if (!$user->can('Mesas-Paz')) {
+            return false;
+        }
+
+        return MesaPazAsistencia::query()
+            ->where('user_id', $userId)
+            ->whereNotNull('evidencia')
+            ->where('evidencia', 'like', '%'.$normalized.'%')
+            ->exists();
+    }
+
+    private function deleteEvidenceFile(string $path): void
+    {
+        $normalized = $this->normalizeEvidencePath($path);
+        if ($normalized === null) {
+            return;
+        }
+
+        if (str_starts_with($normalized, self::SHARED_STORAGE_DIR.'/')) {
+            Storage::disk(self::SHARED_DISK)->delete($normalized);
+            return;
+        }
+
+        $legacyPublicPath = public_path($normalized);
+        if (is_file($legacyPublicPath)) {
+            @unlink($legacyPublicPath);
+        }
+    }
+
+    private function normalizeEvidencePath(string $rawPath): ?string
+    {
+        $path = ltrim(str_replace('\\', '/', trim($rawPath)), '/');
+        if ($path === '' || str_contains($path, '..')) {
+            return null;
+        }
+
+        if (str_starts_with($path, self::LEGACY_PUBLIC_DIR.'/')) {
+            return $path;
+        }
+
+        if (str_starts_with($path, self::SHARED_STORAGE_DIR.'/')) {
             return $path;
         }
 
         return null;
+    }
+
+    private function encodePathForPreview(string $path): string
+    {
+        return rtrim(strtr(base64_encode($path), '+/', '-_'), '=');
     }
 
     private function tieneColumnaParte(): bool

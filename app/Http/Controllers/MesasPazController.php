@@ -143,6 +143,22 @@ class MesasPazController extends Controller
         return response()->json($response);
     }
 
+    public function previewEvidencia(Request $request)
+    {
+        abort_unless(Auth::check(), 403);
+
+        $encodedPath = (string) $request->query('path', '');
+        $decodedPath = base64_decode(strtr($encodedPath, '-_', '+/'), true);
+        $path = is_string($decodedPath) && $decodedPath !== '' ? $decodedPath : $encodedPath;
+
+        abort_unless($this->service->canUserPreviewEvidence((int) Auth::id(), $path), 403);
+
+        $fullPath = $this->service->resolveEvidenceFilePath($path);
+        abort_unless(is_string($fullPath) && is_file($fullPath), 404);
+
+        return response()->file($fullPath);
+    }
+
     /**
      * Guarda asistencias de Mesas de Paz por municipio.
      */

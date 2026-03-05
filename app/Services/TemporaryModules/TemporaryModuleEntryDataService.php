@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Storage;
 
 class TemporaryModuleEntryDataService
 {
+    private const PRIMARY_DISK = 'secure_shared';
+    private const LEGACY_DISK = 'public';
+
     public function deleteStoredPath(string $path): void
     {
         if (trim($path) === '' || filter_var($path, FILTER_VALIDATE_URL)) {
@@ -16,8 +19,10 @@ class TemporaryModuleEntryDataService
         }
 
         $normalizedPath = ltrim(str_replace('\\', '/', $path), '/');
-        if (Storage::disk('public')->exists($normalizedPath)) {
-            Storage::disk('public')->delete($normalizedPath);
+        foreach ([self::PRIMARY_DISK, self::LEGACY_DISK] as $disk) {
+            if (Storage::disk($disk)->exists($normalizedPath)) {
+                Storage::disk($disk)->delete($normalizedPath);
+            }
         }
     }
 
@@ -29,8 +34,10 @@ class TemporaryModuleEntryDataService
 
         $normalizedPath = ltrim(str_replace('\\', '/', $path), '/');
 
-        if (Storage::disk('public')->exists($normalizedPath)) {
-            return Storage::disk('public')->path($normalizedPath);
+        foreach ([self::PRIMARY_DISK, self::LEGACY_DISK] as $disk) {
+            if (Storage::disk($disk)->exists($normalizedPath)) {
+                return Storage::disk($disk)->path($normalizedPath);
+            }
         }
 
         $publicPath = public_path($normalizedPath);
@@ -72,7 +79,9 @@ class TemporaryModuleEntryDataService
         });
 
         if (!empty($filesToDelete)) {
-            Storage::disk('public')->delete(array_values(array_unique($filesToDelete)));
+            $uniqueFiles = array_values(array_unique($filesToDelete));
+            Storage::disk(self::PRIMARY_DISK)->delete($uniqueFiles);
+            Storage::disk(self::LEGACY_DISK)->delete($uniqueFiles);
         }
     }
 
@@ -124,7 +133,9 @@ class TemporaryModuleEntryDataService
         }
 
         if (!empty($filesToDelete)) {
-            Storage::disk('public')->delete(array_values(array_unique($filesToDelete)));
+            $uniqueFiles = array_values(array_unique($filesToDelete));
+            Storage::disk(self::PRIMARY_DISK)->delete($uniqueFiles);
+            Storage::disk(self::LEGACY_DISK)->delete($uniqueFiles);
         }
     }
 }

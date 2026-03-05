@@ -47,6 +47,13 @@ return [
             'report' => false,
         ],
 
+        'secure_shared' => [
+            'driver' => 'local',
+            'root' => env('SHARED_UPLOADS_PATH', storage_path('app/shared_uploads')),
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
