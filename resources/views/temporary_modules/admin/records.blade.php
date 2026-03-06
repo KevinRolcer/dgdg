@@ -426,7 +426,7 @@
                 }
 
                 templateSwal.fire({
-                    title: 'Tipo de exportación',
+                    title: 'Tipo de exportacion',
                     html: '<div style="text-align:left">'
                         + '<label style="display:flex;gap:.5rem;align-items:center;margin-bottom:.65rem;">'
                         + '<input type="radio" name="tm-export-mode" value="single" checked> '
@@ -434,7 +434,7 @@
                         + '</label>'
                         + '<label style="display:flex;gap:.5rem;align-items:center;">'
                         + '<input type="radio" name="tm-export-mode" value="mr"> '
-                        + '<span>1 pagina por Microrregión</span>'
+                        + '<span>1 pagina por Microrregion</span>'
                         + '</label>'
                         + '</div>',
                     icon: 'question',

@@ -22,7 +22,7 @@ class TemporaryModuleExportService
     ) {
     }
 
-    public function exportExcel(int $moduleId, string $mode = 'single'): BinaryFileResponse
+    public function exportExcel(int $moduleId, string $mode = 'single'): \Symfony\Component\HttpFoundation\Response
     {
         $temporaryModule = TemporaryModule::query()
             ->with([
@@ -46,8 +46,13 @@ class TemporaryModuleExportService
         }
 
         $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
+        
+        // --- HOJA 1: ANÁLISIS GENERAL ---
+        $analysisSheet = $spreadsheet->getActiveSheet();
+        $analysisSheet->setTitle('Análisis General');
+        $this->fillAnalysisSheet($analysisSheet, $temporaryModule);
 
+        // --- HOJAS DE DATOS ---
         $microrregionMeta = DB::table('microrregiones')
             ->select(['id', 'cabecera', 'microrregion'])
             ->whereIn('id', $temporaryModule->entries->pluck('microrregion_id')->filter()->unique()->values())
@@ -71,14 +76,14 @@ class TemporaryModuleExportService
                 ->sortKeys();
 
             if ($groups->isEmpty()) {
-                $sheet->setTitle('Registros');
-                $this->fillSheet($sheet, $temporaryModule, collect(), $microrregionMeta);
+                $targetSheet = $spreadsheet->createSheet();
+                $targetSheet->setTitle('Registros');
+                $this->fillSheet($targetSheet, $temporaryModule, collect(), $microrregionMeta);
             } else {
                 $usedTitles = [];
-                $sheetIndex = 0;
 
                 foreach ($groups as $microrregionId => $entries) {
-                    $targetSheet = $sheetIndex === 0 ? $sheet : $spreadsheet->createSheet();
+                    $targetSheet = $spreadsheet->createSheet();
                     $meta = $microrregionMeta[(int) $microrregionId] ?? null;
                     $baseTitle = $this->sheetTitleForMicrorregion(
                         (int) $microrregionId,
@@ -88,13 +93,16 @@ class TemporaryModuleExportService
                     $targetSheet->setTitle($this->uniqueSheetTitle($baseTitle, $usedTitles));
 
                     $this->fillSheet($targetSheet, $temporaryModule, $entries, $microrregionMeta);
-                    $sheetIndex++;
                 }
             }
         } else {
-            $sheet->setTitle('Registros');
-            $this->fillSheet($sheet, $temporaryModule, $temporaryModule->entries, $microrregionMeta);
+            $targetSheet = $spreadsheet->createSheet();
+            $targetSheet->setTitle('Registros');
+            $this->fillSheet($targetSheet, $temporaryModule, $temporaryModule->entries, $microrregionMeta);
         }
+
+        // Asegurar que la primera hoja (Análisis) sea la activa al abrir
+        $spreadsheet->setActiveSheetIndex(0);
 
         $writer = new Xlsx($spreadsheet);
         $writer->save($tempFilePath);
@@ -105,6 +113,139 @@ class TemporaryModuleExportService
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Cache-Control' => 'max-age=0, no-cache, no-store, must-revalidate',
         ])->deleteFileAfterSend(true);
+    }
+
+    private function fillAnalysisSheet(Worksheet $sheet, TemporaryModule $temporaryModule): void
+    {
+        // 1. Identificar si existe algún campo tipo "municipio"
+        $municipioFieldKey = null;
+        foreach ($temporaryModule->fields as $field) {
+            if ($this->fieldService->canonicalFieldType((string)$field->type) === 'municipio') {
+                $municipioFieldKey = $field->key;
+                break;
+            }
+        }
+
+        // 2. Extraer datos globales
+        $totalRegistros = $temporaryModule->entries->count();
+        $microrregionesCapturadas = $temporaryModule->entries->pluck('microrregion_id')->filter()->unique()->count();
+        
+        $municipiosCapturadosUnicos = 0;
+        $capturasPorMunicipioYMicro = []; // [microrregion_id => [municipio_id => count]]
+
+        if ($municipioFieldKey) {
+            $municipiosCapturadosRaw = [];
+            foreach ($temporaryModule->entries as $entry) {
+                $val = $entry->data[$municipioFieldKey] ?? null;
+                if ($val) {
+                    $municipiosCapturadosRaw[] = mb_strtolower(trim((string)$val));
+                }
+            }
+            $municipiosCapturadosGlobalVals = array_unique($municipiosCapturadosRaw);
+        }
+
+        // Para el total global, calcularemos en base a lo que mapeemos directamente del catálogo de la base de datos a continuación
+        // 3. Imprimir encabezados generales
+        $sheet->setCellValue('A1', 'Total de Registros:');
+        $sheet->setCellValue('B1', $totalRegistros);
+        
+        $sheet->setCellValue('A3', 'Total de Microrregiones Capturadas:');
+        $sheet->setCellValue('B3', $microrregionesCapturadas);
+
+        // Estilos de los totales
+        $sheet->getStyle('A1:A3')->getFont()->setBold(true);
+        $sheet->getStyle('B1:B3')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
+
+        // 4. Armar tabla por microrregiones
+        $startRow = 6;
+        $headers = [
+            'A' => 'Microrregión',
+            'B' => 'Total Registros',
+            'C' => 'Total Municipios Capturados',
+            'D' => 'Municipios Capturados (Lista)',
+            'E' => 'Total Municipios Faltantes',
+            'F' => 'Municipios Faltantes (Lista)'
+        ];
+
+        foreach ($headers as $col => $header) {
+            $sheet->setCellValue($col . $startRow, $header);
+            $sheet->getStyle($col . $startRow)->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+            $sheet->getStyle($col . $startRow)->getFill()
+                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                ->getStartColor()->setARGB('FF2E3B4E');
+        }
+
+        $allMicrorregiones = \App\Models\Microrregione::with('municipios')->orderBy('microrregion')->get();
+        $gruposPorMicro = $temporaryModule->entries->groupBy('microrregion_id');
+
+        $row = $startRow + 1;
+        $globalMunicipiosCapturadosNombres = [];
+
+        foreach ($allMicrorregiones as $mr) {
+            $entradasMR = $gruposPorMicro->get($mr->id, collect());
+            $cantidadRegistros = $entradasMR->count();
+            
+            $nombreMr = $this->buildMicrorregionLabel($mr->microrregion ?? '', $mr->cabecera ?? '');
+            
+            $municipiosCapturados = 0;
+            $capturadosArray = [];
+            $faltantesArray = [];
+            $totalFaltantes = 0;
+
+            if ($municipioFieldKey) {
+                // Revisamos sobre TODOS los capturados a nivel global en este módulo (ya sean IDs o Nombres guardados)
+                foreach ($mr->getRelation('municipios') as $muni) {
+                    $muniIdStr = (string)$muni->id;
+                    $muniNombreStr = mb_strtolower(trim($muni->municipio));
+
+                    if (in_array($muniIdStr, $municipiosCapturadosGlobalVals, true) || in_array($muniNombreStr, $municipiosCapturadosGlobalVals, true)) {
+                        $capturadosArray[] = $muni->municipio;
+                        $globalMunicipiosCapturadosNombres[] = $muni->municipio;
+                        $municipiosCapturados++;
+                    } else {
+                        $faltantesArray[] = $muni->municipio;
+                        $totalFaltantes++;
+                    }
+                }
+            } else {
+                $municipiosCapturados = 'N/A';
+                $capturadosArray = ['N/A'];
+                $faltantesArray = ['El módulo no tiene campo de municipio'];
+                $totalFaltantes = 'N/A';
+            }
+
+            $sheet->setCellValue('A' . $row, $nombreMr);
+            $sheet->setCellValue('B' . $row, $cantidadRegistros);
+            $sheet->setCellValue('C' . $row, $municipiosCapturados);
+            $sheet->setCellValue('D' . $row, implode(', ', $capturadosArray));
+            $sheet->setCellValue('E' . $row, $totalFaltantes);
+            $sheet->setCellValue('F' . $row, implode(', ', $faltantesArray));
+            
+            // Ajustar saltos de línea para las listas
+            $sheet->getStyle('D' . $row)->getAlignment()->setWrapText(true);
+            $sheet->getStyle('F' . $row)->getAlignment()->setWrapText(true);
+
+            $row++;
+        }
+
+        // Actualizamos el B2 con los nombres globales únicos de los municipios capturados (o la cuenta real validada)
+        $sheet->setCellValue('A2', 'Total de Municipios Registrados:');
+        if ($municipioFieldKey) {
+            $globalValidados = count(array_unique($globalMunicipiosCapturadosNombres));
+            $sheet->setCellValue('B2', $globalValidados . ' (De Catálogo)');
+        } else {
+            $sheet->setCellValue('B2', 'N/A (No tiene campo municipio)');
+        }
+
+        // Congelar paneles y ajustar columnas de la tabla de análisis
+        $sheet->freezePane('A' . ($startRow + 1));
+        
+        $sheet->getColumnDimension('A')->setWidth(30);
+        $sheet->getColumnDimension('B')->setWidth(18);
+        $sheet->getColumnDimension('C')->setWidth(25);
+        $sheet->getColumnDimension('D')->setWidth(50);
+        $sheet->getColumnDimension('E')->setWidth(25);
+        $sheet->getColumnDimension('F')->setWidth(70); 
     }
 
     private function fillSheet(Worksheet $sheet, TemporaryModule $temporaryModule, Collection $entries, Collection $microrregionMeta): void

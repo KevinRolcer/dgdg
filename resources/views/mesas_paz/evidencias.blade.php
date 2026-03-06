@@ -600,16 +600,47 @@ document.getElementById('btnConfirmarRangoFechasPresentacion')?.addEventListener
         },
         body: JSON.stringify({ fecha_inicio: fechaInicio, fecha_fin: fechaFin })
     })
-    .then(res => res.json())
-    .then(data => {
-        if (data.url) {
-            document.getElementById('canvaPresentacionModalContent').innerHTML = `<a href="${data.url}" class="btn btn-success" download>Descargar presentación PowerPoint</a>`;
-        } else {
-            document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-danger">Error: ${data.error || 'No se pudo generar el documento.'}</span>`;
+    .then(async res => {
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || 'Error al generar la presentación');
         }
+        
+        // Extraer el nombre de archivo de los headers si es posible (content-disposition)
+        let filename = `mesas_paz_${fechaInicio}_${fechaFin}.pptx`;
+        const disposition = res.headers.get('content-disposition');
+        if (disposition && disposition.includes('filename=')) {
+            const matches = disposition.match(/filename="?([^"]+)"?/);
+            if (matches && matches[1]) {
+                filename = matches[1];
+            }
+        }
+        
+        const blob = await res.blob();
+        return { blob, filename };
+    })
+    .then(({ blob, filename }) => {
+        document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-success">Presentación generada y descargada.</span>`;
+        
+        // Crear enlace temporal para forzar la descarga del Blob
+        const urlObj = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = urlObj;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Limpiar el objeto URL y el enlace
+        window.URL.revokeObjectURL(urlObj);
+        document.body.removeChild(a);
+        
+        setTimeout(() => {
+            bootstrap.Modal.getInstance(document.getElementById('canvaPresentacionModal')).hide();
+        }, 2000);
     })
     .catch(err => {
-        document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-danger">Error al generar el documento.</span>`;
+        document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-danger">Error: ${err.message}</span>`;
     });
 });
 </script>
