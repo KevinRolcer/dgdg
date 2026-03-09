@@ -8,7 +8,6 @@
 @endpush
 
 @section('content')
-{{-- Vista de supervisión: concentra evidencias de todos los delegados para revisión transversal. --}}
 <div id="supervisionEvidenciasPage">
 <div class="panel panel-inverse">
     <div class="panel-heading">
@@ -586,9 +585,7 @@ document.getElementById('btnConfirmarRangoFechasPresentacion')?.addEventListener
         alert('Selecciona ambas fechas para continuar.');
         return;
     }
-    // Cierra el modal de rango de fechas
     bootstrap.Modal.getInstance(document.getElementById('rangoFechasPresentacionModal')).hide();
-    // Abre el modal de presentación y muestra "Generando..."
     const modalPresentacion = new bootstrap.Modal(document.getElementById('canvaPresentacionModal'));
     document.getElementById('canvaPresentacionModalContent').innerHTML = '<span class="text-muted">Generando...</span>';
     modalPresentacion.show();
@@ -606,7 +603,6 @@ document.getElementById('btnConfirmarRangoFechasPresentacion')?.addEventListener
             throw new Error(errData.error || 'Error al generar la presentación');
         }
         
-        // Extraer el nombre de archivo de los headers si es posible (content-disposition)
         let filename = `mesas_paz_${fechaInicio}_${fechaFin}.pptx`;
         const disposition = res.headers.get('content-disposition');
         if (disposition && disposition.includes('filename=')) {
@@ -622,7 +618,6 @@ document.getElementById('btnConfirmarRangoFechasPresentacion')?.addEventListener
     .then(({ blob, filename }) => {
         document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-success">Presentación generada y descargada.</span>`;
         
-        // Crear enlace temporal para forzar la descarga del Blob
         const urlObj = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
@@ -631,7 +626,6 @@ document.getElementById('btnConfirmarRangoFechasPresentacion')?.addEventListener
         document.body.appendChild(a);
         a.click();
         
-        // Limpiar el objeto URL y el enlace
         window.URL.revokeObjectURL(urlObj);
         document.body.removeChild(a);
         

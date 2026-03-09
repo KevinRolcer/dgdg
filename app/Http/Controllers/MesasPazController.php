@@ -55,8 +55,9 @@ class MesasPazController extends Controller
             $selectedMicrorregionId = $request->filled('microrregion_id')
                 ? (int) $request->input('microrregion_id')
                 : null;
+            $fechaAsistencia = $request->input('fecha_asist');
 
-            $response = $this->service->guardarEvidenciaHoy((int) Auth::id(), $request->file('evidencia'), $selectedMicrorregionId);
+            $response = $this->service->guardarEvidenciaHoy((int) Auth::id(), $request->file('evidencia'), $selectedMicrorregionId, $fechaAsistencia);
             return response()->json($response);
         } catch (MesasPazServiceException $e) {
             $payload = $e->payload();
@@ -79,8 +80,9 @@ class MesasPazController extends Controller
             $selectedMicrorregionId = $request->filled('microrregion_id')
                 ? (int) $request->input('microrregion_id')
                 : null;
+            $fechaAsistencia = $request->input('fecha_asist');
 
-            $response = $this->service->eliminarEvidenciaHoy((int) Auth::id(), (string) $request->input('evidencia_path'), $selectedMicrorregionId);
+            $response = $this->service->eliminarEvidenciaHoy((int) Auth::id(), (string) $request->input('evidencia_path'), $selectedMicrorregionId, $fechaAsistencia);
             return response()->json($response);
         } catch (MesasPazServiceException $e) {
             $payload = $e->payload();

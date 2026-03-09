@@ -26,6 +26,7 @@
     data-max-evidencias-hoy="{{ $maxEvidenciasHoy ?? 3 }}"
     data-csrf-token="{{ csrf_token() }}"
     data-selected-microrregion-id="{{ (int) ($microrregionSeleccionadaId ?? 0) }}"
+    data-fecha-hoy-iso="{{ $fechaHoyIso }}"
 >
     @if (!empty($esAnalistaEnlace) && isset($microrregionesAsignadas) && $microrregionesAsignadas->count() > 1)
         <div class="col-12 mb-2">
@@ -63,7 +64,11 @@
                         @endif
                         <span class="ms-1">{{ $microrregionNombre }}</span>
                     </h4>
-                    <span class="mesa-heading-date">{{ ucfirst($fechaSolo) }}</span>
+                    @if (!empty($esAnalistaEnlace))
+                        <input type="date" id="fechaSelectorMesas" class="form-control text-end d-inline-block fw-bold bg-transparent border-0 px-2" style="width: auto; cursor: pointer; color: var(--bs-heading-color, inherit); box-shadow: none;" value="{{ $fechaHoyIso }}" max="{{ \Carbon\Carbon::today()->toDateString() }}">
+                    @else
+                        <span class="mesa-heading-date">{{ ucfirst($fechaSolo) }}</span>
+                    @endif
                 </div>
             </div>
             <div class="panel-body">

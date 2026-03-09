@@ -29,6 +29,7 @@ class StoreMesasPazRequest extends MesasPazFormRequest
             'registros.*.municipio_id' => $municipioRules,
             'registros.*.presidente' => ['required', 'string', Rule::in($this->opcionesPresidentePermitidas())],
             'registros.*.representante' => ['nullable', 'string', 'max:160'],
+            'fecha_asist' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
         ];
     }
 

@@ -9,6 +9,7 @@ class GuardarEvidenciaHoyRequest extends MesasPazFormRequest
         return [
             'evidencia' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
             'microrregion_id' => ['nullable', 'integer'],
+            'fecha_asist' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
         ];
     }
 }

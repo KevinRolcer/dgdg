@@ -843,6 +843,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (selectedMicrorregionId > 0) {
             formData.append('microrregion_id', String(selectedMicrorregionId));
         }
+        if (app.dataset.fechaHoyIso) {
+            formData.append('fecha_asist', app.dataset.fechaHoyIso);
+        }
 
         return fetch(guardarEvidenciaHoyUrl, {
             method: 'POST',
@@ -875,6 +878,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (selectedMicrorregionId > 0) {
             payload.microrregion_id = selectedMicrorregionId;
+        }
+        if (app.dataset.fechaHoyIso) {
+            payload.fecha_asist = app.dataset.fechaHoyIso;
         }
 
         return fetch(eliminarEvidenciaHoyUrl, {
@@ -1095,6 +1101,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     municipio_id: Number(municipioId),
                     presidente: presidenteSelect.value,
                     representante: representanteValue,
+                    fecha_asist: app.dataset.fechaHoyIso
                 })
             })
             .then(function (response) {
@@ -1177,6 +1184,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     acuerdo_observacion_items: acuerdosParaGuardar,
                     modalidad: modalidadGlobalSelect ? modalidadGlobalSelect.value : null,
                     delegado_asistio: delegadoAsistioGlobalSelect ? delegadoAsistioGlobalSelect.value : null,
+                    fecha_asist: app.dataset.fechaHoyIso
                 })
             })
             .then(function (response) {
@@ -1238,6 +1246,18 @@ document.addEventListener('DOMContentLoaded', function () {
     // La tecla 'ENTER' agrega nuevo elemento de lista en parte/acuerdos.
     bindTextareaLista(parteObservacionHoy);
     bindTextareaLista(acuerdoObservacionHoy);
+
+    const fechaSelectorMesas = document.getElementById('fechaSelectorMesas');
+    if (fechaSelectorMesas) {
+        fechaSelectorMesas.addEventListener('change', function () {
+            const newDate = this.value;
+            if (newDate) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('fecha', newDate);
+                window.location.href = url.toString();
+            }
+        });
+    }
 
     actualizarEstadoCaptura();
     bloquearModalidadSiCorresponde();

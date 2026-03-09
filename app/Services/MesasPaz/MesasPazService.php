@@ -22,7 +22,6 @@ class MesasPazService
 
     public function indexData(int $userId): array
     {
-        $fechaHoy = Carbon::now()->locale('es');
         $delegado = $this->delegadoPorUsuario($userId);
         $selectedMicrorregionId = request()->filled('microrregion_id')
             ? (int) request()->input('microrregion_id')
@@ -84,7 +83,23 @@ class MesasPazService
             $microrregionNombre = 'Múltiples microrregiones asignadas ('.count($microrregionIds).')';
         }
 
-        $fechaHoyIso = Carbon::today()->toDateString();
+        $esAnalistaEnlace = count($microrregionIds) > 1;
+        $fechaReq = request()->input('fecha');
+        $fechaCarbon = Carbon::today();
+
+        if ($esAnalistaEnlace && $fechaReq && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaReq)) {
+            try {
+                $parsedDate = Carbon::createFromFormat('Y-m-d', $fechaReq)->startOfDay();
+                if ($parsedDate->lte(Carbon::today())) {
+                    $fechaCarbon = $parsedDate;
+                }
+            } catch (\Exception $e) {
+                // Ignore invalid date
+            }
+        }
+
+        $fechaHoyIso = $fechaCarbon->toDateString();
+        $fechaHoy = $fechaCarbon->copy()->locale('es');
         $historialFecha = $fechaHoyIso;
 
         $registrosHoyQuery = MesaPazAsistencia::with('municipio:id,municipio')
@@ -131,7 +146,7 @@ class MesasPazService
             'microrregionNombre' => $microrregionNombre,
             'microrregionSeleccionadaId' => $selectedMicrorregionId,
             'microrregionesAsignadas' => $microrregionesAsignadas,
-            'esAnalistaEnlace' => count($microrregionIds) > 1,
+            'esAnalistaEnlace' => $esAnalistaEnlace,
             'municipios' => $municipios,
             'historialAgrupado' => $historialAgrupado,
             'historialFecha' => $historialFecha,
@@ -149,9 +164,9 @@ class MesasPazService
         ];
     }
 
-    public function guardarEvidenciaHoy(int $userId, UploadedFile $archivo, ?int $selectedMicrorregionId = null): array
+    public function guardarEvidenciaHoy(int $userId, UploadedFile $archivo, ?int $selectedMicrorregionId = null, ?string $fecha = null): array
     {
-        $fechaAsistencia = Carbon::today()->toDateString();
+        $fechaAsistencia = $this->resolverFechaAsistencia($userId, $fecha);
         $registrosHoyQuery = MesaPazAsistencia::where('user_id', $userId)
             ->whereDate('fecha_asist', $fechaAsistencia);
 
@@ -229,9 +244,9 @@ class MesasPazService
         ];
     }
 
-    public function eliminarEvidenciaHoy(int $userId, string $evidenciaPathOrUrl, ?int $selectedMicrorregionId = null): array
+    public function eliminarEvidenciaHoy(int $userId, string $evidenciaPathOrUrl, ?int $selectedMicrorregionId = null, ?string $fecha = null): array
     {
-        $fechaAsistencia = Carbon::today()->toDateString();
+        $fechaAsistencia = $this->resolverFechaAsistencia($userId, $fecha);
         $registrosHoyQuery = MesaPazAsistencia::where('user_id', $userId)
             ->whereDate('fecha_asist', $fechaAsistencia);
 
@@ -341,7 +356,7 @@ class MesasPazService
             throw new MesasPazServiceException('El municipio seleccionado no pertenece a tus microrregiones asignadas.', 422);
         }
 
-        $fechaAsistencia = Carbon::today()->toDateString();
+        $fechaAsistencia = $this->resolverFechaAsistencia($userId, $data['fecha_asist'] ?? null);
         $presidente = $this->mapPresidenteForStorage($data['presidente'] ?? null);
         $asiste = $this->resolverAsisteDesdePresidente($presidente, $data['representante'] ?? null);
         $delegadoAsistio = (string) ($data['delegado_asistio'] ?? '');
@@ -440,7 +455,7 @@ class MesasPazService
 
     public function guardarAcuerdoHoy(int $userId, array $data): array
     {
-        $fechaAsistencia = Carbon::today()->toDateString();
+        $fechaAsistencia = $this->resolverFechaAsistencia($userId, $data['fecha_asist'] ?? null);
         $usarParte = $this->tieneColumnaParte();
         $parteItems = $usarParte ? $this->resolverParteItemsDesdeData($data) : [];
         $acuerdoItems = $this->resolverAcuerdoItemsDesdeData($data);
@@ -612,7 +627,7 @@ class MesasPazService
         }
 
         $registros = (array) ($data['registros'] ?? []);
-        $fechaAsistencia = Carbon::now()->toDateString();
+        $fechaAsistencia = $this->resolverFechaAsistencia($userId, $data['fecha_asist'] ?? null);
         $usarParte = $this->tieneColumnaParte();
         $parteItems = $usarParte ? $this->resolverParteItemsDesdeData($data) : [];
         $parteObservacion = $usarParte ? MesaPazAsistencia::encodeAcuerdoItems($parteItems) : null;
@@ -767,6 +782,26 @@ class MesasPazService
             })
             ->values()
             ->all();
+    }
+
+    private function resolverFechaAsistencia(int $userId, ?string $fechaReq): string
+    {
+        $delegado = $this->delegadoPorUsuario($userId);
+        $microrregionIds = $this->microrregionesPermitidasPorUsuario($userId, $delegado);
+        $esAnalistaEnlace = count($microrregionIds) > 1;
+
+        if ($esAnalistaEnlace && $fechaReq && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaReq)) {
+            try {
+                $parsedDate = Carbon::createFromFormat('Y-m-d', $fechaReq)->startOfDay();
+                if ($parsedDate->lte(Carbon::today())) {
+                    return $parsedDate->toDateString();
+                }
+            } catch (\Exception $e) {
+                // Ignore invalid date
+            }
+        }
+
+        return Carbon::today()->toDateString();
     }
 
     private function resolverAcuerdoItemsDesdeData(array $data): array

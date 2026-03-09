@@ -123,6 +123,11 @@
                     @endif
 
                     <h4>Registros de delegados</h4>
+                    @can('Enlace')
+                    <div class="tm-enlace-eliminar-registro mb-3">
+                        <button type="button" class="tm-btn tm-btn-danger" id="btnEliminarRegistroEnlace">Eliminar registro de Municipios contestados hoy</button>
+                    </div>
+                    @endcan
                     <div class="tm-table-wrap tm-table-wrap-admin-preview">
                         <table class="tm-table tm-admin-preview-table">
                             <thead>

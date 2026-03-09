@@ -21,6 +21,7 @@ class GuardarMunicipioRequest extends MesasPazFormRequest
             'municipio_id' => $municipioRules,
             'presidente' => ['required', 'string', Rule::in($this->opcionesPresidentePermitidas())],
             'representante' => ['nullable', 'string', 'max:160'],
+            'fecha_asist' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
         ];
     }
 }
