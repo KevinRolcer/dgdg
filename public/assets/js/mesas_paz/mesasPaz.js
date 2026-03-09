@@ -14,6 +14,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const guardarEvidenciaHoyUrl = app.dataset.guardarEvidenciaHoyUrl;
     const eliminarEvidenciaHoyUrl = app.dataset.eliminarEvidenciaHoyUrl;
     const historialDetalleUrl = app.dataset.historialDetalleUrl;
+    const importarExcelUrl = app.dataset.importarExcelUrl || '/mesas-paz/importar-excel';
+    const vaciarMicrorregionUrl = app.dataset.vaciarMicrorregionUrl || '/mesas-paz/vaciar-microrregion';
     const csrfToken = app.dataset.csrfToken;
     const listaContestados = document.getElementById('listaMunicipiosContestados');
     const btnToggleContestadosDetalle = document.getElementById('btnToggleContestadosDetalle');
@@ -1283,4 +1285,164 @@ document.addEventListener('DOMContentLoaded', function () {
     actualizarVisibilidadMunicipios();
     bindHistorialActions();
     setupHistorialModalFocusManagement();
+
+    // Drag y Drop para Excel Importar
+    const dropzoneExcel = document.getElementById('dropzoneExcel');
+    const inputExcelHidden = document.getElementById('inputExcelHidden');
+    const excelFileNameDisplay = document.getElementById('excelFileNameDisplay');
+    const formImportarExcel = document.getElementById('formImportarExcel');
+    const btnConfirmarImportacion = document.getElementById('btnConfirmarImportacion');
+    const importarExcelError = document.getElementById('importarExcelError');
+    const spinnerImportacion = document.getElementById('spinnerImportacion');
+
+    if (dropzoneExcel && inputExcelHidden) {
+        dropzoneExcel.addEventListener('click', function () {
+            inputExcelHidden.click();
+        });
+
+        ['dragover', 'dragenter'].forEach(function(eventName) {
+            dropzoneExcel.addEventListener(eventName, function (e) {
+                e.preventDefault();
+                dropzoneExcel.style.backgroundColor = '#e9ecef';
+                dropzoneExcel.style.borderColor = '#0d6efd';
+            });
+        });
+
+        ['dragleave', 'dragend', 'drop'].forEach(function(eventName) {
+            dropzoneExcel.addEventListener(eventName, function (e) {
+                e.preventDefault();
+                dropzoneExcel.style.backgroundColor = '#f8f9fa';
+                dropzoneExcel.style.borderColor = '#dee2e6';
+            });
+        });
+
+        dropzoneExcel.addEventListener('drop', function (e) {
+            if (e.dataTransfer.files.length > 0) {
+                inputExcelHidden.files = e.dataTransfer.files;
+                mostrarNombreArchivoExcel();
+            }
+        });
+
+        inputExcelHidden.addEventListener('change', function () {
+            mostrarNombreArchivoExcel();
+        });
+
+        function mostrarNombreArchivoExcel() {
+            if (inputExcelHidden.files.length > 0) {
+                const fileName = inputExcelHidden.files[0].name;
+                excelFileNameDisplay.textContent = 'Archivo seleccionado: ' + fileName;
+                excelFileNameDisplay.classList.remove('d-none');
+                dropzoneExcel.querySelector('p').classList.add('d-none');
+            } else {
+                excelFileNameDisplay.classList.add('d-none');
+                dropzoneExcel.querySelector('p').classList.remove('d-none');
+            }
+        }
+    }
+
+    if (btnConfirmarImportacion && formImportarExcel) {
+        btnConfirmarImportacion.addEventListener('click', function () {
+            importarExcelError.classList.add('d-none');
+            importarExcelError.textContent = '';
+
+            if (!inputExcelHidden.files.length) {
+                importarExcelError.textContent = 'Por favor selecciona un archivo Excel (.xls, .xlsx).';
+                importarExcelError.classList.remove('d-none');
+                return;
+            }
+
+            const formData = new FormData(formImportarExcel);
+            const url = importarExcelUrl; 
+
+            btnConfirmarImportacion.disabled = true;
+            spinnerImportacion.classList.remove('d-none');
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: formData
+            })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { status: response.status, data: data };
+                });
+            })
+            .then(function (result) {
+                if (result.status >= 400 || !result.data.success) {
+                    throw result.data;
+                }
+                
+                swal('Éxito', result.data.message || 'Datos importados correctamente.', 'success').then(function () {
+                    const reloadUrl = new URL(window.location.href);
+                    reloadUrl.searchParams.set('fecha', result.data.fecha_asist || formData.get('fecha_importacion'));
+                    window.location.href = reloadUrl.toString();
+                });
+            })
+            .catch(function (errorData) {
+                const backendErrors = errorData && errorData.data && errorData.data.errors ? Object.values(errorData.data.errors).flat() : [];
+                const message = backendErrors[0] || (errorData.data && errorData.data.message) || errorData.message || 'Error al importar datos del archivo Excel.';
+                
+                importarExcelError.textContent = message;
+                importarExcelError.classList.remove('d-none');
+            })
+            .finally(function () {
+                btnConfirmarImportacion.disabled = false;
+                spinnerImportacion.classList.add('d-none');
+            });
+        });
+    }
+
+    const btnVaciarMicrorregion = document.getElementById('btnVaciarMicrorregion');
+    if (btnVaciarMicrorregion) {
+        btnVaciarMicrorregion.addEventListener('click', function () {
+            if (!confirm('¿Estás seguro de vaciar todos los registros de asistencia de los municipios que pertenecen a tu microrregión en esta fecha? Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            const originalText = btnVaciarMicrorregion.innerHTML;
+            btnVaciarMicrorregion.disabled = true;
+            btnVaciarMicrorregion.textContent = 'Vaciando...';
+
+            const url = vaciarMicrorregionUrl;
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    fecha_asist: app.dataset.fechaHoyIso || document.getElementById('fechaSelectorMesas').value,
+                    microrregion_id: selectedMicrorregionId
+                })
+            })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { status: response.status, data: data };
+                });
+            })
+            .then(function (result) {
+                if (result.status >= 400 || !result.data.success) {
+                    throw result.data;
+                }
+
+                swal('Éxito', result.data.message || 'Registros vaciados.', 'success').then(function() {
+                    window.location.reload();
+                });
+            })
+            .catch(function (errorData) {
+                const backendErrors = errorData && errorData.data && errorData.data.errors ? Object.values(errorData.data.errors).flat() : [];
+                const message = backendErrors[0] || (errorData.data && errorData.data.message) || errorData.message || 'Error al vaciar los registros.';
+                swal('Error', message, 'error');
+                btnVaciarMicrorregion.disabled = false;
+                btnVaciarMicrorregion.innerHTML = originalText;
+            });
+        });
+    }
+
 });

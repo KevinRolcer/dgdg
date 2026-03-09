@@ -7,6 +7,7 @@ use App\Http\Requests\MesasPaz\EliminarEvidenciaHoyRequest;
 use App\Http\Requests\MesasPaz\GuardarAcuerdoHoyRequest;
 use App\Http\Requests\MesasPaz\GuardarEvidenciaHoyRequest;
 use App\Http\Requests\MesasPaz\GuardarMunicipioRequest;
+use App\Http\Requests\MesasPaz\ImportarExcelRequest;
 use App\Http\Requests\MesasPaz\StoreMesasPazRequest;
 use App\Services\MesasPaz\MesasPazService;
 use App\Services\MesasPaz\MesasPazServiceException;
@@ -42,6 +43,63 @@ class MesasPazController extends Controller
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             ->header('Pragma', 'no-cache')
             ->header('Expires', '0');
+    }
+
+
+    public function importarExcel(ImportarExcelRequest $request)
+    {
+        abort_unless($this->canAccessMesasPazRegistro(), 403);
+
+        try {
+            $response = $this->service->importarExcelData(
+                (int) Auth::id(), 
+                $request->input('fecha_importacion'), 
+                $request->file('archivo_excel')
+            );
+            return response()->json($response);
+        } catch (MesasPazServiceException $e) {
+            $payload = $e->payload();
+            if (!empty($payload['log'])) {
+                Log::error('MesasPaz: error al importar Excel.', $payload['log']);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], $e->status());
+        }
+    }
+
+    /**
+     * Vacía (elimina) los registros de asistencia de una microrregión en una fecha específica
+     */
+    public function vaciarMicrorregion(Request $request)
+    {
+        abort_unless($this->canAccessMesasPazRegistro(), 403);
+
+        $request->validate([
+            'fecha_asist' => 'required|date|before_or_equal:today',
+            'microrregion_id' => 'required|integer',
+        ]);
+
+        try {
+            $response = $this->service->vaciarRegistrosMicrorregion(
+                (int) Auth::id(),
+                $request->input('fecha_asist'),
+                (int) $request->input('microrregion_id')
+            );
+            return response()->json($response);
+        } catch (MesasPazServiceException $e) {
+            $payload = $e->payload();
+            if (!empty($payload['log'])) {
+                Log::error('MesasPaz: error al vaciar microrregión.', $payload['log']);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], $e->status());
+        }
     }
 
     /**

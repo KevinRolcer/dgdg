@@ -22,6 +22,8 @@
     data-guardar-evidencia-hoy-url="{{ route('mesas-paz.guardar-evidencia-hoy') }}"
     data-eliminar-evidencia-hoy-url="{{ route('mesas-paz.eliminar-evidencia-hoy') }}"
     data-historial-detalle-url="{{ route('mesas-paz.historial-detalle') }}"
+    data-importar-excel-url="{{ url('/mesas-paz/importar-excel') }}"
+    data-vaciar-microrregion-url="{{ url('/mesas-paz/vaciar-microrregion') }}"
     data-evidencias-hoy='@json($evidenciasActuales ?? [])'
     data-max-evidencias-hoy="{{ $maxEvidenciasHoy ?? 3 }}"
     data-csrf-token="{{ csrf_token() }}"
@@ -65,7 +67,15 @@
                         <span class="ms-1">{{ $microrregionNombre }}</span>
                     </h4>
                     @if (!empty($esAnalistaEnlace))
-                        <input type="date" id="fechaSelectorMesas" class="form-control text-end d-inline-block fw-bold bg-transparent border-0 px-2" style="width: auto; cursor: pointer; color: var(--bs-heading-color, inherit); box-shadow: none;" value="{{ $fechaHoyIso }}" max="{{ \Carbon\Carbon::today()->toDateString() }}">
+                        <div class="d-flex align-items-center flex-wrap gap-2">
+                            <input type="date" id="fechaSelectorMesas" class="form-control text-end d-inline-block fw-bold bg-transparent border-0 px-2" style="width: auto; cursor: pointer; color: var(--bs-heading-color, inherit); box-shadow: none;" value="{{ $fechaHoyIso }}" max="{{ \Carbon\Carbon::today()->toDateString() }}">
+                            <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#importarExcelModal">
+                                Cargar Excel
+                            </button>
+                            <button type="button" class="btn btn-sm btn-primary" id="btnVaciarMicrorregion">
+                                Vaciar registros
+                            </button>
+                        </div>
                     @else
                         <span class="mesa-heading-date">{{ ucfirst($fechaSolo) }}</span>
                     @endif
@@ -362,6 +372,44 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-danger d-none" id="btnConfirmarEliminarEvidencia">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Importar Excel -->
+<div class="modal fade" id="importarExcelModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cargar Excel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formImportarExcel">
+                    <div class="mb-3">
+                        <label for="fechaImportacionModal" class="form-label fw-bold">Fecha de importación</label>
+                        <input type="date" id="fechaImportacionModal" class="form-control" name="fecha_importacion" value="{{ $fechaHoyIso }}" max="{{ \Carbon\Carbon::today()->toDateString() }}" required>
+                        <small class="text-muted">Se sobreescribirán/guardarán las asistencias en la fecha seleccionada.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Archivo Excel (.xls, .xlsx)</label>
+                        <div id="dropzoneExcel" class="border border-2 border-dashed rounded p-4 text-center" style="cursor: pointer; background-color: #f8f9fa;">
+                            <p class="mb-1 text-muted">Arrastra y suelta aquí tu archivo Excel o haz clic para seleccionarlo.</p>
+                            <span id="excelFileNameDisplay" class="fw-bold text-success d-none"></span>
+                        </div>
+                        <input type="file" id="inputExcelHidden" name="archivo_excel" accept=".xls,.xlsx" class="d-none" required>
+                    </div>
+                </form>
+                <div id="importarExcelError" class="alert alert-danger d-none mb-0"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" id="btnConfirmarImportacion">
+                    <span class="spinner-border spinner-border-sm d-none me-1" role="status" aria-hidden="true" id="spinnerImportacion"></span>
+                    Cargar Excel
+                </button>
             </div>
         </div>
     </div>

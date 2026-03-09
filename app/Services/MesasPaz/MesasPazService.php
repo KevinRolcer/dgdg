@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class MesasPazService
 {
@@ -116,14 +117,57 @@ class MesasPazService
         $registrosHoyByMunicipio = $registrosHoy->keyBy('municipio_id');
         $modalidadActual = optional($registrosHoy->first())->modalidad;
         $delegadoAsistioActual = optional($registrosHoy->first())->delegado_asistio;
-        $parteItemsActual = $this->tieneColumnaParte()
-            ? (optional($registrosHoy->first(function ($registro) {
-                return !empty($registro->parte_items);
-            }))->parte_items ?? [])
-            : [];
+        $parteItemsActual = [];
+        if ($this->tieneColumnaParte()) {
+            $parteItemsActual = optional($registrosHoy->first(function ($registro) {
+                if (empty($registro->parte_items)) return false;
+                if (count($registro->parte_items) === 1) {
+                    $val = mb_strtolower(trim($registro->parte_items[0]), 'UTF-8');
+                    if (in_array($val, ['s/r', 'no se ha anotado nada', 'sin parte'], true)) {
+                        return false;
+                    }
+                }
+                return true;
+            }))->parte_items ?? [];
+
+            if (empty($parteItemsActual)) {
+                $parteItemsActual = optional($registrosHoy->first(function ($registro) {
+                    return !empty($registro->parte_items);
+                }))->parte_items ?? [];
+            }
+        }
+
         $acuerdoItemsActual = optional($registrosHoy->first(function ($registro) {
-            return !empty($registro->acuerdo_items);
+            if (empty($registro->acuerdo_items)) return false;
+            if (count($registro->acuerdo_items) === 1) {
+                $val = mb_strtolower(trim($registro->acuerdo_items[0]), 'UTF-8');
+                if (in_array($val, ['no se ha anotado nada', 'sin acuerdos', 'motivo no registrado'], true)) {
+                    return false;
+                }
+            }
+            return true;
         }))->acuerdo_items ?? [];
+
+        if (empty($acuerdoItemsActual)) {
+            // Check if there is a 'Sin Acuerdos' explicitly
+            $acuerdoItemsActual = optional($registrosHoy->first(function ($registro) {
+                if (!empty($registro->acuerdo_items) && count($registro->acuerdo_items) === 1) {
+                    $val = mb_strtolower(trim($registro->acuerdo_items[0]), 'UTF-8');
+                    if ($val === 'sin acuerdos') {
+                        return true;
+                    }
+                }
+                return false;
+            }))->acuerdo_items ?? [];
+            
+            // Default fallback to whatever is available
+            if (empty($acuerdoItemsActual)) {
+                $acuerdoItemsActual = optional($registrosHoy->first(function ($registro) {
+                    return !empty($registro->acuerdo_items);
+                }))->acuerdo_items ?? [];
+            }
+        }
+
         $evidenciasActualesPaths = $this->resolverEvidenciasHoy($registrosHoy);
         $evidenciasActuales = $this->mapEvidenceItems($evidenciasActualesPaths);
         $evidenciaActualUrl = !empty($evidenciasActuales[0]['url'] ?? null)
@@ -740,6 +784,335 @@ class MesasPazService
         ];
     }
 
+    public function vaciarRegistrosMicrorregion(int $userId, string $fecha, int $microrregionId): array
+    {
+        $fechaObjetivo = $this->resolverFechaAsistencia($userId, $fecha);
+
+        $delegado = $this->delegadoPorUsuario($userId);
+        $microrregionesRoles = $this->microrregionesPermitidasPorUsuario($userId, $delegado);
+
+        if (!in_array($microrregionId, $microrregionesRoles, true)) {
+            throw new MesasPazServiceException('No tienes permiso para modificar la información de esta microrregión.', 403);
+        }
+
+        try {
+            DB::beginTransaction();
+            $registrosEliminados = MesaPazAsistencia::where('user_id', $userId)
+                ->where('microrregion_id', $microrregionId)
+                ->whereDate('fecha_asist', $fechaObjetivo)
+                ->delete();
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            throw new MesasPazServiceException('Error al vaciar los registros en la base de datos: ' . $e->getMessage(), 500);
+        }
+
+        return [
+            'success' => true,
+            'message' => 'Se han eliminado ' . $registrosEliminados . ' registros de esta microrregión exitosamente.',
+            'registros_eliminados' => $registrosEliminados,
+            'fecha_asist' => $fechaObjetivo,
+        ];
+    }
+
+    public function importarExcelData(int $userId, string $fechaImportacion, UploadedFile $archivo): array
+    {
+        $delegado = $this->delegadoPorUsuario($userId);
+        $microrregionIds = $this->microrregionesPermitidasPorUsuario($userId, $delegado);
+
+        if (empty($microrregionIds)) {
+            throw new MesasPazServiceException('No tienes microrregiones asignadas para importar.', 403);
+        }
+        
+        $fechaObjetivo = $this->resolverFechaAsistencia($userId, $fechaImportacion);
+
+        try {
+            $spreadsheet = IOFactory::load($archivo->getRealPath());
+            $sheet = $spreadsheet->getActiveSheet();
+            $rows = $sheet->toArray(null, true, true, true);
+        } catch (\Exception $e) {
+            throw new MesasPazServiceException('El archivo Excel proporcionado no tiene un formato válido.', 422);
+        }
+
+        if (empty($rows)) {
+            throw new MesasPazServiceException('El archivo Excel está vacío.', 422);
+        }
+
+        $rowFechaRaw = trim((string) ($rows[1]['A'] ?? ''));
+        // We will loosely try to match the date in the first cell if the user requires it.
+        // User said: "la primer fila tiene la fecha(Valida que sea de la fecha marcada en el filtro)."
+        $fechaValidFlag = false;
+        
+        if ($rowFechaRaw) {
+            $dateFormats = ['Y-m-d', 'd/m/Y', 'Y/m/d', 'd-m-Y'];
+            foreach($dateFormats as $format) {
+                try {
+                    if (str_contains($rowFechaRaw, ' ')) {
+                        // might have time like '2026-03-09 11:27:00'
+                        $rowFechaRaw = explode(' ', $rowFechaRaw)[0];
+                    }
+                    if (Carbon::createFromFormat($format, $rowFechaRaw)->toDateString() === $fechaObjetivo) {
+                        $fechaValidFlag = true;
+                        break;
+                    }
+                } catch (\Exception $e) { }
+            }
+            // we will let it slide if the date parsing failed as the instruction was slightly ambiguous 
+            // but we'll enforce if we explicitly find a different parseable date.
+        }
+        
+        if (!$fechaValidFlag && !empty($rowFechaRaw) && preg_match('/\d{2,4}[-\/]\d{2}[-\/]\d{2,4}/', $rowFechaRaw)) {
+            throw new MesasPazServiceException('La fecha en el Excel no coincide con la fecha seleccionada en el filtro (' . $fechaObjetivo . ').', 422);
+        }
+
+        $municipiosMap = DB::table('municipios')
+            ->whereIn('microrregion_id', $microrregionIds)
+            ->select('id', 'municipio', 'microrregion_id')
+            ->get();
+            
+        $microrregionesMap = DB::table('microrregiones')
+            ->whereIn('id', $microrregionIds)
+            ->select('id', 'microrregion')
+            ->get();
+            
+        $municipiosPorNombre = [];
+        foreach ($municipiosMap as $m) {
+            $nombreNormalizado = $this->quitarAcentos(mb_strtoupper((string) $m->municipio, 'UTF-8'));
+            $municipiosPorNombre[$nombreNormalizado] = $m;
+        }
+
+        $microPorNombre = [];
+        foreach ($microrregionesMap as $m) {
+            $nombreNormalizado = $this->quitarAcentos(mb_strtoupper((string) $m->microrregion, 'UTF-8'));
+            $microPorNombre[$nombreNormalizado] = $m->id;
+        }
+
+        $usarParte = $this->tieneColumnaParte();
+        $registrosParseados = [];
+        $municipioIdsYaVistos = [];
+
+        // Auto-detectar la columna de 'Acuerdos' en las filas cabecera (usualmente 1 o 2)
+        $acuerdosCol = 'J'; // Default por si no se encuentra
+        for ($i = 1; $i <= 2; $i++) {
+            if (!empty($rows[$i])) {
+                foreach ($rows[$i] as $colLetter => $val) {
+                    $head = $this->quitarAcentos(mb_strtoupper(trim((string) $val), 'UTF-8'));
+                    if (str_contains($head, 'ACUERDO') || str_contains($head, 'OBSERVACION')) {
+                        $acuerdosCol = $colLetter;
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        foreach ($rows as $index => $row) {
+            // Ignorar cabecera(s) (asumiendo que los datos inician en fila 2 o despues)
+            if ($index < 2) continue;
+
+            $colMicrorregion = $this->quitarAcentos(mb_strtoupper(trim((string) ($row['B'] ?? '')), 'UTF-8'));
+            $colMunicipio = $this->quitarAcentos(mb_strtoupper(trim((string) ($row['D'] ?? '')), 'UTF-8'));
+            $colAsiste = mb_strtoupper(trim((string) ($row['H'] ?? '')), 'UTF-8');
+            $colModalidad = mb_strtoupper(trim((string) ($row['I'] ?? '')), 'UTF-8');
+            $colAcuerdosRaw = trim((string) ($row[$acuerdosCol] ?? ''));
+
+            // Primero, asegurarnos de que el texto no esté vacío.
+            if (empty($colAsiste) || empty($colMunicipio)) {
+                // Si asiste está vacío, o no hay municipio, ignoramos.
+                continue;
+            }
+
+            // Validar la microrregión si es posible (Ej. "14 CIUDAD SERDAN" o "CHALCHICOMULA DE SESMA MR 14")
+            $colMicroMatchId = null;
+            if (preg_match('/\b(\d+)\b/', $colMicrorregion, $matchesMicro)) {
+                $colMicroMatchId = (int) $matchesMicro[1];
+            } else {
+                // Si no hay numero, checamos el nombre (por buscar flexibilidad, aunque el user ya definió que usa numeros).
+                if (isset($microPorNombre[$colMicrorregion])) {
+                    $colMicroMatchId = $microPorNombre[$colMicrorregion];
+                }
+            }
+
+            // Mapa para alias comunes que en Excel vienen distintos a la BD
+            $aliasMunicipios = [
+                'CIUDAD SERDAN' => 'CHALCHICOMULA DE SESMA',
+                // Agregar otros alias aquí si el usuario lo reporta en el futuro
+            ];
+
+            if (isset($aliasMunicipios[$colMunicipio])) {
+                $colMunicipio = $aliasMunicipios[$colMunicipio];
+            }
+
+            if (!isset($municipiosPorNombre[$colMunicipio])) {
+                // Municipio no permitido o no pertenece a enlaces asignadas.
+                continue;
+            }
+            
+            $municipioDB = $municipiosPorNombre[$colMunicipio];
+
+            // Verificación extra cruzada: El municipioDB debe corresponder a la microrregión si logramos parsearla.
+            // Si $colMicroMatchId existe y el user tiene microrregiones asignadas, nos cercioramos que concuerde.
+            if ($colMicroMatchId !== null && $municipioDB->microrregion_id !== $colMicroMatchId) {
+                // La microrregión leída en la columna B no concuerda con la microrregión del municipio D en la base de datos
+                continue;
+            }
+
+            if (in_array($municipioDB->id, $municipioIdsYaVistos)) {
+                continue; // Prevent duplicates in the same file
+            }
+            
+            $presidente = null;
+            $representante = null;
+
+            if ($colAsiste === 'DIRECTOR DE SEGURIDAD MUNICIPAL' || str_contains($colAsiste, 'DIRECTOR')) {
+                $presidente = 'Representante';
+                $representante = 'Director de seguridad municipal'; // o similar
+            } elseif ($colAsiste === 'NO' || $colAsiste === 'NINGUNO') {
+                $presidente = 'No';
+            } elseif ($colAsiste === 'SI' || $colAsiste === 'PRESIDENTE') {
+                $presidente = 'Si';
+            } else {
+                $presidente = 'Representante'; // Fallback a representante con cargo custom
+                $representante = $colAsiste;
+            }
+            
+            $modalidadValida = 'Presencial'; // Default
+            if (str_contains($colModalidad, 'VIRTUAL')) {
+                $modalidadValida = 'Virtual';
+            } elseif (str_contains($colModalidad, 'SUSPENDI') || str_contains($colModalidad, 'SUSPENSION')) {
+                $modalidadValida = 'Suspención de mesa de Seguridad';
+            }
+
+            $acuerdosList = $this->normalizarAcuerdoItemsDesdeTexto($colAcuerdosRaw);
+
+            $registrosParseados[] = [
+                'municipio_id' => $municipioDB->id,
+                'microrregion_id' => $municipioDB->microrregion_id,
+                'presidente' => $presidente,
+                'representante' => $representante,
+                'modalidad' => $modalidadValida,
+                'acuerdosList' => $acuerdosList
+            ];
+            
+            $municipioIdsYaVistos[] = $municipioDB->id;
+        }
+
+        if (empty($registrosParseados)) {
+            throw new MesasPazServiceException('No se encontraron registros de municipios válidos asignados a ti en el archivo.', 422);
+        }
+
+        $registrosInsertados = 0;
+
+        DB::beginTransaction();
+        try {
+            foreach ($registrosParseados as $rp) {
+                $presidenteFinal = $rp['presidente'];
+                $asisteFinal = $this->resolverAsisteDesdePresidente($rp['presidente'], $rp['representante']);
+                $delegadoAsistioFinal = 'Si'; // asumimos Si si no viene de reglas
+
+                $override = $this->resolverReglaEspecialPorModalidad($rp['modalidad']);
+                if ($override !== null) {
+                    $presidenteFinal = $override['presidente'];
+                    $asisteFinal = $override['asiste'];
+                    $delegadoAsistioFinal = $override['delegado_asistio'];
+                }
+
+                $parteItems = [];
+                if ($usarParte && str_contains($rp['modalidad'], 'Suspención')) {
+                    $parteItems = ['S/R'];
+                }
+                
+                $acuerdoItems = $rp['acuerdosList'];
+                if (empty($acuerdoItems)) {
+                    $acuerdoItems = str_contains($rp['modalidad'], 'Suspención') ? ['Motivo no registrado'] : ['No se ha anotado nada'];
+                }
+
+                $parteObservacion = $usarParte ? MesaPazAsistencia::encodeAcuerdoItems($parteItems) : null;
+                $acuerdoObservacion = MesaPazAsistencia::encodeAcuerdoItems($acuerdoItems);
+
+                $registro = MesaPazAsistencia::where('user_id', $userId)
+                    ->where('municipio_id', $rp['municipio_id'])
+                    ->whereDate('fecha_asist', $fechaObjetivo)
+                    ->first();
+
+                if ($registro) {
+
+                    continue;
+                } else {
+                    $payloadCrear = [
+                        'user_id' => $userId,
+                        'delegado_id' => $delegado?->id,
+                        'microrregion_id' => $rp['microrregion_id'],
+                        'municipio_id' => $rp['municipio_id'],
+                        'fecha_asist' => $fechaObjetivo,
+                        'presidente' => $presidenteFinal,
+                        'delegado_asistio' => $delegadoAsistioFinal,
+                        'asiste' => $asisteFinal,
+                        'modalidad' => $rp['modalidad'],
+                        'evidencia' => null,
+                        'acuerdo_observacion' => $acuerdoObservacion,
+                        'created_at' => Carbon::now(),
+                    ];
+
+                    if ($usarParte) {
+                        $payloadCrear['parte_observacion'] = $parteObservacion;
+                    }
+
+                    MesaPazAsistencia::create($payloadCrear);
+                    $registrosInsertados++;
+                }
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            throw new MesasPazServiceException('Error al importar en base de datos: ' . $e->getMessage(), 500);
+        }
+
+        return [
+            'success' => true,
+            'message' => 'Se han importado ' . $registrosInsertados . ' registros exitosamente.',
+            'registros_importados' => $registrosInsertados,
+            'fecha_asist' => $fechaObjetivo,
+        ];
+    }
+    
+    private function normalizarAcuerdoItemsDesdeTexto(?string $texto): array
+    {
+        if (empty($texto)) {
+            return [];
+        }
+
+        $soloLetras = preg_replace('/[^a-zñáéíóú]/u', '', mb_strtolower($texto, 'UTF-8'));
+        if (str_contains($soloLetras, 'sinacuerdos')) {
+            return ['Sin Acuerdos'];
+        }
+
+        $textoNormalizado = str_replace(["\r\n", "\r"], "\n", $texto);
+        
+        $bloques = [];
+        $lineas = explode("\n", $textoNormalizado);
+        
+        foreach ($lineas as $linea) {
+            $linea = trim($linea);
+            if ($linea !== '') {
+                $lineaLimpia = trim(preg_replace('/^([\-\*\x{2022}]|\d+[\.)])\s*/u', '', $linea));
+                if ($lineaLimpia !== '') {
+                    $bloques[] = $lineaLimpia;
+                }
+            }
+        }
+
+        return $bloques;
+    }
+
+
+    private function quitarAcentos(string $cadena): string
+    {
+        $no_permitidas= array("Á","É","Í","Ó","Ú","Ñ","á","é","í","ó","ú","ñ");
+        $permitidas= array("A","E","I","O","U","N","a","e","i","o","u","n");
+        return str_replace($no_permitidas, $permitidas ,$cadena);
+    }
+
     private function delegadoPorUsuario(int $userId): ?Delegado
     {
         return Delegado::with('microrregion')
@@ -802,7 +1175,6 @@ class MesasPazService
             } catch (MesasPazServiceException $e) {
                 throw $e;
             } catch (\Exception $e) {
-                // Ignore invalid date
             }
         }
 

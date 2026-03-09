@@ -33,16 +33,18 @@ Route::middleware('auth')->group(function () {
     Route::post('/mesas-paz/acuerdo-hoy', [MesasPazController::class, 'guardarAcuerdoHoy'])->name('mesas-paz.guardar-acuerdo-hoy')->middleware('can:Mesas-Paz');
     Route::post('/mesas-paz/evidencia-hoy', [MesasPazController::class, 'guardarEvidenciaHoy'])->name('mesas-paz.guardar-evidencia-hoy')->middleware('can:Mesas-Paz');
     Route::post('/mesas-paz/evidencia-hoy/eliminar', [MesasPazController::class, 'eliminarEvidenciaHoy'])->name('mesas-paz.eliminar-evidencia-hoy')->middleware('can:Mesas-Paz');
+    Route::post('/mesas-paz/importar-excel', [MesasPazController::class, 'importarExcel'])->name('mesas-paz.importar-excel')->middleware('can:Mesas-Paz');
+    Route::post('/mesas-paz/vaciar-microrregion', [MesasPazController::class, 'vaciarMicrorregion'])->name('mesas-paz.vaciar-microrregion')->middleware('can:Mesas-Paz');
     Route::get('/mesas-paz/evidencia/preview', [MesasPazController::class, 'previewEvidencia']);
     Route::post('/ppt/generar-presentacion', [PowerPointController::class, 'generarPresentacion'])->name('ppt.generar-presentacion');
     Route::get('/mesas-paz/historial-detalle', [MesasPazController::class, 'detallePorFecha'])->name('mesas-paz.historial-detalle')->middleware('can:Mesas-Paz');
     Route::get('/mesas-paz/evidencias', [MesasPazSupervisionController::class, 'evidencias'])->name('mesas-paz.evidencias')->middleware('can:Tableros-incidencias');
     Route::get('/mesas-paz/evidencias/pdf', [MesasPazSupervisionController::class, 'descargarPdf'])->name('mesas-paz.evidencias.pdf')->middleware('can:Tableros-incidencias');
 
-        Route::prefix('admin/configuracion')->middleware('can:Modulos-Temporales-Admin')->group(function () {
-            Route::get('/', [AdminSettingsController::class, 'index'])->name('admin.settings.index');
-            Route::post('/imagenes/migrar', [AdminSettingsController::class, 'migrateImages'])->name('admin.settings.images.migrate');
-        });
+    Route::prefix('admin/configuracion')->middleware('can:Modulos-Temporales-Admin')->group(function () {
+        Route::get('/', [AdminSettingsController::class, 'index'])->name('admin.settings.index');
+        Route::post('/imagenes/migrar', [AdminSettingsController::class, 'migrateImages'])->name('admin.settings.images.migrate');
+    });
 
     Route::prefix('modulos-temporales')->group(function () {
         Route::prefix('admin')->middleware('can:Modulos-Temporales-Admin')->group(function () {
