@@ -618,9 +618,7 @@
                 };
 
                 if (!templateSwal) {
-                    if (window.confirm('Hay datos en campos que vas a modificar o eliminar. ¿Deseas vaciar todos los registros del módulo?')) {
-                        submitWithAction('clear_module');
-                    }
+                    submitWithAction('clear_module');
                     return;
                 }
 

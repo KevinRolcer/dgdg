@@ -602,69 +602,96 @@ document.addEventListener('DOMContentLoaded', function () {
                         return;
                     }
 
-                    const rows = result.data.registros.map(function (registro, index) {
-                        const asisteTexto = normalizarTextoCargo(registro.asiste || 'N/D');
-
-                        return '<tr>' +
-                            '<td>' + (index + 1) + '</td>' +
-                            '<td>' + (registro.municipio || 'N/D') + '</td>' +
-                            '<td>' + (registro.presidente || 'N/D') + '</td>' +
-                            '<td>' + asisteTexto + '</td>' +
-                            '<td>' + (registro.modalidad || 'N/D') + '</td>' +
-                            '</tr>';
-                    }).join('');
-
-                    const parteObservacion = result.data.registros.find(function (registro) {
-                        return Array.isArray(registro.parte_observacion_items) && registro.parte_observacion_items.length > 0;
-                    });
-
-                    const observacion = result.data.registros.find(function (registro) {
-                        return Array.isArray(registro.acuerdo_observacion_items) && registro.acuerdo_observacion_items.length > 0;
-                    });
-
-                    const evidenciaUrls = [];
+                    // Agrupar por microrregiones
+                    const groups = {};
                     result.data.registros.forEach(function (registro) {
-                        const urls = Array.isArray(registro.evidencia_urls) ? registro.evidencia_urls : [];
-                        urls.forEach(function (url) {
-                            if (url && !evidenciaUrls.includes(url)) {
-                                evidenciaUrls.push(url);
-                            }
-                        });
+                        const mid = registro.microrregion_id || 0;
+                        if (!groups[mid]) {
+                            groups[mid] = {
+                                nombre: registro.microrregion_nombre || 'Sin Microrregión',
+                                cabecera: registro.microrregion_cabecera || '',
+                                registros: [],
+                                parte_items: [],
+                                acuerdo_items: [],
+                                evidencias: []
+                            };
+                        }
+                        groups[mid].registros.push(registro);
+
+                        // Acumular partes, acuerdos y evidencias únicos para el grupo
+                        if (Array.isArray(registro.parte_observacion_items)) {
+                            registro.parte_observacion_items.forEach(function (it) {
+                                if (it && !groups[mid].parte_items.includes(it)) groups[mid].parte_items.push(it);
+                            });
+                        }
+                        if (Array.isArray(registro.acuerdo_observacion_items)) {
+                            registro.acuerdo_observacion_items.forEach(function (it) {
+                                if (it && !groups[mid].acuerdo_items.includes(it)) groups[mid].acuerdo_items.push(it);
+                            });
+                        }
+                        if (Array.isArray(registro.evidencia_urls)) {
+                            registro.evidencia_urls.forEach(function (it) {
+                                if (it && !groups[mid].evidencias.includes(it)) groups[mid].evidencias.push(it);
+                            });
+                        }
                     });
 
-                    const evidenciaHtml = evidenciaUrls.length
-                        ? '<div class="mt-2"><strong>Evidencia:</strong><ul class="mb-0 mt-1">'
-                            + evidenciaUrls.map(function (url, index) {
-                                return '<li><a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer">Evidencia ' + (index + 1) + '</a></li>';
-                            }).join('')
-                            + '</ul></div>'
-                        : '<div class="mt-2 text-muted"><strong>Evidencia:</strong> Sin evidencia disponible</div>';
+                    let modalHtml = '';
+                    const groupEntries = Object.values(groups);
+                    
+                    groupEntries.forEach(function (group, index) {
+                        const rows = group.registros.map(function (reg, i) {
+                            const asisteTexto = normalizarTextoCargo(reg.asiste || 'N/D');
+                            return '<tr>' +
+                                '<td>' + (i + 1) + '</td>' +
+                                '<td>' + escapeHtml(reg.municipio || 'N/D') + '</td>' +
+                                '<td>' + escapeHtml(reg.presidente || 'N/D') + '</td>' +
+                                '<td>' + escapeHtml(asisteTexto) + '</td>' +
+                                '<td>' + escapeHtml(reg.modalidad || 'N/D') + '</td>' +
+                                '</tr>';
+                        }).join('');
 
-                    const partesHtml = parteObservacion
-                        ? '<div><strong>Parte:</strong><ul class="mb-2 mt-1">'
-                            + parteObservacion.parte_observacion_items.map(function (item) {
-                                return '<li>' + escapeHtml(item) + '</li>';
-                            }).join('')
-                            + '</ul></div>'
-                        : '<div class="mb-2"><strong>Parte:</strong> <span class="text-muted">Aún no se ha registrado.</span></div>';
+                        const evidenciasHtml = group.evidencias.length
+                            ? '<div class="mt-2"><strong>Evidencias:</strong><ul class="mb-0 mt-1">'
+                                + group.evidencias.map(function (url, i) {
+                                    return '<li><a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer">Evidencia ' + (i + 1) + '</a></li>';
+                                }).join('')
+                                + '</ul></div>'
+                            : '<div class="mt-2 text-muted"><strong>Evidencia:</strong> Sin evidencia disponible</div>';
 
-                    const acuerdosHtml = observacion
-                        ? '<div><strong>Observación/Acuerdo:</strong><ul class="mb-2 mt-1">'
-                            + observacion.acuerdo_observacion_items.map(function (item) {
-                                return '<li>' + escapeHtml(item) + '</li>';
-                            }).join('')
-                            + '</ul></div>'
-                        : '';
+                        const partesHtml = group.parte_items.length
+                            ? '<div><strong>Parte:</strong><ul class="mb-2 mt-1">'
+                                + group.parte_items.map(function (item) {
+                                    return '<li>' + escapeHtml(item) + '</li>';
+                                }).join('')
+                                + '</ul></div>'
+                            : '<div class="mb-2"><strong>Parte:</strong> <span class="text-muted">Sin registro de parte.</span></div>';
 
-                    modalBody.innerHTML =
-                        '<div class="table-responsive">' +
-                        '<table class="table table-sm table-bordered align-middle mb-2">' +
-                        '<thead><tr><th>#</th><th>Municipio</th><th>Asistió</th><th>Asiste</th><th>Modalidad</th></tr></thead>' +
-                        '<tbody>' + rows + '</tbody>' +
-                        '</table></div>' +
-                        partesHtml +
-                        acuerdosHtml +
-                        evidenciaHtml;
+                        const acuerdosHtml = group.acuerdo_items.length
+                            ? '<div><strong>Observación/Acuerdo:</strong><ul class="mb-2 mt-1">'
+                                + group.acuerdo_items.map(function (item) {
+                                    return '<li>' + escapeHtml(item) + '</li>';
+                                }).join('')
+                                + '</ul></div>'
+                            : '';
+
+                        modalHtml += '<div class="' + (index < groupEntries.length - 1 ? 'mb-4 border-bottom pb-4' : 'mb-2') + '">' +
+                            '<h6 class="fw-bold mb-3" style="color: var(--clr-segob-red, #861e34);">' +
+                            '<i class="bi bi-geo-alt-fill me-1"></i> Microrregión: ' + escapeHtml(group.nombre) + 
+                            (group.cabecera ? ' (' + escapeHtml(group.cabecera) + ')' : '') +
+                            '</h6>' +
+                            '<div class="table-responsive">' +
+                            '<table class="table table-sm table-bordered align-middle mb-2">' +
+                            '<thead><tr class="table-light"><th>#</th><th>Municipio</th><th>Asistió</th><th>Asiste</th><th>Modalidad</th></tr></thead>' +
+                            '<tbody>' + rows + '</tbody>' +
+                            '</table></div>' +
+                            partesHtml +
+                            acuerdosHtml +
+                            evidenciasHtml +
+                            '</div>';
+                    });
+
+                    modalBody.innerHTML = modalHtml;
                 })
                 .catch(function (errorData) {
                     const backendErrors = errorData && errorData.errors ? Object.values(errorData.errors).flat() : [];
@@ -1253,14 +1280,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const fechaSelectorWrapper = document.getElementById('fechaSelectorWrapper');
 
     if (fechaSelectorWrapper && fechaSelectorMesas) {
-        fechaSelectorWrapper.addEventListener('click', function (e) {
-            // Si el clic no fue directamente en el input (que es invisible pero está ahí), lo forzamos
-            if (e.target !== fechaSelectorMesas && typeof fechaSelectorMesas.showPicker === 'function') {
+        fechaSelectorWrapper.addEventListener('click', function () {
+            // Siempre forzamos el picker al hacer clic en el contenedor (que es lo que el usuario ve)
+            if (typeof fechaSelectorMesas.showPicker === 'function') {
                 try {
                     fechaSelectorMesas.showPicker();
                 } catch (err) {
                     fechaSelectorMesas.focus();
+                    fechaSelectorMesas.click();
                 }
+            } else {
+                fechaSelectorMesas.focus();
+                fechaSelectorMesas.click();
             }
         });
     }
@@ -1420,13 +1451,19 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnVaciarMicrorregion = document.getElementById('btnVaciarMicrorregion');
     if (btnVaciarMicrorregion) {
         btnVaciarMicrorregion.addEventListener('click', function () {
-            if (!confirm('¿Estás seguro de vaciar todos los registros de asistencia de los municipios que pertenecen a tu microrregión en esta fecha? Esta acción no se puede deshacer.')) {
-                return;
-            }
+            swal({
+                title: "¿Estás seguro?",
+                text: "¿Estás seguro de vaciar todos los registros de asistencia de los municipios que pertenecen a tu microrregión en esta fecha? Esta acción no se puede deshacer.",
+                icon: "warning",
+                buttons: ["Cancelar", "Aceptar"],
+                dangerMode: true,
+            })
+            .then(function(willDelete) {
+                if (!willDelete) return;
 
-            const originalText = btnVaciarMicrorregion.innerHTML;
-            btnVaciarMicrorregion.disabled = true;
-            btnVaciarMicrorregion.textContent = 'Vaciando...';
+                const originalText = btnVaciarMicrorregion.innerHTML;
+                btnVaciarMicrorregion.disabled = true;
+                btnVaciarMicrorregion.textContent = 'Vaciando...';
 
             const url = vaciarMicrorregionUrl;
 
@@ -1465,6 +1502,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 btnVaciarMicrorregion.innerHTML = originalText;
             });
         });
-    }
+    });
+}
 
 });

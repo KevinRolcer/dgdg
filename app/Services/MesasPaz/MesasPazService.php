@@ -628,9 +628,10 @@ class MesasPazService
     public function detallePorFecha(int $userId, string $fecha): array
     {
         $fechaNormalizada = Carbon::parse($fecha)->toDateString();
-        $registros = MesaPazAsistencia::with('municipio:id,municipio')
+        $registros = MesaPazAsistencia::with(['municipio:id,municipio', 'microrregion:id,microrregion,cabecera'])
             ->where('user_id', $userId)
             ->whereDate('fecha_asist', $fechaNormalizada)
+            ->orderBy('microrregion_id')
             ->orderBy('municipio_id')
             ->get();
 
@@ -646,6 +647,9 @@ class MesasPazService
 
                 return [
                     'municipio' => optional($registro->municipio)->municipio,
+                    'microrregion_id' => $registro->microrregion_id,
+                    'microrregion_nombre' => optional($registro->microrregion)->microrregion,
+                    'microrregion_cabecera' => optional($registro->microrregion)->cabecera,
                     'presidente' => $this->mapPresidenteForDisplay($registro->presidente),
                     'delegado_asistio' => $registro->delegado_asistio,
                     'asiste' => $registro->asiste,

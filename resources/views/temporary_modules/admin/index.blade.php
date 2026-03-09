@@ -60,7 +60,7 @@
                             </td>
                             <td>
                                 <a href="{{ route('temporary-modules.admin.edit', $module->id) }}" class="tm-btn">Editar</a>
-                                <form method="POST" action="{{ route('temporary-modules.admin.destroy', $module->id) }}" onsubmit="return confirm('¿Eliminar módulo temporal? Los registros capturados se conservarán.');">
+                                <form method="POST" action="{{ route('temporary-modules.admin.destroy', $module->id) }}" class="tm-inline-form" data-confirm-delete data-module-name="{{ $module->name }}">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="tm-btn tm-btn-danger">Eliminar</button>
@@ -78,3 +78,41 @@
     </article>
 </section>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const deleteForms = Array.from(document.querySelectorAll('form[data-confirm-delete]'));
+        
+        deleteForms.forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                const moduleName = form.getAttribute('data-module-name') || 'este módulo';
+                
+                Swal.fire({
+                    title: '¿Eliminar módulo?',
+                    text: '¿Estás seguro de eliminar el módulo "' + moduleName + '"? Los registros capturados se conservarán.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, eliminar',
+                    cancelButtonText: 'Cancelar',
+                    reverseButtons: true,
+                    buttonsStyling: false,
+                    customClass: {
+                        popup: 'tm-swal-popup',
+                        title: 'tm-swal-title',
+                        htmlContainer: 'tm-swal-text',
+                        confirmButton: 'tm-swal-confirm',
+                        cancelButton: 'tm-swal-cancel'
+                    }
+                }).then(function (result) {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            });
+        });
+    });
+</script>
+@endpush

@@ -537,10 +537,7 @@
         const notify = function (title, message, type) {
             if (typeof window.swal === 'function') {
                 window.swal(title, message, type);
-                return;
             }
-
-            window.alert((title ? title + ': ' : '') + (message || ''));
         };
 
         const activateModulePanel = function (targetId) {

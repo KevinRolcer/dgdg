@@ -231,6 +231,12 @@ class MesaPazAsistencia extends Model
         return $this->belongsTo(Municipio::class, 'municipio_id');
     }
 
+    // Relación: cada asistencia pertenece a una microrregión.
+    public function microrregion()
+    {
+        return $this->belongsTo(Microrregione::class, 'microrregion_id');
+    }
+
     // Relación: cada asistencia pertenece al perfil delegado que la capturó.
     public function delegado()
     {

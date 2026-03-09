@@ -370,14 +370,12 @@
                 };
 
                 if (!templateSwal) {
-                    if (window.confirm('¿Seguro que deseas vaciar todos los registros de ' + moduleName + '?')) {
-                        submitAction();
-                    }
+                    submitAction();
                     return;
                 }
 
                 templateSwal.fire({
-                    title: '¿Vaciar registros?',
+                    title: '¿Vaciar registros de ' + moduleName + '?',
                     text: 'Se eliminarán todos los registros capturados de "' + moduleName + '". Esta acción no se puede deshacer.',
                     icon: 'warning',
                     showCancelButton: true,

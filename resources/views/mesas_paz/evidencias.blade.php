@@ -5,7 +5,11 @@
 @push('css')
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
 <link href="{{ asset('assets/css/mesas_paz/mesaPazSupervision.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesaPazSupervision.css')) ?: time() }}" rel="stylesheet" />
+<link href="{{ asset('assets/css/mesas_paz/mesaPaz.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesaPaz.css')) ?: time() }}" rel="stylesheet" />
 @endpush
+
+@push('scripts')
+<script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
 
 @section('content')
 <div id="supervisionEvidenciasPage">
@@ -582,7 +586,7 @@ document.getElementById('btnConfirmarRangoFechasPresentacion')?.addEventListener
     const fechaInicio = document.getElementById('fechaInicioPresentacion')?.value;
     const fechaFin = document.getElementById('fechaFinPresentacion')?.value;
     if (!fechaInicio || !fechaFin) {
-        alert('Selecciona ambas fechas para continuar.');
+        swal('Atención', 'Selecciona ambas fechas para continuar.', 'warning');
         return;
     }
     bootstrap.Modal.getInstance(document.getElementById('rangoFechasPresentacionModal')).hide();
@@ -642,7 +646,7 @@ document.getElementById('btnConfirmarRangoFechasPresentacion')?.addEventListener
 document.getElementById('btnGenerarPresentacion')?.addEventListener('click', function() {
     const fecha = document.getElementById('fecha_lista')?.value;
     if (!fecha) {
-        alert('Selecciona una fecha para generar la presentación.');
+        swal('Atención', 'Selecciona una fecha para generar la presentación.', 'warning');
         return;
     }
     const modal = new bootstrap.Modal(document.getElementById('canvaPresentacionModal'));
