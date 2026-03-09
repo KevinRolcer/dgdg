@@ -203,6 +203,21 @@
 
                         <form action="{{ route('temporary-modules.submit', $module->id) }}" method="POST" enctype="multipart/form-data" class="tm-form tm-entry-form">
                             @csrf
+                            @if ($mostrarSelectorMicrorregion)
+                                <label class="tm-col-full tm-entry-field">
+                                    Microrregion de captura *
+                                    <select name="selected_microrregion_id" class="tm-mr-selector" required>
+                                        @foreach ($microsAsignadas as $micro)
+                                            <option value="{{ $micro->id }}" @selected((int) ($entry->microrregion_id ?? 0) === (int) $micro->id)>
+                                                MR {{ $micro->microrregion }} - {{ $micro->cabecera }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                            @elseif ($microsAsignadas->isNotEmpty())
+                                <input type="hidden" name="selected_microrregion_id" value="{{ $entry->microrregion_id ?? $microsAsignadas->first()->id }}">
+                            @endif
+
                             <div class="tm-grid tm-grid-2 tm-entry-grid">
                                 <input type="hidden" name="entry_id" value="{{ $entry->id }}">
                                 @foreach ($orderedFields as $field)
@@ -242,7 +257,7 @@
                                                 @endforeach
                                             </select>
                                         @elseif ($field->type === 'municipio')
-                                            <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
+                                            <select id="{{ $id }}" name="{{ $name }}" class="tm-municipio-select" {{ $field->is_required ? 'required' : '' }}>
                                                 <option value="">Selecciona un municipio</option>
                                                 @foreach ($municipios as $municipio)
                                                     <option value="{{ $municipio }}" @selected($value === $municipio)>{{ $municipio }}</option>
@@ -336,7 +351,7 @@
                                 <details class="tm-record-card">
                                     <summary>
                                         <span class="tm-record-card-title">{{ $cardTitle }}</span>
-                                        <small>{{ optional($entry->submitted_at)->format('d/m/Y H:i') }}</small>
+                                        <small>MR {{ $entry->microrregion->microrregion ?? '?' }}</small>
                                     </summary>
 
                                     <div class="tm-record-card-body">
@@ -402,7 +417,7 @@
                             <table class="tm-table">
                                 <thead>
                                     <tr>
-                                        <th>Fecha</th>
+                                        <th>Microrregión</th>
                                         @foreach ($module->fields as $field)
                                             <th>{{ $field->label }}</th>
                                         @endforeach
@@ -412,7 +427,7 @@
                                 <tbody>
                                     @forelse ($module->getRelation('myEntries') as $entry)
                                         <tr>
-                                            <td>{{ optional($entry->submitted_at)->format('d/m/Y H:i') }}</td>
+                                            <td>MR {{ $entry->microrregion->microrregion ?? '-' }}</td>
                                             @foreach ($module->fields as $field)
                                                 @php
                                                     $cell = $entry->data[$field->key] ?? null;

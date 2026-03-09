@@ -445,6 +445,7 @@ class TemporaryModuleController extends Controller
                 ->first());
 
             $module->setRelation('myEntries', $module->entries()
+                ->with('microrregion')
                 ->where('user_id', $user->id)
                 ->latest('submitted_at')
                 ->take(50)

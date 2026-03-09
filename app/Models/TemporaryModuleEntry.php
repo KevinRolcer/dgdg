@@ -33,4 +33,9 @@ class TemporaryModuleEntry extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function microrregion(): BelongsTo
+    {
+        return $this->belongsTo(Microrregione::class, 'microrregion_id');
+    }
 }
