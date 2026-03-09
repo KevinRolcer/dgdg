@@ -1255,7 +1255,7 @@ class MesasPazService
         }
 
         if ($presidente === 'Representante') {
-            return 'Director de Seguridad';
+            return 'Representante';
         }
 
         if (in_array($presidente, ['No', 'Ninguno'], true)) {
@@ -1263,7 +1263,7 @@ class MesasPazService
         }
 
         if ($presidente === 'Ambos') {
-            return 'Ambos (Presidente y Director de Seguridad)';
+            return 'Ambos (Presidente y Representante)';
         }
 
         return $presidente;

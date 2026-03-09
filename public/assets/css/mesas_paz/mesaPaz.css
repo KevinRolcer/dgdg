@@ -43,6 +43,45 @@
     font-weight: 700;
 }
 
+#mesasPazApp .mesa-date-btn-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    background: rgba(72, 71, 71, 0.07);
+    border: 1px solid rgba(72, 71, 71, 0.15);
+    border-radius: var(--mesa-radius-sm);
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--bs-heading-color, #333);
+}
+
+#mesasPazApp .mesa-date-btn-wrapper:hover {
+    background: rgba(72, 71, 71, 0.11);
+    border-color: rgba(72, 71, 71, 0.25);
+}
+
+#mesasPazApp .mesa-date-btn-wrapper > span,
+#mesasPazApp .mesa-date-btn-wrapper > i {
+    pointer-events: none;
+}
+
+#mesasPazApp .mesa-date-input-hidden {
+    position: absolute;
+    opacity: 0;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    border: none;
+    z-index: 2;
+}
+
 #mesasPazApp .mesa-micro-pagination-wrap {
     border: 1px solid var(--clr-border);
     border-radius: var(--mesa-radius-md);

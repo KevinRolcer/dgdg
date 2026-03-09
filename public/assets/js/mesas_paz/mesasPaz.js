@@ -1250,10 +1250,32 @@ document.addEventListener('DOMContentLoaded', function () {
     bindTextareaLista(acuerdoObservacionHoy);
 
     const fechaSelectorMesas = document.getElementById('fechaSelectorMesas');
+    const fechaSelectorWrapper = document.getElementById('fechaSelectorWrapper');
+
+    if (fechaSelectorWrapper && fechaSelectorMesas) {
+        fechaSelectorWrapper.addEventListener('click', function (e) {
+            // Si el clic no fue directamente en el input (que es invisible pero está ahí), lo forzamos
+            if (e.target !== fechaSelectorMesas && typeof fechaSelectorMesas.showPicker === 'function') {
+                try {
+                    fechaSelectorMesas.showPicker();
+                } catch (err) {
+                    fechaSelectorMesas.focus();
+                }
+            }
+        });
+    }
+
     if (fechaSelectorMesas) {
         fechaSelectorMesas.addEventListener('change', function () {
             const newDate = this.value;
             if (newDate) {
+                // Actualizar display visual antes de recargar (opcional pero limpio)
+                const display = document.getElementById('fechaDisplay');
+                if (display && newDate.includes('-')) {
+                    const p = newDate.split('-');
+                    display.textContent = p[2] + '/' + p[1] + '/' + p[0];
+                }
+
                 const parts = newDate.split('-');
                 if (parts.length === 3) {
                     const dt = new Date(parts[0], parts[1] - 1, parts[2]);

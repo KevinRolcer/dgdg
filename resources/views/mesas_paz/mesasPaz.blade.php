@@ -68,7 +68,16 @@
                     </h4>
                     @if (!empty($esAnalistaEnlace))
                         <div class="d-flex align-items-center flex-wrap gap-2">
-                            <input type="date" id="fechaSelectorMesas" class="form-control text-end d-inline-block fw-bold bg-transparent border-0 px-2" style="width: auto; cursor: pointer; color: var(--bs-heading-color, inherit); box-shadow: none;" value="{{ $fechaHoyIso }}" max="{{ \Carbon\Carbon::today()->toDateString() }}">
+                            <div class="mesa-date-btn-wrapper" id="fechaSelectorWrapper" title="Cambiar fecha de consulta">
+                                <span id="fechaDisplay">{{ \Carbon\Carbon::parse($fechaHoyIso)->format('d/m/Y') }}</span>
+                                <i class="ms-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1z"/>
+                                        <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/>
+                                    </svg>
+                                </i>
+                                <input type="date" id="fechaSelectorMesas" class="mesa-date-input-hidden" value="{{ $fechaHoyIso }}" max="{{ \Carbon\Carbon::today()->toDateString() }}">
+                            </div>
                             <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#importarExcelModal">
                                 Cargar Excel
                             </button>
@@ -173,10 +182,10 @@
                                                 <label class="btn btn-outline-secondary btn-sm" for="presidente_opt_si_{{ $municipio->id }}">Presidente Municipal</label>
 
                                                 <input type="radio" class="btn-check presidente-option-input" name="presidente_option_{{ $municipio->id }}" id="presidente_opt_rep_{{ $municipio->id }}" value="Representante" data-municipio-id="{{ $municipio->id }}" @if($isRepresentante) checked @endif @if($registroMunicipio || empty($modalidadActual) || empty($delegadoAsistioActual)) disabled @endif>
-                                                <label class="btn btn-outline-secondary btn-sm" for="presidente_opt_rep_{{ $municipio->id }}">Director de Seguridad</label>
+                                                <label class="btn btn-outline-secondary btn-sm" for="presidente_opt_rep_{{ $municipio->id }}">Representante</label>
 
                                                 <input type="radio" class="btn-check presidente-option-input" name="presidente_option_{{ $municipio->id }}" id="presidente_opt_ambos_{{ $municipio->id }}" value="Ambos" data-municipio-id="{{ $municipio->id }}" @if($isAmbos) checked @endif @if($registroMunicipio || empty($modalidadActual) || empty($delegadoAsistioActual)) disabled @endif>
-                                                <label class="btn btn-outline-secondary btn-sm" for="presidente_opt_ambos_{{ $municipio->id }}">Ambos (Presidente y Director de Seguridad)</label>
+                                                <label class="btn btn-outline-secondary btn-sm" for="presidente_opt_ambos_{{ $municipio->id }}">Ambos (Presidente y Representante)</label>
 
                                                 <input type="radio" class="btn-check presidente-option-input" name="presidente_option_{{ $municipio->id }}" id="presidente_opt_ninguno_{{ $municipio->id }}" value="Ninguno" data-municipio-id="{{ $municipio->id }}" @if($isNinguno) checked @endif @if($registroMunicipio || empty($modalidadActual) || empty($delegadoAsistioActual)) disabled @endif>
                                                 <label class="btn btn-outline-secondary btn-sm btn-ninguno-option" for="presidente_opt_ninguno_{{ $municipio->id }}">Ninguno</label>
@@ -189,8 +198,8 @@
                                             >
                                                 <option value="">Seleccionar</option>
                                                 <option value="Si" @if(optional($registroMunicipio)->presidente === 'Si') selected @endif>Sí</option>
-                                                <option value="Representante" @if(optional($registroMunicipio)->presidente === 'Representante') selected @endif>Director de Seguridad</option>
-                                                <option value="Ambos" @if(optional($registroMunicipio)->presidente === 'Ambos') selected @endif>Ambos (Presidente y Director de Seguridad)</option>
+                                                <option value="Representante" @if(optional($registroMunicipio)->presidente === 'Representante') selected @endif>Representante</option>
+                                                <option value="Ambos" @if(optional($registroMunicipio)->presidente === 'Ambos') selected @endif>Ambos (Presidente y Representante)</option>
                                                 {{-- Municipio no presente" == "No" --}}
                                                 <option value="Ninguno" @if(in_array(optional($registroMunicipio)->presidente, ['No', 'Ninguno'])) selected @endif>Municipio no presente</option>
                                                 <option value="No" hidden @if(optional($registroMunicipio)->presidente === 'No') selected @endif>No</option>
@@ -233,7 +242,7 @@
                                     </div>
                                     <div class="small text-muted mt-2 d-none contestado-detalle-item">
                                         {{-- Compatibilidad visual: si existe histórico en BD con "No"/"Ninguno", se presenta como "Municipio no presente". --}}
-                                        Asistió Presidente Municipal: {{ $item->presidente === 'Si' ? 'Sí' : ($item->presidente === 'Representante' ? 'Director de Seguridad' : ($item->presidente === 'Ambos' ? 'Ambos (Presidente y Director de Seguridad)' : (in_array($item->presidente, ['No', 'Ninguno']) ? 'Municipio no presente' : $item->presidente))) }}@if(!empty($item->asiste)) · Asiste: {{ str_ireplace(['Presidente y Representante', 'Director de seguridad', 'Secretario/Regidor de gobernación', 'Presidente'], ['Presidente y Director de Seguridad', 'Director de Seguridad Municipal', 'Secretario/Regidor de Gobernación', 'Presidente Municipal'], $item->asiste) }}@endif
+                                        Asistió Presidente Municipal: {{ $item->presidente === 'Si' ? 'Sí' : ($item->presidente === 'Representante' ? 'Representante' : ($item->presidente === 'Ambos' ? 'Ambos (Presidente y Representante)' : (in_array($item->presidente, ['No', 'Ninguno']) ? 'Municipio no presente' : $item->presidente))) }}@if(!empty($item->asiste)) · Asiste: {{ str_ireplace(['Presidente y Representante', 'Director de seguridad', 'Secretario/Regidor de gobernación', 'Presidente'], ['Presidente y Representante', 'Director de Seguridad Municipal', 'Secretario/Regidor de Gobernación', 'Presidente Municipal'], $item->asiste) }}@endif
                                     </div>
                                 </li>
                             @endforeach
