@@ -1252,6 +1252,17 @@ document.addEventListener('DOMContentLoaded', function () {
         fechaSelectorMesas.addEventListener('change', function () {
             const newDate = this.value;
             if (newDate) {
+                const parts = newDate.split('-');
+                if (parts.length === 3) {
+                    const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+                    const day = dt.getDay(); // 0 is Sunday, 6 is Saturday
+                    if (day === 0 || day === 6) {
+                        swal('Fecha no permitida', 'Solo se permite seleccionar fechas de lunes a viernes.', 'warning');
+                        this.value = app.dataset.fechaHoyIso;
+                        return;
+                    }
+                }
+
                 const url = new URL(window.location.href);
                 url.searchParams.set('fecha', newDate);
                 window.location.href = url.toString();

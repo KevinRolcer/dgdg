@@ -90,7 +90,7 @@ class MesasPazService
         if ($esAnalistaEnlace && $fechaReq && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaReq)) {
             try {
                 $parsedDate = Carbon::createFromFormat('Y-m-d', $fechaReq)->startOfDay();
-                if ($parsedDate->lte(Carbon::today())) {
+                if ($parsedDate->lte(Carbon::today()) && !$parsedDate->isWeekend()) {
                     $fechaCarbon = $parsedDate;
                 }
             } catch (\Exception $e) {
@@ -793,9 +793,14 @@ class MesasPazService
         if ($esAnalistaEnlace && $fechaReq && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaReq)) {
             try {
                 $parsedDate = Carbon::createFromFormat('Y-m-d', $fechaReq)->startOfDay();
+                if ($parsedDate->isWeekend()) {
+                    throw new MesasPazServiceException('No está permitido registrar asistencias en fines de semana (sábado y domingo).', 422);
+                }
                 if ($parsedDate->lte(Carbon::today())) {
                     return $parsedDate->toDateString();
                 }
+            } catch (MesasPazServiceException $e) {
+                throw $e;
             } catch (\Exception $e) {
                 // Ignore invalid date
             }
