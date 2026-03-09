@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const hayItems = listaContestados.querySelectorAll('.list-group-item').length > 0
                 && !listaContestados.querySelector('.list-group-item.text-muted');
             btnToggleContestadosDetalle.style.display = hayItems ? '' : 'none';
-            btnToggleContestadosDetalle.textContent = mostrarDetalleContestados ? 'Ver menos' : 'Ver más';
+            btnToggleContestadosDetalle.textContent = mostrarDetalleContestados ? 'Ver menos' : 'Ver detalle';
         }
     }
     const maxEvidenciasHoy = Number(app.dataset.maxEvidenciasHoy || 3);

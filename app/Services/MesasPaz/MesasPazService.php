@@ -830,8 +830,8 @@ class MesasPazService
             $spreadsheet = IOFactory::load($archivo->getRealPath());
             $sheet = $spreadsheet->getActiveSheet();
             $rows = $sheet->toArray(null, true, true, true);
-        } catch (\Exception $e) {
-            throw new MesasPazServiceException('El archivo Excel proporcionado no tiene un formato válido.', 422);
+        } catch (\Throwable $e) {
+            throw new MesasPazServiceException('Error al intentar leer el Excel. Detalle del servidor: ' . $e->getMessage(), 422);
         }
 
         if (empty($rows)) {
@@ -839,30 +839,44 @@ class MesasPazService
         }
 
         $rowFechaRaw = trim((string) ($rows[1]['A'] ?? ''));
-        // We will loosely try to match the date in the first cell if the user requires it.
-        // User said: "la primer fila tiene la fecha(Valida que sea de la fecha marcada en el filtro)."
-        $fechaValidFlag = false;
-        
+        $fechaExcelExtraida = null;
+
         if ($rowFechaRaw) {
-            $dateFormats = ['Y-m-d', 'd/m/Y', 'Y/m/d', 'd-m-Y'];
-            foreach($dateFormats as $format) {
-                try {
-                    if (str_contains($rowFechaRaw, ' ')) {
-                        // might have time like '2026-03-09 11:27:00'
-                        $rowFechaRaw = explode(' ', $rowFechaRaw)[0];
-                    }
-                    if (Carbon::createFromFormat($format, $rowFechaRaw)->toDateString() === $fechaObjetivo) {
-                        $fechaValidFlag = true;
+            $meses = [
+                'ENERO' => '01', 'FEBRERO' => '02', 'MARZO' => '03', 'ABRIL' => '04',
+                'MAYO' => '05', 'JUNIO' => '06', 'JULIO' => '07', 'AGOSTO' => '08',
+                'SEPTIEMBRE' => '09', 'OCTUBRE' => '10', 'NOVIEMBRE' => '11', 'DICIEMBRE' => '12'
+            ];
+
+            if (preg_match('/(\d{1,2})\s+DE\s+([A-Za-z]+)\s+DE\s+(\d{4})/u', mb_strtoupper($rowFechaRaw, 'UTF-8'), $matches)) {
+                $dia = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
+                $mesNombre = $matches[2];
+                $anio = $matches[3];
+
+                if (isset($meses[$mesNombre])) {
+                    $fechaExcelExtraida = "$anio-{$meses[$mesNombre]}-$dia";
+                }
+            } else {
+                $dateFormats = ['Y-m-d', 'd/m/Y', 'Y/m/d', 'd-m-Y'];
+                foreach($dateFormats as $format) {
+                    try {
+                        $tempStr = $rowFechaRaw;
+                        if (strpos((string)$tempStr, ' ') !== false) {
+                            $tempStr = explode(' ', $tempStr)[0];
+                        }
+                        $fechaExcelExtraida = Carbon::createFromFormat($format, $tempStr)->toDateString();
                         break;
-                    }
-                } catch (\Exception $e) { }
+                    } catch (\Exception $e) { }
+                }
             }
-            // we will let it slide if the date parsing failed as the instruction was slightly ambiguous 
-            // but we'll enforce if we explicitly find a different parseable date.
-        }
-        
-        if (!$fechaValidFlag && !empty($rowFechaRaw) && preg_match('/\d{2,4}[-\/]\d{2}[-\/]\d{2,4}/', $rowFechaRaw)) {
-            throw new MesasPazServiceException('La fecha en el Excel no coincide con la fecha seleccionada en el filtro (' . $fechaObjetivo . ').', 422);
+            
+            if ($fechaExcelExtraida) {
+                if ($fechaExcelExtraida !== $fechaObjetivo) {
+                    throw new MesasPazServiceException("La fecha del documento ($fechaExcelExtraida) es diferente a la marcada en el filtro ($fechaObjetivo).", 422);
+                }
+            } elseif (preg_match('/\d{2,4}[-\/]\d{2}[-\/]\d{2,4}/', $rowFechaRaw)) {
+                throw new MesasPazServiceException("La fecha del documento tiene un formato irreconocible y parece ser diferente a la marcada ($fechaObjetivo).", 422);
+            }
         }
 
         $municipiosMap = DB::table('municipios')
@@ -897,7 +911,7 @@ class MesasPazService
             if (!empty($rows[$i])) {
                 foreach ($rows[$i] as $colLetter => $val) {
                     $head = $this->quitarAcentos(mb_strtoupper(trim((string) $val), 'UTF-8'));
-                    if (str_contains($head, 'ACUERDO') || str_contains($head, 'OBSERVACION')) {
+                    if (strpos((string)$head, 'ACUERDO') !== false || strpos((string)$head, 'OBSERVACION') !== false) {
                         $acuerdosCol = $colLetter;
                         break 2;
                     }
@@ -942,12 +956,26 @@ class MesasPazService
                 $colMunicipio = $aliasMunicipios[$colMunicipio];
             }
 
-            if (!isset($municipiosPorNombre[$colMunicipio])) {
+            // Flexibilizar validación intentando con y sin acentos
+            $municipioDB = null;
+            if (isset($municipiosPorNombre[$colMunicipio])) {
+                $municipioDB = $municipiosPorNombre[$colMunicipio];
+            } else {
+                // Iterar para encontrar coincidencias borrosas ignorando acentos y espacios extra
+                $colMuniLimpio = $this->quitarAcentos(preg_replace('/\s+/', ' ', $colMunicipio));
+                foreach ($municipiosPorNombre as $nombreClave => $mDB) {
+                    $dbLimpio = $this->quitarAcentos(preg_replace('/\s+/', ' ', $nombreClave));
+                    if ($dbLimpio === $colMuniLimpio) {
+                        $municipioDB = $mDB;
+                        break;
+                    }
+                }
+            }
+
+            if (!$municipioDB) {
                 // Municipio no permitido o no pertenece a enlaces asignadas.
                 continue;
             }
-            
-            $municipioDB = $municipiosPorNombre[$colMunicipio];
 
             // Verificación extra cruzada: El municipioDB debe corresponder a la microrregión si logramos parsearla.
             // Si $colMicroMatchId existe y el user tiene microrregiones asignadas, nos cercioramos que concuerde.
@@ -963,12 +991,13 @@ class MesasPazService
             $presidente = null;
             $representante = null;
 
-            if ($colAsiste === 'DIRECTOR DE SEGURIDAD MUNICIPAL' || str_contains($colAsiste, 'DIRECTOR')) {
+            if ($colAsiste === 'DIRECTOR DE SEGURIDAD MUNICIPAL' || strpos((string)$colAsiste, 'DIRECTOR') !== false) {
                 $presidente = 'Representante';
                 $representante = 'Director de seguridad municipal'; // o similar
             } elseif ($colAsiste === 'NO' || $colAsiste === 'NINGUNO') {
                 $presidente = 'No';
-            } elseif ($colAsiste === 'SI' || $colAsiste === 'PRESIDENTE') {
+            } elseif ($colAsiste === 'SI' || strpos((string)$colAsiste, 'PRESIDENTE') !== false) {
+                // Handle 'PRESIDENTE', 'PRESIDENTE MUNICIPAL', 'SI', etc.
                 $presidente = 'Si';
             } else {
                 $presidente = 'Representante'; // Fallback a representante con cargo custom
@@ -1017,13 +1046,13 @@ class MesasPazService
                 }
 
                 $parteItems = [];
-                if ($usarParte && str_contains($rp['modalidad'], 'Suspención')) {
+                if ($usarParte && strpos((string)$rp['modalidad'], 'Suspención') !== false) {
                     $parteItems = ['S/R'];
                 }
                 
                 $acuerdoItems = $rp['acuerdosList'];
                 if (empty($acuerdoItems)) {
-                    $acuerdoItems = str_contains($rp['modalidad'], 'Suspención') ? ['Motivo no registrado'] : ['No se ha anotado nada'];
+                    $acuerdoItems = strpos((string)$rp['modalidad'], 'Suspención') !== false ? ['Motivo no registrado'] : ['No se ha anotado nada'];
                 }
 
                 $parteObservacion = $usarParte ? MesaPazAsistencia::encodeAcuerdoItems($parteItems) : null;
@@ -1040,7 +1069,7 @@ class MesasPazService
                 } else {
                     $payloadCrear = [
                         'user_id' => $userId,
-                        'delegado_id' => $delegado?->id,
+                        'delegado_id' => $delegado ? $delegado->id : null,
                         'microrregion_id' => $rp['microrregion_id'],
                         'municipio_id' => $rp['municipio_id'],
                         'fecha_asist' => $fechaObjetivo,
@@ -1082,8 +1111,9 @@ class MesasPazService
             return [];
         }
 
-        $soloLetras = preg_replace('/[^a-zñáéíóú]/u', '', mb_strtolower($texto, 'UTF-8'));
-        if (str_contains($soloLetras, 'sinacuerdos')) {
+        // Use unicode escape sequences to prevent cPanel/FTP encoding corruption (preg_replace compilation error)
+        $soloLetras = preg_replace('/[^a-z\x{00F1}\x{00E1}\x{00E9}\x{00ED}\x{00F3}\x{00FA}]/u', '', mb_strtolower($texto, 'UTF-8'));
+        if (strpos((string)$soloLetras, 'sinacuerdos') !== false) {
             return ['Sin Acuerdos'];
         }
 
@@ -1108,8 +1138,8 @@ class MesasPazService
 
     private function quitarAcentos(string $cadena): string
     {
-        $no_permitidas= array("Á","É","Í","Ó","Ú","Ñ","á","é","í","ó","ú","ñ");
-        $permitidas= array("A","E","I","O","U","N","a","e","i","o","u","n");
+        $no_permitidas = array ("á","é","í","ó","ú","Á","É","Í","Ó","Ú","ñ","À","Ã","Ì","Ò","Ù","Ã™","Ã ","Ã¨","Ã¬","Ã²","Ã¹","ç","Ç","Ã¢","ê","Ã®","Ã´","Ã»","Ã‚","ÃŠ","ÃŽ","Ã”","Ã›","ü","Ã¶","Ã–","Ã¯","Ã¤","«","Ò","Ã","Ã„","Ã‹");
+        $permitidas = array ("a","e","i","o","u","A","E","I","O","U","n","N","A","E","I","O","U","a","e","i","o","u","c","C","a","e","i","o","u","A","E","I","O","U","u","o","O","i","a","e","U","I","A","E");
         return str_replace($no_permitidas, $permitidas ,$cadena);
     }
 
@@ -1241,24 +1271,39 @@ class MesasPazService
 
     private function resolverAsisteDesdePresidente(?string $presidente, ?string $representante): ?string
     {
-        return match ($presidente) {
-            'Si' => 'Presidente',
-            'Representante' => 'Director de seguridad',
-            'Ambos' => 'Presidente y Director de seguridad',
-            'No' => 'NO',
-            default => null,
-        };
+        if ($presidente === 'Si') {
+            return 'Presidente';
+        }
+        if ($presidente === 'Representante') {
+            return 'Director de seguridad';
+        }
+        if ($presidente === 'Ambos') {
+            return 'Presidente y Director de seguridad';
+        }
+        if ($presidente === 'No') {
+            return 'NO';
+        }
+        return null;
     }
 
     private function resolverReglaEspecialPorModalidad(string $modalidad): ?array
     {
         $valor = mb_strtolower(trim($modalidad));
+        $mod = $this->quitarAcentos(mb_strtoupper($modalidad, 'UTF-8'));
+
+        if (strpos((string)$mod, 'SUSPENCION') !== false) {
+            return [
+                'asiste' => 'Ninguno',
+                'presidente' => 'S/R',
+                'delegado_asistio' => 'S/R',
+            ];
+        }
 
         if ($valor === mb_strtolower('Sin reporte de Delegado')) {
             return [
                 'asiste' => 'SRD',
                 'presidente' => 'S/R',
-                'delegado_asistio' => 'S/R',
+                'delegado_asistio' => 'No',
             ];
         }
 
@@ -1266,7 +1311,7 @@ class MesasPazService
             return [
                 'asiste' => 'SIE',
                 'presidente' => 'S/R',
-                'delegado_asistio' => 'S/R',
+                'delegado_asistio' => 'No',
             ];
         }
 
@@ -1416,7 +1461,7 @@ class MesasPazService
             return null;
         }
 
-        if (str_starts_with($normalized, self::SHARED_STORAGE_DIR.'/') && Storage::disk(self::SHARED_DISK)->exists($normalized)) {
+        if (strpos((string)$normalized, self::SHARED_STORAGE_DIR.'/') === 0 && Storage::disk(self::SHARED_DISK)->exists($normalized)) {
             return Storage::disk(self::SHARED_DISK)->path($normalized);
         }
 
@@ -1465,7 +1510,7 @@ class MesasPazService
             return;
         }
 
-        if (str_starts_with($normalized, self::SHARED_STORAGE_DIR.'/')) {
+        if (strpos((string)$normalized, self::SHARED_STORAGE_DIR.'/') === 0) {
             Storage::disk(self::SHARED_DISK)->delete($normalized);
             return;
         }
@@ -1479,15 +1524,15 @@ class MesasPazService
     private function normalizeEvidencePath(string $rawPath): ?string
     {
         $path = ltrim(str_replace('\\', '/', trim($rawPath)), '/');
-        if ($path === '' || str_contains($path, '..')) {
+        if ($path === '' || strpos((string)$path, '..') !== false) {
             return null;
         }
 
-        if (str_starts_with($path, self::LEGACY_PUBLIC_DIR.'/')) {
+        if (strpos((string)$path, self::LEGACY_PUBLIC_DIR.'/') === 0) {
             return $path;
         }
 
-        if (str_starts_with($path, self::SHARED_STORAGE_DIR.'/')) {
+        if (strpos((string)$path, self::SHARED_STORAGE_DIR.'/') === 0) {
             return $path;
         }
 

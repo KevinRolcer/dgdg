@@ -6,12 +6,17 @@ use RuntimeException;
 
 class MesasPazServiceException extends RuntimeException
 {
+    private int $httpStatus;
+    private array $extraPayload;
+
     public function __construct(
         string $message,
-        private readonly int $httpStatus = 422,
-        private readonly array $extraPayload = []
+        int $httpStatus = 422,
+        array $extraPayload = []
     ) {
         parent::__construct($message);
+        $this->httpStatus = $httpStatus;
+        $this->extraPayload = $extraPayload;
     }
 
     public function status(): int

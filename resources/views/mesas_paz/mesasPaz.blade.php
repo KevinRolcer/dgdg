@@ -140,7 +140,7 @@
                                             aria-expanded="false"
                                             aria-controls="municipioDetalles{{ $municipio->id }}"
                                         >
-                                            Ver más
+                                            Ver detalle
                                         </button>
                                     </div>
                                 </div>
@@ -218,7 +218,7 @@
                     <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
                         <h6 class="mb-0">Municipios contestados hoy</h6>
                         <button type="button" class="btn btn-sm btn-outline-primary @if(!(isset($registrosHoy) && $registrosHoy->isNotEmpty())) d-none @endif" id="btnToggleContestadosDetalle">
-                            Ver más
+                            Ver detalle
                         </button>
                     </div>
                     <ul id="listaMunicipiosContestados" class="list-group">
