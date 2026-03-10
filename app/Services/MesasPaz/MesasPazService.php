@@ -1489,7 +1489,18 @@ class MesasPazService
             return false;
         }
 
-        // We check both versions (escaped and unescaped slashes) to be resilient to older and newer records.
+        if ($user->hasRole('Superadmin') || 
+            $user->hasRole('superadmin') || 
+            $user->hasRole('Enlace') || 
+            $user->hasRole('enlace') || 
+            $user->can('Tableros-incidencias') || 
+            $user->can('Tableros') || 
+            $user->can('Tablero Incidencias') ||
+            $user->can('Tablero-Incidencias')) {
+            return true;
+        }
+
+        // Para delegados regulares, validamos que la evidencia les pertenezca.
         $escaped = str_replace('/', '\\/', $normalized);
 
         $query = MesaPazAsistencia::query()
@@ -1498,14 +1509,6 @@ class MesasPazService
                 $q->where('evidencia', 'like', '%' . $normalized . '%')
                   ->orWhere('evidencia', 'like', '%' . $escaped . '%');
             });
-
-        if ($user->can('Tableros-incidencias')) {
-            return $query->exists();
-        }
-
-        if (!$user->can('Mesas-Paz')) {
-            return false;
-        }
 
         return $query->where('user_id', $userId)->exists();
     }

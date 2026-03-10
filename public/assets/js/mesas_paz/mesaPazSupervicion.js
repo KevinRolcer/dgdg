@@ -252,4 +252,157 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     bindSupervisionAjax();
+
+
+    const bindPresentations = function() {
+        const btnAbrirRango = document.getElementById('btnAbrirRangoFechasPresentacion');
+        const btnConfirmarRango = document.getElementById('btnConfirmarRangoFechasPresentacion');
+        const btnGenerarCanva = document.getElementById('btnGenerarPresentacion');
+
+        if (btnAbrirRango) {
+            btnAbrirRango.addEventListener('click', function() {
+                const modalEl = document.getElementById('rangoFechasPresentacionModal');
+                if (modalEl) {
+                    const modal = new bootstrap.Modal(modalEl);
+                    modal.show();
+                }
+            });
+        }
+
+        if (btnConfirmarRango) {
+            btnConfirmarRango.addEventListener('click', function() {
+                const fechaInicio = document.getElementById('fechaInicioPresentacion')?.value;
+                const fechaFin = document.getElementById('fechaFinPresentacion')?.value;
+                
+                if (!fechaInicio || !fechaFin) {
+                    if (typeof swal === 'function') {
+                        swal('Atención', 'Selecciona ambas fechas para continuar.', 'warning');
+                    } else {
+                        alert('Selecciona ambas fechas para continuar.');
+                    }
+                    return;
+                }
+
+                const rangoModal = bootstrap.Modal.getInstance(document.getElementById('rangoFechasPresentacionModal'));
+                if (rangoModal) rangoModal.hide();
+
+                const canvaModalEl = document.getElementById('canvaPresentacionModal');
+                const contentEl = document.getElementById('canvaPresentacionModalContent');
+                
+                if (canvaModalEl && contentEl) {
+                    const modalPresentacion = new bootstrap.Modal(canvaModalEl);
+                    contentEl.innerHTML = '<span class="text-muted">Generando...</span>';
+                    modalPresentacion.show();
+
+                    fetch("/ppt/generar-presentacion", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                        },
+                        body: JSON.stringify({ fecha_inicio: fechaInicio, fecha_fin: fechaFin })
+                    })
+                    .then(async res => {
+                        if (!res.ok) {
+                            const errData = await res.json().catch(() => ({}));
+                            throw new Error(errData.error || 'Error al generar la presentación');
+                        }
+                        
+                        let filename = `mesas_paz_${fechaInicio}_${fechaFin}.pptx`;
+                        const disposition = res.headers.get('content-disposition');
+                        if (disposition && disposition.includes('filename=')) {
+                            const matches = disposition.match(/filename="?([^"]+)"?/);
+                            if (matches && matches[1]) {
+                                filename = matches[1];
+                            }
+                        }
+                        
+                        const blob = await res.blob();
+                        return { blob, filename };
+                    })
+                    .then(({ blob, filename }) => {
+                        contentEl.innerHTML = `<span class="text-success">Presentación generada y descargada.</span>`;
+                        
+                        const urlObj = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = urlObj;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        
+                        window.URL.revokeObjectURL(urlObj);
+                        document.body.removeChild(a);
+                        
+                        setTimeout(() => {
+                            bootstrap.Modal.getInstance(canvaModalEl).hide();
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        contentEl.innerHTML = `<span class="text-danger">Error: ${err.message}</span>`;
+                    });
+                }
+            });
+        }
+
+        if (btnGenerarCanva) {
+            btnGenerarCanva.addEventListener('click', function() {
+                const fecha = document.getElementById('fecha_lista')?.value;
+                if (!fecha) {
+                    if (typeof swal === 'function') {
+                        swal('Atención', 'Selecciona una fecha para generar la presentación.', 'warning');
+                    } else {
+                        alert('Selecciona una fecha para generar la presentación.');
+                    }
+                    return;
+                }
+
+                const canvaModalEl = document.getElementById('canvaPresentacionModal');
+                const contentEl = document.getElementById('canvaPresentacionModalContent');
+
+                if (canvaModalEl && contentEl) {
+                    const modal = new bootstrap.Modal(canvaModalEl);
+                    contentEl.innerHTML = '<span class="text-muted">Generando...</span>';
+                    modal.show();
+
+                    fetch("/canva/generar-documento", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                        },
+                        body: JSON.stringify({ fecha })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.url) {
+                            contentEl.innerHTML = `<a href="${data.url}" target="_blank" class="btn btn-primary">Abrir presentación en Canva</a>`;
+                        } else {
+                            contentEl.innerHTML = `<span class="text-danger">Error: ${data.error || 'No se pudo generar el documento.'}</span>`;
+                        }
+                    })
+                    .catch(err => {
+                        contentEl.innerHTML = `<span class="text-danger">Error al generar el documento.</span>`;
+                    });
+                }
+            });
+        }
+    };
+
+    bindPresentations();
+
+
+    window.mostrarVistaPreviaEvidencia = function(url) {
+        const modalEl = document.getElementById('evidenciaPreviewModal');
+        const modalImg = document.getElementById('evidenciaPreviewModalImg');
+        
+        if (!modalEl || !modalImg) {
+            window.open(url, '_blank');
+            return;
+        }
+
+        modalImg.src = url;
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+    };
 });

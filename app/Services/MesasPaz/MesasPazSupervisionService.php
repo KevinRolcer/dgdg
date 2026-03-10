@@ -506,7 +506,7 @@ class MesasPazSupervisionService
 
         $evidencias = $registrosLista
             ->groupBy(function ($registro) {
-                return Carbon::parse($registro->fecha_asist)->toDateString().'|'.$registro->user_id;
+                return Carbon::parse($registro->fecha_asist)->toDateString().'|'.$registro->user_id.'|'.$registro->microrregion_id;
             })
             ->map(function ($items, $grupo) use ($esPresente, $esNoPresente) {
                 $items = collect($items);
@@ -575,9 +575,9 @@ class MesasPazSupervisionService
                     $delegadoNombre = optional($primero->user)->name ?: 'Sin delegado asignado';
                 }
 
-                $microrregionId = optional($primero->delegado)->microrregion_id;
-                $microrregionNombre = optional(optional($primero->delegado)->microrregion)->cabecera
-                    ?: optional(optional($primero->delegado)->microrregion)->microrregion;
+                $microrregionId = $primero->microrregion_id;
+                $microrregionNombre = optional($primero->microrregion)->cabecera
+                    ?: optional($primero->microrregion)->microrregion;
                 $microrregionLabel = null;
                 if (!empty($microrregionId) && !empty($microrregionNombre)) {
                     $microrregionLabel = $microrregionId.' - '.$microrregionNombre;
@@ -604,7 +604,8 @@ class MesasPazSupervisionService
                 ];
             })
             ->sortByDesc('fecha_asist')
-            ->values();
+            ->values()
+            ->toArray();
 
         return [
             'valid' => true,

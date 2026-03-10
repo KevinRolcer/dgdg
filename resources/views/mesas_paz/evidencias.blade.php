@@ -10,6 +10,7 @@
 
 @push('scripts')
 <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+@endpush
 
 @section('content')
 <div id="supervisionEvidenciasPage">
@@ -349,143 +350,147 @@
 
             <div class="d-flex flex-column gap-2">
                 @foreach($evidencias as $item)
-                    @if(!$loop->first)
-                        <hr class="my-1 text-muted">
-                    @endif
-                    <div class="card mb-0 border-0 bg-component">
-                        <div class="card-body py-2 px-3">
-                            <div class="row align-items-center g-2 supervision-row-compact">
-                                <div class="col-12 col-md-2">
-                                    <small class="text-muted d-md-none d-block">Delegado</small>
-                                    <div class="delegado-nombre" title="{{ $item['delegado'] }}">{{ $item['delegado'] }}</div>
+                    <div class="row align-items-center g-2 py-2 supervision-table-row mx-0">
+                        <div class="col-12 col-md-2">
+                            <small class="text-muted d-md-none d-block">Delegado</small>
+                            <div class="delegado-nombre fw-bold" style="font-size: 0.9rem;" title="{{ $item['delegado'] }}">{{ $item['delegado'] }}</div>
+                            <div class="text-muted" style="font-size: 0.75rem; word-break: break-all;">{{ $item['usuario'] }}</div>
+                        </div>
+
+                        <div class="col-12 col-md-2">
+                            <small class="text-muted d-md-none d-block">Microrregión</small>
+                            @if(!empty($item['microrregion_label']))
+                                <span class="text-muted" style="font-size: 0.8rem;" title="{{ $item['microrregion_label'] }}">{{ $item['microrregion_label'] }}</span>
+                            @elseif(!empty($item['microrregion_id']))
+                                <span class="text-muted" style="font-size: 0.8rem;">{{ $item['microrregion_id'] }}</span>
+                            @else
+                                <span class="text-muted" style="font-size: 0.8rem;">N/D</span>
+                            @endif
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <small class="text-muted d-md-none d-block">Municipios con asistencia</small>
+                            @if(collect($item['municipios_con_asistencia'] ?? [])->isNotEmpty())
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach($item['municipios_con_asistencia'] as $municipio)
+                                        <span class="badge" style="background-color: #1b5e40; font-size: 0.75rem;">{{ $municipio }}</span>
+                                    @endforeach
+                                </div>
+                            @else
+                                <span class="text-muted d-block small">Sin municipios con asistencia</span>
+                            @endif
+
+                            @php $collapseId = 'no_presentes_' . $loop->index; @endphp
+                            @if(collect($item['municipios_no_presentes'] ?? [])->isNotEmpty())
+                                <div class="mt-2 text-center text-md-start">
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-primary py-0 px-2"
+                                        style="font-size: 0.7rem;"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#{{ $collapseId }}"
+                                        aria-expanded="false"
+                                        aria-controls="{{ $collapseId }}"
+                                    >
+                                        No presentes ({{ count($item['municipios_no_presentes']) }})
+                                    </button>
                                 </div>
 
-                                <div class="col-12 col-md-2">
-                                    <small class="text-muted d-md-none d-block">Microrregión</small>
-                                    @if(!empty($item['microrregion_label']))
-                                        <span class="micro-label" title="{{ $item['microrregion_label'] }}">{{ $item['microrregion_label'] }}</span>
-                                    @elseif(!empty($item['microrregion_id']))
-                                        <span class="micro-label">{{ $item['microrregion_id'] }}</span>
-                                    @else
-                                        <span class="text-muted">N/D</span>
-                                    @endif
-                                </div>
-
-                                <div class="col-12 col-md-4">
-                                    <small class="text-muted d-md-none d-block">Municipios con asistencia</small>
-                                    @if(collect($item['municipios_con_asistencia'] ?? [])->isNotEmpty())
+                                <div class="collapse mt-2" id="{{ $collapseId }}">
+                                    <div class="border rounded p-2 bg-white">
                                         <div class="d-flex flex-wrap gap-1">
-                                            @foreach($item['municipios_con_asistencia'] as $municipio)
-                                                <span class="badge bg-secondary">{{ $municipio }}</span>
+                                            @foreach($item['municipios_no_presentes'] as $municipioNoPresente)
+                                                <span class="badge bg-warning text-dark" style="font-size: 0.7rem;">{{ $municipioNoPresente }}</span>
                                             @endforeach
                                         </div>
-                                    @else
-                                        <span class="text-muted d-block">Sin municipios con asistencia</span>
-                                    @endif
-
-                                    @php $collapseId = 'no_presentes_' . $loop->index; @endphp
-                                    @if(collect($item['municipios_no_presentes'] ?? [])->isNotEmpty())
-                                        <div class="mt-2">
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm btn-outline-primary btn-supervision-mini"
-                                                data-bs-toggle="collapse"
-                                                data-bs-target="#{{ $collapseId }}"
-                                                aria-expanded="false"
-                                                aria-controls="{{ $collapseId }}"
-                                            >
-                                                No presentes ({{ count($item['municipios_no_presentes']) }})
-                                            </button>
-                                        </div>
-
-                                        <div class="collapse mt-2" id="{{ $collapseId }}">
-                                            <div class="border rounded p-2 bg-white">
-                                                <div class="d-flex flex-wrap gap-1">
-                                                    @foreach($item['municipios_no_presentes'] as $municipioNoPresente)
-                                                        <span class="badge bg-warning text-dark">{{ $municipioNoPresente }}</span>
-                                                    @endforeach
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @endif
+                                    </div>
                                 </div>
+                            @endif
+                        </div>
 
-                                <div class="col-12 col-md-2">
-                                    <small class="text-muted d-md-none d-block">Parte/Acuerdos</small>
-                                    @php $partesCollapseId = 'partes_' . $loop->index; @endphp
-                                    @if(collect($item['partes_observaciones'] ?? [])->isNotEmpty())
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-outline-primary btn-supervision-mini mt-2"
-                                            data-bs-toggle="collapse"
-                                            data-bs-target="#{{ $partesCollapseId }}"
-                                            aria-expanded="false"
-                                            aria-controls="{{ $partesCollapseId }}"
-                                        >
-                                            Parte ({{ count($item['partes_observaciones']) }})
-                                        </button>
+                        <div class="col-12 col-md-2">
+                            <small class="text-muted d-md-none d-block">Parte/Acuerdos</small>
+                            <div class="d-flex flex-column gap-1">
+                                @php $partesCollapseId = 'partes_' . $loop->index; @endphp
+                                @if(collect($item['partes_observaciones'] ?? [])->isNotEmpty())
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-primary text-start py-0"
+                                        style="font-size: 0.7rem;"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#{{ $partesCollapseId }}"
+                                        aria-expanded="false"
+                                        aria-controls="{{ $partesCollapseId }}"
+                                    >
+                                        <i class="fa fa-file-alt me-1"></i> Parte ({{ count($item['partes_observaciones']) }})
+                                    </button>
 
-                                        <div class="collapse mt-2" id="{{ $partesCollapseId }}">
-                                            <div class="border rounded p-2 bg-white">
-                                                <ul class="mb-0 ps-3 small text-muted">
-                                                    @foreach($item['partes_observaciones'] as $parte)
-                                                        <li>{{ $parte }}</li>
-                                                    @endforeach
-                                                </ul>
-                                            </div>
+                                    <div class="collapse mt-1" id="{{ $partesCollapseId }}">
+                                        <div class="border rounded p-2 bg-white">
+                                            <ul class="mb-0 ps-3 small text-muted">
+                                                @foreach($item['partes_observaciones'] as $parte)
+                                                    <li>{{ $parte }}</li>
+                                                @endforeach
+                                            </ul>
                                         </div>
-                                    @else
-                                        <div class="text-muted small mt-2">Parte: Aún no registrada.</div>
-                                    @endif
+                                    </div>
+                                @endif
 
-                                    @php $acuerdosCollapseId = 'acuerdos_' . $loop->index; @endphp
-                                    @if(collect($item['acuerdos_observaciones'] ?? [])->isNotEmpty())
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-outline-primary btn-supervision-mini mt-2"
-                                            data-bs-toggle="collapse"
-                                            data-bs-target="#{{ $acuerdosCollapseId }}"
-                                            aria-expanded="false"
-                                            aria-controls="{{ $acuerdosCollapseId }}"
-                                        >
-                                            Acuerdos ({{ count($item['acuerdos_observaciones']) }})
-                                        </button>
+                                @php $acuerdosCollapseId = 'acuerdos_' . $loop->index; @endphp
+                                @if(collect($item['acuerdos_observaciones'] ?? [])->isNotEmpty())
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-primary text-start py-0"
+                                        style="font-size: 0.7rem;"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#{{ $acuerdosCollapseId }}"
+                                        aria-expanded="false"
+                                        aria-controls="{{ $acuerdosCollapseId }}"
+                                    >
+                                        <i class="fa fa-handshake me-1"></i> Acuerdos ({{ count($item['acuerdos_observaciones']) }})
+                                    </button>
 
-                                        <div class="collapse mt-2" id="{{ $acuerdosCollapseId }}">
-                                            <div class="border rounded p-2 bg-white">
-                                                <ul class="mb-0 ps-3 small text-muted">
-                                                    @foreach($item['acuerdos_observaciones'] as $acuerdo)
-                                                        <li>{{ $acuerdo }}</li>
-                                                    @endforeach
-                                                </ul>
-                                            </div>
+                                    <div class="collapse mt-1" id="{{ $acuerdosCollapseId }}">
+                                        <div class="border rounded p-2 bg-white">
+                                            <ul class="mb-0 ps-3 small text-muted">
+                                                @foreach($item['acuerdos_observaciones'] as $acuerdo)
+                                                    <li>{{ $acuerdo }}</li>
+                                                @endforeach
+                                            </ul>
                                         </div>
-                                    @else
-                                        <div class="text-muted small mt-2">Acuerdos: Aún no registrados.</div>
-                                    @endif
-                                </div>
+                                    </div>
+                                @endif
+                                
+                                @if(collect($item['partes_observaciones'] ?? [])->isEmpty())
+                                    <div class="badge-supervision-soft" style="font-size: 0.75rem;">Parte: Aún no registrada.</div>
+                                @endif
 
-                                <div class="col-12 col-md-2">
-                                    <small class="text-muted d-md-none d-block">Evidencia</small>
-                                    @php
-                                        $evidenciasUrls = collect($item['evidencia_urls'] ?? [])->filter()->values();
-                                    @endphp
-                                    @if(!empty($item['tiene_evidencia']) && $evidenciasUrls->isNotEmpty())
-                                        <div class="evidencia-thumbs">
-                                            @foreach($evidenciasUrls as $indexEvidencia => $evidenciaUrl)
-                                                <img
-                                                    src="{{ $evidenciaUrl }}"
-                                                    alt="Evidencia {{ $indexEvidencia + 1 }}"
-                                                    class="evidencia-thumb-mini"
-                                                    data-evidencia-url="{{ $evidenciaUrl }}"
-                                                >
-                                            @endforeach
-                                        </div>
-                                    @else
-                                        <span class="text-muted">Sin evidencia</span>
-                                    @endif
-                                </div>
+                                @if(collect($item['acuerdos_observaciones'] ?? [])->isEmpty())
+                                    <div class="badge-supervision-soft mt-1" style="font-size: 0.75rem;">Acuerdos: Aún no registrados.</div>
+                                @endif
                             </div>
+                        </div>
+
+                        <div class="col-12 col-md-2">
+                            <small class="text-muted d-md-none d-block">Evidencia</small>
+                            @php
+                                $evidenciasUrls = collect($item['evidencia_urls'] ?? [])->filter()->values();
+                            @endphp
+                            @if(!empty($item['tiene_evidencia']) && $evidenciasUrls->isNotEmpty())
+                                <div class="evidencia-thumbs d-flex flex-wrap gap-1">
+                                    @foreach($evidenciasUrls as $indexEvidencia => $evidenciaUrl)
+                                        <img
+                                            src="{{ $evidenciaUrl }}"
+                                            alt="Evidencia {{ $indexEvidencia + 1 }}"
+                                            class="rounded border"
+                                            style="width: 45px; height: 45px; object-fit: cover; cursor: pointer;"
+                                            onclick="mostrarVistaPreviaEvidencia('{{ $evidenciaUrl }}')"
+                                        >
+                                    @endforeach
+                                </div>
+                            @else
+                                <span class="badge-supervision-soft small">Sin evidencia</span>
+                            @endif
                         </div>
                     </div>
                 @endforeach
@@ -576,101 +581,4 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 <script src="{{ asset('assets/js/mesas_paz/mesaPazSupervicion.js') }}?v={{ @filemtime(public_path('assets/js/mesas_paz/mesaPazSupervicion.js')) ?: time() }}"></script>
-<script>
-document.getElementById('btnAbrirRangoFechasPresentacion')?.addEventListener('click', function() {
-    const modal = new bootstrap.Modal(document.getElementById('rangoFechasPresentacionModal'));
-    modal.show();
-});
-
-document.getElementById('btnConfirmarRangoFechasPresentacion')?.addEventListener('click', function() {
-    const fechaInicio = document.getElementById('fechaInicioPresentacion')?.value;
-    const fechaFin = document.getElementById('fechaFinPresentacion')?.value;
-    if (!fechaInicio || !fechaFin) {
-        swal('Atención', 'Selecciona ambas fechas para continuar.', 'warning');
-        return;
-    }
-    bootstrap.Modal.getInstance(document.getElementById('rangoFechasPresentacionModal')).hide();
-    const modalPresentacion = new bootstrap.Modal(document.getElementById('canvaPresentacionModal'));
-    document.getElementById('canvaPresentacionModalContent').innerHTML = '<span class="text-muted">Generando...</span>';
-    modalPresentacion.show();
-    fetch("{{ route('ppt.generar-presentacion') }}", {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify({ fecha_inicio: fechaInicio, fecha_fin: fechaFin })
-    })
-    .then(async res => {
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error || 'Error al generar la presentación');
-        }
-        
-        let filename = `mesas_paz_${fechaInicio}_${fechaFin}.pptx`;
-        const disposition = res.headers.get('content-disposition');
-        if (disposition && disposition.includes('filename=')) {
-            const matches = disposition.match(/filename="?([^"]+)"?/);
-            if (matches && matches[1]) {
-                filename = matches[1];
-            }
-        }
-        
-        const blob = await res.blob();
-        return { blob, filename };
-    })
-    .then(({ blob, filename }) => {
-        document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-success">Presentación generada y descargada.</span>`;
-        
-        const urlObj = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = urlObj;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        
-        window.URL.revokeObjectURL(urlObj);
-        document.body.removeChild(a);
-        
-        setTimeout(() => {
-            bootstrap.Modal.getInstance(document.getElementById('canvaPresentacionModal')).hide();
-        }, 2000);
-    })
-    .catch(err => {
-        document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-danger">Error: ${err.message}</span>`;
-    });
-});
-</script>
-<script>
-document.getElementById('btnGenerarPresentacion')?.addEventListener('click', function() {
-    const fecha = document.getElementById('fecha_lista')?.value;
-    if (!fecha) {
-        swal('Atención', 'Selecciona una fecha para generar la presentación.', 'warning');
-        return;
-    }
-    const modal = new bootstrap.Modal(document.getElementById('canvaPresentacionModal'));
-    document.getElementById('canvaPresentacionModalContent').innerHTML = '<span class="text-muted">Generando...</span>';
-    modal.show();
-    fetch("{{ route('canva.generar-documento') }}", {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify({ fecha })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.url) {
-            document.getElementById('canvaPresentacionModalContent').innerHTML = `<a href="${data.url}" target="_blank" class="btn btn-primary">Abrir presentación en Canva</a>`;
-        } else {
-            document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-danger">Error: ${data.error || 'No se pudo generar el documento.'}</span>`;
-        }
-    })
-    .catch(err => {
-        document.getElementById('canvaPresentacionModalContent').innerHTML = `<span class="text-danger">Error al generar el documento.</span>`;
-    });
-});
-</script>
 @endpush

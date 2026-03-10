@@ -177,3 +177,24 @@
         height: 52px;
     }
 }
+
+#supervisionEvidenciasPage .badge-supervision-soft {
+    color: var(--clr-primary-dark, #861e34);
+    border: 1px solid rgba(199, 155, 102, 0.4);
+    background: rgba(199, 155, 102, 0.05);
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+#supervisionEvidenciasPage .supervision-table-row {
+    background-color: var(--clr-card, #ffffff);
+    border-bottom: 1px solid var(--clr-border, #dee2e6);
+    transition: background-color 0.2s;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+#supervisionEvidenciasPage .supervision-table-row:hover {
+    background-color: rgba(72, 71, 71, 0.05);
+}
