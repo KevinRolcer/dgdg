@@ -378,3 +378,39 @@
 .swal-footer {
     text-align: center !important;
 }
+
+#mesasPazApp #dropzoneEvidencia {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-color: rgba(72, 71, 71, 0.2) !important;
+}
+
+#mesasPazApp #dropzoneEvidencia.is-dragover {
+    background-color: rgba(134, 30, 52, 0.08) !important;
+    border-color: var(--clr-segob-red) !important;
+    box-shadow: 0 0 0 4px rgba(134, 30, 52, 0.1);
+}
+
+#mesasPazApp #dropzoneEvidencia.is-dragover #dropzonePlaceholder i,
+#mesasPazApp #dropzoneEvidencia.is-dragover #dropzonePlaceholder p {
+    color: var(--clr-segob-red) !important;
+    transform: scale(1.05);
+}
+
+#mesasPazApp #dropzonePlaceholder {
+    transition: transform 0.2s ease;
+}
+
+#mesasPazApp .h-40px {
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#btnPegarEvidencia {
+    transition: all 0.2s ease;
+}
+
+#btnPegarEvidencia:active {
+    transform: scale(0.92);
+}

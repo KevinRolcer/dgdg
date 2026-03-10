@@ -222,7 +222,7 @@ class MesaPazAsistencia extends Model
             return null;
         }
 
-        return json_encode($items, JSON_UNESCAPED_UNICODE);
+        return json_encode($items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     // Relación: cada asistencia pertenece a un municipio.

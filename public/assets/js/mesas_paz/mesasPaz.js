@@ -112,10 +112,15 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        const placeholder = document.getElementById('dropzonePlaceholder');
+
         if (!evidenciasHoy.length) {
             evidenciaActualBox.innerHTML = '<span class="text-muted">Sin evidencia cargada hoy.</span>';
+            if (placeholder) placeholder.classList.remove('d-none');
             return;
         }
+
+        if (placeholder) placeholder.classList.add('d-none');
 
         evidenciaActualBox.innerHTML = '<div class="evidencias-grid">'
             + evidenciasHoy.map(function (item, index) {
@@ -1004,6 +1009,149 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    const btnPegarEvidencia = document.getElementById('btnPegarEvidencia');
+    const dropzoneEvidencia = document.getElementById('dropzoneEvidencia');
+    const dropzonePlaceholder = document.getElementById('dropzonePlaceholder');
+
+    function validarYSubirArchivos(archivos) {
+        if (!archivos || !archivos.length) {
+            return;
+        }
+
+        const disponibles = Math.max(0, maxEvidenciasHoy - evidenciasHoy.length);
+        if (disponibles <= 0) {
+            swal('Límite alcanzado', 'Solo puedes cargar hasta ' + maxEvidenciasHoy + ' imágenes.', 'warning');
+            return;
+        }
+
+        const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp'];
+        const maxSize = 10 * 1024 * 1024;
+
+        const archivosValidos = [];
+        archivos.forEach(function (archivo) {
+            if (!tiposPermitidos.includes(archivo.type)) {
+                return;
+            }
+            if (archivo.size > maxSize) {
+                return;
+            }
+            archivosValidos.push(archivo);
+        });
+
+        if (!archivosValidos.length) {
+            swal('Archivo no permitido', 'Solo se permiten imágenes JPG, PNG o WEBP de hasta 10MB.', 'warning');
+            return;
+        }
+
+        const archivosParaSubir = archivosValidos.slice(0, disponibles);
+        
+        const textoOriginal = btnCargarEvidencia.innerHTML;
+        btnCargarEvidencia.disabled = true;
+        if (btnPegarEvidencia) btnPegarEvidencia.disabled = true;
+        
+        btnCargarEvidencia.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Subiendo...';
+
+        let cadena = Promise.resolve();
+        archivosParaSubir.forEach(function (archivo) {
+            cadena = cadena.then(function () {
+                return subirUnaEvidencia(archivo);
+            });
+        });
+
+        cadena
+            .then(function () {
+                swal('Éxito', 'Evidencias guardadas correctamente.', 'success');
+            })
+            .catch(function (errorData) {
+                const backendErrors = errorData && errorData.errors ? Object.values(errorData.errors).flat() : [];
+                const message = backendErrors[0] || errorData.message || 'No fue posible guardar la evidencia.';
+                swal('Error', message, 'error');
+            })
+            .finally(function () {
+                btnCargarEvidencia.disabled = false;
+                if (btnPegarEvidencia) btnPegarEvidencia.disabled = false;
+                btnCargarEvidencia.innerHTML = textoOriginal;
+                if (inputEvidenciaHoy) inputEvidenciaHoy.value = '';
+                
+                if (dropzonePlaceholder) {
+                    if (evidenciasHoy.length > 0) {
+                        dropzonePlaceholder.classList.add('d-none');
+                    } else {
+                        dropzonePlaceholder.classList.remove('d-none');
+                    }
+                }
+            });
+    }
+
+    if (btnPegarEvidencia) {
+        btnPegarEvidencia.addEventListener('click', function() {
+            swal({
+                title: "Pegar imagen",
+                text: "Usa Ctrl+V para pegar una imagen desde tu portapapeles ahora mismo.",
+                icon: "info",
+                buttons: false,
+                timer: 3000
+            });
+        });
+    }
+
+    if (dropzoneEvidencia) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropzoneEvidencia.addEventListener(eventName, e => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropzoneEvidencia.addEventListener(eventName, () => {
+                dropzoneEvidencia.classList.add('is-dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropzoneEvidencia.addEventListener(eventName, () => {
+                dropzoneEvidencia.classList.remove('is-dragover');
+            }, false);
+        });
+
+        dropzoneEvidencia.addEventListener('drop', e => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            validarYSubirArchivos(Array.from(files));
+        });
+
+        // Permitir clic en el dropzone para abrir el selector de archivos si el box está vacío
+        dropzoneEvidencia.addEventListener('click', function(e) {
+            if (e.target.closest('.evidencias-grid') || e.target.closest('.btn-preview-evidencia') || e.target.closest('.btn-eliminar-evidencia')) {
+                return;
+            }
+            if (inputEvidenciaHoy) inputEvidenciaHoy.click();
+        });
+    }
+
+    // Listener global de pegado
+    window.addEventListener('paste', function(e) {
+        // No interferir si el foco está en un textarea o input
+        const target = e.target;
+        if (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT') {
+            return;
+        }
+
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        const files = [];
+        
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                files.push(items[i].getAsFile());
+            }
+        }
+
+        if (files.length > 0) {
+            validarYSubirArchivos(files);
+        }
+    });
+
     if (btnCargarEvidencia && inputEvidenciaHoy && guardarEvidenciaHoyUrl) {
         btnCargarEvidencia.addEventListener('click', function () {
             if (btnCargarEvidencia.disabled) {
@@ -1014,71 +1162,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         inputEvidenciaHoy.addEventListener('change', function () {
             const archivos = Array.from(inputEvidenciaHoy.files || []);
-            if (!archivos.length) {
-                return;
-            }
-
-            const disponibles = Math.max(0, maxEvidenciasHoy - evidenciasHoy.length);
-            if (disponibles <= 0) {
-                swal('Límite alcanzado', 'Solo puedes cargar hasta ' + maxEvidenciasHoy + ' imágenes.', 'warning');
-                inputEvidenciaHoy.value = '';
-                return;
-            }
-
-            const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp'];
-            const maxSize = 10 * 1024 * 1024;
-
-            const archivosValidos = [];
-            archivos.forEach(function (archivo) {
-                if (!tiposPermitidos.includes(archivo.type)) {
-                    return;
-                }
-                if (archivo.size > maxSize) {
-                    return;
-                }
-                archivosValidos.push(archivo);
-            });
-
-            if (!archivosValidos.length) {
-                swal('Archivo no permitido', 'Solo se permiten imágenes JPG, PNG o WEBP de hasta 10MB.', 'warning');
-                inputEvidenciaHoy.value = '';
-                return;
-            }
-
-            const archivosParaSubir = archivosValidos.slice(0, disponibles);
-            if (!archivosParaSubir.length) {
-                swal('Límite alcanzado', 'Solo puedes cargar hasta ' + maxEvidenciasHoy + ' imágenes.', 'warning');
-                inputEvidenciaHoy.value = '';
-                return;
-            }
-
-            const textoOriginal = btnCargarEvidencia.textContent;
-            btnCargarEvidencia.disabled = true;
-            inputEvidenciaHoy.disabled = true;
-            btnCargarEvidencia.textContent = 'Subiendo...';
-
-            let cadena = Promise.resolve();
-            archivosParaSubir.forEach(function (archivo) {
-                cadena = cadena.then(function () {
-                    return subirUnaEvidencia(archivo);
-                });
-            });
-
-            cadena
-                .then(function () {
-                    swal('Éxito', 'Evidencias guardadas correctamente.', 'success');
-                })
-                .catch(function (errorData) {
-                    const backendErrors = errorData && errorData.errors ? Object.values(errorData.errors).flat() : [];
-                    const message = backendErrors[0] || errorData.message || 'No fue posible guardar la evidencia.';
-                    swal('Error', message, 'error');
-                })
-                .finally(function () {
-                    btnCargarEvidencia.disabled = false;
-                    inputEvidenciaHoy.disabled = false;
-                    btnCargarEvidencia.textContent = textoOriginal;
-                    inputEvidenciaHoy.value = '';
-                });
+            validarYSubirArchivos(archivos);
         });
     }
 
@@ -1300,22 +1384,33 @@ document.addEventListener('DOMContentLoaded', function () {
         fechaSelectorMesas.addEventListener('change', function () {
             const newDate = this.value;
             if (newDate) {
-                // Actualizar display visual antes de recargar (opcional pero limpio)
-                const display = document.getElementById('fechaDisplay');
-                if (display && newDate.includes('-')) {
-                    const p = newDate.split('-');
-                    display.textContent = p[2] + '/' + p[1] + '/' + p[0];
-                }
-
                 const parts = newDate.split('-');
                 if (parts.length === 3) {
                     const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+                    dt.setHours(0, 0, 0, 0);
+
+                    const now = new Date();
+                    now.setHours(0, 0, 0, 0);
+
+                    if (dt > now) {
+                        swal('Fecha no permitida', 'No se permite seleccionar fechas de días posteriores a hoy.', 'warning');
+                        this.value = app.dataset.fechaHoyIso;
+                        return;
+                    }
+
                     const day = dt.getDay(); // 0 is Sunday, 6 is Saturday
                     if (day === 0 || day === 6) {
                         swal('Fecha no permitida', 'Solo se permite seleccionar fechas de lunes a viernes.', 'warning');
                         this.value = app.dataset.fechaHoyIso;
                         return;
                     }
+                }
+
+                // Actualizar display visual antes de recargar
+                const display = document.getElementById('fechaDisplay');
+                if (display && newDate.includes('-')) {
+                    const p = newDate.split('-');
+                    display.textContent = p[2] + '/' + p[1] + '/' + p[0];
                 }
 
                 const url = new URL(window.location.href);
@@ -1402,6 +1497,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 importarExcelError.textContent = 'Por favor selecciona un archivo Excel (.xls, .xlsx).';
                 importarExcelError.classList.remove('d-none');
                 return;
+            }
+
+            const fechaImportacionModal = document.getElementById('fechaImportacionModal');
+            if (fechaImportacionModal && fechaImportacionModal.value) {
+                const parts = fechaImportacionModal.value.split('-');
+                if (parts.length === 3) {
+                    const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+                    dt.setHours(0, 0, 0, 0);
+                    const now = new Date();
+                    now.setHours(0, 0, 0, 0);
+
+                    if (dt > now) {
+                        importarExcelError.textContent = 'No se permite seleccionar fechas de días posteriores a hoy.';
+                        importarExcelError.classList.remove('d-none');
+                        return;
+                    }
+                }
             }
 
             const formData = new FormData(formImportarExcel);

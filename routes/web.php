@@ -35,7 +35,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/mesas-paz/evidencia-hoy/eliminar', [MesasPazController::class, 'eliminarEvidenciaHoy'])->name('mesas-paz.eliminar-evidencia-hoy')->middleware('can:Mesas-Paz');
     Route::post('/mesas-paz/importar-excel', [MesasPazController::class, 'importarExcel'])->name('mesas-paz.importar-excel')->middleware('can:Mesas-Paz');
     Route::post('/mesas-paz/vaciar-microrregion', [MesasPazController::class, 'vaciarMicrorregion'])->name('mesas-paz.vaciar-microrregion')->middleware('can:Mesas-Paz');
-    Route::get('/mesas-paz/evidencia/preview', [MesasPazController::class, 'previewEvidencia']);
+    Route::get('/mesas-paz/evidencia/preview', [MesasPazController::class, 'previewEvidencia'])->name('mesas-paz.evidencia.preview');
     Route::post('/ppt/generar-presentacion', [PowerPointController::class, 'generarPresentacion'])->name('ppt.generar-presentacion');
     Route::get('/mesas-paz/historial-detalle', [MesasPazController::class, 'detallePorFecha'])->name('mesas-paz.historial-detalle')->middleware('can:Mesas-Paz');
     Route::get('/mesas-paz/evidencias', [MesasPazSupervisionController::class, 'evidencias'])->name('mesas-paz.evidencias')->middleware('can:Tableros-incidencias');

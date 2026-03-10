@@ -264,18 +264,30 @@
                 <div class="border rounded p-3 mb-3">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                         <h6 class="mb-0">Herramientas de sesión ({{ $fechaHoyIso }})</h6>
-                        <button type="button" class="btn btn-outline-primary" id="btnCargarEvidencia" @if(empty($canEditarEvidenciaHoy)) disabled @endif>
-                            Cargar evidencia
-                        </button>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-primary h-40px px-3" id="btnCargarEvidencia" @if(empty($canEditarEvidenciaHoy)) disabled @endif>
+                                <i class="fa fa-upload me-1"></i> Cargar
+                            </button>
+                            <button type="button" class="btn btn-outline-primary h-40px px-3" id="btnPegarEvidencia" @if(empty($canEditarEvidenciaHoy)) disabled @endif title="Pegar imagen desde el portapapeles">
+                                <i class="fa fa-paste"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <input type="file" id="inputEvidenciaHoy" class="d-none" accept="image/jpeg,image/png,image/webp" multiple>
                     @if(!empty($canEditarEvidenciaHoy))
-                        <small class="text-muted d-block mb-2">Puedes cargar hasta 3 imágenes en la sesión del día actual.</small>
+                        <small class="text-muted d-block mb-3">Puedes cargar hasta 3 imágenes. Arrastra aquí o usa los botones.</small>
                     @else
-                        <small class="text-muted d-block mb-2">Para habilitar evidencia, primero registra al menos un municipio hoy.</small>
+                        <small class="text-muted d-block mb-3">Para habilitar evidencia, primero registra al menos un municipio hoy.</small>
                     @endif
-                    <div id="evidenciaActualBox" class="mb-3"></div>
+                    
+                    <div id="dropzoneEvidencia" class="border border-2 border-dashed rounded p-3 mb-3 text-center @if(empty($canEditarEvidenciaHoy)) d-none @endif" style="min-height: 120px; background-color: rgba(72, 71, 71, 0.02); display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                        <div id="evidenciaActualBox" class="w-100"></div>
+                        <div id="dropzonePlaceholder" class="py-3 @if(count($evidenciasActuales) > 0) d-none @endif">
+                            <i class="fa fa-images fa-2x text-muted mb-2"></i>
+                            <p class="mb-0 text-muted small">Suelta tus imágenes aquí</p>
+                        </div>
+                    </div>
 
                     <div>
                         @php

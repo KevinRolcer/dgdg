@@ -1395,7 +1395,7 @@ class MesasPazService
             return null;
         }
 
-        return json_encode($normalizados, JSON_UNESCAPED_UNICODE);
+        return json_encode($normalizados, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     private function mapEvidenceItems(array $paths): array
@@ -1489,22 +1489,25 @@ class MesasPazService
             return false;
         }
 
+        // We check both versions (escaped and unescaped slashes) to be resilient to older and newer records.
+        $escaped = str_replace('/', '\\/', $normalized);
+
+        $query = MesaPazAsistencia::query()
+            ->whereNotNull('evidencia')
+            ->where(function ($q) use ($normalized, $escaped) {
+                $q->where('evidencia', 'like', '%' . $normalized . '%')
+                  ->orWhere('evidencia', 'like', '%' . $escaped . '%');
+            });
+
         if ($user->can('Tableros-incidencias')) {
-            return MesaPazAsistencia::query()
-                ->whereNotNull('evidencia')
-                ->where('evidencia', 'like', '%'.$normalized.'%')
-                ->exists();
+            return $query->exists();
         }
 
         if (!$user->can('Mesas-Paz')) {
             return false;
         }
 
-        return MesaPazAsistencia::query()
-            ->where('user_id', $userId)
-            ->whereNotNull('evidencia')
-            ->where('evidencia', 'like', '%'.$normalized.'%')
-            ->exists();
+        return $query->where('user_id', $userId)->exists();
     }
 
     private function deleteEvidenceFile(string $path): void
