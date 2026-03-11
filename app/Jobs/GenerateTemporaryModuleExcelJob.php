@@ -19,7 +19,8 @@ class GenerateTemporaryModuleExcelJob implements ShouldQueue
     public function __construct(
         public readonly int $moduleId,
         public readonly string $mode,
-        public readonly int $userId
+        public readonly int $userId,
+        public readonly bool $includeAnalysis = true,
     ) {
     }
 
@@ -31,7 +32,7 @@ class GenerateTemporaryModuleExcelJob implements ShouldQueue
         }
 
         try {
-            $result = $exportService->exportExcel($this->moduleId, $this->mode);
+            $result = $exportService->exportExcel($this->moduleId, $this->mode, $this->includeAnalysis);
 
             if (is_array($result) && isset($result['name'], $result['url'])) {
                 $user->notify(new ExcelExportCompleted($result['name'], $result['url']));

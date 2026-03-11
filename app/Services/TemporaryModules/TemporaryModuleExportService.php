@@ -24,7 +24,7 @@ class TemporaryModuleExportService
     ) {
     }
 
-    public function exportExcel(int $moduleId, string $mode = 'single'): array
+    public function exportExcel(int $moduleId, string $mode = 'single', bool $includeAnalysis = true): array
     {
         set_time_limit(0);
         ini_set('memory_limit', '1024M');
@@ -52,9 +52,16 @@ class TemporaryModuleExportService
 
         $spreadsheet = new Spreadsheet();
 
-        $analysisSheet = $spreadsheet->getActiveSheet();
-        $analysisSheet->setTitle('Análisis General');
-        $this->fillAnalysisSheet($analysisSheet, $temporaryModule);
+        $usedDataSheet = false;
+
+        if ($includeAnalysis) {
+            $analysisSheet = $spreadsheet->getActiveSheet();
+            $analysisSheet->setTitle('Análisis General');
+            $this->fillAnalysisSheet($analysisSheet, $temporaryModule);
+        } else {
+            $spreadsheet->getActiveSheet()->setTitle('Registros');
+            $usedDataSheet = true;
+        }
 
         $microrregionIds = $temporaryModule->entries()
             ->withoutGlobalScopes()
@@ -81,6 +88,15 @@ class TemporaryModuleExportService
                 ]];
             });
 
+        $createDataSheet = function () use (&$usedDataSheet, $spreadsheet) {
+            if (!$usedDataSheet) {
+                $usedDataSheet = true;
+                return $spreadsheet->getActiveSheet();
+            }
+
+            return $spreadsheet->createSheet();
+        };
+
         if ($mode === 'mr') {
             // Obtenemos los grupos directamente de la base de datos para no cargar todo en memoria a la vez
             $groups = $temporaryModule->entries()
@@ -93,7 +109,7 @@ class TemporaryModuleExportService
                 ->values();
 
             if ($groups->isEmpty()) {
-                $targetSheet = $spreadsheet->createSheet();
+                $targetSheet = $createDataSheet();
                 $targetSheet->setTitle('Registros');
                 $entriesQuery = $temporaryModule->entries()->whereNull('microrregion_id'); // Fallback if no groups
                 $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta);
@@ -101,7 +117,7 @@ class TemporaryModuleExportService
                 $usedTitles = [];
 
                 foreach ($groups as $microrregionId) {
-                    $targetSheet = $spreadsheet->createSheet();
+                    $targetSheet = $createDataSheet();
                     $meta = $microrregionMeta->get((int) $microrregionId);
                     $baseTitle = $this->sheetTitleForMicrorregion(
                         (int) $microrregionId,
@@ -118,13 +134,13 @@ class TemporaryModuleExportService
                 }
             }
         } else {
-            $targetSheet = $spreadsheet->createSheet();
+            $targetSheet = $createDataSheet();
             $targetSheet->setTitle('Registros');
             $entriesQuery = $temporaryModule->entries()->latest('submitted_at');
             $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta);
         }
 
-        // Asegurar que la primera hoja (Análisis) sea la activa al abrir
+        // Asegurar que la primera hoja (sea análisis o registros) sea la activa al abrir
         $spreadsheet->setActiveSheetIndex(0);
 
         $writer = new Xlsx($spreadsheet);

@@ -431,7 +431,8 @@
                 }
 
                 if (!templateSwal) {
-                    window.location.href = exportUrl + '?mode=single';
+                    const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
+                    window.location.href = exportUrl + separator + 'mode=single&analysis=0';
                     return;
                 }
 
@@ -446,23 +447,33 @@
                         + '<input type="radio" name="tm-export-mode" value="mr"> '
                         + '<span>1 pagina por Microrregion</span>'
                         + '</label>'
+                        + '<hr style="margin:.7rem 0;">'
+                        + '<label style="display:flex;gap:.5rem;align-items:center;">'
+                        + '<input type="checkbox" name="tm-include-analysis" value="1">'
+                        + '<span>Incluir hoja de análisis</span>'
+                        + '</label>'
                         + '</div>',
                     icon: 'question',
                     showCancelButton: true,
                     confirmButtonText: 'Exportar',
                     cancelButtonText: 'Cancelar',
                     preConfirm: function () {
-                        const checked = document.querySelector('input[name="tm-export-mode"]:checked');
-                        return checked ? checked.value : 'single';
+                        const checkedMode = document.querySelector('input[name="tm-export-mode"]:checked');
+                        const includeAnalysis = document.querySelector('input[name="tm-include-analysis"]')?.checked || false;
+                        return {
+                            mode: checkedMode ? checkedMode.value : 'single',
+                            analysis: includeAnalysis ? 1 : 0
+                        };
                     }
                 }).then(function (result) {
                     if (!result.isConfirmed) {
                         return;
                     }
 
-                    const mode = result.value === 'mr' ? 'mr' : 'single';
+                    const mode = result.value && result.value.mode === 'mr' ? 'mr' : 'single';
+                    const analysis = result.value && result.value.analysis ? 1 : 0;
                     const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
-                    window.location.href = exportUrl + separator + 'mode=' + mode;
+                    window.location.href = exportUrl + separator + 'mode=' + mode + '&analysis=' + String(analysis);
                 });
             });
         });

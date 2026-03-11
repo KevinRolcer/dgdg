@@ -688,8 +688,8 @@
 }
 
 .tm-table-wrap.tm-table-wrap-scroll {
-    max-height: min(62vh, 620px);
-    overflow: auto;
+    /* max-height: min(62vh, 620px); */
+    /* overflow: auto; */
 }
 
 .tm-table-wrap.tm-table-wrap-admin-preview {

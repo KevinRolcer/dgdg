@@ -662,8 +662,9 @@ class TemporaryModuleController extends Controller
         if (!in_array($mode, ['single', 'mr'], true)) {
             $mode = 'single';
         }
+        $includeAnalysis = (bool) $request->boolean('analysis', false);
 
-        \App\Jobs\GenerateTemporaryModuleExcelJob::dispatchAfterResponse($module, $mode, $request->user()->id);
+        \App\Jobs\GenerateTemporaryModuleExcelJob::dispatchAfterResponse($module, $mode, $request->user()->id, $includeAnalysis);
 
         return redirect()->back()->with('toast', 'La generación del archivo Excel se ha enviado a segundo plano. Te notificaremos cuando esté listo para descargar.');
     }
