@@ -439,7 +439,7 @@ class TemporaryModuleController extends Controller
             return null;
         }
 
-        return Carbon::parse($date)->endOfDay();
+        return Carbon::parse($date);
     }
 
     public function delegateIndex(Request $request): View

@@ -27,7 +27,7 @@
                 <label>
                     Visible hasta
                     <div class="tm-date-with-toggle" id="tmDateWithToggle">
-                        <input type="date" id="tmExpiresAt" name="expires_at" value="{{ old('expires_at') }}">
+                        <input type="datetime-local" id="tmExpiresAt" name="expires_at" value="{{ old('expires_at') }}">
                         <input type="hidden" id="tmIsIndefinite" name="is_indefinite" value="{{ old('is_indefinite') ? '1' : '0' }}">
                         <button type="button" class="tm-btn" id="tmIndefiniteBtn" aria-pressed="{{ old('is_indefinite') ? 'true' : 'false' }}">Indefinido</button>
                     </div>
@@ -84,12 +84,12 @@
                 </div>
             </section>
 
+
             <div class="tm-fields-head">
                 <h3>Campos requeridos</h3>
-                <button type="button" class="tm-btn tm-btn-primary" id="tmAddFieldBtn">Agregar campo</button>
             </div>
-
             <div id="tmFieldsContainer" class="tm-fields-list"></div>
+            <button type="button" class="tm-btn tm-btn-primary" id="tmAddFieldBtn">Agregar campo</button>
 
             <div class="tm-actions">
                 <button type="submit" class="tm-btn tm-btn-primary">Guardar módulo</button>
