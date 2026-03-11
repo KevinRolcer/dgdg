@@ -283,6 +283,41 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    document.querySelectorAll('form[data-notifications-clear]').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            var submitButton = form.querySelector('button[type="submit"]');
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+
+            var formData = new FormData(form);
+
+            fetch(form.action, {
+                method: form.method || 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            })
+                .then(function () {
+                    refreshNotifications();
+                })
+                .catch(function () {
+                    if (typeof window.swal === 'function') {
+                        window.swal('Error', 'No se pudieron vaciar las notificaciones.', 'error');
+                    }
+                })
+                .finally(function () {
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                    }
+                });
+        });
+    });
+
     if (notificationsDrawerBackdrop) {
         notificationsDrawerBackdrop.addEventListener('click', function () {
             closeNotificationsDrawer();

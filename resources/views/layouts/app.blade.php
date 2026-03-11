@@ -174,7 +174,7 @@
                 <button type="button" class="notifications-drawer-refresh" title="Recargar notificaciones" id="notificationsDrawerRefresh">
                     <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
                 </button>
-                <form method="POST" action="{{ route('notifications.clear') }}">
+                <form method="POST" action="{{ route('notifications.clear') }}" data-notifications-clear="1">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="notifications-drawer-clear">

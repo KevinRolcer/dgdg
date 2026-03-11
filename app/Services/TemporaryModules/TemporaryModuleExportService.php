@@ -52,7 +52,9 @@ class TemporaryModuleExportService
 
         $spreadsheet = new Spreadsheet();
 
-        $usedDataSheet = false;
+        // Si hay hoja de análisis, la primera hoja se usa para eso.
+        // Si NO hay análisis, la primera hoja se reserva para datos y no creamos una vacía adicional.
+        $usedDataSheet = $includeAnalysis;
 
         if ($includeAnalysis) {
             $analysisSheet = $spreadsheet->getActiveSheet();
@@ -60,7 +62,6 @@ class TemporaryModuleExportService
             $this->fillAnalysisSheet($analysisSheet, $temporaryModule);
         } else {
             $spreadsheet->getActiveSheet()->setTitle('Registros');
-            $usedDataSheet = true;
         }
 
         $microrregionIds = $temporaryModule->entries()
