@@ -662,9 +662,9 @@ class TemporaryModuleController extends Controller
             $mode = 'single';
         }
 
-        \App\Jobs\GenerateTemporaryModuleExcelJob::dispatch($module, $mode, $request->user()->id);
+        \App\Jobs\GenerateTemporaryModuleExcelJob::dispatchAfterResponse($module, $mode, $request->user()->id);
 
-        return redirect()->back()->with('status', 'La generación del archivo Excel ha comenzado en segundo plano. Te notificaremos en la barra de navegación cuando esté listo.');
+        return redirect()->back()->with('status', 'La generación del archivo Excel se ha enviado a segundo plano. Sigue navegando, te notificaremos en la barra de navegación (campana) cuando esté listo.');
     }
 
     public function previewEntryFile(Request $request, int $entry, string $fieldKey)
