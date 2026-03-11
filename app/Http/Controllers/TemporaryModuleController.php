@@ -46,6 +46,7 @@ class TemporaryModuleController extends Controller
     public function adminIndex(): View
     {
         $modules = TemporaryModule::query()
+            ->select(['id', 'name', 'description', 'expires_at', 'applies_to_all', 'is_active'])
             ->withCount(['fields', 'entries', 'targetUsers'])
             ->latest()
             ->get();
@@ -65,13 +66,14 @@ class TemporaryModuleController extends Controller
                 'fields:id,temporary_module_id,label,key,type',
                 'entries' => function ($query) {
                     $query->with('user:id,name,email')
-                        ->latest('submitted_at');
+                        ->latest('submitted_at')
+                        ->limit(50);
                 },
             ])
             ->whereHas('entries')
             ->withCount(['fields', 'entries', 'targetUsers'])
             ->latest()
-            ->get();
+            ->paginate(15);
 
         return view('temporary_modules.admin.records', [
             'pageTitle' => 'Registros de modulos temporales',
@@ -94,7 +96,10 @@ class TemporaryModuleController extends Controller
 
     public function edit(int $module): View
     {
-        $temporaryModule = TemporaryModule::query()->with('fields', 'targetUsers:id')->findOrFail($module);
+        $temporaryModule = TemporaryModule::query()
+            ->select(['id', 'name', 'description', 'expires_at', 'applies_to_all', 'is_active'])
+            ->with(['fields', 'targetUsers:id'])
+            ->findOrFail($module);
         $fieldUsage = $this->fieldService->countFieldDataUsage((int) $temporaryModule->id);
 
         return view('temporary_modules.admin.edit', [
@@ -417,6 +422,7 @@ class TemporaryModuleController extends Controller
         $microrregionesAsignadas = $this->accessService->microrregionesConMunicipiosPorUsuario((int) $user->id);
 
         $modules = TemporaryModule::query()
+            ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all'])
             ->with(['fields' => function ($query) {
                 $columns = ['id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required'];
                 if ($this->fieldService->supportsFieldComment()) {
@@ -440,17 +446,24 @@ class TemporaryModuleController extends Controller
             ->get();
 
         $modules->each(function (TemporaryModule $module) use ($user): void {
-            $module->setRelation('myLatestEntry', $module->entries()
-                ->where('user_id', $user->id)
-                ->latest('submitted_at')
-                ->first());
+            $baseEntries = $module->entries()->where('user_id', $user->id);
 
-            $module->setRelation('myEntries', $module->entries()
-                ->with('microrregion')
-                ->where('user_id', $user->id)
-                ->latest('submitted_at')
-                ->take(50)
-                ->get());
+            $module->setRelation(
+                'myLatestEntry',
+                (clone $baseEntries)->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'submitted_at'])
+                    ->latest('submitted_at')
+                    ->first()
+            );
+
+            $module->setRelation(
+                'myEntries',
+                (clone $baseEntries)
+                    ->with(['microrregion:id,microrregion,cabecera'])
+                    ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
+                    ->latest('submitted_at')
+                    ->take(50)
+                    ->get()
+            );
         });
 
         $requestedModuleId = $request->filled('module')
@@ -663,8 +676,9 @@ class TemporaryModuleController extends Controller
             $mode = 'single';
         }
 
-        // Enviar la generación del archivo a segundo plano mediante un Job
-        \App\Jobs\GenerateTemporaryModuleExcelJob::dispatch($module, $mode, $request->user()->id);
+        // Enviar la generación del archivo a segundo plano mediante un Job,
+        // justo después de enviar la respuesta al navegador.
+        \App\Jobs\GenerateTemporaryModuleExcelJob::dispatchAfterResponse($module, $mode, $request->user()->id);
 
         return redirect()->back()->with('toast', 'La generación del archivo Excel se ha enviado a segundo plano. Te notificaremos cuando esté listo para descargar.');
     }

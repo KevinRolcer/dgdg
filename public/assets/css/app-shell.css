@@ -849,6 +849,7 @@ body.sidebar-collapsed .sidebar-logout-btn {
     opacity: 0;
     transform: translateY(10px);
     transition: opacity 0.18s ease, transform 0.18s ease;
+    pointer-events: none;
 }
 
 .app-toast.is-visible {

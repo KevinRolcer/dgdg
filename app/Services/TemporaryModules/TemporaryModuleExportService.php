@@ -381,12 +381,30 @@ class TemporaryModuleExportService
             });
         }
 
-        // Ajustar ancho de columnas al contenido una vez generada la hoja.
-        // Esto tiene un costo en rendimiento, pero la generación se hace en segundo plano.
+        // Ajustar envoltura de texto para todas las celdas de datos
+        if ($rowIndex > 2) {
+            $lastColumnLetter = Coordinate::stringFromColumnIndex(count($headers));
+            $lastDataRow = $rowIndex - 1;
+            $sheet->getStyle('A2:'.$lastColumnLetter.$lastDataRow)
+                ->getAlignment()
+                ->setWrapText(true)
+                ->setVertical(Alignment::VERTICAL_TOP);
+        }
+
+        // Anchos de columna pensados para no generar filas extremadamente largas
         $lastColumnIndex = count($headers);
         for ($columnIndex = 1; $columnIndex <= $lastColumnIndex; $columnIndex++) {
             $columnLetter = Coordinate::stringFromColumnIndex($columnIndex);
-            $sheet->getColumnDimension($columnLetter)->setAutoSize(true);
+
+            if ($columnIndex === 1) { // Ítem
+                $sheet->getColumnDimension($columnLetter)->setWidth(6);
+            } elseif ($columnIndex === 2) { // Microrregión
+                $sheet->getColumnDimension($columnLetter)->setWidth(22);
+            } elseif ($columnIndex === $lastColumnIndex) { // Fecha
+                $sheet->getColumnDimension($columnLetter)->setWidth(18);
+            } else { // Campos de datos
+                $sheet->getColumnDimension($columnLetter)->setWidth(28);
+            }
         }
     }
 

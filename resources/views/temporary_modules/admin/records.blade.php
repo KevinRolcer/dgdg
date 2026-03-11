@@ -97,6 +97,12 @@
                 </tbody>
             </table>
         </div>
+
+        @if (method_exists($modules, 'links'))
+            <div class="tm-pagination-wrap">
+                {{ $modules->links() }}
+            </div>
+        @endif
     </article>
 
     @foreach ($modules as $module)
