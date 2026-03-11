@@ -334,8 +334,7 @@
                     @php
                         $municipioField = $module->fields->firstWhere('type', 'municipio');
                         $isModuleActive = (int) ($activeModuleId ?? 0) === (int) $module->id || ((int) ($activeModuleId ?? 0) === 0 && $loop->first);
-                        // Asegura que $entries esté definido en todos los contextos
-                        $entries = isset($myEntries) && $isModuleActive ? $myEntries : collect();
+                        $entries = $isModuleActive && isset($myEntries) ? $myEntries : $module->getRelation('myEntries');
                     @endphp
                     <section
                         class="tm-module-records-panel {{ $isModuleActive ? 'is-active' : '' }}"
@@ -500,7 +499,7 @@
                                     {{ $entries->links() }}
                                 </div>
                             @endif
-                        </div
+                        </div>
                     </section>
                 @endforeach
             </div>

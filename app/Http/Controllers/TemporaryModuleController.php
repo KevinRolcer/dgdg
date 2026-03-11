@@ -424,11 +424,30 @@ class TemporaryModuleController extends Controller
                 $query->whereNull('expires_at')
                     ->orWhere('expires_at', '>=', Carbon::now());
             })
+            ->with([
+                'fields' => fn ($q) => $q->select('id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required', 'comment')->orderBy('sort_order'),
+            ])
             ->withCount([
                 'entries as my_entries_count' => fn ($query) => $query->where('user_id', $user->id),
             ])
             ->latest()
             ->paginate(10);
+
+        $moduleIds = $modules->getCollection()->pluck('id')->all();
+        $entriesByModule = collect();
+        if ($moduleIds !== []) {
+            $entriesByModule = TemporaryModuleEntry::query()
+                ->whereIn('temporary_module_id', $moduleIds)
+                ->where('user_id', $user->id)
+                ->with('microrregion:id,microrregion,cabecera')
+                ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
+                ->latest('submitted_at')
+                ->get()
+                ->groupBy('temporary_module_id');
+        }
+        foreach ($modules->getCollection() as $module) {
+            $module->setRelation('myEntries', $entriesByModule->get($module->id, collect()));
+        }
 
         // Solo carga campos y entradas del usuario para el módulo activo
         $requestedModuleId = $request->filled('module')
