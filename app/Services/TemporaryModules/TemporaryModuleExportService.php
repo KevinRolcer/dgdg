@@ -34,6 +34,10 @@ class TemporaryModuleExportService
             ->with(['fields:id,temporary_module_id,label,key,type'])
             ->findOrFail($moduleId);
 
+        $entries = \Cache::remember("temporary_module_entries_{$moduleId}", 600, function () use ($temporaryModule) {
+            return $temporaryModule->entries()->withoutGlobalScopes()->get();
+        });
+
         $baseName = Str::slug((string) $temporaryModule->name, '_');
         if ($baseName === '') {
             $baseName = 'modulo_temporal_'.$temporaryModule->id;
@@ -48,7 +52,7 @@ class TemporaryModuleExportService
         }
 
         $spreadsheet = new Spreadsheet();
-        
+
         // --- HOJA 1: ANÁLISIS GENERAL ---
         $analysisSheet = $spreadsheet->getActiveSheet();
         $analysisSheet->setTitle('Análisis General');
@@ -65,7 +69,7 @@ class TemporaryModuleExportService
             ->filter()
             ->values()
             ->all();
-        
+
         $microrregionMeta = DB::table('microrregiones')
             ->select(['id', 'cabecera', 'microrregion'])
             ->whereIn('id', $microrregionIds)
@@ -157,7 +161,7 @@ class TemporaryModuleExportService
             ->select('microrregion_id')
             ->distinct()
             ->count('microrregion_id');
-        
+
         $municipiosCapturadosUnicos = 0;
         $capturasPorMunicipioYMicro = []; // [microrregion_id => [municipio_id => count]]
 
@@ -178,7 +182,7 @@ class TemporaryModuleExportService
         // 3. Imprimir encabezados generales
         $sheet->setCellValue('A1', 'Total de Registros:');
         $sheet->setCellValue('B1', $totalRegistros);
-        
+
         $sheet->setCellValue('A3', 'Total de Microrregiones Capturadas:');
         $sheet->setCellValue('B3', $microrregionesCapturadas);
 
@@ -219,9 +223,9 @@ class TemporaryModuleExportService
 
         foreach ($allMicrorregiones as $mr) {
             $cantidadRegistros = (int) ($registrosPorMicrorregion[$mr->id] ?? 0);
-            
+
             $nombreMr = $this->buildMicrorregionLabel($mr->microrregion ?? '', $mr->cabecera ?? '');
-            
+
             $municipiosCapturados = 0;
             $capturadosArray = [];
             $faltantesArray = [];
@@ -255,7 +259,7 @@ class TemporaryModuleExportService
             $sheet->setCellValue('D' . $row, implode(', ', $capturadosArray));
             $sheet->setCellValue('E' . $row, $totalFaltantes);
             $sheet->setCellValue('F' . $row, implode(', ', $faltantesArray));
-            
+
             // Ajustar saltos de línea para las listas
             $sheet->getStyle('D' . $row)->getAlignment()->setWrapText(true);
             $sheet->getStyle('F' . $row)->getAlignment()->setWrapText(true);
@@ -274,13 +278,13 @@ class TemporaryModuleExportService
 
         // Congelar paneles y ajustar columnas de la tabla de análisis
         $sheet->freezePane('A' . ($startRow + 1));
-        
+
         $sheet->getColumnDimension('A')->setWidth(30);
         $sheet->getColumnDimension('B')->setWidth(18);
         $sheet->getColumnDimension('C')->setWidth(25);
         $sheet->getColumnDimension('D')->setWidth(50);
         $sheet->getColumnDimension('E')->setWidth(25);
-        $sheet->getColumnDimension('F')->setWidth(70); 
+        $sheet->getColumnDimension('F')->setWidth(70);
     }
 
     private function fillSheet(Worksheet $sheet, TemporaryModule $temporaryModule, $entriesQuery, Collection $microrregionMeta): void
@@ -289,12 +293,11 @@ class TemporaryModuleExportService
         foreach ($temporaryModule->fields as $field) {
             $headers[] = (string) $field->label;
         }
-        $headers[] = 'Fecha';
 
         foreach ($headers as $headerIndex => $headerText) {
             $column = Coordinate::stringFromColumnIndex($headerIndex + 1);
             $sheet->setCellValue($column.'1', $headerText);
-            
+
             // Establecer el auto-size a la celda del header también
             // Opcional: Centrado y Estilo
             $sheet->getStyle($column.'1')->getFont()->setBold(true);
@@ -313,7 +316,7 @@ class TemporaryModuleExportService
             $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule) {
                 foreach ($entries as $entry) {
                     $sheet->setCellValue('A'.$rowIndex, $itemNumber);
-                    
+
                     $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                     $sheet->setCellValue('B'.$rowIndex, (string) ($meta->label ?? $meta['label'] ?? 'Sin microrregión'));
 
@@ -373,8 +376,6 @@ class TemporaryModuleExportService
                     $columnIndex++;
                 }
 
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex($columnIndex).$rowIndex, (string) (optional($entry->submitted_at)->format('d/m/Y H:i') ?? ''));
-
                     $rowIndex++;
                     $itemNumber++;
                 }
@@ -400,10 +401,8 @@ class TemporaryModuleExportService
                 $sheet->getColumnDimension($columnLetter)->setWidth(6);
             } elseif ($columnIndex === 2) { // Microrregión
                 $sheet->getColumnDimension($columnLetter)->setWidth(22);
-            } elseif ($columnIndex === $lastColumnIndex) { // Fecha
-                $sheet->getColumnDimension($columnLetter)->setWidth(18);
             } else { // Campos de datos
-                $sheet->getColumnDimension($columnLetter)->setWidth(28);
+                $sheet->getColumnDimension($columnLetter)->setWidth(32);
             }
         }
     }

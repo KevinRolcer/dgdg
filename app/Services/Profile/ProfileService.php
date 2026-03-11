@@ -11,7 +11,7 @@ class ProfileService
 {
     public function buildProfileData(User $user): array
     {
-        $roleName = $user->roles()->pluck('name')->first() ?? 'Sin rol';
+        $roleName = $user->roles()->select('name')->pluck('name')->first() ?? 'Sin rol';
 
         $delegado = DB::table('delegados')
             ->where('user_id', $user->id)
@@ -29,6 +29,7 @@ class ProfileService
             $municipios = DB::table('municipios')
                 ->where('microrregion_id', $delegado->microrregion_id)
                 ->orderBy('municipio')
+                ->select('municipio')
                 ->pluck('municipio');
 
             if ($microrregion) {
