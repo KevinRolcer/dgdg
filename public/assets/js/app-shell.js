@@ -287,7 +287,7 @@ document.addEventListener('DOMContentLoaded', function () {
             toastElement.classList.add('is-visible');
             setTimeout(function () {
                 toastElement.classList.remove('is-visible');
-            }, 1200);
+            }, 2000);
         });
     }
 

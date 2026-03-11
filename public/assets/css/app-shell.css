@@ -833,16 +833,16 @@ body.sidebar-collapsed .sidebar-logout-btn {
 
 .app-toast {
     position: fixed;
+    top: 14px;
     right: 16px;
-    bottom: 16px;
     z-index: 200;
-    background: #fff;
+    background: var(--clr-accent);
     border-radius: 999px;
     box-shadow: var(--shadow-soft);
-    border: 1px solid var(--clr-border);
+    border: 0;
     padding: 8px 16px;
     font-size: 0.8rem;
-    color: var(--clr-text-main);
+    color: #fff;
     display: inline-flex;
     align-items: center;
     max-width: min(360px, 92vw);

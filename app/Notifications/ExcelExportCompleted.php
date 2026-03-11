@@ -38,7 +38,6 @@ class ExcelExportCompleted extends Notification implements ShouldQueue
             'icon' => 'fa-solid fa-file-excel',
             'title' => 'Documento generado exitosamente: '.$this->fileName,
             'url' => $this->downloadUrl,
-            'time' => now()->diffForHumans(),
         ];
     }
 }

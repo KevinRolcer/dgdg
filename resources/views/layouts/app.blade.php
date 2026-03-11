@@ -21,7 +21,7 @@
                     'id' => $noty->id,
                     'icon' => $noty->data['icon'] ?? 'fa-regular fa-bell',
                     'title' => $noty->data['title'] ?? 'Nueva Notificación',
-                    'time' => $noty->data['time'] ?? $noty->created_at->diffForHumans(),
+                    'time' => $noty->created_at->locale('es')->diffForHumans(),
                     'url' => $noty->data['url'] ?? null,
                 ];
             });
