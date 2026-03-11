@@ -55,6 +55,9 @@
                     <p>No hay modulos temporales activos en este momento.</p>
                 </article>
             @endforelse
+            <div class="tm-pagination">
+                {{ $modules->links() }}
+            </div>
         </div>
     </section>
 
@@ -179,7 +182,12 @@
             </div>
         </div>
 
-        @foreach ($module->getRelation('myEntries') as $entry)
+        @php
+            if (!isset($entries)) {
+                $entries = collect();
+            }
+        @endphp
+        @foreach ($entries as $entry)
             <div class="tm-modal" id="delegate-edit-{{ $entry->id }}" aria-hidden="true" role="dialog" aria-modal="true">
                 <div class="tm-modal-backdrop" data-close-module-preview></div>
                 <div class="tm-modal-dialog tm-modal-dialog-entry">
@@ -331,6 +339,8 @@
                     @php
                         $municipioField = $module->fields->firstWhere('type', 'municipio');
                         $isModuleActive = (int) ($activeModuleId ?? 0) === (int) $module->id || ((int) ($activeModuleId ?? 0) === 0 && $loop->first);
+                        // Asegura que $entries esté definido en todos los contextos
+                        $entries = isset($myEntries) && $isModuleActive ? $myEntries : collect();
                     @endphp
                     <section
                         class="tm-module-records-panel {{ $isModuleActive ? 'is-active' : '' }}"
@@ -341,7 +351,7 @@
                         <p class="tm-module-subtitle">{{ $module->name }}</p>
 
                         <div class="tm-records-mobile tm-scroll-panel">
-                            @forelse ($module->getRelation('myEntries') as $entry)
+                            @forelse ($entries as $entry)
                                 @php
                                     $municipioValue = $municipioField ? ($entry->data[$municipioField->key] ?? null) : null;
                                     $cardTitle = (is_string($municipioValue) && trim($municipioValue) !== '')
@@ -412,6 +422,11 @@
                             @empty
                                 <div class="tm-record-empty">Sin registros capturados.</div>
                             @endforelse
+                            @if ($isModuleActive)
+                                <div class="tm-pagination">
+                                    {{ $entries->links() }}
+                                </div>
+                            @endif
                         </div>
 
                         <div class="tm-table-wrap tm-table-wrap-scroll tm-records-desktop">
@@ -426,7 +441,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @forelse ($module->getRelation('myEntries') as $entry)
+                                    @forelse ($entries as $entry)
                                         <tr>
                                             <td>MR {{ $entry->microrregion->microrregion ?? '-' }}</td>
                                             @foreach ($module->fields as $field)
@@ -485,7 +500,12 @@
                                     @endforelse
                                 </tbody>
                             </table>
-                        </div>
+                            @if ($isModuleActive)
+                                <div class="tm-pagination">
+                                    {{ $entries->links() }}
+                                </div>
+                            @endif
+                        </div
                     </section>
                 @endforeach
             </div>

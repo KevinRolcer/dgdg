@@ -415,22 +415,6 @@ class TemporaryModuleController extends Controller
 
         $modules = TemporaryModule::query()
             ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all'])
-            ->with([
-                'fields' => function ($query) {
-                    $columns = ['id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required'];
-                    if ($this->fieldService->supportsFieldComment()) {
-                        $columns[] = 'comment';
-                    }
-                    $query->select($columns);
-                },
-                // Eager load only the current user's entries, with microrregion
-                'entries' => function ($query) use ($user) {
-                    $query->where('user_id', $user->id)
-                        ->with('microrregion:id,microrregion,cabecera')
-                        ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
-                        ->latest('submitted_at');
-                }
-            ])
             ->where('is_active', true)
             ->where(function ($query) use ($user) {
                 $query->where('applies_to_all', true)
@@ -444,23 +428,31 @@ class TemporaryModuleController extends Controller
                 'entries as my_entries_count' => fn ($query) => $query->where('user_id', $user->id),
             ])
             ->latest()
-            ->get();
+            ->paginate(10);
 
-        // Manipula las colecciones en memoria (sin consultas extra)
-        $modules->each(function (TemporaryModule $module) {
-            $myEntries = $module->entries->take(50);
-            $module->setRelation('myEntries', $myEntries);
-            $module->setRelation('myLatestEntry', $myEntries->first());
-        });
-
+        // Solo carga campos y entradas del usuario para el módulo activo
         $requestedModuleId = $request->filled('module')
             ? (int) $request->query('module')
             : null;
 
         $activeModuleId = $requestedModuleId !== null
-            && $modules->contains(fn (TemporaryModule $module) => (int) $module->id === $requestedModuleId)
+            && $modules->contains(fn ($module) => (int) $module->id === $requestedModuleId)
             ? $requestedModuleId
-            : (int) ($modules->first()->id ?? 0);
+            : (int) ($modules->first()?->id ?? 0);
+
+        $activeModule = $modules->firstWhere('id', $activeModuleId);
+
+        $fields = [];
+        $myEntries = collect();
+        if ($activeModule) {
+            $fields = $activeModule->fields()->select(['id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required'])->get();
+            $myEntries = $activeModule->entries()
+                ->where('user_id', $user->id)
+                ->with('microrregion:id,microrregion,cabecera')
+                ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
+                ->latest('submitted_at')
+                ->paginate(20);
+        }
 
         $activeSection = optional($request->route())->getName() === 'temporary-modules.records'
             ? 'records'
@@ -471,6 +463,8 @@ class TemporaryModuleController extends Controller
             'pageDescription' => 'Registra informacion solicitada para tus municipios en modulos activos.',
             'topbarNotifications' => [],
             'modules' => $modules,
+            'fields' => $fields,
+            'myEntries' => $myEntries,
             'municipios' => $municipios,
             'microrregionesAsignadas' => $microrregionesAsignadas,
             'activeSection' => $activeSection,
