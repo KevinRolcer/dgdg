@@ -49,7 +49,7 @@ class TemporaryModuleController extends Controller
             ->select(['id', 'name', 'description', 'expires_at', 'applies_to_all', 'is_active'])
             ->withCount(['fields', 'entries', 'targetUsers'])
             ->latest()
-            ->get();
+            ->paginate(10);
 
         return view('temporary_modules.admin.index', [
             'pageTitle' => 'Modulos temporales',
@@ -62,14 +62,6 @@ class TemporaryModuleController extends Controller
     public function adminRecords(): View
     {
         $modules = TemporaryModule::query()
-            ->with([
-                'fields:id,temporary_module_id,label,key,type',
-                'entries' => function ($query) {
-                    $query->with('user:id,name,email')
-                        ->latest('submitted_at')
-                        ->limit(50);
-                },
-            ])
             ->whereHas('entries')
             ->withCount(['fields', 'entries', 'targetUsers'])
             ->latest()
@@ -423,13 +415,22 @@ class TemporaryModuleController extends Controller
 
         $modules = TemporaryModule::query()
             ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all'])
-            ->with(['fields' => function ($query) {
-                $columns = ['id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required'];
-                if ($this->fieldService->supportsFieldComment()) {
-                    $columns[] = 'comment';
+            ->with([
+                'fields' => function ($query) {
+                    $columns = ['id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required'];
+                    if ($this->fieldService->supportsFieldComment()) {
+                        $columns[] = 'comment';
+                    }
+                    $query->select($columns);
+                },
+                // Eager load only the current user's entries, with microrregion
+                'entries' => function ($query) use ($user) {
+                    $query->where('user_id', $user->id)
+                        ->with('microrregion:id,microrregion,cabecera')
+                        ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
+                        ->latest('submitted_at');
                 }
-                $query->select($columns);
-            }])
+            ])
             ->where('is_active', true)
             ->where(function ($query) use ($user) {
                 $query->where('applies_to_all', true)
@@ -445,25 +446,11 @@ class TemporaryModuleController extends Controller
             ->latest()
             ->get();
 
-        $modules->each(function (TemporaryModule $module) use ($user): void {
-            $baseEntries = $module->entries()->where('user_id', $user->id);
-
-            $module->setRelation(
-                'myLatestEntry',
-                (clone $baseEntries)->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'submitted_at'])
-                    ->latest('submitted_at')
-                    ->first()
-            );
-
-            $module->setRelation(
-                'myEntries',
-                (clone $baseEntries)
-                    ->with(['microrregion:id,microrregion,cabecera'])
-                    ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
-                    ->latest('submitted_at')
-                    ->take(50)
-                    ->get()
-            );
+        // Manipula las colecciones en memoria (sin consultas extra)
+        $modules->each(function (TemporaryModule $module) {
+            $myEntries = $module->entries->take(50);
+            $module->setRelation('myEntries', $myEntries);
+            $module->setRelation('myLatestEntry', $myEntries->first());
         });
 
         $requestedModuleId = $request->filled('module')

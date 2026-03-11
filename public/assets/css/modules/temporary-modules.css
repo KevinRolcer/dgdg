@@ -1074,16 +1074,32 @@
     cursor: pointer;
 }
 
+
 .tm-image-modal-dialog {
-    width: min(900px, calc(100vw - 30px));
+    width: min(600px, 96vw);
+    max-width: 96vw;
+    height: min(80vh, 700px);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 0;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .tm-image-modal-preview {
+    display: block;
     width: 100%;
-    max-height: calc(100vh - 180px);
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
     object-fit: contain;
     border-radius: 10px;
     background: #f8f8f8;
+    margin: 0 auto;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.08);
 }
 
 .tm-edit-compact .tm-fields-head h3 {
@@ -1134,10 +1150,8 @@
 .tm-modal-dialog {
     position: relative;
     z-index: 1;
-    width: min(1040px, calc(100vw - 28px));
-    max-width: calc(100vw - 18px);
-    height: 60vh;
-    max-height: calc(100vh - 40px);
+    max-width: 60%;
+    max-height: 80vh;
     overflow-y: auto;
     overflow-x: hidden;
     box-sizing: border-box;
@@ -1230,6 +1244,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    max-height: 80px;
 }
 
 .tm-modal-head-stack {

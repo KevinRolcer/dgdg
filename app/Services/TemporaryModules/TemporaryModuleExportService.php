@@ -26,7 +26,6 @@ class TemporaryModuleExportService
 
     public function exportExcel(int $moduleId, string $mode = 'single'): array
     {
-        // Aumentar límites para evitar desconexiones en módulos grandes
         set_time_limit(0);
         ini_set('memory_limit', '1024M');
 
@@ -53,16 +52,13 @@ class TemporaryModuleExportService
 
         $spreadsheet = new Spreadsheet();
 
-        // --- HOJA 1: ANÁLISIS GENERAL ---
         $analysisSheet = $spreadsheet->getActiveSheet();
         $analysisSheet->setTitle('Análisis General');
         $this->fillAnalysisSheet($analysisSheet, $temporaryModule);
 
-        // --- HOJAS DE DATOS ---
-        // Obtenemos las microrregiones sin heredar ordenamientos (para evitar conflictos con DISTINCT)
         $microrregionIds = $temporaryModule->entries()
             ->withoutGlobalScopes()
-            ->reorder() // limpia cualquier "order by" previo (p.ej. submitted_at)
+            ->reorder()
             ->select('microrregion_id')
             ->distinct()
             ->pluck('microrregion_id')
