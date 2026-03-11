@@ -333,32 +333,21 @@ class TemporaryModuleExportService
                     if ($fieldType === 'image') {
                         if (is_string($cell) && trim($cell) !== '') {
                             $rawValue = trim($cell);
-                            // Si es una URL, dejamos solo el enlace para no descargarla en el servidor
                             if (filter_var($rawValue, FILTER_VALIDATE_URL)) {
-                                $sheet->setCellValue($cellCoordinate, 'Ver Imagen');
-                                $sheet->getCell($cellCoordinate)->getHyperlink()->setUrl($rawValue);
-                                $sheet->getStyle($cellCoordinate)->getFont()->getColor()->setARGB('FF0000FF');
-                                $sheet->getStyle($cellCoordinate)->getFont()->setUnderline(true);
+                                $sheet->setCellValue($cellCoordinate, $rawValue);
                             } else {
-                                // Intentar resolver la ruta física almacenada en el módulo temporal
                                 $fullPath = $this->entryDataService->resolveStoredFilePath($rawValue);
                                 if (is_string($fullPath) && is_file($fullPath)) {
-                                    // Insertar una miniatura en la celda para no inflar demasiado el archivo
                                     $drawing = new Drawing();
                                     $drawing->setPath($fullPath);
                                     $drawing->setCoordinates($cellCoordinate);
+                                    $drawing->setOffsetX(2);
+                                    $drawing->setOffsetY(2);
+                                    $drawing->setResizeProportional(true);
                                     $drawing->setHeight(80);
                                     $drawing->setWorksheet($sheet);
 
-                                    // Ajustar la altura de la fila para que quepa la miniatura
                                     $sheet->getRowDimension($rowIndex)->setRowHeight(80);
-
-                                    // Además, dejar un enlace de vista previa en la celda
-                                    $previewUrl = route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]);
-                                    $sheet->setCellValue($cellCoordinate, 'Ver Imagen');
-                                    $sheet->getCell($cellCoordinate)->getHyperlink()->setUrl($previewUrl);
-                                    $sheet->getStyle($cellCoordinate)->getFont()->getColor()->setARGB('FF0000FF');
-                                    $sheet->getStyle($cellCoordinate)->getFont()->setUnderline(true);
                                 } else {
                                     $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
                                 }

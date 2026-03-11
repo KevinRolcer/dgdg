@@ -666,7 +666,7 @@ class TemporaryModuleController extends Controller
         // Enviar la generación del archivo a segundo plano mediante un Job
         \App\Jobs\GenerateTemporaryModuleExcelJob::dispatch($module, $mode, $request->user()->id);
 
-        return redirect()->back()->with('status', 'La generación del archivo Excel se ha enviado a segundo plano. Te notificaremos cuando esté listo para descargar.');
+        return redirect()->back()->with('toast', 'La generación del archivo Excel se ha enviado a segundo plano. Te notificaremos cuando esté listo para descargar.');
     }
 
     public function downloadExport(Request $request, string $file): BinaryFileResponse

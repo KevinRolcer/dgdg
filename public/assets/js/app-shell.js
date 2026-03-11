@@ -281,6 +281,16 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    var toastElement = document.getElementById('appToast');
+    if (toastElement) {
+        requestAnimationFrame(function () {
+            toastElement.classList.add('is-visible');
+            setTimeout(function () {
+                toastElement.classList.remove('is-visible');
+            }, 1200);
+        });
+    }
+
     var calendarCard = document.getElementById('calendarCard');
     if (!calendarCard) {
         return;

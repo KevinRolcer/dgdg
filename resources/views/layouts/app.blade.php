@@ -153,6 +153,12 @@
         </div>
     </div>
 
+    @if (session('toast'))
+        <div class="app-toast" id="appToast">
+            <span>{{ session('toast') }}</span>
+        </div>
+    @endif
+
     <aside class="notifications-drawer" id="notificationsDrawer" aria-hidden="true">
         <header class="notifications-drawer-header">
             <strong>Todas las notificaciones</strong>

@@ -831,6 +831,31 @@ body.sidebar-collapsed .sidebar-logout-btn {
     visibility: visible;
 }
 
+.app-toast {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 200;
+    background: #fff;
+    border-radius: 999px;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--clr-border);
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    color: var(--clr-text-main);
+    display: inline-flex;
+    align-items: center;
+    max-width: min(360px, 92vw);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.app-toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 
 .menu-toggle {
     width: 44px;
