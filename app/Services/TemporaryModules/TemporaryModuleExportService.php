@@ -438,6 +438,9 @@ class TemporaryModuleExportService
             $sheet->setCellValue('A1', $fixedHeaders[0]);
             $sheet->setCellValue('B1', $fixedHeaders[1]);
             $sheet->setCellValue('C1', $fixedHeaders[2]);
+            $sheet->mergeCells('A1:A2');
+            $sheet->mergeCells('B1:B2');
+            $sheet->mergeCells('C1:C2');
             $colIdx = $numFixed + 1;
             $mergeStart = null;
             $mergeHeader1 = null;
@@ -445,10 +448,18 @@ class TemporaryModuleExportService
                 $colLetter = Coordinate::stringFromColumnIndex($colIdx);
                 $sheet->setCellValue($colLetter.'1', $col['header1'] ?? '');
                 $sheet->setCellValue($colLetter.'2', $col['header2']);
-                if ($col['header1'] !== null && $col['header1'] !== '') {
-                    if ($mergeStart === null) {
+                $h1 = $col['header1'] ?? '';
+                if ($h1 !== '') {
+                    if ($mergeStart === null || $mergeHeader1 !== $h1) {
+                        if ($mergeStart !== null) {
+                            $startLetter = Coordinate::stringFromColumnIndex($mergeStart);
+                            $endLetter = Coordinate::stringFromColumnIndex($colIdx - 1);
+                            if ($mergeStart < $colIdx - 1) {
+                                $sheet->mergeCells($startLetter.'1:'.$endLetter.'1');
+                            }
+                        }
                         $mergeStart = $colIdx;
-                        $mergeHeader1 = $col['header1'];
+                        $mergeHeader1 = $h1;
                     }
                 } else {
                     if ($mergeStart !== null) {
