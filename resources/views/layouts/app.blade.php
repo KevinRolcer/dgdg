@@ -15,6 +15,18 @@
 <body>
     @php
         $topbarNotifications = collect($topbarNotifications ?? []);
+        if (auth()->check()) {
+            $dbNotifications = auth()->user()->unreadNotifications->map(function ($noty) {
+                return [
+                    'id' => $noty->id,
+                    'icon' => $noty->data['icon'] ?? 'fa-regular fa-bell',
+                    'title' => $noty->data['title'] ?? 'Nueva Notificación',
+                    'time' => $noty->data['time'] ?? $noty->created_at->diffForHumans(),
+                    'url' => $noty->data['url'] ?? null,
+                ];
+            });
+            $topbarNotifications = $dbNotifications->concat($topbarNotifications);
+        }
     @endphp
 
     <div class="app-shell">
@@ -53,7 +65,13 @@
                                             <i class="{{ $notification['icon'] ?? 'fa-regular fa-bell' }}" aria-hidden="true"></i>
                                         </span>
                                         <div>
-                                            <strong>{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                            @if(!empty($notification['url']))
+                                                <a href="{{ $notification['url'] }}" target="_blank" style="text-decoration:none; color:inherit;">
+                                                    <strong>{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                                </a>
+                                            @else
+                                                <strong>{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                            @endif
                                             <small>{{ $notification['time'] ?? 'Reciente' }}</small>
                                         </div>
                                     </li>
@@ -141,7 +159,13 @@
                                 <i class="{{ $notification['icon'] ?? 'fa-regular fa-bell' }}" aria-hidden="true"></i>
                             </span>
                             <div>
-                                <strong>{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                @if(!empty($notification['url']))
+                                    <a href="{{ $notification['url'] }}" target="_blank" style="text-decoration:none; color:inherit;">
+                                        <strong>{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                    </a>
+                                @else
+                                    <strong>{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                @endif
                                 <small>{{ $notification['time'] ?? 'Reciente' }}</small>
                             </div>
                         </li>

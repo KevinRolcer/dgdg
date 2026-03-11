@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ingreso al Sistema | Dirección General de Delegaciones</title>
 
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="Sat, 01 Jan 2000 00:00:00 GMT">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -26,11 +30,24 @@
                 @if ($errors->any())
                     <div class="auth-alert" role="alert">
                         {{ $errors->first() }}
+                        @if(session('error_code') === 419)
+                            <div class="auth-alert-csrf">
+                                Error de autenticidad de sesión (CSRF).<br>
+                                Por favor asegúrate de:
+                                <ul>
+                                    <li>No tener bloqueadas las cookies en tu navegador.</li>
+                                    <li>Acceder siempre por <strong>https://kevinrolcer.com</strong>.</li>
+                                    <li>No usar modo incógnito o extensiones que bloqueen cookies.</li>
+                                    <li>Si el problema persiste, recarga la página o borra las cookies.</li>
+                                </ul>
+                            </div>
+                        @endif
                     </div>
                 @endif
 
                 <form method="POST" action="{{ route('login') }}" novalidate>
                     @csrf
+                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
 
                     <div class="form-field">
                         <label for="email" class="form-label">Correo electrónico</label>
@@ -44,6 +61,7 @@
                             autofocus
                             autocomplete="username"
                             placeholder="usuario@puebla.gob.mx"
+                            pattern="^[^@\s]+@[^@\s]+\.[^@\s]+$"
                         >
                     </div>
 

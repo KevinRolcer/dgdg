@@ -8,10 +8,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Worksheet\BaseDrawing;
-use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class TemporaryModuleExportService
@@ -22,15 +23,14 @@ class TemporaryModuleExportService
     ) {
     }
 
-    public function exportExcel(int $moduleId, string $mode = 'single'): \Symfony\Component\HttpFoundation\Response
+    public function exportExcel(int $moduleId, string $mode = 'single'): array
     {
+        // Aumentar límites para evitar desconexiones en módulos grandes
+        set_time_limit(0);
+        ini_set('memory_limit', '1024M');
+
         $temporaryModule = TemporaryModule::query()
-            ->with([
-                'fields:id,temporary_module_id,label,key,type',
-                'entries' => function ($query) {
-                    $query->latest('submitted_at');
-                },
-            ])
+            ->with(['fields:id,temporary_module_id,label,key,type'])
             ->findOrFail($moduleId);
 
         $baseName = Str::slug((string) $temporaryModule->name, '_');
@@ -38,11 +38,12 @@ class TemporaryModuleExportService
             $baseName = 'modulo_temporal_'.$temporaryModule->id;
         }
 
-        $fileName = $baseName.'_'.now()->format('Y-m-d').'.xlsx';
-        $tempFilePath = storage_path('app/temp/'.$fileName);
+        $fileName = $baseName.'_'.now()->format('Ymd_His').'.xlsx';
+        $exportDir = storage_path('app/public/temporary-exports');
+        $tempFilePath = $exportDir.'/'.$fileName;
 
-        if (!is_dir(dirname($tempFilePath))) {
-            mkdir(dirname($tempFilePath), 0755, true);
+        if (!is_dir($exportDir)) {
+            mkdir($exportDir, 0755, true);
         }
 
         $spreadsheet = new Spreadsheet();
@@ -53,9 +54,11 @@ class TemporaryModuleExportService
         $this->fillAnalysisSheet($analysisSheet, $temporaryModule);
 
         // --- HOJAS DE DATOS ---
+        $microrregionIds = $temporaryModule->entries()->select('microrregion_id')->distinct()->pluck('microrregion_id')->filter();
+        
         $microrregionMeta = DB::table('microrregiones')
             ->select(['id', 'cabecera', 'microrregion'])
-            ->whereIn('id', $temporaryModule->entries->pluck('microrregion_id')->filter()->unique()->values())
+            ->whereIn('id', $microrregionIds)
             ->get()
             ->mapWithKeys(function ($row) {
                 $number = trim((string) ($row->microrregion ?? ''));
@@ -69,36 +72,44 @@ class TemporaryModuleExportService
             });
 
         if ($mode === 'mr') {
-            $groups = $temporaryModule->entries
-                ->groupBy(function ($entry) {
-                    return (int) ($entry->microrregion_id ?? 0);
-                })
-                ->sortKeys();
+            // Obtenemos los grupos directamente de la base de datos para no cargar todo en memoria a la vez
+            $groups = $temporaryModule->entries()
+                ->select('microrregion_id')
+                ->distinct()
+                ->pluck('microrregion_id')
+                ->sort()
+                ->values();
 
             if ($groups->isEmpty()) {
                 $targetSheet = $spreadsheet->createSheet();
                 $targetSheet->setTitle('Registros');
-                $this->fillSheet($targetSheet, $temporaryModule, collect(), $microrregionMeta);
+                $entriesQuery = $temporaryModule->entries()->whereNull('microrregion_id'); // Fallback if no groups
+                $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta);
             } else {
                 $usedTitles = [];
 
-                foreach ($groups as $microrregionId => $entries) {
+                foreach ($groups as $microrregionId) {
                     $targetSheet = $spreadsheet->createSheet();
-                    $meta = $microrregionMeta[(int) $microrregionId] ?? null;
+                    $meta = $microrregionMeta->get((int) $microrregionId);
                     $baseTitle = $this->sheetTitleForMicrorregion(
                         (int) $microrregionId,
-                        (string) ($meta['number'] ?? ''),
-                        (string) ($meta['name'] ?? '')
+                        (string) ($meta->number ?? $meta['number'] ?? ''),
+                        (string) ($meta->name ?? $meta['name'] ?? '')
                     );
                     $targetSheet->setTitle($this->uniqueSheetTitle($baseTitle, $usedTitles));
 
-                    $this->fillSheet($targetSheet, $temporaryModule, $entries, $microrregionMeta);
+                    $entriesQuery = $temporaryModule->entries()
+                        ->where('microrregion_id', $microrregionId)
+                        ->latest('submitted_at');
+
+                    $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta);
                 }
             }
         } else {
             $targetSheet = $spreadsheet->createSheet();
             $targetSheet->setTitle('Registros');
-            $this->fillSheet($targetSheet, $temporaryModule, $temporaryModule->entries, $microrregionMeta);
+            $entriesQuery = $temporaryModule->entries()->latest('submitted_at');
+            $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta);
         }
 
         // Asegurar que la primera hoja (Análisis) sea la activa al abrir
@@ -109,10 +120,10 @@ class TemporaryModuleExportService
         $spreadsheet->disconnectWorksheets();
         unset($spreadsheet);
 
-        return response()->download($tempFilePath, $fileName, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Cache-Control' => 'max-age=0, no-cache, no-store, must-revalidate',
-        ])->deleteFileAfterSend(true);
+        return [
+            'name' => $fileName,
+            'url' => asset('storage/temporary-exports/'.$fileName),
+        ];
     }
 
     private function fillAnalysisSheet(Worksheet $sheet, TemporaryModule $temporaryModule): void
@@ -127,20 +138,22 @@ class TemporaryModuleExportService
         }
 
         // 2. Extraer datos globales
-        $totalRegistros = $temporaryModule->entries->count();
-        $microrregionesCapturadas = $temporaryModule->entries->pluck('microrregion_id')->filter()->unique()->count();
+        $totalRegistros = $temporaryModule->entries()->count();
+        $microrregionesCapturadas = $temporaryModule->entries()->select('microrregion_id')->distinct()->count('microrregion_id');
         
         $municipiosCapturadosUnicos = 0;
         $capturasPorMunicipioYMicro = []; // [microrregion_id => [municipio_id => count]]
 
         if ($municipioFieldKey) {
             $municipiosCapturadosRaw = [];
-            foreach ($temporaryModule->entries as $entry) {
-                $val = $entry->data[$municipioFieldKey] ?? null;
-                if ($val) {
-                    $municipiosCapturadosRaw[] = mb_strtolower(trim((string)$val));
+            $temporaryModule->entries()->select('data')->chunk(500, function ($entries) use (&$municipiosCapturadosRaw, $municipioFieldKey) {
+                foreach ($entries as $entry) {
+                    $val = $entry->data[$municipioFieldKey] ?? null;
+                    if ($val) {
+                        $municipiosCapturadosRaw[] = mb_strtolower(trim((string)$val));
+                    }
                 }
-            }
+            });
             $municipiosCapturadosGlobalVals = array_unique($municipiosCapturadosRaw);
         }
 
@@ -176,14 +189,12 @@ class TemporaryModuleExportService
         }
 
         $allMicrorregiones = \App\Models\Microrregione::with('municipios')->orderBy('microrregion')->get();
-        $gruposPorMicro = $temporaryModule->entries->groupBy('microrregion_id');
 
         $row = $startRow + 1;
         $globalMunicipiosCapturadosNombres = [];
 
         foreach ($allMicrorregiones as $mr) {
-            $entradasMR = $gruposPorMicro->get($mr->id, collect());
-            $cantidadRegistros = $entradasMR->count();
+            $cantidadRegistros = $temporaryModule->entries()->where('microrregion_id', $mr->id)->count();
             
             $nombreMr = $this->buildMicrorregionLabel($mr->microrregion ?? '', $mr->cabecera ?? '');
             
@@ -248,7 +259,7 @@ class TemporaryModuleExportService
         $sheet->getColumnDimension('F')->setWidth(70); 
     }
 
-    private function fillSheet(Worksheet $sheet, TemporaryModule $temporaryModule, Collection $entries, Collection $microrregionMeta): void
+    private function fillSheet(Worksheet $sheet, TemporaryModule $temporaryModule, \Illuminate\Database\Eloquent\Builder $entriesQuery, Collection $microrregionMeta): void
     {
         $headers = ['Ítem', 'Microrregión'];
         foreach ($temporaryModule->fields as $field) {
@@ -259,6 +270,9 @@ class TemporaryModuleExportService
         foreach ($headers as $headerIndex => $headerText) {
             $column = Coordinate::stringFromColumnIndex($headerIndex + 1);
             $sheet->setCellValue($column.'1', $headerText);
+            
+            // Establecer el auto-size a la celda del header también
+            // Opcional: Centrado y Estilo
             $sheet->getStyle($column.'1')->getFont()->setBold(true);
         }
 
@@ -266,18 +280,20 @@ class TemporaryModuleExportService
         $lastColumnLetter = Coordinate::stringFromColumnIndex(count($headers));
         $sheet->setAutoFilter('A1:'.$lastColumnLetter.'1');
 
-        $imageColumns = [];
         $rowIndex = 2;
 
-        if ($entries->isEmpty()) {
+        if ($entriesQuery->count() === 0) {
             $sheet->setCellValue('A2', 'Sin registros');
         } else {
             $itemNumber = 1;
-            foreach ($entries as $entry) {
-                $sheet->setCellValue('A'.$rowIndex, $itemNumber);
-                $sheet->setCellValue('B'.$rowIndex, (string) (($microrregionMeta[(int) ($entry->microrregion_id ?? 0)]['label'] ?? 'Sin microrregión')));
+            $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule) {
+                foreach ($entries as $entry) {
+                    $sheet->setCellValue('A'.$rowIndex, $itemNumber);
+                    
+                    $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+                    $sheet->setCellValue('B'.$rowIndex, (string) ($meta->label ?? $meta['label'] ?? 'Sin microrregión'));
 
-                $columnIndex = 3;
+                    $columnIndex = 3;
 
                 foreach ($temporaryModule->fields as $field) {
                     $cell = $entry->data[$field->key] ?? null;
@@ -290,30 +306,16 @@ class TemporaryModuleExportService
                         continue;
                     }
 
-                    if ($fieldType === 'image' && is_string($cell) && trim($cell) !== '') {
-                        $imagePath = $this->entryDataService->resolveStoredFilePath($cell);
-                        if ($imagePath !== null) {
-                            try {
-                                $drawing = new Drawing();
-                                $drawing->setPath($imagePath);
-                                $drawing->setCoordinates($cellCoordinate);
-                                $drawing->setOffsetX(2);
-                                $drawing->setOffsetY(2);
-                                $drawing->setHeight(62);
-                                $drawing->setCoordinates2($cellCoordinate);
-                                $drawing->setOffsetX2(96);
-                                $drawing->setOffsetY2(48);
-                                $drawing->setEditAs(BaseDrawing::EDIT_AS_TWOCELL);
-                                $drawing->setWorksheet($sheet);
-                                $sheet->getRowDimension($rowIndex)->setRowHeight(50);
-                                $imageColumns[$columnIndex] = true;
-                            } catch (\Throwable $exception) {
-                                $sheet->setCellValue($cellCoordinate, route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]));
-                            }
+                    if ($fieldType === 'image') {
+                        if (is_string($cell) && trim($cell) !== '') {
+                            $previewUrl = route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]);
+                            $sheet->setCellValue($cellCoordinate, 'Ver Imagen');
+                            $sheet->getCell($cellCoordinate)->getHyperlink()->setUrl($previewUrl);
+                            $sheet->getStyle($cellCoordinate)->getFont()->getColor()->setARGB('FF0000FF');
+                            $sheet->getStyle($cellCoordinate)->getFont()->setUnderline(true);
                         } else {
-                            $sheet->setCellValue($cellCoordinate, route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]));
+                            $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
                         }
-
                         $columnIndex++;
                         continue;
                     }
@@ -334,19 +336,15 @@ class TemporaryModuleExportService
 
                 $sheet->setCellValue(Coordinate::stringFromColumnIndex($columnIndex).$rowIndex, (string) (optional($entry->submitted_at)->format('d/m/Y H:i') ?? ''));
 
-                $rowIndex++;
-                $itemNumber++;
-            }
+                    $rowIndex++;
+                    $itemNumber++;
+                }
+            });
         }
 
         $lastColumnIndex = count($headers);
         for ($columnIndex = 1; $columnIndex <= $lastColumnIndex; $columnIndex++) {
             $columnLetter = Coordinate::stringFromColumnIndex($columnIndex);
-            if (isset($imageColumns[$columnIndex])) {
-                $sheet->getColumnDimension($columnLetter)->setWidth(14);
-                continue;
-            }
-
             $sheet->getColumnDimension($columnLetter)->setAutoSize(true);
         }
     }

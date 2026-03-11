@@ -662,7 +662,9 @@ class TemporaryModuleController extends Controller
             $mode = 'single';
         }
 
-        return $this->exportService->exportExcel($module, $mode);
+        \App\Jobs\GenerateTemporaryModuleExcelJob::dispatch($module, $mode, $request->user()->id);
+
+        return redirect()->back()->with('status', 'La generación del archivo Excel ha comenzado en segundo plano. Te notificaremos en la barra de navegación cuando esté listo.');
     }
 
     public function previewEntryFile(Request $request, int $entry, string $fieldKey)
