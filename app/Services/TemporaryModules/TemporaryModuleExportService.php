@@ -54,7 +54,16 @@ class TemporaryModuleExportService
         $this->fillAnalysisSheet($analysisSheet, $temporaryModule);
 
         // --- HOJAS DE DATOS ---
-        $microrregionIds = $temporaryModule->entries()->select('microrregion_id')->distinct()->pluck('microrregion_id')->filter();
+        // Obtenemos las microrregiones sin heredar ordenamientos (para evitar conflictos con DISTINCT)
+        $microrregionIds = $temporaryModule->entries()
+            ->withoutGlobalScopes()
+            ->reorder() // limpia cualquier "order by" previo (p.ej. submitted_at)
+            ->select('microrregion_id')
+            ->distinct()
+            ->pluck('microrregion_id')
+            ->filter()
+            ->values()
+            ->all();
         
         $microrregionMeta = DB::table('microrregiones')
             ->select(['id', 'cabecera', 'microrregion'])
@@ -74,6 +83,8 @@ class TemporaryModuleExportService
         if ($mode === 'mr') {
             // Obtenemos los grupos directamente de la base de datos para no cargar todo en memoria a la vez
             $groups = $temporaryModule->entries()
+                ->withoutGlobalScopes()
+                ->reorder() // evitamos ordenar por submitted_at en una consulta DISTINCT
                 ->select('microrregion_id')
                 ->distinct()
                 ->pluck('microrregion_id')
@@ -139,7 +150,7 @@ class TemporaryModuleExportService
 
         // 2. Extraer datos globales
         $totalRegistros = $temporaryModule->entries()->count();
-        $microrregionesCapturadas = $temporaryModule->entries()->select('microrregion_id')->distinct()->count('microrregion_id');
+        $microrregionesCapturadas = $temporaryModule->entries()->withoutGlobalScopes()->getQuery()->select('microrregion_id')->distinct()->count('microrregion_id');
         
         $municipiosCapturadosUnicos = 0;
         $capturasPorMunicipioYMicro = []; // [microrregion_id => [municipio_id => count]]
@@ -259,7 +270,7 @@ class TemporaryModuleExportService
         $sheet->getColumnDimension('F')->setWidth(70); 
     }
 
-    private function fillSheet(Worksheet $sheet, TemporaryModule $temporaryModule, \Illuminate\Database\Eloquent\Builder $entriesQuery, Collection $microrregionMeta): void
+    private function fillSheet(Worksheet $sheet, TemporaryModule $temporaryModule, $entriesQuery, Collection $microrregionMeta): void
     {
         $headers = ['Ítem', 'Microrregión'];
         foreach ($temporaryModule->fields as $field) {

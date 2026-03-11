@@ -662,9 +662,17 @@ class TemporaryModuleController extends Controller
             $mode = 'single';
         }
 
-        \App\Jobs\GenerateTemporaryModuleExcelJob::dispatchAfterResponse($module, $mode, $request->user()->id);
+        // Generar el archivo de Excel de forma síncrona y devolver la descarga directa
+        $result = $this->exportService->exportExcel($module, $mode);
 
-        return redirect()->back()->with('status', 'La generación del archivo Excel se ha enviado a segundo plano. Sigue navegando, te notificaremos en la barra de navegación (campana) cuando esté listo.');
+        $fileName = $result['name'] ?? ('export_'.$module.'.xlsx');
+        $filePath = storage_path('app/public/temporary-exports/'.$fileName);
+
+        if (!is_file($filePath)) {
+            return redirect()->back()->with('status', 'No fue posible generar el archivo Excel en este momento.');
+        }
+
+        return response()->download($filePath, $fileName);
     }
 
     public function previewEntryFile(Request $request, int $entry, string $fieldKey)
