@@ -586,11 +586,32 @@ body.sidebar-collapsed .sidebar-logout-btn {
 
 .topbar-dropdown-header {
     padding: 6px 8px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .topbar-dropdown-header strong {
     font-size: 0.8rem;
     color: var(--clr-primary-dark);
+}
+
+.topbar-notify-refresh {
+    border: 0;
+    background: transparent;
+    color: var(--clr-text-light);
+    cursor: pointer;
+    padding: 0;
+    font-size: 0.8rem;
+}
+
+.topbar-notify-refresh:hover {
+    color: var(--clr-primary-dark);
+}
+
+.topbar-notify-refresh.is-loading i,
+.notifications-drawer-refresh.is-loading i {
+    animation: app-spin 0.6s linear infinite;
 }
 
 .topbar-notify-list {
@@ -764,6 +785,31 @@ body.sidebar-collapsed .sidebar-logout-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+}
+
+.notifications-drawer-refresh {
+    width: 34px;
+    height: 34px;
+    border: 0;
+    background: transparent;
+    color: var(--clr-text-light);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notifications-drawer-refresh:hover {
+    color: var(--clr-primary-dark);
+}
+
+@keyframes app-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .notifications-drawer-clear {

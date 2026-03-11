@@ -57,6 +57,14 @@
                         <div class="topbar-dropdown topbar-notify-panel" id="topbarNotifyPanel" role="menu" aria-hidden="true">
                             <div class="topbar-dropdown-header">
                                 <strong>Notificaciones</strong>
+                                <button
+                                    type="button"
+                                    class="topbar-notify-refresh"
+                                    title="Recargar notificaciones"
+                                    id="topbarNotifyRefresh"
+                                >
+                                    <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+                                </button>
                             </div>
                             <ul class="topbar-notify-list">
                                 @forelse ($topbarNotifications->take(6) as $notification)
@@ -163,6 +171,9 @@
         <header class="notifications-drawer-header">
             <strong>Todas las notificaciones</strong>
             <div class="notifications-drawer-actions">
+                <button type="button" class="notifications-drawer-refresh" title="Recargar notificaciones" id="notificationsDrawerRefresh">
+                    <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+                </button>
                 <form method="POST" action="{{ route('notifications.clear') }}">
                     @csrf
                     @method('DELETE')

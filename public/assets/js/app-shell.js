@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var notificationsDrawer = document.getElementById('notificationsDrawer');
     var notificationsDrawerClose = document.getElementById('notificationsDrawerClose');
     var notificationsDrawerBackdrop = document.getElementById('notificationsDrawerBackdrop');
+    var topbarNotifyRefresh = document.getElementById('topbarNotifyRefresh');
+    var notificationsDrawerRefresh = document.getElementById('notificationsDrawerRefresh');
     var collapseStorageKey = 'segob_sidebar_collapsed';
     var mobileBreakpoint = 768;
 
@@ -128,6 +130,82 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function refreshNotifications() {
+        if (window.__segobRefreshingNotifications) {
+            return;
+        }
+
+        var refreshButtons = [];
+        if (topbarNotifyRefresh) {
+            refreshButtons.push(topbarNotifyRefresh);
+        }
+        if (notificationsDrawerRefresh) {
+            refreshButtons.push(notificationsDrawerRefresh);
+        }
+
+        window.__segobRefreshingNotifications = true;
+        refreshButtons.forEach(function (btn) {
+            btn.classList.add('is-loading');
+            btn.disabled = true;
+        });
+
+        var requestUrl = window.location.href.split('#')[0];
+
+        fetch(requestUrl, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+            .then(function (response) {
+                return response.text();
+            })
+            .then(function (html) {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, 'text/html');
+
+                var newTopList = doc.querySelector('#topbarNotifyPanel .topbar-notify-list');
+                var currentTopList = document.querySelector('#topbarNotifyPanel .topbar-notify-list');
+                if (newTopList && currentTopList) {
+                    currentTopList.innerHTML = newTopList.innerHTML;
+                }
+
+                var newDrawerBody = doc.querySelector('.notifications-drawer-body');
+                var currentDrawerBody = document.querySelector('.notifications-drawer-body');
+                if (newDrawerBody && currentDrawerBody) {
+                    currentDrawerBody.innerHTML = newDrawerBody.innerHTML;
+                }
+
+                var newDot = doc.querySelector('.topbar-notify-dot');
+                var currentDot = document.querySelector('.topbar-notify-dot');
+                var notifyButton = topbarNotifyToggle;
+
+                if (notifyButton) {
+                    if (newDot && !currentDot) {
+                        var dot = document.createElement('span');
+                        dot.className = 'topbar-notify-dot';
+                        dot.setAttribute('aria-hidden', 'true');
+                        notifyButton.appendChild(dot);
+                    } else if (!newDot && currentDot) {
+                        currentDot.remove();
+                    }
+                }
+            })
+            .catch(function () {
+                // opcional: podríamos mostrar un toast de error si existe swal
+                if (typeof window.swal === 'function') {
+                    window.swal('Error', 'No se pudieron recargar las notificaciones.', 'error');
+                }
+            })
+            .finally(function () {
+                window.__segobRefreshingNotifications = false;
+                refreshButtons.forEach(function (btn) {
+                    btn.classList.remove('is-loading');
+                    btn.disabled = false;
+                });
+            });
+    }
+
     function toggleTopbarDropdown(toggleButton, panelElement) {
         if (!toggleButton || !panelElement) {
             return;
@@ -186,6 +264,22 @@ document.addEventListener('DOMContentLoaded', function () {
     if (notificationsDrawerClose) {
         notificationsDrawerClose.addEventListener('click', function () {
             closeNotificationsDrawer();
+        });
+    }
+
+    if (topbarNotifyRefresh) {
+        topbarNotifyRefresh.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            refreshNotifications();
+        });
+    }
+
+    if (notificationsDrawerRefresh) {
+        notificationsDrawerRefresh.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            refreshNotifications();
         });
     }
 

@@ -20,7 +20,7 @@ class GenerateTemporaryModuleExcelJob implements ShouldQueue
         public readonly int $moduleId,
         public readonly string $mode,
         public readonly int $userId,
-        public readonly bool $includeAnalysis = true,
+        public readonly bool $includeAnalysis = false,
     ) {
     }
 

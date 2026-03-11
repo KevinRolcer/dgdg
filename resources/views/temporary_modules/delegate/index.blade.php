@@ -369,8 +369,9 @@
                                                             data-open-image-preview
                                                             data-image-src="{{ route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) }}"
                                                             data-image-title="{{ $field->label }}"
+                                                            title="Ver imagen"
                                                         >
-                                                            <img class="tm-thumb" src="{{ route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) }}" alt="{{ $field->label }}">
+                                                            <i class="fa fa-image" aria-hidden="true"></i> Ver imagen
                                                         </button>
                                                     @elseif (is_bool($cell))
                                                         {{ $cell ? 'Si' : 'No' }}
@@ -440,8 +441,9 @@
                                                             data-open-image-preview
                                                             data-image-src="{{ route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) }}"
                                                             data-image-title="{{ $field->label }}"
+                                                            title="Ver imagen"
                                                         >
-                                                            <img class="tm-thumb" src="{{ route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) }}" alt="{{ $field->label }}">
+                                                            <i class="fa fa-image" aria-hidden="true"></i> Ver imagen
                                                         </button>
                                                     @elseif (is_bool($cell))
                                                         {{ $cell ? 'Si' : 'No' }}
