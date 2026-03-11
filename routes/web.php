@@ -46,6 +46,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/imagenes/migrar', [AdminSettingsController::class, 'migrateImages'])->name('admin.settings.images.migrate');
     });
 
+    Route::delete('/notificaciones', function (\Illuminate\Http\Request $request) {
+        $user = $request->user();
+        if ($user) {
+            $user->notifications()->delete();
+        }
+
+        return back();
+    })->name('notifications.clear');
+
     Route::prefix('modulos-temporales')->group(function () {
         Route::prefix('admin')->middleware('can:Modulos-Temporales-Admin')->group(function () {
             Route::get('/', [TemporaryModuleController::class, 'adminIndex'])->name('temporary-modules.admin.index');
@@ -61,6 +70,9 @@ Route::middleware('auth')->group(function () {
             Route::get('/{module}/exportar-excel', [TemporaryModuleController::class, 'exportExcel'])
                 ->whereNumber('module')
                 ->name('temporary-modules.admin.export');
+            Route::get('/exportaciones/{file}', [TemporaryModuleController::class, 'downloadExport'])
+                ->where('file', '[A-Za-z0-9_\-]+\.xlsx')
+                ->name('temporary-modules.admin.exports.download');
             Route::delete('/{module}/registros', [TemporaryModuleController::class, 'clearEntries'])
                 ->whereNumber('module')
                 ->name('temporary-modules.admin.clear-entries');

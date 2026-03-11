@@ -60,13 +60,24 @@
                             </div>
                             <ul class="topbar-notify-list">
                                 @forelse ($topbarNotifications->take(6) as $notification)
+                                    @php
+                                        $rawUrl = $notification['url'] ?? null;
+                                        $targetUrl = $rawUrl;
+                                        if (is_string($rawUrl) && str_contains($rawUrl, '/temporary-exports/')) {
+                                            $pathPart = parse_url($rawUrl, PHP_URL_PATH) ?: '';
+                                            $fileName = basename($pathPart);
+                                            if ($fileName !== '') {
+                                                $targetUrl = route('temporary-modules.admin.exports.download', ['file' => $fileName]);
+                                            }
+                                        }
+                                    @endphp
                                     <li class="{{ $loop->first ? 'is-active' : '' }}">
                                         <span class="topbar-notify-icon">
                                             <i class="{{ $notification['icon'] ?? 'fa-regular fa-bell' }}" aria-hidden="true"></i>
                                         </span>
                                         <div>
-                                            @if(!empty($notification['url']))
-                                                <a href="{{ $notification['url'] }}" target="_blank" style="text-decoration:none; color:inherit;">
+                                            @if(!empty($targetUrl))
+                                                <a href="{{ $targetUrl }}" style="text-decoration:none; color:inherit;">
                                                     <strong>{{ $notification['title'] ?? 'Notificación' }}</strong>
                                                 </a>
                                             @else
@@ -145,22 +156,42 @@
     <aside class="notifications-drawer" id="notificationsDrawer" aria-hidden="true">
         <header class="notifications-drawer-header">
             <strong>Todas las notificaciones</strong>
-            <button type="button" class="notifications-drawer-close" id="notificationsDrawerClose" aria-label="Cerrar panel de notificaciones">
-                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-            </button>
+            <div class="notifications-drawer-actions">
+                <form method="POST" action="{{ route('notifications.clear') }}">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="notifications-drawer-clear">
+                        Vaciar bandeja
+                    </button>
+                </form>
+                <button type="button" class="notifications-drawer-close" id="notificationsDrawerClose" aria-label="Cerrar panel de notificaciones">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
         </header>
 
         <div class="notifications-drawer-body">
             @if ($topbarNotifications->isNotEmpty())
                 <ul class="topbar-notify-list notifications-drawer-list">
                     @foreach ($topbarNotifications as $notification)
+                        @php
+                            $rawUrl = $notification['url'] ?? null;
+                            $targetUrl = $rawUrl;
+                            if (is_string($rawUrl) && str_contains($rawUrl, '/temporary-exports/')) {
+                                $pathPart = parse_url($rawUrl, PHP_URL_PATH) ?: '';
+                                $fileName = basename($pathPart);
+                                if ($fileName !== '') {
+                                    $targetUrl = route('temporary-modules.admin.exports.download', ['file' => $fileName]);
+                                }
+                            }
+                        @endphp
                         <li>
                             <span class="topbar-notify-icon">
                                 <i class="{{ $notification['icon'] ?? 'fa-regular fa-bell' }}" aria-hidden="true"></i>
                             </span>
                             <div>
-                                @if(!empty($notification['url']))
-                                    <a href="{{ $notification['url'] }}" target="_blank" style="text-decoration:none; color:inherit;">
+                                @if(!empty($targetUrl))
+                                    <a href="{{ $targetUrl }}" style="text-decoration:none; color:inherit;">
                                         <strong>{{ $notification['title'] ?? 'Notificación' }}</strong>
                                     </a>
                                 @else

@@ -635,6 +635,16 @@ body.sidebar-collapsed .sidebar-logout-btn {
     line-height: 1.25;
 }
 
+/* En el dropdown (campana) mantenemos el texto más compacto */
+.topbar-notify-panel .topbar-notify-list strong {
+    font-size: 0.72rem;
+    word-break: break-word;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
 .topbar-notify-list small {
     font-size: 0.68rem;
     color: var(--clr-text-light);
@@ -747,6 +757,28 @@ body.sidebar-collapsed .sidebar-logout-btn {
 
 .notifications-drawer-header strong {
     font-size: 0.96rem;
+    color: var(--clr-primary-dark);
+}
+
+.notifications-drawer-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.notifications-drawer-clear {
+    border: 1px solid var(--clr-border);
+    background: #fff;
+    color: var(--clr-text-light);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.notifications-drawer-clear:hover {
+    background: rgba(134, 30, 52, 0.04);
     color: var(--clr-primary-dark);
 }
 

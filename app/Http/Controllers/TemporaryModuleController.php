@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class TemporaryModuleController extends Controller
 {
@@ -662,17 +663,23 @@ class TemporaryModuleController extends Controller
             $mode = 'single';
         }
 
-        // Generar el archivo de Excel de forma síncrona y devolver la descarga directa
-        $result = $this->exportService->exportExcel($module, $mode);
+        // Enviar la generación del archivo a segundo plano mediante un Job
+        \App\Jobs\GenerateTemporaryModuleExcelJob::dispatch($module, $mode, $request->user()->id);
 
-        $fileName = $result['name'] ?? ('export_'.$module.'.xlsx');
-        $filePath = storage_path('app/public/temporary-exports/'.$fileName);
+        return redirect()->back()->with('status', 'La generación del archivo Excel se ha enviado a segundo plano. Te notificaremos cuando esté listo para descargar.');
+    }
 
-        if (!is_file($filePath)) {
-            return redirect()->back()->with('status', 'No fue posible generar el archivo Excel en este momento.');
-        }
+    public function downloadExport(Request $request, string $file): BinaryFileResponse
+    {
+        abort_unless($request->user()->can('Modulos-Temporales-Admin'), 403);
 
-        return response()->download($filePath, $fileName);
+        $file = trim($file);
+        abort_unless($file !== '' && preg_match('/\A[A-Za-z0-9_\-]+\.xlsx\z/', $file) === 1, 404);
+
+        $path = storage_path('app/public/temporary-exports/'.$file);
+        abort_unless(is_file($path), 404);
+
+        return response()->download($path, $file);
     }
 
     public function previewEntryFile(Request $request, int $entry, string $fieldKey)

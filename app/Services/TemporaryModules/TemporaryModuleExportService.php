@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -133,7 +134,7 @@ class TemporaryModuleExportService
 
         return [
             'name' => $fileName,
-            'url' => asset('storage/temporary-exports/'.$fileName),
+            'url' => route('temporary-modules.admin.exports.download', ['file' => $fileName]),
         ];
     }
 
@@ -148,9 +149,14 @@ class TemporaryModuleExportService
             }
         }
 
-        // 2. Extraer datos globales
+        // 2. Extraer datos globales (usando agregaciones para minimizar consultas)
         $totalRegistros = $temporaryModule->entries()->count();
-        $microrregionesCapturadas = $temporaryModule->entries()->withoutGlobalScopes()->getQuery()->select('microrregion_id')->distinct()->count('microrregion_id');
+        $microrregionesCapturadas = $temporaryModule->entries()
+            ->withoutGlobalScopes()
+            ->reorder()
+            ->select('microrregion_id')
+            ->distinct()
+            ->count('microrregion_id');
         
         $municipiosCapturadosUnicos = 0;
         $capturasPorMunicipioYMicro = []; // [microrregion_id => [municipio_id => count]]
@@ -201,11 +207,18 @@ class TemporaryModuleExportService
 
         $allMicrorregiones = \App\Models\Microrregione::with('municipios')->orderBy('microrregion')->get();
 
+        // Precalcular conteo de registros por microrregión en una sola consulta
+        $registrosPorMicrorregion = $temporaryModule->entries()
+            ->reorder() // evitar ORDER BY heredado (submitted_at) con ONLY_FULL_GROUP_BY
+            ->select('microrregion_id', DB::raw('COUNT(*) as total'))
+            ->groupBy('microrregion_id')
+            ->pluck('total', 'microrregion_id');
+
         $row = $startRow + 1;
         $globalMunicipiosCapturadosNombres = [];
 
         foreach ($allMicrorregiones as $mr) {
-            $cantidadRegistros = $temporaryModule->entries()->where('microrregion_id', $mr->id)->count();
+            $cantidadRegistros = (int) ($registrosPorMicrorregion[$mr->id] ?? 0);
             
             $nombreMr = $this->buildMicrorregionLabel($mr->microrregion ?? '', $mr->cabecera ?? '');
             
@@ -319,11 +332,37 @@ class TemporaryModuleExportService
 
                     if ($fieldType === 'image') {
                         if (is_string($cell) && trim($cell) !== '') {
-                            $previewUrl = route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]);
-                            $sheet->setCellValue($cellCoordinate, 'Ver Imagen');
-                            $sheet->getCell($cellCoordinate)->getHyperlink()->setUrl($previewUrl);
-                            $sheet->getStyle($cellCoordinate)->getFont()->getColor()->setARGB('FF0000FF');
-                            $sheet->getStyle($cellCoordinate)->getFont()->setUnderline(true);
+                            $rawValue = trim($cell);
+                            // Si es una URL, dejamos solo el enlace para no descargarla en el servidor
+                            if (filter_var($rawValue, FILTER_VALIDATE_URL)) {
+                                $sheet->setCellValue($cellCoordinate, 'Ver Imagen');
+                                $sheet->getCell($cellCoordinate)->getHyperlink()->setUrl($rawValue);
+                                $sheet->getStyle($cellCoordinate)->getFont()->getColor()->setARGB('FF0000FF');
+                                $sheet->getStyle($cellCoordinate)->getFont()->setUnderline(true);
+                            } else {
+                                // Intentar resolver la ruta física almacenada en el módulo temporal
+                                $fullPath = $this->entryDataService->resolveStoredFilePath($rawValue);
+                                if (is_string($fullPath) && is_file($fullPath)) {
+                                    // Insertar una miniatura en la celda para no inflar demasiado el archivo
+                                    $drawing = new Drawing();
+                                    $drawing->setPath($fullPath);
+                                    $drawing->setCoordinates($cellCoordinate);
+                                    $drawing->setHeight(80);
+                                    $drawing->setWorksheet($sheet);
+
+                                    // Ajustar la altura de la fila para que quepa la miniatura
+                                    $sheet->getRowDimension($rowIndex)->setRowHeight(80);
+
+                                    // Además, dejar un enlace de vista previa en la celda
+                                    $previewUrl = route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]);
+                                    $sheet->setCellValue($cellCoordinate, 'Ver Imagen');
+                                    $sheet->getCell($cellCoordinate)->getHyperlink()->setUrl($previewUrl);
+                                    $sheet->getStyle($cellCoordinate)->getFont()->getColor()->setARGB('FF0000FF');
+                                    $sheet->getStyle($cellCoordinate)->getFont()->setUnderline(true);
+                                } else {
+                                    $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
+                                }
+                            }
                         } else {
                             $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
                         }
@@ -353,6 +392,8 @@ class TemporaryModuleExportService
             });
         }
 
+        // Ajustar ancho de columnas al contenido una vez generada la hoja.
+        // Esto tiene un costo en rendimiento, pero la generación se hace en segundo plano.
         $lastColumnIndex = count($headers);
         for ($columnIndex = 1; $columnIndex <= $lastColumnIndex; $columnIndex++) {
             $columnLetter = Coordinate::stringFromColumnIndex($columnIndex);
