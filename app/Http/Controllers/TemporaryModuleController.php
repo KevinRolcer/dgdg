@@ -37,8 +37,10 @@ class TemporaryModuleController extends Controller
         'date' => 'Fecha',
         'datetime' => 'Fecha y hora',
         'select' => 'Lista de opciones',
+        'categoria' => 'Categoría',
         'municipio' => 'Municipio',
         'boolean' => 'Sí / No',
+        'seccion' => 'Sección',
         'geopoint' => 'Georreferencia',
         'image' => 'Imagen',
     ];
@@ -123,6 +125,8 @@ class TemporaryModuleController extends Controller
             'fields.*.type' => ['required', Rule::in(array_keys(self::FIELD_TYPES))],
             'fields.*.required' => ['nullable', 'boolean'],
             'fields.*.options' => ['nullable', 'string', 'max:2000'],
+            'fields.*.options_title' => ['nullable', 'string', 'max:255'],
+            'fields.*.options_subsections' => ['nullable', 'string', 'max:2000'],
         ];
 
         if ($this->fieldService->supportsFieldComment()) {
@@ -199,12 +203,17 @@ class TemporaryModuleController extends Controller
             'existing_fields.*.required' => ['nullable', 'boolean'],
             'existing_fields.*.delete' => ['nullable', 'boolean'],
             'existing_fields.*.options' => ['nullable', 'string', 'max:2000'],
+            'existing_fields.*.options_title' => ['nullable', 'string', 'max:255'],
+            'existing_fields.*.options_subsections' => ['nullable', 'string', 'max:2000'],
+            'existing_fields.*.subsection_index' => ['nullable', 'integer', 'min:0'],
             'extra_fields' => ['nullable', 'array'],
             'extra_fields.*.label' => ['required_with:extra_fields', 'string', 'max:120'],
             'extra_fields.*.key' => ['nullable', 'string', 'max:120'],
             'extra_fields.*.type' => ['required_with:extra_fields', Rule::in(array_keys(self::FIELD_TYPES))],
             'extra_fields.*.required' => ['nullable', 'boolean'],
             'extra_fields.*.options' => ['nullable', 'string', 'max:2000'],
+            'extra_fields.*.options_title' => ['nullable', 'string', 'max:255'],
+            'extra_fields.*.options_subsections' => ['nullable', 'string', 'max:2000'],
         ];
 
         if ($this->fieldService->supportsFieldComment()) {
@@ -243,16 +252,47 @@ class TemporaryModuleController extends Controller
         $fieldUsage = $this->fieldService->countFieldDataUsage((int) $temporaryModule->id);
 
         foreach ($temporaryModule->fields as $field) {
-            $row = $submittedExisting->get((int) $field->id, [
-                'id' => (int) $field->id,
-                'label' => $field->label,
-                'comment' => $this->fieldService->supportsFieldComment() ? ($field->comment ?? null) : null,
-                'key' => $field->key,
-                'type' => $field->type,
-                'required' => $field->is_required,
-                'options' => is_array($field->options) ? implode(', ', $field->options) : null,
-                'delete' => false,
-            ]);
+            $defaultOptions = $field->options;
+            if (is_array($defaultOptions) && ($field->type === 'seccion')) {
+                $defaultRow = [
+                    'id' => (int) $field->id,
+                    'label' => $field->label,
+                    'comment' => $this->fieldService->supportsFieldComment() ? ($field->comment ?? null) : null,
+                    'key' => $field->key,
+                    'type' => $field->type,
+                    'required' => $field->is_required,
+                    'options_title' => $defaultOptions['title'] ?? '',
+                    'options_subsections' => implode("\n", (array) ($defaultOptions['subsections'] ?? [])),
+                    'options' => $defaultOptions,
+                    'subsection_index' => $field->subsection_index,
+                    'delete' => false,
+                ];
+            } elseif (is_array($defaultOptions) && ($field->type === 'categoria')) {
+                $defaultRow = [
+                    'id' => (int) $field->id,
+                    'label' => $field->label,
+                    'comment' => $this->fieldService->supportsFieldComment() ? ($field->comment ?? null) : null,
+                    'key' => $field->key,
+                    'type' => $field->type,
+                    'required' => $field->is_required,
+                    'options' => $defaultOptions,
+                    'subsection_index' => $field->subsection_index,
+                    'delete' => false,
+                ];
+            } else {
+                $defaultRow = [
+                    'id' => (int) $field->id,
+                    'label' => $field->label,
+                    'comment' => $this->fieldService->supportsFieldComment() ? ($field->comment ?? null) : null,
+                    'key' => $field->key,
+                    'type' => $field->type,
+                    'required' => $field->is_required,
+                    'options' => is_array($defaultOptions) ? implode(', ', $defaultOptions) : $defaultOptions,
+                    'subsection_index' => $field->subsection_index,
+                    'delete' => false,
+                ];
+            }
+            $row = $submittedExisting->get((int) $field->id, $defaultRow);
 
             $isDeleted = (bool) ($row['delete'] ?? false);
             $oldKey = (string) $field->key;
@@ -561,6 +601,10 @@ class TemporaryModuleController extends Controller
         $attributes = [];
 
         foreach ($temporaryModule->fields as $field) {
+            if ($field->type === 'seccion') {
+                continue;
+            }
+
             $key = 'values.'.$field->key;
             $attributes[$key] = $field->label;
 
@@ -585,7 +629,16 @@ class TemporaryModuleController extends Controller
         $validated = $request->validate($rules, [], $attributes);
         $values = Arr::get($validated, 'values', []);
 
+        $seccionKeys = $temporaryModule->fields->where('type', 'seccion')->pluck('key')->all();
+        foreach ($seccionKeys as $sk) {
+            Arr::forget($values, $sk);
+        }
+
         foreach ($temporaryModule->fields as $field) {
+            if ($field->type === 'seccion') {
+                continue;
+            }
+
             $value = $values[$field->key] ?? null;
             $existingValue = $existingEntry?->data[$field->key] ?? null;
             $removeRequested = filter_var(Arr::get($validated, 'remove_images.'.$field->key), FILTER_VALIDATE_BOOLEAN);

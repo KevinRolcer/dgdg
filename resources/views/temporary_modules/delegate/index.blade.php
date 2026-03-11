@@ -112,6 +112,24 @@
                                     $value = old('values.'.$field->key, $savedData[$field->key] ?? null);
                                     $isMediaField = in_array($field->type, ['image', 'file'], true);
                                 @endphp
+                                @if ($field->type === 'seccion')
+                                    @php
+                                        $secOpts = is_array($field->options) ? $field->options : [];
+                                        $secTitle = $secOpts['title'] ?? $field->label;
+                                        $secSubs = $secOpts['subsections'] ?? [];
+                                    @endphp
+                                    <div class="tm-entry-section-header tm-col-full" role="group" aria-label="{{ $secTitle }}">
+                                        <h4 class="tm-section-title">{{ $secTitle }}</h4>
+                                        @if (count($secSubs) > 0)
+                                            <div class="tm-section-subsections">
+                                                @foreach ($secSubs as $sub)
+                                                    <span class="tm-section-sub">{{ $sub }}</span>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+                                    @continue
+                                @endif
                                 @if ($isMediaField && !$mediaDividerPrinted)
                                     <div class="tm-form-divider tm-col-full">
                                         <span>Evidencias</span>
@@ -125,7 +143,27 @@
                                         <small class="tm-field-help">{{ $field->comment }}</small>
                                     @endif
 
-                                    @if ($field->type === 'textarea')
+                                    @if ($field->type === 'categoria')
+                                        @php
+                                            $catOpts = is_array($field->options) ? $field->options : [];
+                                        @endphp
+                                        <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }} data-categoria-select>
+                                            <option value="">Selecciona categoría</option>
+                                            @foreach ($catOpts as $cat)
+                                                @php
+                                                    $catName = $cat['name'] ?? '';
+                                                    $subs = $cat['sub'] ?? [];
+                                                @endphp
+                                                @if ($catName !== '')
+                                                    <option value="{{ $catName }}" @selected($value === $catName)>{{ $catName }}</option>
+                                                    @foreach ($subs as $sub)
+                                                        @php $subVal = $catName.' > '.$sub; @endphp
+                                                        <option value="{{ $subVal }}" @selected($value === $subVal)>{{ $catName }} &rarr; {{ $sub }}</option>
+                                                    @endforeach
+                                                @endif
+                                            @endforeach
+                                        </select>
+                                    @elseif ($field->type === 'textarea')
                                         <textarea id="{{ $id }}" name="{{ $name }}" rows="3" {{ $field->is_required ? 'required' : '' }}>{{ $value }}</textarea>
                                     @elseif ($field->type === 'number')
                                         <input id="{{ $id }}" type="number" step="any" name="{{ $name }}" value="{{ $value }}" {{ $field->is_required ? 'required' : '' }}>
@@ -231,6 +269,24 @@
                                         $isMediaField = in_array($field->type, ['image', 'file'], true);
                                         $hasExistingImage = is_string($entry->data[$field->key] ?? null) && trim((string) ($entry->data[$field->key] ?? '')) !== '';
                                     @endphp
+                                    @if ($field->type === 'seccion')
+                                        @php
+                                            $secOpts = is_array($field->options) ? $field->options : [];
+                                            $secTitle = $secOpts['title'] ?? $field->label;
+                                            $secSubs = $secOpts['subsections'] ?? [];
+                                        @endphp
+                                        <div class="tm-entry-section-header tm-col-full" role="group" aria-label="{{ $secTitle }}">
+                                            <h4 class="tm-section-title">{{ $secTitle }}</h4>
+                                            @if (count($secSubs) > 0)
+                                                <div class="tm-section-subsections">
+                                                    @foreach ($secSubs as $sub)
+                                                        <span class="tm-section-sub">{{ $sub }}</span>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        </div>
+                                        @continue
+                                    @endif
                                     @if ($isMediaField && !$mediaDividerPrinted)
                                         <div class="tm-form-divider tm-col-full">
                                             <span>Evidencias</span>
@@ -244,7 +300,27 @@
                                             <small class="tm-field-help">{{ $field->comment }}</small>
                                         @endif
 
-                                        @if ($field->type === 'textarea')
+                                        @if ($field->type === 'categoria')
+                                            @php
+                                                $catOpts = is_array($field->options) ? $field->options : [];
+                                            @endphp
+                                            <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }} data-categoria-select>
+                                                <option value="">Selecciona categoría</option>
+                                                @foreach ($catOpts as $cat)
+                                                    @php
+                                                        $catName = $cat['name'] ?? '';
+                                                        $subs = $cat['sub'] ?? [];
+                                                    @endphp
+                                                    @if ($catName !== '')
+                                                        <option value="{{ $catName }}" @selected($value === $catName)>{{ $catName }}</option>
+                                                        @foreach ($subs as $sub)
+                                                            @php $subVal = $catName.' > '.$sub; @endphp
+                                                            <option value="{{ $subVal }}" @selected($value === $subVal)>{{ $catName }} &rarr; {{ $sub }}</option>
+                                                        @endforeach
+                                                    @endif
+                                                @endforeach
+                                            </select>
+                                        @elseif ($field->type === 'textarea')
                                             <textarea id="{{ $id }}" name="{{ $name }}" rows="3" {{ $field->is_required ? 'required' : '' }}>{{ $value }}</textarea>
                                         @elseif ($field->type === 'number')
                                             <input id="{{ $id }}" type="number" step="any" name="{{ $name }}" value="{{ $value }}" {{ $field->is_required ? 'required' : '' }}>

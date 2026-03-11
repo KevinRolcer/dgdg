@@ -1231,6 +1231,30 @@
     background: var(--clr-border);
 }
 
+.tm-entry-section-header {
+    margin: 0.75rem 0 0.25rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+.tm-entry-section-header .tm-section-title {
+    margin: 0 0 0.35rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--clr-primary-dark);
+}
+
+.tm-section-subsections {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tm-section-subsections .tm-section-sub {
+    font-size: 0.8rem;
+    color: var(--clr-text-muted);
+}
+
 .tm-entry-form .tm-actions {
     position: sticky;
     bottom: -10px;

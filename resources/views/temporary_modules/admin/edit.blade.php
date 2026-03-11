@@ -149,14 +149,47 @@
                                 </select>
                             </label>
 
-                            <label class="tm-inline-check">
+                            @php
+                                $existingOptionsValue = '';
+                                if ($field->type === 'categoria' && is_array($field->options)) {
+                                    $lines = [];
+                                    foreach ($field->options as $cat) {
+                                        $nm = $cat['name'] ?? '';
+                                        $subs = $cat['sub'] ?? [];
+                                        $lines[] = $nm . (count($subs) ? ': ' . implode(', ', $subs) : '');
+                                    }
+                                    $existingOptionsValue = implode("\n", $lines);
+                                } elseif ($field->type === 'select' && is_array($field->options)) {
+                                    $existingOptionsValue = implode(", ", $field->options);
+                                } else {
+                                    $existingOptionsValue = (string) ($oldRow['options'] ?? (is_array($field->options) ? implode(', ', $field->options) : ($field->options ?? '')));
+                                }
+                                $existingSeccionTitle = (string) ($oldRow['options_title'] ?? (is_array($field->options) && isset($field->options['title']) ? $field->options['title'] : ''));
+                                $existingSeccionSubs = (string) ($oldRow['options_subsections'] ?? (is_array($field->options) && !empty($field->options['subsections']) ? implode("\n", $field->options['subsections']) : ''));
+                            @endphp
+
+                            <label class="tm-inline-check" data-existing-required-wrap>
                                 <input type="checkbox" value="1" name="existing_fields[{{ $index }}][required]" @checked((bool) ($oldRow['required'] ?? $field->is_required)) {{ $oldDelete ? 'disabled' : '' }}>
                                 <span>Obligatorio</span>
                             </label>
 
                             <label class="tm-options-field" data-existing-options-wrap {{ $rowTypeForInput === 'select' ? '' : 'hidden' }}>
                                 Opciones (separadas por coma o salto de línea)
-                                <textarea name="existing_fields[{{ $index }}][options]" rows="2" {{ $rowTypeForInput === 'select' ? '' : 'disabled' }} {{ $oldDelete ? 'disabled' : '' }}>{{ $oldRow['options'] ?? (is_array($field->options) ? implode(', ', $field->options) : '') }}</textarea>
+                                <textarea name="existing_fields[{{ $index }}][options]" rows="2" {{ $rowTypeForInput === 'select' ? '' : 'disabled' }} {{ $oldDelete ? 'disabled' : '' }}>{{ $rowTypeForInput === 'select' ? ($oldRow['options'] ?? (is_array($field->options) ? implode(', ', $field->options) : '')) : '' }}</textarea>
+                            </label>
+
+                            <label class="tm-options-field" data-existing-categoria-wrap {{ $rowTypeForInput === 'categoria' ? '' : 'hidden' }}>
+                                Categorías (una por línea: <code>Categoría: sub1, sub2</code>)
+                                <textarea name="existing_fields[{{ $index }}][options]" rows="3" {{ $rowTypeForInput === 'categoria' ? '' : 'disabled' }} {{ $oldDelete ? 'disabled' : '' }}>{{ $existingOptionsValue }}</textarea>
+                            </label>
+
+                            <label class="tm-options-field tm-seccion-options" data-existing-seccion-wrap {{ $rowTypeForInput === 'seccion' ? '' : 'hidden' }}>
+                                Título de la sección
+                                <input type="text" name="existing_fields[{{ $index }}][options_title]" value="{{ $existingSeccionTitle }}" {{ $oldDelete ? 'disabled' : '' }}>
+                            </label>
+                            <label class="tm-options-field tm-seccion-subsections" data-existing-seccion-wrap {{ $rowTypeForInput === 'seccion' ? '' : 'hidden' }}>
+                                Subsecciones (una por línea)
+                                <textarea name="existing_fields[{{ $index }}][options_subsections]" rows="2" {{ $oldDelete ? 'disabled' : '' }}>{{ $existingSeccionSubs }}</textarea>
                             </label>
 
                             <input type="hidden" name="existing_fields[{{ $index }}][delete]" value="{{ $oldDelete ? '1' : '0' }}" data-existing-delete-flag>
@@ -211,7 +244,7 @@
             </select>
         </label>
 
-        <label class="tm-inline-check">
+        <label class="tm-inline-check" data-required-wrap>
             <input type="checkbox" value="1" data-name="required">
             <span>Obligatorio</span>
         </label>
@@ -219,6 +252,20 @@
         <label class="tm-options-field" data-options-wrap hidden>
             Opciones (separadas por coma o salto de línea)
             <textarea data-name="options" rows="2" placeholder="Alta, Media, Baja"></textarea>
+        </label>
+
+        <label class="tm-options-field" data-categoria-wrap hidden>
+            Categorías (una por línea: <code>Categoría: sub1, sub2</code>)
+            <textarea data-name="options" rows="3" placeholder="Ejemplo:&#10;Ventas: Norte, Sur&#10;Soporte: Interno"></textarea>
+        </label>
+
+        <label class="tm-options-field tm-seccion-options" data-seccion-wrap hidden>
+            Título de la sección
+            <input type="text" data-name="options_title" placeholder="Ej.: Datos generales">
+        </label>
+        <label class="tm-options-field tm-seccion-subsections" data-seccion-wrap hidden>
+            Subsecciones (una por línea)
+            <textarea data-name="options_subsections" rows="2" placeholder="Subsección 1&#10;Subsección 2"></textarea>
         </label>
 
         <button type="button" class="tm-btn tm-btn-danger" data-remove-field>Quitar</button>
@@ -277,6 +324,9 @@
             const keyInput = row.querySelector('[data-name="key"]');
             const typeSelect = row.querySelector('[data-field-type]');
             const optionsWrap = row.querySelector('[data-options-wrap]');
+            const categoriaWrap = row.querySelector('[data-categoria-wrap]');
+            const seccionWraps = row.querySelectorAll('[data-seccion-wrap]');
+            const requiredWrap = row.querySelector('[data-required-wrap]');
             const removeButton = row.querySelector('[data-remove-field]');
             const commentWrap = row.querySelector('[data-comment-wrap]');
             const toggleCommentButton = row.querySelector('[data-toggle-comment]');
@@ -291,21 +341,37 @@
             }
 
             if (typeSelect && optionsWrap) {
-                const toggleOptions = function () {
-                    const isSelect = typeSelect.value === 'select';
+                const toggleByType = function () {
+                    const t = typeSelect.value;
+                    const isSelect = t === 'select';
+                    const isCategoria = t === 'categoria';
+                    const isSeccion = t === 'seccion';
+
                     optionsWrap.hidden = !isSelect;
+                    if (categoriaWrap) categoriaWrap.hidden = !isCategoria;
+                    seccionWraps.forEach(function (w) { w.hidden = !isSeccion; });
+                    if (requiredWrap) requiredWrap.hidden = isSeccion;
+
                     const optionsInput = optionsWrap.querySelector('[data-name="options"]');
                     if (optionsInput) {
                         optionsInput.required = isSelect;
                         optionsInput.disabled = !isSelect;
-                        if (!isSelect) {
-                            optionsInput.value = '';
-                        }
+                        if (!isSelect) optionsInput.value = '';
                     }
+                    const categoriaInput = categoriaWrap ? categoriaWrap.querySelector('[data-name="options"]') : null;
+                    if (categoriaInput) {
+                        categoriaInput.required = isCategoria;
+                        categoriaInput.disabled = !isCategoria;
+                        if (!isCategoria) categoriaInput.value = '';
+                    }
+                    const optionsTitle = row.querySelector('[data-name="options_title"]');
+                    const optionsSubsections = row.querySelector('[data-name="options_subsections"]');
+                    if (optionsTitle) { optionsTitle.disabled = !isSeccion; if (!isSeccion) optionsTitle.value = ''; }
+                    if (optionsSubsections) { optionsSubsections.disabled = !isSeccion; if (!isSeccion) optionsSubsections.value = ''; }
                 };
 
-                typeSelect.addEventListener('change', toggleOptions);
-                toggleOptions();
+                typeSelect.addEventListener('change', toggleByType);
+                toggleByType();
             }
 
             if (removeButton) {
@@ -372,21 +438,46 @@
         const syncExistingOptions = function (row) {
             const typeSelect = row.querySelector('[data-existing-field-type]');
             const optionsWrap = row.querySelector('[data-existing-options-wrap]');
-            if (!typeSelect || !optionsWrap) {
+            const categoriaWrap = row.querySelector('[data-existing-categoria-wrap]');
+            const seccionWraps = row.querySelectorAll('[data-existing-seccion-wrap]');
+            const requiredWrap = row.querySelector('[data-existing-required-wrap]');
+            if (!typeSelect) {
                 return;
             }
 
-            const optionsInput = optionsWrap.querySelector('textarea');
             const isDeleted = row.classList.contains('is-marked-remove');
-            const isSelect = typeSelect.value === 'select';
-            optionsWrap.hidden = !isSelect;
+            const t = typeSelect.value;
+            const isSelect = t === 'select';
+            const isCategoria = t === 'categoria';
+            const isSeccion = t === 'seccion';
 
-            if (optionsInput) {
-                optionsInput.disabled = isDeleted || !isSelect;
-                optionsInput.required = !isDeleted && isSelect;
-                if (!isSelect && !isDeleted) {
-                    optionsInput.value = '';
+            if (optionsWrap) {
+                optionsWrap.hidden = !isSelect;
+                const optionsInput = optionsWrap.querySelector('textarea');
+                if (optionsInput) {
+                    optionsInput.disabled = isDeleted || !isSelect;
+                    optionsInput.required = !isDeleted && isSelect;
+                    if (!isSelect && !isDeleted) optionsInput.value = '';
                 }
+            }
+            if (categoriaWrap) {
+                categoriaWrap.hidden = !isCategoria;
+                const catInput = categoriaWrap.querySelector('textarea');
+                if (catInput) {
+                    catInput.disabled = isDeleted || !isCategoria;
+                    catInput.required = !isDeleted && isCategoria;
+                    if (!isCategoria && !isDeleted) catInput.value = '';
+                }
+            }
+            seccionWraps.forEach(function (w) {
+                w.hidden = !isSeccion;
+                w.querySelectorAll('input, textarea').forEach(function (el) {
+                    el.disabled = isDeleted || !isSeccion;
+                    if (!isSeccion && !isDeleted) el.value = '';
+                });
+            });
+            if (requiredWrap) {
+                requiredWrap.hidden = isSeccion;
             }
         };
 

@@ -52,14 +52,33 @@ class TemporaryModuleFieldService
                 }
             }
 
+            if ($type === 'categoria') {
+                $options = $this->parseCategoriaOptions((string) ($field['options'] ?? ''));
+                if (empty($options)) {
+                    throw ValidationException::withMessages([
+                        'fields.'.$index.'.options' => 'Debes agregar al menos una categoría (formato: Categoría: sub1, sub2).',
+                    ]);
+                }
+            }
+
+            if ($type === 'seccion') {
+                $title = trim((string) ($field['options_title'] ?? $field['options']['title'] ?? ''));
+                $subsections = $this->parseSubsectionsList((string) ($field['options_subsections'] ?? ''));
+                if (isset($field['options']) && is_array($field['options']) && isset($field['options']['subsections'])) {
+                    $subsections = $field['options']['subsections'];
+                }
+                $options = ['title' => $title ?: $label, 'subsections' => $subsections];
+            }
+
             $prepared[] = [
                 'label' => $label,
                 ...($this->supportsFieldComment() ? ['comment' => (trim((string) ($field['comment'] ?? '')) ?: null)] : []),
                 'key' => $key,
                 'type' => $type,
-                'is_required' => (bool) ($field['required'] ?? false),
+                'is_required' => $type !== 'seccion' && (bool) ($field['required'] ?? false),
                 'options' => $options,
                 'sort_order' => $sortOrder,
+                'subsection_index' => null,
             ];
 
             $sortOrder++;
@@ -103,14 +122,40 @@ class TemporaryModuleFieldService
             }
         }
 
+        if ($type === 'categoria') {
+            $raw = is_array($field['options'] ?? null) ? '' : (string) ($field['options'] ?? '');
+            if (is_array($field['options'] ?? null)) {
+                $options = $field['options'];
+            } else {
+                $options = $this->parseCategoriaOptions($raw);
+            }
+            if (empty($options)) {
+                throw ValidationException::withMessages([
+                    $validationPrefix.'.options' => 'Debes agregar al menos una categoría.',
+                ]);
+            }
+        }
+
+        if ($type === 'seccion') {
+            $title = trim((string) ($field['options_title'] ?? ($field['options']['title'] ?? '')));
+            $subsections = $this->parseSubsectionsList((string) ($field['options_subsections'] ?? ''));
+            if (is_array($field['options'] ?? null) && !empty($field['options']['subsections'])) {
+                $subsections = $field['options']['subsections'];
+            }
+            $options = ['title' => $title ?: $label, 'subsections' => $subsections];
+        }
+
+        $subsectionIndex = $this->parseSubsectionIndex($field['subsection_index'] ?? null);
+
         return [
             'label' => $label,
             ...($this->supportsFieldComment() ? ['comment' => (trim((string) ($field['comment'] ?? '')) ?: null)] : []),
             'key' => $key,
             'type' => $type,
-            'is_required' => (bool) ($field['required'] ?? false),
+            'is_required' => $type !== 'seccion' && (bool) ($field['required'] ?? false),
             'options' => $options,
             'sort_order' => $sortOrder,
+            'subsection_index' => $subsectionIndex,
         ];
     }
 
@@ -157,13 +202,76 @@ class TemporaryModuleFieldService
             'date' => [...$rules, 'date'],
             'datetime' => [...$rules, 'date'],
             'select' => [...$rules, Rule::in($options)],
+            'categoria' => [...$rules, 'string', 'max:255', Rule::in($this->categoriaAllowedValues($options))],
             'municipio' => [...$rules, Rule::in($municipios)],
             'boolean' => [...$rules, 'boolean'],
+            'seccion' => ['nullable', 'string'], // no se guarda valor; solo layout
             'geopoint' => [...$rules, 'string', 'max:120'],
             'file' => [...$rules, 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
             'image' => [...$rules, 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
             default => [...$rules, 'string', 'max:255'],
         };
+    }
+
+    /** @return list<string> */
+    public function categoriaAllowedValues(array $options): array
+    {
+        $allowed = [];
+        foreach ($options as $cat) {
+            $name = is_array($cat) ? trim((string) ($cat['name'] ?? '')) : '';
+            if ($name === '') {
+                continue;
+            }
+            $allowed[] = $name;
+            $subs = is_array($cat) && isset($cat['sub']) && is_array($cat['sub']) ? $cat['sub'] : [];
+            foreach ($subs as $sub) {
+                $sub = trim((string) $sub);
+                if ($sub !== '') {
+                    $allowed[] = $name.' > '.$sub;
+                }
+            }
+        }
+        return $allowed;
+    }
+
+    /** @return array<int, array{name: string, sub: array<string>}> */
+    public function parseCategoriaOptions(string $raw): array
+    {
+        $out = [];
+        $lines = preg_split('/\r\n|\r|\n/', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            $parts = preg_split('/\s*:\s*/', $line, 2);
+            $name = trim((string) ($parts[0] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $subRaw = isset($parts[1]) ? trim((string) $parts[1]) : '';
+            $subs = $subRaw !== ''
+                ? collect(preg_split('/\s*,\s*/', $subRaw))->map(fn ($s) => trim((string) $s))->filter(fn ($s) => $s !== '')->values()->all()
+                : [];
+            $out[] = ['name' => $name, 'sub' => $subs];
+        }
+        return $out;
+    }
+
+    /** @return array<string> */
+    public function parseSubsectionsList(string $raw): array
+    {
+        $lines = preg_split('/\r\n|\r|\n/', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        return collect($lines)->map(fn ($s) => trim((string) $s))->filter(fn ($s) => $s !== '')->values()->all();
+    }
+
+    private function parseSubsectionIndex(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $n = is_numeric($value) ? (int) $value : null;
+        return $n !== null && $n >= 0 ? $n : null;
     }
 
     public function canonicalFieldType(string $type): string

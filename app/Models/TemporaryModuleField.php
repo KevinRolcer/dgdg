@@ -19,6 +19,7 @@ class TemporaryModuleField extends Model
         'is_required',
         'options',
         'sort_order',
+        'subsection_index',
     ];
 
     protected $casts = [

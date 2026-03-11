@@ -14,10 +14,14 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class TemporaryModuleExportService
 {
+    private const HEADER_FILL_COLOR = 'FF861E34'; // --clr-primary #861e34
+
+    private const HEADER_FONT_COLOR = 'FFFFFFFF'; // blanco
     public function __construct(
         private readonly TemporaryModuleFieldService $fieldService,
         private readonly TemporaryModuleEntryDataService $entryDataService,
@@ -30,7 +34,7 @@ class TemporaryModuleExportService
         ini_set('memory_limit', '1024M');
 
         $temporaryModule = TemporaryModule::query()
-            ->with(['fields:id,temporary_module_id,label,key,type'])
+            ->with(['fields' => fn ($q) => $q->orderBy('sort_order')])
             ->findOrFail($moduleId);
 
         $entries = \Cache::remember("temporary_module_entries_{$moduleId}", 600, function () use ($temporaryModule) {
@@ -56,10 +60,13 @@ class TemporaryModuleExportService
         // Si NO hay análisis, la primera hoja se reserva para datos y no creamos una vacía adicional.
         $usedDataSheet = $includeAnalysis;
 
+        $fechaCorte = now();
+
         if ($includeAnalysis) {
             $analysisSheet = $spreadsheet->getActiveSheet();
             $analysisSheet->setTitle('Análisis General');
             $this->fillAnalysisSheet($analysisSheet, $temporaryModule);
+            $this->applyPrintSetup($analysisSheet);
         } else {
             $spreadsheet->getActiveSheet()->setTitle('Registros');
         }
@@ -113,7 +120,8 @@ class TemporaryModuleExportService
                 $targetSheet = $createDataSheet();
                 $targetSheet->setTitle('Registros');
                 $entriesQuery = $temporaryModule->entries()->whereNull('microrregion_id'); // Fallback if no groups
-                $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta);
+                $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta, $fechaCorte);
+                $this->applyPrintSetup($targetSheet);
             } else {
                 $usedTitles = [];
 
@@ -131,14 +139,48 @@ class TemporaryModuleExportService
                         ->where('microrregion_id', $microrregionId)
                         ->latest('submitted_at');
 
-                    $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta);
+                    $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta, $fechaCorte);
+                    $this->applyPrintSetup($targetSheet);
                 }
             }
         } else {
-            $targetSheet = $createDataSheet();
-            $targetSheet->setTitle('Registros');
-            $entriesQuery = $temporaryModule->entries()->latest('submitted_at');
-            $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta);
+            $categoriaField = $temporaryModule->fields->firstWhere('type', 'categoria');
+
+            if ($categoriaField && $mode === 'single') {
+                $catOpts = is_array($categoriaField->options) ? $categoriaField->options : [];
+                $topLevelCats = array_filter(array_map(fn ($c) => is_array($c) ? trim((string) ($c['name'] ?? '')) : '', $catOpts));
+                $usedTitles = [];
+                foreach ($topLevelCats as $catName) {
+                    if ($catName === '') {
+                        continue;
+                    }
+                    $targetSheet = $createDataSheet();
+                    $sheetTitle = $this->uniqueSheetTitle(mb_substr(preg_replace('/[\\\\\/?*\[\]:]/', ' ', $catName) ?: $catName, 0, 31), $usedTitles);
+                    $targetSheet->setTitle($sheetTitle);
+
+                    $catKey = $categoriaField->key;
+                    $entriesQuery = $temporaryModule->entries()
+                        ->withoutGlobalScopes()
+                        ->latest('submitted_at')
+                        ->where(function ($q) use ($catKey, $catName) {
+                            $q->where('data->'.$catKey, $catName)
+                                ->orWhere('data->'.$catKey, 'like', $catName.' > %');
+                        });
+                    $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta, $fechaCorte);
+                    $this->applyPrintSetup($targetSheet);
+                }
+
+                $totalsSheet = $createDataSheet();
+                $totalsSheet->setTitle('Totales por categoría');
+                $this->fillTotalesPorCategoriaSheet($totalsSheet, $temporaryModule, $categoriaField);
+                $this->applyPrintSetup($totalsSheet);
+            } else {
+                $targetSheet = $createDataSheet();
+                $targetSheet->setTitle('Registros');
+                $entriesQuery = $temporaryModule->entries()->latest('submitted_at');
+                $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta, $fechaCorte);
+                $this->applyPrintSetup($targetSheet);
+            }
         }
 
         // Asegurar que la primera hoja (sea análisis o registros) sea la activa al abrir
@@ -199,9 +241,10 @@ class TemporaryModuleExportService
         $sheet->setCellValue('A3', 'Total de Microrregiones Capturadas:');
         $sheet->setCellValue('B3', $microrregionesCapturadas);
 
-        // Estilos de los totales
-        $sheet->getStyle('A1:A3')->getFont()->setBold(true);
-        $sheet->getStyle('B1:B3')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
+        // Títulos de totales: fondo primario y letra blanca
+        $sheet->getStyle('A1:A3')->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
+        $sheet->getStyle('A1:A3')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::HEADER_FILL_COLOR);
+        $sheet->getStyle('A1:B3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
 
         // 4. Armar tabla por microrregiones
         $startRow = 6;
@@ -216,10 +259,11 @@ class TemporaryModuleExportService
 
         foreach ($headers as $col => $header) {
             $sheet->setCellValue($col . $startRow, $header);
-            $sheet->getStyle($col . $startRow)->getFont()->setBold(true)->getColor()->setARGB('FFFFFFFF');
+            $sheet->getStyle($col . $startRow)->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
             $sheet->getStyle($col . $startRow)->getFill()
-                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
-                ->getStartColor()->setARGB('FF2E3B4E');
+                ->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()->setARGB(self::HEADER_FILL_COLOR);
+            $sheet->getStyle($col . $startRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
         }
 
         $allMicrorregiones = \App\Models\Microrregione::with('municipios')->orderBy('microrregion')->get();
@@ -298,96 +342,222 @@ class TemporaryModuleExportService
         $sheet->getColumnDimension('D')->setWidth(50);
         $sheet->getColumnDimension('E')->setWidth(25);
         $sheet->getColumnDimension('F')->setWidth(70);
+
+        $lastRow = $row > $startRow ? $row - 1 : $startRow + 1;
+        $analysisRange = 'A1:F' . $lastRow;
+        $sheet->getStyle($analysisRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle($analysisRange)->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('D' . ($startRow + 1) . ':F' . $lastRow)->getAlignment()->setWrapText(true);
     }
 
-    private function fillSheet(Worksheet $sheet, TemporaryModule $temporaryModule, $entriesQuery, Collection $microrregionMeta): void
+    private function applyPrintSetup(Worksheet $sheet): void
     {
-        $headers = ['Ítem', 'Microrregión'];
+        $sheet->getPageSetup()
+            ->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)
+            ->setPaperSize(PageSetup::PAPERSIZE_A4);
+    }
+
+    private function fillTotalesPorCategoriaSheet(Worksheet $sheet, TemporaryModule $temporaryModule, $categoriaField): void
+    {
+        $catKey = $categoriaField->key;
+        $counts = $temporaryModule->entries()
+            ->withoutGlobalScopes()
+            ->get()
+            ->groupBy(fn ($e) => (string) ($e->data[$catKey] ?? ''))
+            ->map->count();
+
+        $sheet->setCellValue('A1', 'Categoría');
+        $sheet->setCellValue('B1', 'Total');
+        $sheet->getStyle('A1:B1')
+            ->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
+        $sheet->getStyle('A1:B1')
+            ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::HEADER_FILL_COLOR);
+        $sheet->getStyle('A1:B1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+
+        $row = 2;
+        foreach ($counts->sortKeys() as $categoriaVal => $total) {
+            $sheet->setCellValue('A'.$row, $categoriaVal !== '' ? $categoriaVal : '(sin categoría)');
+            $sheet->setCellValue('B'.$row, $total);
+            $row++;
+        }
+
+        $lastRow = $row > 2 ? $row - 1 : 2;
+        $sheet->getStyle('A1:B'.$lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle('A1:B'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getColumnDimension('A')->setWidth(40);
+        $sheet->getColumnDimension('B')->setWidth(12);
+    }
+
+    /** @return list<array{header1: ?string, header2: string, field: \App\Models\TemporaryModuleField}> */
+    private function buildExportColumns(TemporaryModule $temporaryModule): array
+    {
+        $columns = [];
+        $currentSection = null;
+
         foreach ($temporaryModule->fields as $field) {
-            $headers[] = (string) $field->label;
+            if ($field->type === 'seccion') {
+                $opts = is_array($field->options) ? $field->options : [];
+                $currentSection = [
+                    'title' => (string) ($opts['title'] ?? $field->label),
+                    'subsections' => array_values((array) ($opts['subsections'] ?? [])),
+                ];
+                continue;
+            }
+
+            if ($currentSection !== null && !empty($currentSection['subsections'])) {
+                $idx = (int) ($field->subsection_index ?? 0);
+                $subName = $currentSection['subsections'][$idx] ?? $field->label;
+                $columns[] = ['header1' => $currentSection['title'], 'header2' => $subName, 'field' => $field];
+            } else {
+                $columns[] = ['header1' => $field->label, 'header2' => $field->label, 'field' => $field];
+                $currentSection = null;
+            }
         }
 
-        foreach ($headers as $headerIndex => $headerText) {
-            $column = Coordinate::stringFromColumnIndex($headerIndex + 1);
-            $sheet->setCellValue($column.'1', $headerText);
+        return $columns;
+    }
 
-            // Establecer el auto-size a la celda del header también
-            // Opcional: Centrado y Estilo
-            $sheet->getStyle($column.'1')->getFont()->setBold(true);
+    private function fillSheet(Worksheet $sheet, TemporaryModule $temporaryModule, $entriesQuery, Collection $microrregionMeta, \DateTimeInterface $fechaCorte): void
+    {
+        $exportColumns = $this->buildExportColumns($temporaryModule);
+        $hasSections = false;
+        foreach ($exportColumns as $col) {
+            if ($col['header1'] !== $col['header2']) {
+                $hasSections = true;
+                break;
+            }
         }
 
-        $sheet->freezePane('A2');
-        $lastColumnLetter = Coordinate::stringFromColumnIndex(count($headers));
-        $sheet->setAutoFilter('A1:'.$lastColumnLetter.'1');
+        $fixedHeaders = ['Ítem', 'Microrregión', 'Fecha corte'];
+        $numFixed = count($fixedHeaders);
+        $fechaCorteStr = $fechaCorte->format('d/m/Y H:i');
 
-        $rowIndex = 2;
+        if ($hasSections) {
+            $sheet->setCellValue('A1', $fixedHeaders[0]);
+            $sheet->setCellValue('B1', $fixedHeaders[1]);
+            $sheet->setCellValue('C1', $fixedHeaders[2]);
+            $colIdx = $numFixed + 1;
+            $mergeStart = null;
+            $mergeHeader1 = null;
+            foreach ($exportColumns as $col) {
+                $colLetter = Coordinate::stringFromColumnIndex($colIdx);
+                $sheet->setCellValue($colLetter.'1', $col['header1'] ?? '');
+                $sheet->setCellValue($colLetter.'2', $col['header2']);
+                if ($col['header1'] !== null && $col['header1'] !== '') {
+                    if ($mergeStart === null) {
+                        $mergeStart = $colIdx;
+                        $mergeHeader1 = $col['header1'];
+                    }
+                } else {
+                    if ($mergeStart !== null) {
+                        $startLetter = Coordinate::stringFromColumnIndex($mergeStart);
+                        $endLetter = Coordinate::stringFromColumnIndex($colIdx - 1);
+                        if ($mergeStart < $colIdx - 1) {
+                            $sheet->mergeCells($startLetter.'1:'.$endLetter.'1');
+                        }
+                        $mergeStart = null;
+                    }
+                }
+                $colIdx++;
+            }
+            if ($mergeStart !== null) {
+                $startLetter = Coordinate::stringFromColumnIndex($mergeStart);
+                $endLetter = Coordinate::stringFromColumnIndex($colIdx - 1);
+                if ($mergeStart < $colIdx - 1) {
+                    $sheet->mergeCells($startLetter.'1:'.$endLetter.'1');
+                }
+            }
+            $headerRowCount = 2;
+        } else {
+            $headers = array_merge($fixedHeaders, array_map(fn ($c) => $c['header2'], $exportColumns));
+            foreach ($headers as $i => $headerText) {
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($i + 1).'1', $headerText);
+            }
+            $headerRowCount = 1;
+        }
+
+        $totalColumns = $numFixed + count($exportColumns);
+        $lastColumnLetter = Coordinate::stringFromColumnIndex($totalColumns);
+        $headerRange = 'A1:'.$lastColumnLetter.($headerRowCount === 2 ? '2' : '1');
+        $sheet->getStyle($headerRange)
+            ->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
+        $sheet->getStyle($headerRange)
+            ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::HEADER_FILL_COLOR);
+        $sheet->getStyle($headerRange)
+            ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+
+        $sheet->freezePane('A'.($headerRowCount + 1));
+        $sheet->setAutoFilter('A1:'.$lastColumnLetter.$headerRowCount);
+
+        $rowIndex = $headerRowCount + 1;
 
         if ($entriesQuery->count() === 0) {
-            $sheet->setCellValue('A2', 'Sin registros');
+            $sheet->setCellValue('A'.$rowIndex, 'Sin registros');
         } else {
             $itemNumber = 1;
-            $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule) {
+            $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule, $fechaCorteStr, $exportColumns, $headerRowCount) {
                 foreach ($entries as $entry) {
                     $sheet->setCellValue('A'.$rowIndex, $itemNumber);
-
                     $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                     $sheet->setCellValue('B'.$rowIndex, (string) ($meta->label ?? $meta['label'] ?? 'Sin microrregión'));
+                    $sheet->setCellValue('C'.$rowIndex, $fechaCorteStr);
 
-                    $columnIndex = 3;
+                    $columnIndex = 4;
+                    foreach ($exportColumns as $col) {
+                        $field = $col['field'];
+                        $cell = $entry->data[$field->key] ?? null;
+                        $cellCoordinate = Coordinate::stringFromColumnIndex($columnIndex).$rowIndex;
+                        $fieldType = $this->fieldService->canonicalFieldType((string) $field->type);
 
-                foreach ($temporaryModule->fields as $field) {
-                    $cell = $entry->data[$field->key] ?? null;
-                    $cellCoordinate = Coordinate::stringFromColumnIndex($columnIndex).$rowIndex;
-                    $fieldType = $this->fieldService->canonicalFieldType((string) $field->type);
+                        if (is_bool($cell)) {
+                            $sheet->setCellValue($cellCoordinate, $cell ? 'Sí' : 'No');
+                            $columnIndex++;
+                            continue;
+                        }
 
-                    if (is_bool($cell)) {
-                        $sheet->setCellValue($cellCoordinate, $cell ? 'Sí' : 'No');
-                        $columnIndex++;
-                        continue;
-                    }
-
-                    if ($fieldType === 'image') {
-                        if (is_string($cell) && trim($cell) !== '') {
-                            $rawValue = trim($cell);
-                            if (filter_var($rawValue, FILTER_VALIDATE_URL)) {
-                                $sheet->setCellValue($cellCoordinate, $rawValue);
-                            } else {
-                                $fullPath = $this->entryDataService->resolveStoredFilePath($rawValue);
-                                if (is_string($fullPath) && is_file($fullPath)) {
-                                    $drawing = new Drawing();
-                                    $drawing->setPath($fullPath);
-                                    $drawing->setCoordinates($cellCoordinate);
-                                    $drawing->setOffsetX(2);
-                                    $drawing->setOffsetY(2);
-                                    $drawing->setResizeProportional(true);
-                                    $drawing->setHeight(80);
-                                    $drawing->setWorksheet($sheet);
-
-                                    $sheet->getRowDimension($rowIndex)->setRowHeight(80);
+                        if ($fieldType === 'image') {
+                            if (is_string($cell) && trim($cell) !== '') {
+                                $rawValue = trim($cell);
+                                if (filter_var($rawValue, FILTER_VALIDATE_URL)) {
+                                    $sheet->setCellValue($cellCoordinate, $rawValue);
                                 } else {
-                                    $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
+                                    $fullPath = $this->entryDataService->resolveStoredFilePath($rawValue);
+                                    if (is_string($fullPath) && is_file($fullPath)) {
+                                        $drawing = new Drawing();
+                                        $drawing->setPath($fullPath);
+                                        $drawing->setCoordinates($cellCoordinate);
+                                        $drawing->setOffsetX(2);
+                                        $drawing->setOffsetY(2);
+                                        $drawing->setResizeProportional(true);
+                                        $drawing->setHeight(80);
+                                        $drawing->setWorksheet($sheet);
+                                        $sheet->getRowDimension($rowIndex)->setRowHeight(80);
+                                    } else {
+                                        $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
+                                    }
                                 }
+                            } else {
+                                $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
                             }
-                        } else {
-                            $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
+                            $columnIndex++;
+                            continue;
                         }
-                        $columnIndex++;
-                        continue;
-                    }
 
-                    if ($fieldType === 'geopoint' && is_string($cell) && trim($cell) !== '') {
-                        $geoValue = trim($cell);
-                        $sheet->setCellValue($cellCoordinate, $geoValue);
-                        if (filter_var($geoValue, FILTER_VALIDATE_URL)) {
-                            $sheet->getCell($cellCoordinate)->getHyperlink()->setUrl($geoValue);
+                        if ($fieldType === 'geopoint' && is_string($cell) && trim($cell) !== '') {
+                            $geoValue = trim($cell);
+                            $sheet->setCellValue($cellCoordinate, $geoValue);
+                            if (filter_var($geoValue, FILTER_VALIDATE_URL)) {
+                                $sheet->getCell($cellCoordinate)->getHyperlink()->setUrl($geoValue);
+                            }
+                            $columnIndex++;
+                            continue;
                         }
-                        $columnIndex++;
-                        continue;
-                    }
 
-                    $sheet->setCellValue($cellCoordinate, is_scalar($cell) ? (string) $cell : '');
-                    $columnIndex++;
-                }
+                        $sheet->setCellValue($cellCoordinate, is_scalar($cell) ? (string) $cell : '');
+                        $columnIndex++;
+                    }
 
                     $rowIndex++;
                     $itemNumber++;
@@ -395,26 +565,27 @@ class TemporaryModuleExportService
             });
         }
 
-        // Ajustar envoltura de texto para todas las celdas de datos
-        if ($rowIndex > 2) {
-            $lastColumnLetter = Coordinate::stringFromColumnIndex(count($headers));
-            $lastDataRow = $rowIndex - 1;
-            $sheet->getStyle('A2:'.$lastColumnLetter.$lastDataRow)
-                ->getAlignment()
-                ->setWrapText(true)
-                ->setVertical(Alignment::VERTICAL_TOP);
+        $lastDataRow = $rowIndex > ($headerRowCount + 1) ? $rowIndex - 1 : $headerRowCount + 1;
+        $dataRange = 'A1:'.$lastColumnLetter.$lastDataRow;
+        $sheet->getStyle($dataRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle($dataRange)->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER);
+
+        if ($lastDataRow > $headerRowCount) {
+            $sheet->getStyle('A'.($headerRowCount + 1).':'.$lastColumnLetter.$lastDataRow)
+                ->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_CENTER);
         }
 
-        // Anchos de columna pensados para no generar filas extremadamente largas
-        $lastColumnIndex = count($headers);
-        for ($columnIndex = 1; $columnIndex <= $lastColumnIndex; $columnIndex++) {
-            $columnLetter = Coordinate::stringFromColumnIndex($columnIndex);
-
-            if ($columnIndex === 1) { // Ítem
+        for ($colIdx = 1; $colIdx <= $totalColumns; $colIdx++) {
+            $columnLetter = Coordinate::stringFromColumnIndex($colIdx);
+            if ($colIdx === 1) {
                 $sheet->getColumnDimension($columnLetter)->setWidth(6);
-            } elseif ($columnIndex === 2) { // Microrregión
+            } elseif ($colIdx === 2) {
                 $sheet->getColumnDimension($columnLetter)->setWidth(22);
-            } else { // Campos de datos
+            } elseif ($colIdx === 3) {
+                $sheet->getColumnDimension($columnLetter)->setWidth(18);
+            } else {
                 $sheet->getColumnDimension($columnLetter)->setWidth(32);
             }
         }

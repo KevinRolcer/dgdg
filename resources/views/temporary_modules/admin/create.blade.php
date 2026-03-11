@@ -126,7 +126,7 @@
             </select>
         </label>
 
-        <label class="tm-inline-check">
+        <label class="tm-inline-check" data-required-wrap>
             <input type="checkbox" value="1" data-name="required">
             <span>Obligatorio</span>
         </label>
@@ -134,6 +134,20 @@
         <label class="tm-options-field" data-options-wrap hidden>
             Opciones (separadas por coma o salto de línea)
             <textarea data-name="options" rows="2" placeholder="Alta, Media, Baja"></textarea>
+        </label>
+
+        <label class="tm-options-field" data-categoria-wrap hidden>
+            Categorías (una por línea: <code>Categoría: sub1, sub2</code>)
+            <textarea data-name="options" rows="3" placeholder="Ejemplo:&#10;Ventas: Norte, Sur&#10;Soporte: Interno"></textarea>
+        </label>
+
+        <label class="tm-options-field tm-seccion-options" data-seccion-wrap hidden>
+            Título de la sección
+            <input type="text" data-name="options_title" placeholder="Ej.: Datos generales">
+        </label>
+        <label class="tm-options-field tm-seccion-subsections" data-seccion-wrap hidden>
+            Subsecciones (una por línea; serán columnas agrupadas)
+            <textarea data-name="options_subsections" rows="2" placeholder="Subsección 1&#10;Subsección 2"></textarea>
         </label>
 
         <button type="button" class="tm-btn tm-btn-danger" data-remove-field>Quitar</button>
@@ -189,6 +203,9 @@
             const keyInput = row.querySelector('[data-name="key"]');
             const typeSelect = row.querySelector('[data-field-type]');
             const optionsWrap = row.querySelector('[data-options-wrap]');
+            const categoriaWrap = row.querySelector('[data-categoria-wrap]');
+            const seccionWraps = row.querySelectorAll('[data-seccion-wrap]');
+            const requiredWrap = row.querySelector('[data-required-wrap]');
             const removeButton = row.querySelector('[data-remove-field]');
             const commentWrap = row.querySelector('[data-comment-wrap]');
             const toggleCommentButton = row.querySelector('[data-toggle-comment]');
@@ -203,21 +220,37 @@
             }
 
             if (typeSelect && optionsWrap) {
-                const toggleOptions = function () {
-                    const isSelect = typeSelect.value === 'select';
+                const toggleByType = function () {
+                    const t = typeSelect.value;
+                    const isSelect = t === 'select';
+                    const isCategoria = t === 'categoria';
+                    const isSeccion = t === 'seccion';
+
                     optionsWrap.hidden = !isSelect;
+                    if (categoriaWrap) categoriaWrap.hidden = !isCategoria;
+                    seccionWraps.forEach(function (w) { w.hidden = !isSeccion; });
+                    if (requiredWrap) requiredWrap.hidden = isSeccion;
+
                     const optionsInput = optionsWrap.querySelector('[data-name="options"]');
                     if (optionsInput) {
                         optionsInput.required = isSelect;
                         optionsInput.disabled = !isSelect;
-                        if (!isSelect) {
-                            optionsInput.value = '';
-                        }
+                        if (!isSelect) optionsInput.value = '';
                     }
+                    const categoriaInput = categoriaWrap ? categoriaWrap.querySelector('[data-name="options"]') : null;
+                    if (categoriaInput) {
+                        categoriaInput.required = isCategoria;
+                        categoriaInput.disabled = !isCategoria;
+                        if (!isCategoria) categoriaInput.value = '';
+                    }
+                    const optionsTitle = row.querySelector('[data-name="options_title"]');
+                    const optionsSubsections = row.querySelector('[data-name="options_subsections"]');
+                    if (optionsTitle) { optionsTitle.disabled = !isSeccion; if (!isSeccion) optionsTitle.value = ''; }
+                    if (optionsSubsections) { optionsSubsections.disabled = !isSeccion; if (!isSeccion) optionsSubsections.value = ''; }
                 };
 
-                typeSelect.addEventListener('change', toggleOptions);
-                toggleOptions();
+                typeSelect.addEventListener('change', toggleByType);
+                toggleByType();
             }
 
             if (removeButton) {
