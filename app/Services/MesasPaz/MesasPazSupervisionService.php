@@ -67,6 +67,7 @@ class MesasPazSupervisionService
         }
 
         $query = MesaPazAsistencia::query()
+            ->select(['id', 'municipio_id', 'delegado_id', 'user_id', 'microrregion_id', 'fecha_asist', 'created_at', 'presidente', 'asiste', 'delegado_asistio', 'evidencia', 'acuerdo_items', 'parte_items'])
             ->with([
                 'municipio:id,municipio',
                 'delegado:id,nombre,ap_paterno,ap_materno,microrregion_id',
@@ -82,7 +83,7 @@ class MesasPazSupervisionService
                 ->whereDate('fecha_asist', $fechaListaFiltro)
                 ->orderByDesc('fecha_asist')
                 ->orderByDesc('created_at')
-                ->get();
+                ->paginate(10);
 
             $registrosLista = $registrosComunes;
             $registrosAnalisisBase = $registrosComunes;
@@ -91,12 +92,12 @@ class MesasPazSupervisionService
                 ->whereDate('fecha_asist', $fechaListaFiltro)
                 ->orderByDesc('fecha_asist')
                 ->orderByDesc('created_at')
-                ->get();
+                ->paginate(10);
 
             $registrosAnalisisBase = (clone $query)
                 ->whereDate('fecha_asist', $fechaAnalisisFiltro)
                 ->orderByDesc('created_at')
-                ->get();
+                ->paginate(10);
         }
 
         $representantesDisponibles = $registrosAnalisisBase
@@ -504,7 +505,8 @@ class MesasPazSupervisionService
             }
         );
 
-        $evidencias = $registrosLista
+        // Agrupar y mapear evidencias paginadas
+        $evidencias = collect($registrosLista->items())
             ->groupBy(function ($registro) {
                 return Carbon::parse($registro->fecha_asist)->toDateString().'|'.$registro->user_id.'|'.$registro->microrregion_id;
             })
@@ -604,8 +606,7 @@ class MesasPazSupervisionService
                 ];
             })
             ->sortByDesc('fecha_asist')
-            ->values()
-            ->toArray();
+            ->values();
 
         return [
             'valid' => true,

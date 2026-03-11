@@ -460,7 +460,7 @@
                                         </div>
                                     </div>
                                 @endif
-                                
+
                                 @if(collect($item['partes_observaciones'] ?? [])->isEmpty())
                                     <div class="badge-supervision-soft" style="font-size: 0.75rem;">Parte: Aún no registrada.</div>
                                 @endif
@@ -495,6 +495,11 @@
                     </div>
                 @endforeach
             </div>
+            @if(isset($registrosPaginator) && $registrosPaginator)
+                <div class="mt-3">
+                    {{ $registrosPaginator->withQueryString()->links() }}
+                </div>
+            @endif
         @else
             <div class="alert alert-secondary mb-0">
                 No se encontraron evidencias con los filtros seleccionados.

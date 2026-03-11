@@ -28,6 +28,9 @@ class MesasPazSupervisionController extends Controller
         $resultado['data']['pageTitle'] = 'Mesas de Paz - Evidencias';
         $resultado['data']['pageDescription'] = 'Supervisión de asistencias y evidencias por fecha y microrregión.';
 
+        // Pasar el paginador de registrosLista a la vista para paginación
+        $resultado['data']['registrosPaginator'] = $resultado['data']['registrosLista'] ?? null;
+
         return view('mesas_paz.evidencias', $resultado['data']);
     }
 
