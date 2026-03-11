@@ -182,12 +182,7 @@
             </div>
         </div>
 
-        @php
-            if (!isset($entries)) {
-                $entries = collect();
-            }
-        @endphp
-        @foreach ($entries as $entry)
+        @foreach ($module->getRelation('myEntries') as $entry)
             <div class="tm-modal" id="delegate-edit-{{ $entry->id }}" aria-hidden="true" role="dialog" aria-modal="true">
                 <div class="tm-modal-backdrop" data-close-module-preview></div>
                 <div class="tm-modal-dialog tm-modal-dialog-entry">
