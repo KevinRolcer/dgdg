@@ -130,6 +130,39 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    var exportPollIntervals = {};
+
+    function stopAllExportPolling() {
+        Object.keys(exportPollIntervals).forEach(function (id) {
+            clearInterval(exportPollIntervals[id]);
+            delete exportPollIntervals[id];
+        });
+    }
+
+    function startExportStatusPolling() {
+        stopAllExportPolling();
+        var urlTemplate = document.body.getAttribute('data-export-status-url');
+        if (!urlTemplate) return;
+        document.querySelectorAll('[data-export-request-id]').forEach(function (el) {
+            var id = el.getAttribute('data-export-request-id');
+            if (!id || exportPollIntervals[id]) return;
+            var url = urlTemplate.replace(/\/0$/, '/' + id);
+            var intervalId = setInterval(function () {
+                fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        if (data.status === 'completed' || data.status === 'failed') {
+                            clearInterval(exportPollIntervals[id]);
+                            delete exportPollIntervals[id];
+                            refreshNotifications();
+                        }
+                    })
+                    .catch(function () {});
+            }, 10000);
+            exportPollIntervals[id] = intervalId;
+        });
+    }
+
     function refreshNotifications() {
         if (window.__segobRefreshingNotifications) {
             return;
@@ -190,6 +223,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         currentDot.remove();
                     }
                 }
+                startExportStatusPolling();
             })
             .catch(function () {
                 // opcional: podríamos mostrar un toast de error si existe swal
@@ -204,6 +238,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     btn.disabled = false;
                 });
             });
+    }
+
+    if (document.body.getAttribute('data-export-status-url')) {
+        startExportStatusPolling();
     }
 
     function toggleTopbarDropdown(toggleButton, panelElement) {

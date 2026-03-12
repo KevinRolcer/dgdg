@@ -21,6 +21,7 @@ class GenerateTemporaryModuleExcelJob implements ShouldQueue
         public readonly string $mode,
         public readonly int $userId,
         public readonly bool $includeAnalysis = false,
+        public readonly ?string $exportRequestId = null,
     ) {
     }
 
@@ -35,13 +36,62 @@ class GenerateTemporaryModuleExcelJob implements ShouldQueue
             $result = $exportService->exportExcel($this->moduleId, $this->mode, $this->includeAnalysis);
 
             if (is_array($result) && isset($result['name'], $result['url'])) {
-                $user->notify(new ExcelExportCompleted($result['name'], $result['url']));
+                if ($this->exportRequestId !== null) {
+                    $this->updatePendingNotificationToCompleted($user, $result['name'], $result['url']);
+                } else {
+                    $user->notify(new ExcelExportCompleted($result['name'], $result['url']));
+                }
             }
         } catch (\Throwable $e) {
             Log::error('Fallo al generar excel en segundo plano: '.$e->getMessage(), [
                 'module_id' => $this->moduleId,
                 'mode' => $this->mode,
                 'user_id' => $this->userId,
+            ]);
+
+            if ($this->exportRequestId !== null) {
+                $this->updatePendingNotificationToFailed($user);
+            }
+        }
+    }
+
+    private function updatePendingNotificationToCompleted(User $user, string $fileName, string $downloadUrl): void
+    {
+        $notification = $user->notifications()
+            ->where('type', \App\Notifications\ExcelExportPending::class)
+            ->where('data->export_request_id', $this->exportRequestId)
+            ->first();
+
+        if ($notification) {
+            $notification->update([
+                'type' => ExcelExportCompleted::class,
+                'data' => [
+                    'icon' => 'fa-solid fa-file-excel',
+                    'title' => 'Documento generado exitosamente: '.$fileName,
+                    'url' => $downloadUrl,
+                    'file_name' => $fileName,
+                    'export_status' => 'completed',
+                ],
+            ]);
+        }
+    }
+
+    private function updatePendingNotificationToFailed(User $user): void
+    {
+        $notification = $user->notifications()
+            ->where('type', \App\Notifications\ExcelExportPending::class)
+            ->where('data->export_request_id', $this->exportRequestId)
+            ->first();
+
+        if ($notification) {
+            $notification->update([
+                'type' => ExcelExportCompleted::class,
+                'data' => [
+                    'icon' => 'fa-solid fa-circle-exclamation',
+                    'title' => 'Error al generar el Excel',
+                    'url' => null,
+                    'export_status' => 'failed',
+                ],
             ]);
         }
     }

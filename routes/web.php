@@ -63,6 +63,9 @@ Route::middleware('auth')->group(function () {
             Route::get('/{module}/campos', [TemporaryModuleController::class, 'fieldsJson'])
                 ->whereNumber('module')
                 ->name('temporary-modules.admin.fields-json');
+            Route::get('/export-status/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
+                ->where('exportRequest', '[a-f0-9\-]+')
+                ->name('temporary-modules.admin.export-status');
             Route::post('/', [TemporaryModuleController::class, 'store'])->name('temporary-modules.admin.store');
             Route::get('/{module}/editar', [TemporaryModuleController::class, 'edit'])
                 ->whereNumber('module')

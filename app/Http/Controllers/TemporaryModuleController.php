@@ -770,9 +770,40 @@ class TemporaryModuleController extends Controller
         }
         $includeAnalysis = (bool) $request->boolean('analysis', false);
 
-        \App\Jobs\GenerateTemporaryModuleExcelJob::dispatchAfterResponse($module, $mode, $request->user()->id, $includeAnalysis);
+        $exportRequestId = Str::uuid()->toString();
+        $request->user()->notify(new \App\Notifications\ExcelExportPending($exportRequestId));
 
-        return redirect()->back()->with('toast', 'La generación del archivo Excel se ha enviado a segundo plano. Te notificaremos cuando esté listo para descargar.');
+        \App\Jobs\GenerateTemporaryModuleExcelJob::dispatchAfterResponse(
+            $module,
+            $mode,
+            $request->user()->id,
+            $includeAnalysis,
+            $exportRequestId
+        );
+
+        return redirect()->back()->with('toast', 'La generación del archivo Excel se ha enviado a segundo plano. Revisa tus notificaciones para ver el estado.');
+    }
+
+    public function exportStatus(Request $request, string $exportRequest): \Illuminate\Http\JsonResponse
+    {
+        $notification = $request->user()->notifications()
+            ->where('data->export_request_id', $exportRequest)
+            ->first();
+
+        if (!$notification) {
+            abort(404);
+        }
+
+        $isPending = $notification->type === \App\Notifications\ExcelExportPending::class;
+        $data = [
+            'status' => $isPending ? 'pending' : (($notification->data['export_status'] ?? 'completed')),
+        ];
+        if (!$isPending && is_array($notification->data) && ($data['status'] === 'completed')) {
+            $data['url'] = $notification->data['url'] ?? null;
+            $data['file_name'] = $notification->data['file_name'] ?? null;
+        }
+
+        return response()->json($data);
     }
 
     public function downloadExport(Request $request, string $file): BinaryFileResponse

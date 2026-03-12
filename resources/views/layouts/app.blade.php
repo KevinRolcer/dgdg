@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ asset('assets/css/app-shell.css') }}">
     @stack('css')
 </head>
-<body>
+<body data-export-status-url="{{ route('temporary-modules.admin.export-status', ['exportRequest' => 0]) }}">
     @php
         $topbarNotifications = collect($topbarNotifications ?? []);
         if (auth()->check()) {
@@ -23,6 +23,7 @@
                     'title' => $noty->data['title'] ?? 'Nueva Notificación',
                     'time' => $noty->created_at->locale('es')->diffForHumans(),
                     'url' => $noty->data['url'] ?? null,
+                    'export_request_id' => $noty->data['export_request_id'] ?? null,
                 ];
             });
             $topbarNotifications = $dbNotifications->concat($topbarNotifications);
@@ -79,7 +80,7 @@
                                             }
                                         }
                                     @endphp
-                                    <li class="{{ $loop->first ? 'is-active' : '' }}">
+                                    <li class="{{ $loop->first ? 'is-active' : '' }}" @if(!empty($notification['export_request_id'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif>
                                         <span class="topbar-notify-icon">
                                             <i class="{{ $notification['icon'] ?? 'fa-regular fa-bell' }}" aria-hidden="true"></i>
                                         </span>
@@ -202,7 +203,7 @@
                                 }
                             }
                         @endphp
-                        <li>
+                        <li @if(!empty($notification['export_request_id'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif>
                             <span class="topbar-notify-icon">
                                 <i class="{{ $notification['icon'] ?? 'fa-regular fa-bell' }}" aria-hidden="true"></i>
                             </span>
