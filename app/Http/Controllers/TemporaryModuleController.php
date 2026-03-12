@@ -18,6 +18,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\JsonResponse;
 
 class TemporaryModuleController extends Controller
 {
@@ -79,13 +80,52 @@ class TemporaryModuleController extends Controller
 
     public function create(): View
     {
+        $modulesForCopy = TemporaryModule::query()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
+
         return view('temporary_modules.admin.create', [
             'pageTitle' => 'Crear modulo temporal',
             'pageDescription' => 'Define nombre, campos requeridos y fecha limite de visualizacion.',
             'topbarNotifications' => [],
             'fieldTypes' => self::FIELD_TYPES,
             'delegates' => $this->accessService->delegates(),
+            'modulesForCopy' => $modulesForCopy,
         ]);
+    }
+
+    public function fieldsJson(int $module): JsonResponse
+    {
+        $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
+        $fields = $temporaryModule->fields->map(function ($field) {
+            $row = [
+                'label' => $field->label,
+                'key' => $field->key,
+                'type' => $field->type,
+                'required' => (bool) $field->is_required,
+                'comment' => $field->comment ?? '',
+            ];
+            if ($field->type === 'select' && is_array($field->options)) {
+                $row['options'] = implode("\n", $field->options);
+            } elseif ($field->type === 'categoria' && is_array($field->options)) {
+                $lines = [];
+                foreach ($field->options as $c) {
+                    $name = $c['name'] ?? '';
+                    $subs = $c['sub'] ?? [];
+                    $lines[] = $name . (count($subs) ? ': ' . implode(', ', $subs) : '');
+                }
+                $row['options'] = implode("\n", $lines);
+            } elseif ($field->type === 'seccion' && is_array($field->options)) {
+                $row['options_title'] = (string) ($field->options['title'] ?? '');
+                $row['options_subsections'] = implode("\n", (array) ($field->options['subsections'] ?? []));
+            } else {
+                $row['options'] = is_array($field->options) ? implode(', ', $field->options) : '';
+            }
+            return $row;
+        })->values()->all();
+
+        return response()->json(['fields' => $fields]);
     }
 
     public function edit(int $module): View
@@ -439,7 +479,7 @@ class TemporaryModuleController extends Controller
             return null;
         }
 
-        return Carbon::parse($date);
+        return Carbon::parse($date)->endOfDay();
     }
 
     public function delegateIndex(Request $request): View

@@ -463,6 +463,33 @@
     font-size: 0.9rem;
 }
 
+.tm-fields-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.tm-copy-from-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tm-copy-from-wrap .tm-copy-label {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--clr-text-muted);
+}
+
+.tm-copy-from-wrap .tm-copy-select {
+    min-width: 180px;
+    padding: 6px 10px;
+    border: 1px solid var(--clr-border);
+    border-radius: 6px;
+}
+
 .tm-target-box {
     border: 1px solid var(--clr-border);
     border-radius: 12px;

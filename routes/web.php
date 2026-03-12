@@ -60,6 +60,9 @@ Route::middleware('auth')->group(function () {
             Route::get('/', [TemporaryModuleController::class, 'adminIndex'])->name('temporary-modules.admin.index');
             Route::get('/registros', [TemporaryModuleController::class, 'adminRecords'])->name('temporary-modules.admin.records');
             Route::get('/crear', [TemporaryModuleController::class, 'create'])->name('temporary-modules.admin.create');
+            Route::get('/{module}/campos', [TemporaryModuleController::class, 'fieldsJson'])
+                ->whereNumber('module')
+                ->name('temporary-modules.admin.fields-json');
             Route::post('/', [TemporaryModuleController::class, 'store'])->name('temporary-modules.admin.store');
             Route::get('/{module}/editar', [TemporaryModuleController::class, 'edit'])
                 ->whereNumber('module')

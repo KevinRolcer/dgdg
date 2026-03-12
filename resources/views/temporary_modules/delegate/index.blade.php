@@ -1056,8 +1056,16 @@
                     body: formData
                 })
                 .then(function (response) {
+                    var ct = (response.headers.get('Content-Type') || '').toLowerCase();
+                    if (!ct.includes('application/json')) {
+                        return response.text().then(function () {
+                            return { status: response.status, data: { success: false, message: 'La respuesta del servidor no es válida. Intenta de nuevo.' } };
+                        });
+                        }
                     return response.json().then(function (data) {
                         return { status: response.status, data: data };
+                    }).catch(function () {
+                        return { status: response.status, data: { success: false, message: 'Error al procesar la respuesta.' } };
                     });
                 })
                 .then(function (result) {

@@ -27,7 +27,7 @@
                 <label>
                     Visible hasta
                     <div class="tm-date-with-toggle" id="tmDateWithToggle">
-                        <input type="datetime-local" id="tmExpiresAt" name="expires_at" value="{{ old('expires_at') }}">
+                        <input type="date" id="tmExpiresAt" name="expires_at" value="{{ old('expires_at') }}">
                         <input type="hidden" id="tmIsIndefinite" name="is_indefinite" value="{{ old('is_indefinite') ? '1' : '0' }}">
                         <button type="button" class="tm-btn" id="tmIndefiniteBtn" aria-pressed="{{ old('is_indefinite') ? 'true' : 'false' }}">Indefinido</button>
                     </div>
@@ -84,12 +84,26 @@
                 </div>
             </section>
 
-
             <div class="tm-fields-head">
                 <h3>Campos requeridos</h3>
+                <div class="tm-fields-head-actions">
+                    @if (isset($modulesForCopy) && $modulesForCopy->isNotEmpty())
+                        <div class="tm-copy-from-wrap">
+                            <label for="tmCopyFromModule" class="tm-copy-label">Copiar campos de:</label>
+                            <select id="tmCopyFromModule" class="tm-copy-select">
+                                <option value="">— Seleccionar módulo —</option>
+                                @foreach ($modulesForCopy as $m)
+                                    <option value="{{ $m->id }}">{{ $m->name }}</option>
+                                @endforeach
+                            </select>
+                            <button type="button" class="tm-btn" id="tmCopyFieldsBtn">Copiar campos aquí</button>
+                        </div>
+                    @endif
+                    <button type="button" class="tm-btn tm-btn-primary" id="tmAddFieldBtn">Agregar campo</button>
+                </div>
             </div>
+
             <div id="tmFieldsContainer" class="tm-fields-list"></div>
-            <button type="button" class="tm-btn tm-btn-primary" id="tmAddFieldBtn">Agregar campo</button>
 
             <div class="tm-actions">
                 <button type="submit" class="tm-btn tm-btn-primary">Guardar módulo</button>
@@ -166,6 +180,24 @@
         const expiresAtInput = document.getElementById('tmExpiresAt');
         const isIndefiniteInput = document.getElementById('tmIsIndefinite');
         const indefiniteButton = document.getElementById('tmIndefiniteBtn');
+
+        // Indefinido: ejecutar siempre para que funcione aunque falle algo del listado de campos
+        const actualizarModoIndefinido = function () {
+            if (!expiresAtInput || !isIndefiniteInput || !indefiniteButton) return;
+            const indefinidoActivo = isIndefiniteInput.value === '1';
+            expiresAtInput.disabled = indefinidoActivo;
+            expiresAtInput.required = !indefinidoActivo;
+            if (indefinidoActivo) expiresAtInput.value = '';
+            indefiniteButton.classList.toggle('is-active', indefinidoActivo);
+            indefiniteButton.setAttribute('aria-pressed', indefinidoActivo ? 'true' : 'false');
+        };
+        if (indefiniteButton && isIndefiniteInput) {
+            indefiniteButton.addEventListener('click', function () {
+                isIndefiniteInput.value = isIndefiniteInput.value === '1' ? '0' : '1';
+                actualizarModoIndefinido();
+            });
+            actualizarModoIndefinido();
+        }
 
         if (!container || !addButton || !rowTemplate) {
             return;
@@ -394,30 +426,85 @@
 
         reordenarDelegados();
 
-        const actualizarModoIndefinido = function () {
-            if (!expiresAtInput || !isIndefiniteInput || !indefiniteButton) {
-                return;
+        // Copiar campos de otro módulo
+        const copyFromSelect = document.getElementById('tmCopyFromModule');
+        const copyFieldsBtn = document.getElementById('tmCopyFieldsBtn');
+        const copyFieldsUrl = '{{ route("temporary-modules.admin.fields-json", ["module" => "__ID__"]) }}';
+
+        const addRowWithData = function (data) {
+            const fragment = rowTemplate.content.cloneNode(true);
+            const row = fragment.querySelector('[data-field-row]');
+            if (!row) return;
+            syncRowNames(row, index);
+            attachRowEvents(row);
+            container.appendChild(row);
+
+            const set = function (name, value) {
+                const el = row.querySelector('[data-name="' + name + '"]');
+                if (el && value !== undefined && value !== null) el.value = value;
+            };
+            const setCheck = function (name, checked) {
+                const el = row.querySelector('[data-name="' + name + '"]');
+                if (el) el.checked = !!checked;
+            };
+
+            set('label', data.label);
+            set('key', data.key || '');
+            set('comment', data.comment || '');
+            const commentWrap = row.querySelector('[data-comment-wrap]');
+            const toggleCommentBtn = row.querySelector('[data-toggle-comment]');
+            if (commentWrap && toggleCommentBtn && (data.comment || '').trim() !== '') {
+                commentWrap.hidden = false;
+                toggleCommentBtn.textContent = 'Ocultar observación';
+            }
+            const typeSelect = row.querySelector('[data-field-type]');
+            if (typeSelect) typeSelect.value = data.type || 'text';
+            setCheck('required', data.required);
+
+            if (data.type === 'select') {
+                var optEl = row.querySelector('[data-options-wrap] [data-name="options"]');
+                if (optEl) optEl.value = data.options || '';
+            }
+            if (data.type === 'categoria') {
+                var catEl = row.querySelector('[data-categoria-wrap] [data-name="options"]');
+                if (catEl) catEl.value = data.options || '';
+            }
+            if (data.type === 'seccion') {
+                set('options_title', data.options_title || '');
+                set('options_subsections', data.options_subsections || '');
             }
 
-            const indefinidoActivo = isIndefiniteInput.value === '1';
-            expiresAtInput.disabled = indefinidoActivo;
-            expiresAtInput.required = !indefinidoActivo;
-            if (indefinidoActivo) {
-                expiresAtInput.value = '';
-            }
+            if (typeSelect) typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
 
-            indefiniteButton.classList.toggle('is-active', indefinidoActivo);
-            indefiniteButton.setAttribute('aria-pressed', indefinidoActivo ? 'true' : 'false');
+            index++;
         };
 
-        if (indefiniteButton && isIndefiniteInput) {
-            indefiniteButton.addEventListener('click', function () {
-                isIndefiniteInput.value = isIndefiniteInput.value === '1' ? '0' : '1';
-                actualizarModoIndefinido();
+        if (copyFieldsBtn && copyFromSelect) {
+            copyFieldsBtn.addEventListener('click', function () {
+                const moduleId = copyFromSelect.value;
+                if (!moduleId) return;
+                const url = copyFieldsUrl.replace('__ID__', moduleId);
+                copyFieldsBtn.disabled = true;
+                copyFieldsBtn.textContent = 'Cargando...';
+                fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (res) {
+                        if (!res.ok) throw new Error('No se pudieron cargar los campos');
+                        return res.json();
+                    })
+                    .then(function (json) {
+                        const fields = json.fields || [];
+                        fields.forEach(function (f) { addRowWithData(f); });
+                        refreshIndices();
+                    })
+                    .catch(function () {
+                        alert('No se pudieron cargar los campos del módulo. Intenta de nuevo.');
+                    })
+                    .finally(function () {
+                        copyFieldsBtn.disabled = false;
+                        copyFieldsBtn.textContent = 'Copiar campos aquí';
+                    });
             });
         }
-
-        actualizarModoIndefinido();
 
         addRow();
         addRow();
