@@ -809,6 +809,84 @@ class TemporaryModuleController extends Controller
         return response()->json($data);
     }
 
+    public function exportPreviewStructure(Request $request, int $module): \Illuminate\Http\JsonResponse
+    {
+        $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
+        abort_unless($request->user()->can('Modulos-Temporales-Admin'), 403);
+
+        $exportColumns = $this->getExportColumnsForPreview($temporaryModule);
+
+        $maxWidths = [];
+        $entries = $temporaryModule->entries()->withoutGlobalScopes()->select('data')->limit(500)->get();
+        foreach ($exportColumns as $col) {
+            if (($col['is_image'] ?? false)) {
+                $maxWidths[$col['key']] = ['chars' => 12, 'image_height' => 80];
+                continue;
+            }
+            $key = $col['key'];
+            $max = 8;
+            foreach ($entries as $entry) {
+                $val = $entry->data[$key] ?? null;
+                if (is_bool($val)) {
+                    $max = max($max, 3);
+                } elseif (is_scalar($val)) {
+                    $max = max($max, mb_strlen((string) $val));
+                }
+            }
+            $maxWidths[$col['key']] = ['chars' => min($max, 60)];
+        }
+
+        $columns = [];
+        $columns[] = ['key' => 'item', 'label' => 'Ítem', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 6];
+        $columns[] = ['key' => 'microrregion', 'label' => 'Microrregión', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 22];
+        foreach ($exportColumns as $col) {
+            $info = $maxWidths[$col['key']] ?? ['chars' => 15];
+            $columns[] = [
+                'key' => $col['key'],
+                'label' => $col['label'],
+                'type' => $col['type'],
+                'is_image' => $col['is_image'],
+                'max_width_chars' => $info['chars'] ?? 15,
+                'image_height' => $info['image_height'] ?? 80,
+            ];
+        }
+
+        return response()->json([
+            'title' => $temporaryModule->name,
+            'columns' => $columns,
+        ]);
+    }
+
+    /** @return list<array{key: string, label: string, type: string, is_image: bool}> */
+    private function getExportColumnsForPreview(TemporaryModule $temporaryModule): array
+    {
+        $cols = [];
+        $currentSection = null;
+        foreach ($temporaryModule->fields as $field) {
+            if ($field->type === 'seccion') {
+                $opts = is_array($field->options) ? $field->options : [];
+                $currentSection = [
+                    'title' => (string) ($opts['title'] ?? $field->label),
+                    'subsections' => array_values((array) ($opts['subsections'] ?? [])),
+                ];
+                continue;
+            }
+            $label = $field->label;
+            if ($currentSection !== null && !empty($currentSection['subsections'])) {
+                $idx = (int) ($field->subsection_index ?? 0);
+                $label = $currentSection['subsections'][$idx] ?? $field->label;
+            }
+            $cols[] = [
+                'key' => $field->key,
+                'label' => $label,
+                'type' => $field->type,
+                'is_image' => in_array($field->type, ['image', 'file'], true),
+            ];
+            $currentSection = null;
+        }
+        return $cols;
+    }
+
     public function downloadExport(Request $request, string $file): BinaryFileResponse
     {
         abort_unless($request->user()->can('Modulos-Temporales-Admin'), 403);

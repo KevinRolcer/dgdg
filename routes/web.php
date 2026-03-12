@@ -66,6 +66,9 @@ Route::middleware('auth')->group(function () {
             Route::get('/export-status/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
                 ->where('exportRequest', '[a-f0-9\-]+')
                 ->name('temporary-modules.admin.export-status');
+            Route::get('/{module}/export-preview-structure', [TemporaryModuleController::class, 'exportPreviewStructure'])
+                ->whereNumber('module')
+                ->name('temporary-modules.admin.export-preview-structure');
             Route::post('/', [TemporaryModuleController::class, 'store'])->name('temporary-modules.admin.store');
             Route::get('/{module}/editar', [TemporaryModuleController::class, 'edit'])
                 ->whereNumber('module')
