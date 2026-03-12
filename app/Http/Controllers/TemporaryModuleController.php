@@ -770,8 +770,11 @@ class TemporaryModuleController extends Controller
         }
         $includeAnalysis = (bool) $request->boolean('analysis', false);
 
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+        $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$module;
+
         $exportRequestId = Str::uuid()->toString();
-        $request->user()->notify(new \App\Notifications\ExcelExportPending($exportRequestId));
+        $request->user()->notify(new \App\Notifications\ExcelExportPending($exportRequestId, $fileName));
 
         \App\Jobs\GenerateTemporaryModuleExcelJob::dispatchAfterResponse(
             $module,

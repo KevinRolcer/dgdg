@@ -7,7 +7,8 @@ use Illuminate\Notifications\Notification;
 class ExcelExportPending extends Notification
 {
     public function __construct(
-        public string $exportRequestId
+        public string $exportRequestId,
+        public string $fileName = 'archivo'
     ) {
     }
 
@@ -24,11 +25,13 @@ class ExcelExportPending extends Notification
      */
     public function toArray(object $notifiable): array
     {
+        $name = $this->fileName !== '' ? $this->fileName : 'archivo';
+
         return [
             'type' => 'excel_export_pending',
             'export_request_id' => $this->exportRequestId,
             'icon' => 'fa-solid fa-spinner fa-spin',
-            'title' => 'Generando Excel...',
+            'title' => 'Generando "'.$name.'"....xlsx',
             'url' => null,
         ];
     }
