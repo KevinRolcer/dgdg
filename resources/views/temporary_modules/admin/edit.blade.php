@@ -204,10 +204,13 @@
 
             <div class="tm-fields-head">
                 <h3>Agregar nuevos campos</h3>
-                <button type="button" class="tm-btn tm-btn-primary" id="tmAddFieldBtn">Agregar campo</button>
             </div>
 
             <div id="tmFieldsContainer" class="tm-fields-list"></div>
+
+            <div class="tm-fields-foot">
+                <button type="button" class="tm-btn tm-btn-primary" id="tmAddFieldBtn">Agregar campo</button>
+            </div>
 
             <div class="tm-actions">
                 <button type="submit" class="tm-btn tm-btn-primary">Guardar cambios</button>

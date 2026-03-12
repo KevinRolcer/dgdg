@@ -86,24 +86,25 @@
 
             <div class="tm-fields-head">
                 <h3>Campos requeridos</h3>
-                <div class="tm-fields-head-actions">
-                    @if (isset($modulesForCopy) && $modulesForCopy->isNotEmpty())
-                        <div class="tm-copy-from-wrap">
-                            <label for="tmCopyFromModule" class="tm-copy-label">Copiar campos de:</label>
-                            <select id="tmCopyFromModule" class="tm-copy-select">
-                                <option value="">— Seleccionar módulo —</option>
-                                @foreach ($modulesForCopy as $m)
-                                    <option value="{{ $m->id }}">{{ $m->name }}</option>
-                                @endforeach
-                            </select>
-                            <button type="button" class="tm-btn" id="tmCopyFieldsBtn">Copiar campos aquí</button>
-                        </div>
-                    @endif
-                    <button type="button" class="tm-btn tm-btn-primary" id="tmAddFieldBtn">Agregar campo</button>
-                </div>
+                @if (isset($modulesForCopy) && $modulesForCopy->isNotEmpty())
+                    <div class="tm-copy-from-wrap">
+                        <label for="tmCopyFromModule" class="tm-copy-label">Copiar campos de:</label>
+                        <select id="tmCopyFromModule" class="tm-copy-select">
+                            <option value="">— Seleccionar módulo —</option>
+                            @foreach ($modulesForCopy as $m)
+                                <option value="{{ $m->id }}">{{ $m->name }}</option>
+                            @endforeach
+                        </select>
+                        <button type="button" class="tm-btn" id="tmCopyFieldsBtn">Copiar campos aquí</button>
+                    </div>
+                @endif
             </div>
 
             <div id="tmFieldsContainer" class="tm-fields-list"></div>
+
+            <div class="tm-fields-foot">
+                <button type="button" class="tm-btn tm-btn-primary" id="tmAddFieldBtn">Agregar campo</button>
+            </div>
 
             <div class="tm-actions">
                 <button type="submit" class="tm-btn tm-btn-primary">Guardar módulo</button>
