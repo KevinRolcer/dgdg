@@ -430,24 +430,39 @@ class TemporaryModuleExportService
             }
         }
 
-        $fixedHeaders = ['Ítem', 'Microrregión', 'Fecha corte'];
+        $fixedHeaders = ['Ítem', 'Microrregión'];
         $numFixed = count($fixedHeaders);
         $fechaCorteStr = $fechaCorte->format('d/m/Y H:i');
+        $totalColumns = $numFixed + count($exportColumns);
+        $lastColumnLetter = Coordinate::stringFromColumnIndex($totalColumns);
+        $titleRow = 1;
+        $dateRow = 2;
+        $headerStartRow = 3;
+
+        // Título (letra grande) centrado
+        $sheet->setCellValue('A'.$titleRow, (string) $temporaryModule->name);
+        $sheet->mergeCells('A'.$titleRow.':'.$lastColumnLetter.$titleRow);
+        $sheet->getStyle('A'.$titleRow)->getFont()->setSize(16)->setBold(true);
+        $sheet->getStyle('A'.$titleRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+
+        // Fecha y hora de corte a la derecha, parte inferior del bloque título
+        $sheet->setCellValue($lastColumnLetter.$dateRow, 'Fecha y hora de corte: '.$fechaCorteStr);
+        $sheet->getStyle($lastColumnLetter.$dateRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT)->setVertical(Alignment::VERTICAL_TOP);
 
         if ($hasSections) {
-            $sheet->setCellValue('A1', $fixedHeaders[0]);
-            $sheet->setCellValue('B1', $fixedHeaders[1]);
-            $sheet->setCellValue('C1', $fixedHeaders[2]);
-            $sheet->mergeCells('A1:A2');
-            $sheet->mergeCells('B1:B2');
-            $sheet->mergeCells('C1:C2');
+            $r1 = $headerStartRow;
+            $r2 = $headerStartRow + 1;
+            $sheet->setCellValue('A'.$r1, $fixedHeaders[0]);
+            $sheet->setCellValue('B'.$r1, $fixedHeaders[1]);
+            $sheet->mergeCells('A'.$r1.':A'.$r2);
+            $sheet->mergeCells('B'.$r1.':B'.$r2);
             $colIdx = $numFixed + 1;
             $mergeStart = null;
             $mergeHeader1 = null;
             foreach ($exportColumns as $col) {
                 $colLetter = Coordinate::stringFromColumnIndex($colIdx);
-                $sheet->setCellValue($colLetter.'1', $col['header1'] ?? '');
-                $sheet->setCellValue($colLetter.'2', $col['header2']);
+                $sheet->setCellValue($colLetter.$r1, $col['header1'] ?? '');
+                $sheet->setCellValue($colLetter.$r2, $col['header2']);
                 $h1 = $col['header1'] ?? '';
                 if ($h1 !== '') {
                     if ($mergeStart === null || $mergeHeader1 !== $h1) {
@@ -455,7 +470,7 @@ class TemporaryModuleExportService
                             $startLetter = Coordinate::stringFromColumnIndex($mergeStart);
                             $endLetter = Coordinate::stringFromColumnIndex($colIdx - 1);
                             if ($mergeStart < $colIdx - 1) {
-                                $sheet->mergeCells($startLetter.'1:'.$endLetter.'1');
+                                $sheet->mergeCells($startLetter.$r1.':'.$endLetter.$r1);
                             }
                         }
                         $mergeStart = $colIdx;
@@ -466,7 +481,7 @@ class TemporaryModuleExportService
                         $startLetter = Coordinate::stringFromColumnIndex($mergeStart);
                         $endLetter = Coordinate::stringFromColumnIndex($colIdx - 1);
                         if ($mergeStart < $colIdx - 1) {
-                            $sheet->mergeCells($startLetter.'1:'.$endLetter.'1');
+                            $sheet->mergeCells($startLetter.$r1.':'.$endLetter.$r1);
                         }
                         $mergeStart = null;
                     }
@@ -477,21 +492,21 @@ class TemporaryModuleExportService
                 $startLetter = Coordinate::stringFromColumnIndex($mergeStart);
                 $endLetter = Coordinate::stringFromColumnIndex($colIdx - 1);
                 if ($mergeStart < $colIdx - 1) {
-                    $sheet->mergeCells($startLetter.'1:'.$endLetter.'1');
+                    $sheet->mergeCells($startLetter.$r1.':'.$endLetter.$r1);
                 }
             }
             $headerRowCount = 2;
         } else {
             $headers = array_merge($fixedHeaders, array_map(fn ($c) => $c['header2'], $exportColumns));
             foreach ($headers as $i => $headerText) {
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex($i + 1).'1', $headerText);
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($i + 1).$headerStartRow, $headerText);
             }
             $headerRowCount = 1;
         }
 
-        $totalColumns = $numFixed + count($exportColumns);
-        $lastColumnLetter = Coordinate::stringFromColumnIndex($totalColumns);
-        $headerRange = 'A1:'.$lastColumnLetter.($headerRowCount === 2 ? '2' : '1');
+        $tableHeaderFirstRow = $headerStartRow;
+        $tableHeaderLastRow = $headerStartRow + $headerRowCount - 1;
+        $headerRange = 'A'.$tableHeaderFirstRow.':'.$lastColumnLetter.$tableHeaderLastRow;
         $sheet->getStyle($headerRange)
             ->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
         $sheet->getStyle($headerRange)
@@ -499,23 +514,23 @@ class TemporaryModuleExportService
         $sheet->getStyle($headerRange)
             ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
 
-        $sheet->freezePane('A'.($headerRowCount + 1));
-        $sheet->setAutoFilter('A1:'.$lastColumnLetter.$headerRowCount);
+        $dataStartRow = $headerStartRow + $headerRowCount;
+        $sheet->freezePane('A'.$dataStartRow);
+        $sheet->setAutoFilter('A'.$tableHeaderFirstRow.':'.$lastColumnLetter.$tableHeaderLastRow);
 
-        $rowIndex = $headerRowCount + 1;
+        $rowIndex = $dataStartRow;
 
         if ($entriesQuery->count() === 0) {
             $sheet->setCellValue('A'.$rowIndex, 'Sin registros');
         } else {
             $itemNumber = 1;
-            $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule, $fechaCorteStr, $exportColumns, $headerRowCount) {
+            $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule, $exportColumns, $headerRowCount) {
                 foreach ($entries as $entry) {
                     $sheet->setCellValue('A'.$rowIndex, $itemNumber);
                     $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                     $sheet->setCellValue('B'.$rowIndex, (string) ($meta->label ?? $meta['label'] ?? 'Sin microrregión'));
-                    $sheet->setCellValue('C'.$rowIndex, $fechaCorteStr);
 
-                    $columnIndex = 4;
+                    $columnIndex = 3;
                     foreach ($exportColumns as $col) {
                         $field = $col['field'];
                         $cell = $entry->data[$field->key] ?? null;
@@ -576,15 +591,15 @@ class TemporaryModuleExportService
             });
         }
 
-        $lastDataRow = $rowIndex > ($headerRowCount + 1) ? $rowIndex - 1 : $headerRowCount + 1;
-        $dataRange = 'A1:'.$lastColumnLetter.$lastDataRow;
-        $sheet->getStyle($dataRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-        $sheet->getStyle($dataRange)->getAlignment()
+        $lastDataRow = $rowIndex > $dataStartRow ? $rowIndex - 1 : $dataStartRow;
+        $tableRange = 'A'.$tableHeaderFirstRow.':'.$lastColumnLetter.$lastDataRow;
+        $sheet->getStyle($tableRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle($tableRange)->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setVertical(Alignment::VERTICAL_CENTER);
 
-        if ($lastDataRow > $headerRowCount) {
-            $sheet->getStyle('A'.($headerRowCount + 1).':'.$lastColumnLetter.$lastDataRow)
+        if ($lastDataRow > $tableHeaderLastRow) {
+            $sheet->getStyle('A'.$dataStartRow.':'.$lastColumnLetter.$lastDataRow)
                 ->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_CENTER);
         }
 
@@ -594,8 +609,6 @@ class TemporaryModuleExportService
                 $sheet->getColumnDimension($columnLetter)->setWidth(6);
             } elseif ($colIdx === 2) {
                 $sheet->getColumnDimension($columnLetter)->setWidth(22);
-            } elseif ($colIdx === 3) {
-                $sheet->getColumnDimension($columnLetter)->setWidth(18);
             } else {
                 $sheet->getColumnDimension($columnLetter)->setWidth(32);
             }
