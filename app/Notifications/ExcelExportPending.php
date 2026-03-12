@@ -2,14 +2,10 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
-class ExcelExportPending extends Notification implements ShouldQueue
+class ExcelExportPending extends Notification
 {
-    use Queueable;
-
     public function __construct(
         public string $exportRequestId
     ) {
