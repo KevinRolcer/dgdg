@@ -29,7 +29,7 @@
                             @endif
                             <strong>{{ $item->asunto }}</strong>
                             @if($item->descripcion)
-                                <small>{{ Str::limit($item->descripcion, 60) }}</small>
+                                <small>{{ Str::limit($item->descripcionConAforoPersonas(), 72) }}</small>
                             @endif
                             @if($item->repite)
                                 <span class="agenda-pill-recurrente"><i class="fa-solid fa-repeat"></i> Recurrente</span>

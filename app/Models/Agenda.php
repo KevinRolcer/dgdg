@@ -81,6 +81,16 @@ class Agenda extends Model
     }
 
     /**
+     * Descripción para vista/calendar: líneas antiguas "Aforo: N" pasan a "Aforo: N personas".
+     */
+    public function descripcionConAforoPersonas(): string
+    {
+        $d = (string) ($this->descripcion ?? '');
+
+        return preg_replace('/^\s*Aforo:\s*(\d+)\s*$/mi', 'Aforo: $1 personas', $d);
+    }
+
+    /**
      * Emoji + banner HTML para semáforo en Google Calendar (título y descripción).
      *
      * @return array{emoji: string, label: string, banner_html: string}|null
@@ -143,7 +153,7 @@ class Agenda extends Model
         }
         $text = urlencode($title);
 
-        $detailsText = $this->descripcion ?? '';
+        $detailsText = $this->descripcionConAforoPersonas();
         if ($this->tipo === 'gira') {
             $delegado = Delegado::whereHas('microrregion', function ($q) {
                 $q->where('microrregion', $this->microrregion);

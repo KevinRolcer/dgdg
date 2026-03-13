@@ -52,9 +52,14 @@
                         </a>
                     </div>
                 </div>
-                <button type="button" class="agenda-btn agenda-btn-secondary agenda-btn-mas-filtros" id="agendaBtnMasFiltros" aria-expanded="{{ $agendaFiltrosAvanzadosAbiertos ? 'true' : 'false' }}" aria-controls="agendaFiltersAdvanced">
-                    <i class="fa-solid fa-sliders" aria-hidden="true"></i> <span id="agendaBtnMasFiltrosText">{{ $agendaFiltrosAvanzadosAbiertos ? 'Menos filtros' : 'Más filtros' }}</span>
-                </button>
+                <div class="agenda-filters-head-right">
+                    <button type="button" class="agenda-btn agenda-btn-secondary" id="agendaBtnRefreshList" title="Volver a cargar el listado (sin recargar la página)">
+                        <i class="fa-solid fa-arrows-rotate" aria-hidden="true" id="agendaBtnRefreshIcon"></i> Actualizar lista
+                    </button>
+                    <button type="button" class="agenda-btn agenda-btn-secondary agenda-btn-mas-filtros" id="agendaBtnMasFiltros" aria-expanded="{{ $agendaFiltrosAvanzadosAbiertos ? 'true' : 'false' }}" aria-controls="agendaFiltersAdvanced">
+                        <i class="fa-solid fa-sliders" aria-hidden="true"></i> <span id="agendaBtnMasFiltrosText">{{ $agendaFiltrosAvanzadosAbiertos ? 'Menos filtros' : 'Más filtros' }}</span>
+                    </button>
+                </div>
             </div>
             <div class="agenda-filters-advanced {{ $agendaFiltrosAvanzadosAbiertos ? 'is-open' : '' }}" id="agendaFiltersAdvanced" @if(!$agendaFiltrosAvanzadosAbiertos) hidden @endif>
                 <div class="agenda-filters-row agenda-filters-inputs agenda-filters-inputs-inline">

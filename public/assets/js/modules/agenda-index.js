@@ -15,6 +15,7 @@
         var debounceTimer;
         var agendaAjaxSeq = 0;
         var agendaAjaxAbort = null;
+        var btnRefreshIcon = document.getElementById('agendaBtnRefreshIcon');
 
         function agendaFragmentUrl(params) {
             var u = new URL(baseUrl, window.location.origin);
@@ -30,15 +31,6 @@
             var o = {};
             fd.forEach(function (v, k) { o[k] = v; });
             return o;
-        }
-
-        function loadFromForm() {
-            agendaAjaxLoad(agendaFragmentUrl(readFormParams()));
-        }
-
-        function loadFromFormDebounced() {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(loadFromForm, 320);
         }
 
         function agendaAjaxLoad(url) {
@@ -89,6 +81,7 @@
                 })
                 .finally(function () {
                     if (mySeq !== agendaAjaxSeq) return;
+                    if (btnRefreshIcon) btnRefreshIcon.classList.remove('agenda-refresh-spin');
                     if (loading) {
                         loading.hidden = true;
                         loading.style.display = 'none';
@@ -96,6 +89,15 @@
                     }
                     container.classList.remove('is-loading');
                 });
+        }
+
+        function loadFromForm() {
+            agendaAjaxLoad(agendaFragmentUrl(readFormParams()));
+        }
+
+        function loadFromFormDebounced() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(loadFromForm, 320);
         }
 
         function bindPagination() {
@@ -160,6 +162,14 @@
                 if (selectPerPage) selectPerPage.value = '20';
                 document.querySelectorAll('[data-agenda-clasificacion]').forEach(function (b) { b.classList.remove('is-active'); });
                 agendaAjaxLoad(agendaFragmentUrl({ per_page: '20' }));
+            });
+        }
+
+        var btnRefresh = document.getElementById('agendaBtnRefreshList');
+        if (btnRefresh) {
+            btnRefresh.addEventListener('click', function () {
+                if (btnRefreshIcon) btnRefreshIcon.classList.add('agenda-refresh-spin');
+                loadFromForm();
             });
         }
 

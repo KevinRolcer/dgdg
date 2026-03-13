@@ -19,6 +19,19 @@
     gap: 8px;
     margin-bottom: 0;
 }
+.agenda-filters-head-right {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+@keyframes agenda-refresh-spin {
+    to { transform: rotate(360deg); }
+}
+.agenda-refresh-spin {
+    display: inline-block;
+    animation: agenda-refresh-spin 0.65s linear infinite;
+}
 .agenda-filters-compact .agenda-filters-head-left {
     flex: 1;
     min-width: 0;
@@ -358,7 +371,7 @@
     width: 95%;
     max-width: 650px;
     height: auto;
-    max-height: 85vh;
+    max-height: 87vh;
     border-radius: 12px;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
     display: flex;
@@ -440,6 +453,7 @@
     font-size: 0.75rem;
     font-weight: 500;
     color: #64748b;
+    margin-top: 0.25rem;
     margin-bottom: 0.25rem;
 }
 
@@ -523,6 +537,53 @@
     margin-top: 4px;
     font-size: 0.7rem;
     color: #64748b;
+}
+
+/* Gira: delegado + Asignar usuario + Aforo en una fila */
+.agenda-gira-delegado-aforo-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px 16px;
+    width: 100%;
+}
+.agenda-assign-aforo-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px 14px;
+    flex: 1;
+    min-width: 0;
+}
+.agenda-aforo-field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 72px;
+}
+.agenda-aforo-label {
+    margin-bottom: 0 !important;
+    font-size: 0.65rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--clr-text-light, #64748b);
+}
+.agenda-aforo-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.agenda-aforo-input {
+    width: 88px;
+    min-height: 34px !important;
+    padding: 6px 8px !important;
+    font-size: 0.8rem !important;
+}
+.agenda-aforo-suffix {
+    font-size: 0.72rem;
+    color: var(--clr-text-light, #64748b);
+    white-space: nowrap;
 }
 
 #extraAddressesContainer {

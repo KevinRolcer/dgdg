@@ -115,17 +115,25 @@
                     </div>
                 </div>
 
-                <div class="mt-4 agenda-row-two-cols">
-                    {{-- Solo Gira/Pre-Gira: el delegado es el de la microrregión elegida --}}
+                <div class="mt-4 agenda-gira-delegado-aforo-row">
+                    {{-- Solo Gira/Pre-Gira: delegado de la MR --}}
                     <div class="agenda-col-40" id="agendaDelegadoLabelWrap" style="display: none;">
                         <p id="agendaDelegadoLabel" class="agenda-delegado-label">
                             Delegad@ encargado: —
                         </p>
                     </div>
-                    <div>
+                    <div class="agenda-assign-aforo-wrap">
                         <button type="button" id="btnOpenAssignModal" class="btn-toggle-unfold">
                             <i class="fa-solid fa-user-plus"></i> Asignar Usuario
                         </button>
+                        {{-- Aforo opcional (Gira/Pre-Gira); si >0 se guarda en descripción como "Aforo: N" --}}
+                        <div class="agenda-aforo-field" id="agendaAforoWrap" style="display: none;" aria-hidden="true">
+                            <label class="form-label-agenda agenda-aforo-label" for="modalAforo">Aforo</label>
+                            <div class="agenda-aforo-input-row">
+                                <input type="number" id="modalAforo" class="form-control-agenda agenda-aforo-input" min="0" step="1" placeholder="Opcional" inputmode="numeric" title="Número de personas; vacío o 0 no se añade a la descripción" aria-describedby="agendaAforoSuffix">
+                                <span class="agenda-aforo-suffix" id="agendaAforoSuffix">personas</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
