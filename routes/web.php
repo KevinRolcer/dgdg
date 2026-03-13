@@ -59,15 +59,19 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('modulos-temporales')->group(function () {
         Route::prefix('admin')->middleware('can:Modulos-Temporales-Admin')->group(function () {
+            /* Rutas sin {module} primero: evitan que "registros"/"crear" se interpreten como id numérico en cachés viejos */
             Route::get('/', [TemporaryModuleController::class, 'adminIndex'])->name('temporary-modules.admin.index');
             Route::get('/registros', [TemporaryModuleController::class, 'adminRecords'])->name('temporary-modules.admin.records');
             Route::get('/crear', [TemporaryModuleController::class, 'create'])->name('temporary-modules.admin.create');
-            Route::get('/{module}/campos', [TemporaryModuleController::class, 'fieldsJson'])
-                ->whereNumber('module')
-                ->name('temporary-modules.admin.fields-json');
             Route::get('/export-status/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
                 ->where('exportRequest', '[a-f0-9\-]+')
                 ->name('temporary-modules.admin.export-status');
+            Route::get('/exportaciones/{file}', [TemporaryModuleController::class, 'downloadExport'])
+                ->where('file', '[A-Za-z0-9_\-]+\.(xlsx|docx)')
+                ->name('temporary-modules.admin.exports.download');
+            Route::get('/{module}/campos', [TemporaryModuleController::class, 'fieldsJson'])
+                ->whereNumber('module')
+                ->name('temporary-modules.admin.fields-json');
             Route::get('/{module}/export-preview-structure', [TemporaryModuleController::class, 'exportPreviewStructure'])
                 ->whereNumber('module')
                 ->name('temporary-modules.admin.export-preview-structure');
@@ -87,9 +91,6 @@ Route::middleware('auth')->group(function () {
             Route::post('/{module}/exportar-analisis-word', [TemporaryModuleController::class, 'exportAnalysisWord'])
                 ->whereNumber('module')
                 ->name('temporary-modules.admin.export-analysis-word');
-            Route::get('/exportaciones/{file}', [TemporaryModuleController::class, 'downloadExport'])
-                ->where('file', '[A-Za-z0-9_\-]+\.(xlsx|docx)')
-                ->name('temporary-modules.admin.exports.download');
             Route::delete('/{module}/registros', [TemporaryModuleController::class, 'clearEntries'])
                 ->whereNumber('module')
                 ->name('temporary-modules.admin.clear-entries');

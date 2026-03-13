@@ -29,9 +29,12 @@ class TemporaryModuleController extends Controller
         private readonly TemporaryModuleFieldService $fieldService,
         private readonly TemporaryModuleEntryDataService $entryDataService,
         private readonly TemporaryModuleExportService $exportService,
-        private readonly TemporaryModuleAnalysisWordService $analysisWordService,
-    )
+    ) {}
+
+    /** Solo se resuelve al usar preview Word (evita cargar PhpWord en el resto de acciones). */
+    private function analysisWordService(): TemporaryModuleAnalysisWordService
     {
+        return app(TemporaryModuleAnalysisWordService::class);
     }
 
     private const FIELD_TYPES = [
@@ -69,7 +72,7 @@ class TemporaryModuleController extends Controller
     {
         $modules = TemporaryModule::query()
             ->whereHas('entries')
-            ->withCount(['fields', 'entries', 'targetUsers'])
+            ->withCount(['fields', 'entries'])
             ->latest()
             ->paginate(15);
 
@@ -924,7 +927,7 @@ class TemporaryModuleController extends Controller
             'totals_column_keys' => $request->query('totals_column_keys', '[]'),
         ];
 
-        return response()->json($this->analysisWordService->buildPreviewPayload($module, $config));
+        return response()->json($this->analysisWordService()->buildPreviewPayload($module, $config));
     }
 
     public function exportAnalysisWord(Request $request, int $module): RedirectResponse
