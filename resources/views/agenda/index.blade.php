@@ -93,6 +93,10 @@
 @include('agenda.partials.modulo-modal')
 
 @push('scripts')
+{{-- URLs absolutas: si la app no está en la raíz del dominio, fetch('/agenda/...') daría 404 --}}
+<meta name="agenda-modulo-enlaces" content="{{ route('agenda.modulo.enlaces') }}">
+<meta name="agenda-modulo-asignar" content="{{ route('agenda.modulo.asignar') }}">
+<meta name="agenda-modulo-quitar" content="{{ route('agenda.modulo.quitar') }}">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="{{ asset('assets/js/modules/agenda.js') }}?v={{ @filemtime(public_path('assets/js/modules/agenda.js')) ?: time() }}"></script>
 <script src="{{ asset('assets/js/modules/agenda-index.js') }}?v={{ @filemtime(public_path('assets/js/modules/agenda-index.js')) ?: time() }}"></script>

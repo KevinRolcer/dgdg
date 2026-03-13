@@ -325,6 +325,15 @@ function agendaCsrfToken() {
     return input ? input.value : '';
 }
 
+/** Evita 404 cuando la app vive en subcarpeta (APP_URL con path); route() rellena las meta en index. */
+function agendaModuloApiUrl(kind) {
+    const meta = document.querySelector('meta[name="agenda-modulo-' + kind + '"]');
+    const c = meta && meta.getAttribute('content');
+    if (c) return c;
+    const fallback = { enlaces: '/agenda/modulo/enlaces', asignar: '/agenda/modulo/asignar', quitar: '/agenda/modulo/quitar' };
+    return fallback[kind] || fallback.enlaces;
+}
+
 function openAgendaModuloModal() {
     const el = document.getElementById('agendaModuloModal');
     if (!el) return;
@@ -334,7 +343,7 @@ function openAgendaModuloModal() {
     const loading = document.getElementById('agendaModuloLoading');
     list.innerHTML = '';
     loading.style.display = 'block';
-    fetch('/agenda/modulo/enlaces', {
+    fetch(agendaModuloApiUrl('enlaces'), {
         credentials: 'same-origin',
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': agendaCsrfToken() },
     })
@@ -362,7 +371,7 @@ function openAgendaModuloModal() {
                 btn.addEventListener('click', function () {
                     const uid = btn.getAttribute('data-user-id');
                     const action = btn.getAttribute('data-action');
-                    const url = action === 'asignar' ? '/agenda/modulo/asignar' : '/agenda/modulo/quitar';
+                    const url = action === 'asignar' ? agendaModuloApiUrl('asignar') : agendaModuloApiUrl('quitar');
                     btn.disabled = true;
                     const token = agendaCsrfToken();
                     const body = new URLSearchParams();
