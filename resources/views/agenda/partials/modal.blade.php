@@ -7,7 +7,7 @@
             </button>
         </div>
         
-        <form id="agendaForm" method="POST">
+        <form id="agendaForm" method="POST" action="{{ route('agenda.store') }}">
             @csrf
             <input type="hidden" name="_method" id="formMethod" value="POST">
             <input type="hidden" name="tipo" id="modalTipo" value="asunto">

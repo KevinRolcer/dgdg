@@ -93,7 +93,10 @@
 @include('agenda.partials.modulo-modal')
 
 @push('scripts')
-{{-- URLs absolutas: si la app no está en la raíz del dominio, fetch('/agenda/...') daría 404 --}}
+{{-- POST/PUT: misma base que APP_URL (evita 404 en subcarpeta) --}}
+<meta name="agenda-url-store" content="{{ route('agenda.store') }}">
+<meta name="agenda-url-base" content="{{ url('/agenda') }}">
+{{-- URLs absolutas: fetch/modulo --}}
 <meta name="agenda-modulo-enlaces" content="{{ route('agenda.modulo.enlaces') }}">
 <meta name="agenda-modulo-asignar" content="{{ route('agenda.modulo.asignar') }}">
 <meta name="agenda-modulo-quitar" content="{{ route('agenda.modulo.quitar') }}">

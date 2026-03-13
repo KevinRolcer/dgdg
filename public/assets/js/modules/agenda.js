@@ -1,5 +1,17 @@
 // Agenda Module Functionality
 
+function agendaUrlStore() {
+    var m = document.querySelector('meta[name="agenda-url-store"]');
+    if (m && m.getAttribute('content')) return m.getAttribute('content');
+    return agendaUrlBase();
+}
+
+function agendaUrlBase() {
+    var m = document.querySelector('meta[name="agenda-url-base"]');
+    if (m && m.getAttribute('content')) return m.getAttribute('content').replace(/\/$/, '');
+    return window.location.origin + '/agenda';
+}
+
 function openAgendaModal(id = null, tipo = 'asunto') {
     const modal = document.getElementById('agendaModal');
     const form = document.getElementById('agendaForm');
@@ -47,7 +59,7 @@ function openAgendaModal(id = null, tipo = 'asunto') {
                 });
             }
             title.innerText = itemTipo === 'gira' ? 'Editar Gira/Pre-Gira' : 'Editar Asunto';
-            form.action = `/agenda/${id}`;
+            form.action = agendaUrlBase() + '/' + id;
             document.getElementById('formMethod').value = 'PUT';
             
             document.getElementById('modalAsunto').value = btn.dataset.asunto || '';
@@ -90,7 +102,7 @@ function openAgendaModal(id = null, tipo = 'asunto') {
         }
     } else {
         title.innerText = tipo === 'gira' ? 'Nueva Gira/Pre-Gira' : 'Nuevo Asunto';
-        form.action = '/agenda';
+        form.action = agendaUrlStore();
         document.getElementById('formMethod').value = 'POST';
     }
     

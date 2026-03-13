@@ -12,6 +12,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="{{ asset('assets/css/app-shell.css') }}">
     @stack('css')
+    {{-- jQuery solo por HTTPS en head; carga antes del body (mixed content si fuera script inseguro) --}}
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="{{ asset('assets/js/vendor/simple-expand.min.js') }}"></script>
 </head>
 <body data-export-status-url="{{ route('temporary-modules.admin.export-status', ['exportRequest' => 0]) }}">
     @php
@@ -230,9 +233,6 @@
     <button type="button" class="notifications-drawer-backdrop" id="notificationsDrawerBackdrop" aria-label="Cerrar panel de notificaciones"></button>
 
     <div class="app-overlay" id="appOverlay" aria-hidden="true"></div>
-    {{-- HTTPS obligatorio: http://code.jquery.com se bloquea en páginas HTTPS (mixed content) --}}
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-    <script src="{{ asset('assets/js/vendor/simple-expand.min.js') }}"></script>
     <script src="{{ asset('assets/js/app-shell.js') }}" defer></script>
     @stack('scripts')
 </body>
