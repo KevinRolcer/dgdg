@@ -148,7 +148,7 @@
                 Mostrando {{ $users->firstItem() }}–{{ $users->lastItem() }} de {{ $users->total() }} usuarios
             </p>
             <div class="um-pagination">
-                {{ $users->withQueryString()->links() }}
+                {{ $users->withQueryString()->links('pagination::bootstrap-5') }}
             </div>
         </div>
         @endif
