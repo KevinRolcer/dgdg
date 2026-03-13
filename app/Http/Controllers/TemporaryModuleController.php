@@ -770,6 +770,19 @@ class TemporaryModuleController extends Controller
         }
         $includeAnalysis = (bool) $request->boolean('analysis', false);
 
+        $rawConfig = $request->query('cfg');
+        $exportConfig = null;
+        if (is_string($rawConfig) && $rawConfig !== '') {
+            try {
+                $decoded = json_decode($rawConfig, true, 512, JSON_THROW_ON_ERROR);
+                if (is_array($decoded)) {
+                    $exportConfig = $decoded;
+                }
+            } catch (\Throwable $e) {
+                $exportConfig = null;
+            }
+        }
+
         $temporaryModule = TemporaryModule::query()->findOrFail($module);
         $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$module;
 
@@ -781,7 +794,8 @@ class TemporaryModuleController extends Controller
             $mode,
             $request->user()->id,
             $includeAnalysis,
-            $exportRequestId
+            $exportRequestId,
+            $exportConfig
         );
 
         return redirect()->back()->with('toast', 'La generación del archivo Excel se ha enviado a segundo plano. Revisa tus notificaciones para ver el estado.');

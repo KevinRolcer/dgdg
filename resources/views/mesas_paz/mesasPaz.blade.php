@@ -416,9 +416,12 @@
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Archivo Excel (.xls, .xlsx)</label>
-                        <div id="dropzoneExcel" class="border border-2 border-dashed rounded p-4 text-center" style="cursor: pointer; background-color: #f8f9fa;">
+                        <div id="dropzoneExcel" class="border border-2 border-dashed rounded p-4 text-center position-relative" style="cursor: pointer; background-color: #f8f9fa;">
                             <p class="mb-1 text-muted">Arrastra y suelta aquí tu archivo Excel o haz clic para seleccionarlo.</p>
-                            <span id="excelFileNameDisplay" class="fw-bold text-success d-none"></span>
+                            <div id="excelFileStatus" class="d-none align-items-center justify-content-center gap-2">
+                                <span id="excelFileNameDisplay" class="fw-bold text-success"></span>
+                                <button type="button" id="btnRemoveExcel" class="btn-close" style="font-size: 0.75rem;" aria-label="Remover archivo"></button>
+                            </div>
                         </div>
                         <input type="file" id="inputExcelHidden" name="archivo_excel" accept=".xls,.xlsx" class="d-none" required>
                     </div>

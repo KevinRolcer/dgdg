@@ -17,7 +17,6 @@
     <article class="content-card tm-card">
         <div class="tm-head">
             <div>
-                <h2>Registros de módulos temporales</h2>
                 <p>Visualiza módulos con registros capturados, vista previa y exportación a Excel.</p>
             </div>
             <div class="tm-inline-actions">
@@ -112,7 +111,9 @@
             <div class="tm-modal-dialog">
                 <div class="tm-modal-head">
                     <h3>{{ $module->name }}</h3>
-                    <button type="button" class="tm-modal-close" data-close-module-preview>&times;</button>
+                    <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
                 </div>
 
                 <div class="tm-modal-body">
@@ -228,7 +229,9 @@
         <div class="tm-modal-dialog tm-image-modal-dialog">
             <div class="tm-modal-head">
                 <h3 id="tmImagePreviewTitle">Vista previa</h3>
-                <button type="button" class="tm-modal-close" data-close-image-preview>&times;</button>
+                <button type="button" class="tm-modal-close" data-close-image-preview aria-label="Cerrar">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
             </div>
 
             <div class="tm-modal-body">
@@ -242,30 +245,54 @@
         <div class="tm-modal-dialog tm-export-personalize-dialog">
             <div class="tm-modal-head">
                 <h3>Personalizar vista previa del Excel</h3>
-                <button type="button" class="tm-modal-close" data-close-export-personalize>&times;</button>
+                <button type="button" class="tm-modal-close" data-close-export-personalize aria-label="Cerrar">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
             </div>
             <div class="tm-modal-body">
                 <div class="tm-export-personalize-loading" id="tmExportPersonalizeLoading">Cargando estructura…</div>
                 <div class="tm-export-personalize-content" id="tmExportPersonalizeContent" hidden>
-                    <div class="tm-export-personalize-field">
-                        <label for="tmExportPersonalizeTitle">Título del documento</label>
-                        <input type="text" id="tmExportPersonalizeTitle" class="tm-input" placeholder="Nombre del módulo">
-                    </div>
+                    <div class="tm-export-personalize-form">
+                        <div class="tm-export-personalize-field">
+                            <label for="tmExportPersonalizeTitle">Título del documento</label>
+                            <input type="text" id="tmExportPersonalizeTitle" class="tm-input" placeholder="Nombre del módulo">
+                        </div>
                     <div class="tm-export-personalize-field tm-export-title-align">
                         <span class="tm-export-label-inline">Alineación del título</span>
                         <div class="tm-export-align-btns" role="group" aria-label="Alineación del título">
-                            <button type="button" class="tm-export-align-btn is-active" data-title-align="left">Izq</button>
-                            <button type="button" class="tm-export-align-btn" data-title-align="center">Centro</button>
+                            <button type="button" class="tm-export-align-btn" data-title-align="left">Izq</button>
+                            <button type="button" class="tm-export-align-btn is-active" data-title-align="center">Centro</button>
                             <button type="button" class="tm-export-align-btn" data-title-align="right">Der</button>
                         </div>
                     </div>
-                    <p class="tm-export-personalize-hint">Arrastra las columnas para cambiar el orden. Usa &times; para omitir una columna del reporte.</p>
-                    <div class="tm-export-personalize-columns" id="tmExportPersonalizeColumns" role="list"></div>
-                    <p class="tm-export-restore-wrap" id="tmExportRestoreWrap" hidden>
-                        <button type="button" class="tm-export-restore-btn" id="tmExportRestoreBtn">Restaurar todas las columnas</button>
-                    </p>
-                    <div class="tm-export-personalize-preview-wrap tm-export-preview-a4">
-                        <div class="tm-export-personalize-preview" id="tmExportPersonalizePreview"></div>
+                        <p class="tm-export-personalize-hint">Arrastra las columnas para cambiar el orden. Usa &times; para omitir una columna del reporte.</p>
+                        <div class="tm-export-personalize-columns" id="tmExportPersonalizeColumns" role="list"></div>
+                        <p class="tm-export-restore-wrap" id="tmExportRestoreWrap" hidden>
+                            <button type="button" class="tm-export-restore-btn" id="tmExportRestoreBtn">Restaurar todas las columnas</button>
+                        </p>
+                    </div>
+                    <div class="tm-export-personalize-preview-wrap">
+                        <div class="tm-export-preview-toolbar">
+                            <span class="tm-export-preview-label">Vista previa</span>
+                            <div class="tm-export-toolbar-controls">
+                                <div class="tm-export-zoom-btns">
+                                    <button type="button" class="tm-export-zoom-btn" data-zoom-out title="Alejar" aria-label="Alejar">−</button>
+                                    <button type="button" class="tm-export-zoom-reset" title="100%" aria-label="Zoom 100%"><span id="tmExportZoomValue">100</span>%</button>
+                                    <button type="button" class="tm-export-zoom-btn" data-zoom-in title="Acercar" aria-label="Acercar">+</button>
+                                </div>
+                                <div class="tm-export-orient-group" role="group" aria-label="Orientación de la hoja">
+                                    <button type="button" class="tm-export-orient-btn is-active" data-orientation="portrait">Vertical</button>
+                                    <button type="button" class="tm-export-orient-btn" data-orientation="landscape">Horizontal</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tm-export-preview-a4">
+                            <div class="tm-export-preview-page" id="tmExportPreviewPage">
+                                <div class="tm-export-preview-zoom-wrap" id="tmExportPreviewZoomWrap">
+                                    <div class="tm-export-personalize-preview" id="tmExportPersonalizePreview"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -477,10 +504,13 @@
         });
 
         const TEMPLATE_COLORS = [
-            { name: 'Encabezado', value: '#861e34' },
-            { name: 'Blanco', value: '#ffffff' },
-            { name: 'Gris claro', value: '#f5f5f5' },
-            { name: 'Gris', value: '#e8e8e8' }
+            { name: 'Primario', value: 'var(--clr-primary)' },
+            { name: 'Secundario', value: 'var(--clr-secondary)' },
+            { name: 'Acento', value: 'var(--clr-accent)' },
+            { name: 'Texto principal', value: 'var(--clr-text-main)' },
+            { name: 'Texto claro', value: 'var(--clr-text-light)' },
+            { name: 'Fondo', value: 'var(--clr-bg)' },
+            { name: 'Tarjeta', value: 'var(--clr-card)' }
         ];
 
         const closePersonalizeModal = function () {
@@ -497,14 +527,27 @@
         if (personalizeModal) {
             personalizeModal.addEventListener('click', function (e) {
                 var alignBtn = e.target.closest('.tm-export-align-btn');
-                if (!alignBtn) { return; }
-                var cols = personalizeModal._personalizeColumns;
-                if (!cols) { return; }
-                personalizeModal.querySelectorAll('.tm-export-align-btn').forEach(function (b) { b.classList.remove('is-active'); });
-                alignBtn.classList.add('is-active');
-                var columnsEl = document.getElementById('tmExportPersonalizeColumns');
-                var previewEl = document.getElementById('tmExportPersonalizePreview');
-                if (columnsEl && previewEl) { buildPersonalizePreview(reorderColumnsList(columnsEl, cols), previewEl); }
+                if (alignBtn) {
+                    var cols = personalizeModal._personalizeColumns;
+                    if (!cols) { return; }
+                    personalizeModal.querySelectorAll('.tm-export-align-btn').forEach(function (b) { b.classList.remove('is-active'); });
+                    alignBtn.classList.add('is-active');
+                    var columnsEl = document.getElementById('tmExportPersonalizeColumns');
+                    var previewEl = document.getElementById('tmExportPersonalizePreview');
+                    if (columnsEl && previewEl) { buildPersonalizePreview(reorderColumnsList(columnsEl, cols), previewEl); }
+                    return;
+                }
+
+                var orientBtn = e.target.closest('.tm-export-orient-btn');
+                if (orientBtn) {
+                    var orientation = orientBtn.getAttribute('data-orientation') || 'portrait';
+                    personalizeModal.querySelectorAll('.tm-export-orient-btn').forEach(function (b) { b.classList.remove('is-active'); });
+                    orientBtn.classList.add('is-active');
+                    var page = document.getElementById('tmExportPreviewPage');
+                    if (page) {
+                        page.classList.toggle('is-landscape', orientation === 'landscape');
+                    }
+                }
             });
         }
 
@@ -520,6 +563,19 @@
                 item.innerHTML =
                     '<span class="tm-export-drag-handle" aria-hidden="true">&#9776;</span>' +
                     '<span class="tm-export-col-label">' + escapeHtml(col.label) + '</span>' +
+                    '<div class="tm-export-col-color">' +
+                        '<button type="button" class="tm-export-color-trigger" data-color="' + escapeHtml(TEMPLATE_COLORS[0].value) + '" aria-haspopup="listbox" aria-expanded="false">' +
+                            '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(TEMPLATE_COLORS[0].value) + '"></span>' +
+                        '</button>' +
+                        '<div class="tm-export-color-menu" role="listbox" hidden>' +
+                            TEMPLATE_COLORS.map(function (c, i) {
+                                return '<button type="button" class="tm-export-color-option' + (i === 0 ? ' is-active' : '') + '" data-color="' + escapeHtml(c.value) + '">' +
+                                    '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c.value) + '"></span>' +
+                                    '<span class="tm-export-color-name">' + escapeHtml(c.name) + '</span>' +
+                                '</button>';
+                            }).join('') +
+                        '</div>' +
+                    '</div>' +
                     (col.is_image
                         ? '<div class="tm-export-col-image-opts">' +
                             '<label>Ancho <input type="number" min="40" max="400" value="120" class="tm-export-image-width" data-key="' + escapeHtml(col.key) + '"></label>' +
@@ -528,11 +584,6 @@
                         : '<div class="tm-export-col-width-preview" style="min-width:' + Math.min(col.max_width_chars || 10, 40) + 'ch" title="Ancho aprox. ' + (col.max_width_chars || 10) + ' caracteres">' +
                             '<span class="tm-export-col-width-num">' + (col.max_width_chars || 10) + '</span> ch' +
                             '</div>') +
-                    '<div class="tm-export-col-color">' +
-                    TEMPLATE_COLORS.map(function (c, i) {
-                        return '<button type="button" class="tm-export-color-swatch' + (i === 0 ? ' is-active' : '') + '" data-color="' + escapeHtml(c.value) + '" title="' + escapeHtml(c.name) + '" style="background-color:' + escapeHtml(c.value) + '"></button>';
-                    }).join('') +
-                    '</div>' +
                     '<button type="button" class="tm-export-omit-btn" title="Omitir en el reporte" aria-label="Omitir en el reporte">&times;</button>';
                 container.appendChild(item);
             });
@@ -553,8 +604,8 @@
             const items = Array.from(container.querySelectorAll('.tm-export-personalize-col'));
             const columns = items.map(function (item) {
                 const key = item.dataset.key || '';
-                const colorBtn = item.querySelector('.tm-export-color-swatch.is-active');
-                const color = colorBtn ? (colorBtn.getAttribute('data-color') || '#861e34') : '#861e34';
+                const colorTrigger = item.querySelector('.tm-export-color-trigger');
+                const color = colorTrigger ? (colorTrigger.getAttribute('data-color') || 'var(--clr-primary)') : 'var(--clr-primary)';
                 let imageWidth = 120, imageHeight = 80;
                 const w = item.querySelector('.tm-export-image-width');
                 const h = item.querySelector('.tm-export-image-height');
@@ -601,8 +652,8 @@
             });
             html += '</div><div class="tm-export-preview-row tm-export-preview-data">';
             columns.forEach(function (col) {
-                const color = colorMap[col.key] || '#861e34';
-                const cellColor = color === '#861e34' ? '#f5f5f5' : (color === '#ffffff' ? '#fff' : color);
+                const color = colorMap[col.key] || 'var(--clr-primary)';
+                const cellColor = '#f5f5f5';
                 if (col.is_image) {
                     const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
                     const w = (c.imageWidth || 120) + 'px';
@@ -631,14 +682,73 @@
             restoreWrap.hidden = current >= originalColumns.length;
         }
 
+        var PREVIEW_ZOOM_STEPS = [50, 75, 100, 125, 150, 175, 200];
+        function applyPreviewZoom(level) {
+            var pageEl = document.getElementById('tmExportPreviewPage');
+            var valueEl = document.getElementById('tmExportZoomValue');
+            if (!pageEl) { return; }
+            var zoom = Math.min(Math.max(level, PREVIEW_ZOOM_STEPS[0]), PREVIEW_ZOOM_STEPS[PREVIEW_ZOOM_STEPS.length - 1]);
+            if (personalizeModal) { personalizeModal._previewZoom = zoom; }
+            pageEl.style.transform = 'scale(' + (zoom / 100) + ')';
+            pageEl.style.transformOrigin = 'top left';
+            if (valueEl) { valueEl.textContent = zoom; }
+        }
+        function setupPreviewZoom() {
+            var zoomWrap = document.getElementById('tmExportPreviewZoomWrap');
+            var zoomOutBtn = personalizeModal && personalizeModal.querySelector('[data-zoom-out]');
+            var zoomInBtn = personalizeModal && personalizeModal.querySelector('[data-zoom-in]');
+            var resetBtn = personalizeModal && personalizeModal.querySelector('.tm-export-zoom-reset');
+            var current = (personalizeModal && personalizeModal._previewZoom) || 100;
+            applyPreviewZoom(current);
+            if (zoomOutBtn) {
+                zoomOutBtn.onclick = function () {
+                    var idx = PREVIEW_ZOOM_STEPS.indexOf((personalizeModal && personalizeModal._previewZoom) || 100);
+                    if (idx <= 0) { idx = 0; } else { idx -= 1; }
+                    applyPreviewZoom(PREVIEW_ZOOM_STEPS[idx]);
+                };
+            }
+            if (zoomInBtn) {
+                zoomInBtn.onclick = function () {
+                    var idx = PREVIEW_ZOOM_STEPS.indexOf((personalizeModal && personalizeModal._previewZoom) || 100);
+                    if (idx < 0) { idx = PREVIEW_ZOOM_STEPS.indexOf(100); }
+                    if (idx >= PREVIEW_ZOOM_STEPS.length - 1) { idx = PREVIEW_ZOOM_STEPS.length - 1; } else { idx += 1; }
+                    applyPreviewZoom(PREVIEW_ZOOM_STEPS[idx]);
+                };
+            }
+            if (resetBtn) {
+                resetBtn.onclick = function () { applyPreviewZoom(100); };
+            }
+        }
+
         function attachPersonalizeColumnListeners(columnsEl, columns, previewEl, restoreWrap) {
-            columnsEl.querySelectorAll('.tm-export-color-swatch').forEach(function (swatch) {
-                swatch.addEventListener('click', function () {
-                    const parent = swatch.closest('.tm-export-personalize-col');
-                    if (parent) {
-                        parent.querySelectorAll('.tm-export-color-swatch').forEach(function (s) { s.classList.remove('is-active'); });
-                        swatch.classList.add('is-active');
+            columnsEl.querySelectorAll('.tm-export-color-trigger').forEach(function (trigger) {
+                trigger.addEventListener('click', function () {
+                    const menu = trigger.nextElementSibling;
+                    if (!(menu instanceof HTMLElement)) { return; }
+                    const isOpen = !menu.hidden;
+                    Array.from(columnsEl.querySelectorAll('.tm-export-color-menu')).forEach(function (m) { m.hidden = true; });
+                    trigger.setAttribute('aria-expanded', String(!isOpen));
+                    menu.hidden = isOpen;
+                });
+            });
+
+            columnsEl.querySelectorAll('.tm-export-color-menu').forEach(function (menu) {
+                menu.addEventListener('click', function (e) {
+                    const option = e.target.closest('.tm-export-color-option');
+                    if (!option) { return; }
+                    const color = option.getAttribute('data-color') || '';
+                    const parentCol = menu.closest('.tm-export-personalize-col');
+                    const trigger = parentCol ? parentCol.querySelector('.tm-export-color-trigger') : null;
+                    if (parentCol && trigger) {
+                        parentCol.querySelectorAll('.tm-export-color-option').forEach(function (opt) { opt.classList.remove('is-active'); });
+                        option.classList.add('is-active');
+                        trigger.setAttribute('data-color', color);
+                        const swatch = trigger.querySelector('.tm-export-color-swatch');
+                        if (swatch instanceof HTMLElement) {
+                            swatch.style.backgroundColor = color;
+                        }
                     }
+                    menu.hidden = true;
                     buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
                 });
             });
@@ -706,6 +816,8 @@
                     buildPersonalizeColumnsList(columns, columnsEl);
                     buildPersonalizePreview(columns, previewEl);
                     if (restoreWrap) { restoreWrap.hidden = true; }
+                    if (personalizeModal) { personalizeModal._previewZoom = 100; }
+                    setupPreviewZoom();
 
                     columnsEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     columnsEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
@@ -737,9 +849,32 @@
 
                     if (applyBtn && exportUrl) {
                         applyBtn.onclick = function () {
-                            closePersonalizeModal();
+                            const orderedCols = reorderColumnsList(columnsEl, columns);
+                            const state = getPersonalizeState();
+                            const orientBtn = personalizeModal.querySelector('.tm-export-orient-btn.is-active');
+                            const orientation = orientBtn ? (orientBtn.getAttribute('data-orientation') || 'portrait') : 'portrait';
+
+                            const cfg = {
+                                title: state.title || '',
+                                title_align: state.titleAlign || 'center',
+                                orientation: orientation,
+                                columns: orderedCols.map(function (col) {
+                                    const colState = state.columns.find(function (c) { return c.key === col.key; }) || {};
+                                    return {
+                                        key: col.key,
+                                        color: colState.color || 'var(--clr-primary)',
+                                        image_width: colState.imageWidth || null,
+                                        image_height: colState.imageHeight || null,
+                                        // width in caracteres aproximados, si viene del API
+                                        max_width_chars: col.max_width_chars || null
+                                    };
+                                })
+                            };
+
                             const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
-                            window.location.href = exportUrl + separator + 'mode=single&analysis=0';
+                            const cfgParam = encodeURIComponent(JSON.stringify(cfg));
+                            closePersonalizeModal();
+                            window.location.href = exportUrl + separator + 'mode=single&analysis=0&cfg=' + cfgParam;
                         };
                     }
                 })

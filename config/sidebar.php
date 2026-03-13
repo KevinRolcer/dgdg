@@ -1,6 +1,11 @@
 <?php
 
 return [
+    /*
+    | Visibilidad del menú: misma lógica que PAP (includes/sidebar).
+    | Cada ítem con clave 'permission' solo se muestra si el usuario está autenticado
+    | y tiene ese permiso (Auth::user()->can($permission)). Sin 'permission' se muestra a todos los autenticados.
+    */
     'menu' => [
         [
             'icon' => 'fa-solid fa-house',
@@ -21,7 +26,14 @@ return [
             'permission' => 'Tableros-incidencias',
         ],
         [
+            'icon' => 'fa-solid fa-calendar-days',
+            'title' => 'Agenda Directiva',
+            'route' => 'agenda.index',
+            'permission_any' => ['Modulos-Temporales-Admin', 'Agenda-Directiva'],
+        ],
+        [
             'icon' => 'fa-solid fa-layer-group',
+
             'title' => 'Módulos temporales',
             'children' => [
                 [

@@ -15,8 +15,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // Honor reverse-proxy HTTPS headers in shared hosting / CDN setups.
         $middleware->trustProxies(at: '*');
         $middleware->append(SecurityHeaders::class);
+        $middleware->alias([
+            'agenda.access' => \App\Http\Middleware\AgendaAccess::class,
+        ]);
+    })
+    ->withSchedule(function (\Illuminate\Console\Scheduling\Schedule $schedule) {
+        $schedule->job(new \App\Jobs\SendAgendaRemindersJob)->everyMinute();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+
         //
     })->create();
 

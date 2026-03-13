@@ -22,6 +22,7 @@ class GenerateTemporaryModuleExcelJob implements ShouldQueue
         public readonly int $userId,
         public readonly bool $includeAnalysis = false,
         public readonly ?string $exportRequestId = null,
+        public readonly ?array $exportConfig = null,
     ) {
     }
 
@@ -33,7 +34,7 @@ class GenerateTemporaryModuleExcelJob implements ShouldQueue
         }
 
         try {
-            $result = $exportService->exportExcel($this->moduleId, $this->mode, $this->includeAnalysis);
+            $result = $exportService->exportExcel($this->moduleId, $this->mode, $this->includeAnalysis, $this->exportConfig);
 
             if (is_array($result) && isset($result['name'], $result['url'])) {
                 if ($this->exportRequestId !== null) {

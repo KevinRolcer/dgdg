@@ -132,34 +132,24 @@
                                 <option value="0" @selected($value === '0')>No</option>
                             </select>
                         @elseif (in_array($field->type, ['image', 'file'], true))
-                            <div class="tm-file-paste-wrap" data-paste-upload-wrap>
-                                <input
-                                    id="{{ $id }}"
-                                    type="file"
-                                    accept="image/*"
-                                    name="{{ $name }}"
-                                    class="tm-hidden-file-input"
-                                    data-paste-upload-input
-                                    {{ $field->is_required ? 'required' : '' }}
-                                >
-                                <div class="tm-file-upload-layout">
-                                    <div class="tm-file-upload-controls">
-                                        <div class="tm-file-paste-actions">
-                                            <button
-                                                type="button"
-                                                class="tm-btn tm-btn-icon"
-                                                data-paste-image-button
-                                                data-target-input="{{ $id }}"
-                                                aria-label="Pegar imagen"
-                                                title="Pegar imagen"
-                                            >
-                                                <i class="fa-regular fa-paste" aria-hidden="true"></i>
-                                            </button>
-                                        </div>
-                                        <div class="tm-paste-zone" contenteditable="true" data-paste-zone data-target-input="{{ $id }}" role="textbox" aria-label="Area para pegar imagen">Pega o arrastra imagen</div>
+                            <div class="tm-upload-evidence">
+                                <div class="tm-upload-evidence-toolbar">
+                                    <button type="button" class="tm-btn tm-btn-outline" data-upload-trigger data-target-input="{{ $id }}" aria-label="Cargar imagen">
+                                        <i class="fa-solid fa-upload" aria-hidden="true"></i> Cargar
+                                    </button>
+                                    <button type="button" class="tm-btn tm-btn-outline" data-paste-image-button data-target-input="{{ $id }}" aria-label="Pegar imagen" title="Pegar imagen">
+                                        <i class="fa-solid fa-paste" aria-hidden="true"></i> Pegar
+                                    </button>
+                                </div>
+                                <small class="tm-upload-evidence-hint">Arrastra aquí o usa los botones.</small>
+                                <div class="tm-upload-evidence-dropzone" data-paste-upload-wrap>
+                                    <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" class="d-none" {{ $field->is_required ? 'required' : '' }}>
+                                    <div class="tm-upload-evidence-placeholder">
+                                        <i class="fa-solid fa-images" aria-hidden="true"></i>
+                                        <p>Suelta la imagen aquí</p>
                                     </div>
-                                    <div class="tm-inline-image-preview" data-inline-image-preview hidden>
-                                        <img src="" alt="Vista previa" data-inline-image-preview-img>
+                                    <div class="tm-inline-image-preview tm-image-preview" data-inline-image-preview data-image-preview hidden>
+                                        <img src="" alt="Vista previa" data-inline-image-preview-img data-image-preview-img>
                                         <button type="button" class="tm-image-clear" data-inline-image-remove aria-label="Quitar imagen">&times;</button>
                                     </div>
                                 </div>
@@ -233,7 +223,9 @@
         <div class="tm-modal-dialog tm-image-modal-dialog">
             <div class="tm-modal-head">
                 <h3 id="tmImagePreviewTitle">Vista previa</h3>
-                <button type="button" class="tm-modal-close" data-close-image-preview>&times;</button>
+                <button type="button" class="tm-modal-close" data-close-image-preview aria-label="Cerrar">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
             </div>
 
             <div class="tm-modal-body">
@@ -249,7 +241,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         const pasteButtons = Array.from(document.querySelectorAll('[data-paste-image-button]'));
         const pasteInputs = Array.from(document.querySelectorAll('[data-paste-upload-input]'));
-        const pasteZones = Array.from(document.querySelectorAll('[data-paste-zone]'));
+        const pasteUploadAreas = Array.from(document.querySelectorAll('[data-paste-upload-wrap]'));
         let activePasteInput = null;
 
         const extensionFromMime = function (mimeType) {
@@ -460,46 +452,41 @@
             });
         });
 
-        pasteZones.forEach(function (zone) {
-            const targetInputId = zone.getAttribute('data-target-input') || '';
-            const input = targetInputId ? document.getElementById(targetInputId) : null;
+        pasteUploadAreas.forEach(function (area) {
+            const input = area.querySelector('input[type="file"][accept="image/*"]');
             if (!(input instanceof HTMLInputElement)) {
                 return;
             }
 
-            zone.addEventListener('mousedown', function () {
+            area.addEventListener('click', function (event) {
+                if (event.target.closest('[data-inline-image-remove]') || event.target.closest('.tm-inline-image-preview img')) {
+                    return;
+                }
+                activePasteInput = input;
                 input.click();
             });
 
-            zone.addEventListener('focus', function () {
+            area.addEventListener('focusin', function () {
                 activePasteInput = input;
             });
 
-            zone.addEventListener('click', function () {
-                activePasteInput = input;
-            });
-
-            zone.addEventListener('input', function () {
-                zone.textContent = 'Pega o arrastra imagen';
-            });
-
-            zone.addEventListener('dragenter', function (event) {
+            area.addEventListener('dragenter', function (event) {
                 event.preventDefault();
-                zone.classList.add('is-dragover');
+                area.classList.add('is-dragover');
             });
 
-            zone.addEventListener('dragover', function (event) {
+            area.addEventListener('dragover', function (event) {
                 event.preventDefault();
-                zone.classList.add('is-dragover');
+                area.classList.add('is-dragover');
             });
 
-            zone.addEventListener('dragleave', function () {
-                zone.classList.remove('is-dragover');
+            area.addEventListener('dragleave', function () {
+                area.classList.remove('is-dragover');
             });
 
-            zone.addEventListener('drop', function (event) {
+            area.addEventListener('drop', function (event) {
                 event.preventDefault();
-                zone.classList.remove('is-dragover');
+                area.classList.remove('is-dragover');
 
                 const imageFile = getImageFileFromFileList(event.dataTransfer ? event.dataTransfer.files : []);
                 if (!imageFile) {
@@ -511,6 +498,17 @@
                 setStatus(getStatusElement(input), wasAssigned ? 'Imagen cargada.' : 'No se pudo adjuntar.', !wasAssigned);
                 if (wasAssigned) {
                     setPreview(input, imageFile);
+                }
+            });
+        });
+
+        Array.from(document.querySelectorAll('[data-upload-trigger]')).forEach(function (button) {
+            button.addEventListener('click', function () {
+                const targetId = button.getAttribute('data-target-input') || '';
+                const input = targetId ? document.getElementById(targetId) : null;
+                if (input instanceof HTMLInputElement) {
+                    activePasteInput = input;
+                    input.click();
                 }
             });
         });

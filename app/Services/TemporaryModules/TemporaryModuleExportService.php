@@ -22,13 +22,19 @@ class TemporaryModuleExportService
     private const HEADER_FILL_COLOR = 'FF861E34'; // --clr-primary #861e34
 
     private const HEADER_FONT_COLOR = 'FFFFFFFF'; // blanco
+
+    /** @var array<string,mixed>|null */
+    private ?array $exportConfig = null;
+
+    /** @var array<string,array<string,mixed>> */
+    private array $columnConfigByKey = [];
     public function __construct(
         private readonly TemporaryModuleFieldService $fieldService,
         private readonly TemporaryModuleEntryDataService $entryDataService,
     ) {
     }
 
-    public function exportExcel(int $moduleId, string $mode = 'single', bool $includeAnalysis = true): array
+    public function exportExcel(int $moduleId, string $mode = 'single', bool $includeAnalysis = true, ?array $exportConfig = null): array
     {
         set_time_limit(0);
         ini_set('memory_limit', '1024M');
@@ -56,6 +62,24 @@ class TemporaryModuleExportService
 
         $spreadsheet = new Spreadsheet();
 
+        // Normalizar configuración opcional desde el front
+        $this->exportConfig = $exportConfig ?? [];
+        $this->columnConfigByKey = [];
+        foreach (($this->exportConfig['columns'] ?? []) as $colCfg) {
+            if (!is_array($colCfg)) {
+                continue;
+            }
+            $key = (string) ($colCfg['key'] ?? '');
+            if ($key === '') {
+                continue;
+            }
+            $this->columnConfigByKey[$key] = $colCfg;
+        }
+
+        $orientation = isset($this->exportConfig['orientation']) && $this->exportConfig['orientation'] === 'landscape'
+            ? 'landscape'
+            : 'portrait';
+
         // Si hay hoja de análisis, la primera hoja se usa para eso.
         // Si NO hay análisis, la primera hoja se reserva para datos y no creamos una vacía adicional.
         $usedDataSheet = $includeAnalysis;
@@ -66,7 +90,7 @@ class TemporaryModuleExportService
             $analysisSheet = $spreadsheet->getActiveSheet();
             $analysisSheet->setTitle('Análisis General');
             $this->fillAnalysisSheet($analysisSheet, $temporaryModule);
-            $this->applyPrintSetup($analysisSheet);
+            $this->applyPrintSetup($analysisSheet, $orientation);
         } else {
             $spreadsheet->getActiveSheet()->setTitle('Registros');
         }
@@ -121,7 +145,7 @@ class TemporaryModuleExportService
                 $targetSheet->setTitle('Registros');
                 $entriesQuery = $temporaryModule->entries()->whereNull('microrregion_id'); // Fallback if no groups
                 $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta, $fechaCorte);
-                $this->applyPrintSetup($targetSheet);
+                $this->applyPrintSetup($targetSheet, $orientation);
             } else {
                 $usedTitles = [];
 
@@ -140,7 +164,7 @@ class TemporaryModuleExportService
                         ->latest('submitted_at');
 
                     $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta, $fechaCorte);
-                    $this->applyPrintSetup($targetSheet);
+                    $this->applyPrintSetup($targetSheet, $orientation);
                 }
             }
         } else {
@@ -173,13 +197,13 @@ class TemporaryModuleExportService
                 $totalsSheet = $createDataSheet();
                 $totalsSheet->setTitle('Totales por categoría');
                 $this->fillTotalesPorCategoriaSheet($totalsSheet, $temporaryModule, $categoriaField);
-                $this->applyPrintSetup($totalsSheet);
+                $this->applyPrintSetup($totalsSheet, $orientation);
             } else {
                 $targetSheet = $createDataSheet();
                 $targetSheet->setTitle('Registros');
                 $entriesQuery = $temporaryModule->entries()->latest('submitted_at');
                 $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta, $fechaCorte);
-                $this->applyPrintSetup($targetSheet);
+                $this->applyPrintSetup($targetSheet, $orientation);
             }
         }
 
@@ -352,11 +376,75 @@ class TemporaryModuleExportService
         $sheet->getStyle('D' . ($startRow + 1) . ':F' . $lastRow)->getAlignment()->setWrapText(true);
     }
 
-    private function applyPrintSetup(Worksheet $sheet): void
+    private function applyPrintSetup(Worksheet $sheet, string $orientation = 'landscape'): void
     {
         $sheet->getPageSetup()
-            ->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)
+            ->setOrientation($orientation === 'landscape'
+                ? PageSetup::ORIENTATION_LANDSCAPE
+                : PageSetup::ORIENTATION_PORTRAIT)
             ->setPaperSize(PageSetup::PAPERSIZE_A4);
+    }
+
+    /**
+     * Reordenar/filtrar columnas según configuración enviada desde el front.
+     *
+     * @param array<int,array{header1:?string,header2:string,field:\App\Models\TemporaryModuleField}> $exportColumns
+     * @return array<int,array{header1:?string,header2:string,field:\App\Models\TemporaryModuleField}>
+     */
+    private function reorderExportColumns(array $exportColumns): array
+    {
+        if (empty($this->columnConfigByKey) || empty($this->exportConfig['columns'] ?? null)) {
+            return $exportColumns;
+        }
+
+        $byKey = [];
+        foreach ($exportColumns as $col) {
+            $byKey[(string) $col['field']->key] = $col;
+        }
+
+        $ordered = [];
+        foreach ($this->exportConfig['columns'] as $cfgCol) {
+            if (!is_array($cfgCol) || !isset($cfgCol['key'])) {
+                continue;
+            }
+            $key = (string) $cfgCol['key'];
+            if (isset($byKey[$key])) {
+                $ordered[] = $byKey[$key];
+            }
+        }
+
+        return $ordered ?: $exportColumns;
+    }
+
+    private function mapCssColorToArgb(string $color): ?string
+    {
+        $color = trim($color);
+        if ($color === '') {
+            return null;
+        }
+
+        $map = [
+            'var(--clr-primary)' => 'FF861E34',
+            'var(--clr-secondary)' => 'FF246257',
+            'var(--clr-accent)' => 'FFC79B66',
+            'var(--clr-text-main)' => 'FF484747',
+            'var(--clr-text-light)' => 'FF6B6A6A',
+            'var(--clr-bg)' => 'FFF7F7F8',
+            'var(--clr-card)' => 'FFFFFFFF',
+        ];
+
+        if (isset($map[$color])) {
+            return $map[$color];
+        }
+
+        if ($color[0] === '#') {
+            $hex = strtoupper(ltrim($color, '#'));
+            if (strlen($hex) === 6) {
+                return 'FF'.$hex;
+            }
+        }
+
+        return null;
     }
 
     private function fillTotalesPorCategoriaSheet(Worksheet $sheet, TemporaryModule $temporaryModule, $categoriaField): void
@@ -422,6 +510,7 @@ class TemporaryModuleExportService
     private function fillSheet(Worksheet $sheet, TemporaryModule $temporaryModule, $entriesQuery, Collection $microrregionMeta, \DateTimeInterface $fechaCorte): void
     {
         $exportColumns = $this->buildExportColumns($temporaryModule);
+        $exportColumns = $this->reorderExportColumns($exportColumns);
         $hasSections = false;
         foreach ($exportColumns as $col) {
             if ($col['header1'] !== $col['header2']) {
@@ -439,11 +528,25 @@ class TemporaryModuleExportService
         $dateRow = 2;
         $headerStartRow = 3;
 
-        // Título (letra grande) centrado
-        $sheet->setCellValue('A'.$titleRow, (string) $temporaryModule->name);
+        // Título (letra grande) usando configuración si existe
+        $configuredTitle = null;
+        if (is_array($this->exportConfig) && isset($this->exportConfig['title'])) {
+            $configuredTitle = trim((string) $this->exportConfig['title']);
+        }
+        $titleText = $configuredTitle !== '' ? $configuredTitle : (string) $temporaryModule->name;
+        $sheet->setCellValue('A'.$titleRow, $titleText);
         $sheet->mergeCells('A'.$titleRow.':'.$lastColumnLetter.$titleRow);
         $sheet->getStyle('A'.$titleRow)->getFont()->setSize(16)->setBold(true);
-        $sheet->getStyle('A'.$titleRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+        $titleAlign = Alignment::HORIZONTAL_CENTER;
+        if (is_array($this->exportConfig) && isset($this->exportConfig['title_align'])) {
+            $alignCfg = (string) $this->exportConfig['title_align'];
+            if ($alignCfg === 'left') {
+                $titleAlign = Alignment::HORIZONTAL_LEFT;
+            } elseif ($alignCfg === 'right') {
+                $titleAlign = Alignment::HORIZONTAL_RIGHT;
+            }
+        }
+        $sheet->getStyle('A'.$titleRow)->getAlignment()->setHorizontal($titleAlign)->setVertical(Alignment::VERTICAL_CENTER);
 
         // Fecha y hora de corte a la derecha, parte inferior del bloque título
         $sheet->setCellValue($lastColumnLetter.$dateRow, 'Fecha y hora de corte: '.$fechaCorteStr);
@@ -514,6 +617,50 @@ class TemporaryModuleExportService
         $sheet->getStyle($headerRange)
             ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
 
+        // Aplicar colores por columna según configuración (solo encabezados)
+        if (!empty($this->columnConfigByKey)) {
+            // 1) Fijos: Ítem y Microrregión
+            $fixedKeys = [
+                1 => 'item',
+                2 => 'microrregion',
+            ];
+            foreach ($fixedKeys as $colIndex => $key) {
+                $cfg = $this->columnConfigByKey[$key] ?? null;
+                if (!is_array($cfg) || empty($cfg['color'])) {
+                    continue;
+                }
+                $argb = $this->mapCssColorToArgb((string) $cfg['color']);
+                if ($argb === null) {
+                    continue;
+                }
+                $letter = Coordinate::stringFromColumnIndex($colIndex);
+                $range = $letter.$tableHeaderFirstRow.':'.$letter.$tableHeaderLastRow;
+                $sheet->getStyle($range)->getFill()
+                    ->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()->setARGB($argb);
+            }
+
+            // 2) Dinámicos: columnas provenientes de campos del módulo
+            foreach ($exportColumns as $idx => $col) {
+                $field = $col['field'];
+                $key = (string) $field->key;
+                $cfg = $this->columnConfigByKey[$key] ?? null;
+                if (!is_array($cfg) || empty($cfg['color'])) {
+                    continue;
+                }
+                $argb = $this->mapCssColorToArgb((string) $cfg['color']);
+                if ($argb === null) {
+                    continue;
+                }
+                $colIndex = $numFixed + $idx + 1;
+                $letter = Coordinate::stringFromColumnIndex($colIndex);
+                $range = $letter.$tableHeaderFirstRow.':'.$letter.$tableHeaderLastRow;
+                $sheet->getStyle($range)->getFill()
+                    ->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()->setARGB($argb);
+            }
+        }
+
         $dataStartRow = $headerStartRow + $headerRowCount;
         $sheet->freezePane('A'.$dataStartRow);
         $sheet->setAutoFilter('A'.$tableHeaderFirstRow.':'.$lastColumnLetter.$tableHeaderLastRow);
@@ -557,9 +704,14 @@ class TemporaryModuleExportService
                                         $drawing->setOffsetX(2);
                                         $drawing->setOffsetY(2);
                                         $drawing->setResizeProportional(true);
-                                        $drawing->setHeight(80);
+                                        $height = 80;
+                                        $fieldCfg = $this->columnConfigByKey[(string) $field->key] ?? null;
+                                        if (is_array($fieldCfg) && isset($fieldCfg['image_height']) && is_numeric($fieldCfg['image_height'])) {
+                                            $height = max(20, min((int) $fieldCfg['image_height'], 400));
+                                        }
+                                        $drawing->setHeight($height);
                                         $drawing->setWorksheet($sheet);
-                                        $sheet->getRowDimension($rowIndex)->setRowHeight(80);
+                                        $sheet->getRowDimension($rowIndex)->setRowHeight($height);
                                     } else {
                                         $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
                                     }
@@ -603,6 +755,9 @@ class TemporaryModuleExportService
                 ->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_CENTER);
         }
 
+        // Celdas de datos se mantienen con color de fondo por defecto (blanco),
+        // solo los encabezados se colorean por columna.
+
         for ($colIdx = 1; $colIdx <= $totalColumns; $colIdx++) {
             $columnLetter = Coordinate::stringFromColumnIndex($colIdx);
             if ($colIdx === 1) {
@@ -610,7 +765,17 @@ class TemporaryModuleExportService
             } elseif ($colIdx === 2) {
                 $sheet->getColumnDimension($columnLetter)->setWidth(22);
             } else {
-                $sheet->getColumnDimension($columnLetter)->setWidth(32);
+                $cfgWidth = null;
+                $exportColIndex = $colIdx - 3;
+                if (isset($exportColumns[$exportColIndex])) {
+                    $fieldKey = (string) $exportColumns[$exportColIndex]['field']->key;
+                    $colCfg = $this->columnConfigByKey[$fieldKey] ?? null;
+                    if (is_array($colCfg) && isset($colCfg['max_width_chars']) && is_numeric($colCfg['max_width_chars'])) {
+                        $chars = (int) $colCfg['max_width_chars'];
+                        $cfgWidth = max(8, min($chars + 2, 60));
+                    }
+                }
+                $sheet->getColumnDimension($columnLetter)->setWidth($cfgWidth ?? 32);
             }
         }
     }

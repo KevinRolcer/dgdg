@@ -1475,14 +1475,31 @@ document.addEventListener('DOMContentLoaded', function () {
             mostrarNombreArchivoExcel();
         });
 
+        const excelFileStatus = document.getElementById('excelFileStatus');
+        const btnRemoveExcel = document.getElementById('btnRemoveExcel');
+
+        if (btnRemoveExcel) {
+            btnRemoveExcel.addEventListener('click', function (e) {
+                e.stopPropagation(); // Avoid triggering dropzone click
+                limpiarSeleccionExcel();
+            });
+        }
+
+        function limpiarSeleccionExcel() {
+            inputExcelHidden.value = '';
+            mostrarNombreArchivoExcel();
+        }
+
         function mostrarNombreArchivoExcel() {
             if (inputExcelHidden.files.length > 0) {
                 const fileName = inputExcelHidden.files[0].name;
-                excelFileNameDisplay.textContent = 'Archivo seleccionado: ' + fileName;
-                excelFileNameDisplay.classList.remove('d-none');
+                excelFileNameDisplay.textContent = 'Archivo: ' + fileName;
+                excelFileStatus.classList.remove('d-none');
+                excelFileStatus.classList.add('d-flex');
                 dropzoneExcel.querySelector('p').classList.add('d-none');
             } else {
-                excelFileNameDisplay.classList.add('d-none');
+                excelFileStatus.classList.add('d-none');
+                excelFileStatus.classList.remove('d-flex');
                 dropzoneExcel.querySelector('p').classList.remove('d-none');
             }
         }

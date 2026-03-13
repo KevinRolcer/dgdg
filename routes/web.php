@@ -11,6 +11,8 @@ use App\Http\Controllers\MesasPazSupervisionController;
 use App\Http\Controllers\TemporaryModuleController;
 use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\CanvaController;
+use App\Http\Controllers\AgendaController;
+
 
 Route::get('/', function () {
     return redirect('/login');
@@ -119,6 +121,14 @@ Route::middleware('auth')->group(function () {
             ->name('temporary-modules.entry-file.preview');
     });
 
+    Route::middleware(['agenda.access'])->group(function () {
+        Route::get('agenda/modulo/enlaces', [AgendaController::class, 'moduloEnlaces'])->name('agenda.modulo.enlaces');
+        Route::post('agenda/modulo/asignar', [AgendaController::class, 'moduloAsignar'])->name('agenda.modulo.asignar');
+        Route::post('agenda/modulo/quitar', [AgendaController::class, 'moduloQuitar'])->name('agenda.modulo.quitar');
+        Route::resource('agenda', AgendaController::class);
+    });
+
     Route::get('/canva/auth', [CanvaController::class, 'authRedirect'])->name('canva.auth');
+
     Route::post('/canva/generar-documento', [CanvaController::class, 'generarDocumento'])->name('canva.generar-documento');
 });

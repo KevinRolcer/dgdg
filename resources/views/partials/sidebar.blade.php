@@ -2,33 +2,47 @@
     $menuItems = config('sidebar.menu', []);
     $currentRouteName = optional(request()->route())->getName();
 
+    // Misma lógica que PAP (includes/sidebar): ítems con 'permission' solo visibles si el usuario está autenticado y puede ese permiso
     $hasPermission = static function (array $item): bool {
-        if (!auth()->check()) {
+        $user = auth()->user();
+        if (!$user) {
             return false;
         }
 
-        $user = auth()->user();
-        $userEmail = mb_strtolower(trim((string) ($user->email ?? '')));
+        // Si el ítem exige permiso: no mostrar si el usuario no lo tiene (como en PAP: continue si !can(permission))
+        if (isset($item['permission_any']) && is_array($item['permission_any'])) {
+            $ok = false;
+            foreach ($item['permission_any'] as $perm) {
+                if ($user->can($perm)) {
+                    $ok = true;
+                    break;
+                }
+            }
+            if (!$ok) {
+                return false;
+            }
+        } elseif (isset($item['permission'])) {
+            if (!$user->can($item['permission'])) {
+                return false;
+            }
+        }
 
+        // Reglas adicionales de segob
         if (isset($item['hidden_if_can']) && $user->can($item['hidden_if_can'])) {
             return false;
         }
 
+        $userEmail = mb_strtolower(trim((string) ($user->email ?? '')));
         if (!empty($item['hidden_for_emails']) && is_array($item['hidden_for_emails'])) {
             $blockedEmails = array_map(static function ($email) {
                 return mb_strtolower(trim((string) $email));
             }, $item['hidden_for_emails']);
-
             if ($userEmail !== '' && in_array($userEmail, $blockedEmails, true)) {
                 return false;
             }
         }
 
-        if (!isset($item['permission'])) {
-            return true;
-        }
-
-        return $user->can($item['permission']);
+        return true;
     };
 
     $isItemVisible = static function (array $item) use (&$isItemVisible, $hasPermission): bool {

@@ -70,7 +70,9 @@
                         <h3>Registro de modulo temporal</h3>
                         <p class="tm-modal-subtitle">{{ $module->name }}</p>
                     </div>
-                    <button type="button" class="tm-modal-close" data-close-module-preview>&times;</button>
+                    <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
                 </div>
 
                 <div class="tm-modal-body">
@@ -88,23 +90,24 @@
 
                     <form action="{{ route('temporary-modules.submit', $module->id) }}" method="POST" enctype="multipart/form-data" class="tm-form tm-entry-form">
                         @csrf
-                        @if ($mostrarSelectorMicrorregion)
-                            <label class="tm-col-full tm-entry-field">
-                                Microrregion de captura *
-                                <select name="selected_microrregion_id" class="tm-mr-selector" required>
-                                    @foreach ($microsAsignadas as $micro)
-                                        <option value="{{ $micro->id }}" @selected($loop->first)>
-                                            MR {{ $micro->microrregion }} - {{ $micro->cabecera }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </label>
-                        @elseif ($microsAsignadas->isNotEmpty())
+                        @if ($microsAsignadas->isNotEmpty() && !$mostrarSelectorMicrorregion)
                             <input type="hidden" name="selected_microrregion_id" value="{{ $microsAsignadas->first()->id }}">
                         @endif
+                        <input type="hidden" name="entry_id" value="">
 
                         <div class="tm-grid tm-grid-2 tm-entry-grid">
-                            <input type="hidden" name="entry_id" value="">
+                            @if ($mostrarSelectorMicrorregion)
+                                <label class="tm-entry-field">
+                                    Microrregion de captura *
+                                    <select name="selected_microrregion_id" class="tm-mr-selector" required>
+                                        @foreach ($microsAsignadas as $micro)
+                                            <option value="{{ $micro->id }}" @selected($loop->first)>
+                                                MR {{ $micro->microrregion }} - {{ $micro->cabecera }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                            @endif
                             @foreach ($orderedFields as $field)
                                 @php
                                     $name = 'values['.$field->key.']';
@@ -192,17 +195,27 @@
                                             <option value="0" @selected($value === '0')>No</option>
                                         </select>
                                     @elseif (in_array($field->type, ['image', 'file'], true))
-                                        <div class="tm-file-paste-wrap" data-paste-upload-wrap>
-                                            <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
-                                            <div class="tm-file-paste-actions">
-                                                <button type="button" class="tm-btn tm-btn-icon" data-paste-image-button data-target-input="{{ $id }}" aria-label="Pegar imagen" title="Pegar imagen">
-                                                    <i class="fa-regular fa-paste" aria-hidden="true"></i>
+                                        <div class="tm-upload-evidence">
+                                            <div class="tm-upload-evidence-toolbar">
+                                                <button type="button" class="tm-btn tm-btn-outline" data-upload-trigger data-target-input="{{ $id }}" aria-label="Cargar imagen">
+                                                    <i class="fa-solid fa-upload" aria-hidden="true"></i> Cargar
+                                                </button>
+                                                <button type="button" class="tm-btn tm-btn-outline" data-paste-image-button data-target-input="{{ $id }}" aria-label="Pegar imagen" title="Pegar imagen">
+                                                    <i class="fa-solid fa-paste" aria-hidden="true"></i> Pegar
                                                 </button>
                                             </div>
-                                        </div>
-                                        <div class="tm-image-preview" data-image-preview hidden>
-                                            <img src="" alt="Vista previa" data-image-preview-img>
-                                            <button type="button" class="tm-image-clear" data-image-remove aria-label="Quitar imagen">&times;</button>
+                                            <small class="tm-upload-evidence-hint">Arrastra aquí o usa los botones.</small>
+                                            <div class="tm-upload-evidence-dropzone" data-paste-upload-wrap>
+                                                <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" class="d-none" {{ $field->is_required ? 'required' : '' }}>
+                                                <div class="tm-upload-evidence-placeholder">
+                                                    <i class="fa-solid fa-images" aria-hidden="true"></i>
+                                                    <p>Suelta la imagen aquí</p>
+                                                </div>
+                                                <div class="tm-image-preview" data-image-preview hidden>
+                                                    <img src="" alt="Vista previa" data-image-preview-img>
+                                                    <button type="button" class="tm-image-clear" data-image-remove aria-label="Quitar imagen">&times;</button>
+                                                </div>
+                                            </div>
                                         </div>
                                     @else
                                         <input id="{{ $id }}" type="text" name="{{ $name }}" value="{{ $value }}" {{ $field->is_required ? 'required' : '' }}>
@@ -229,7 +242,9 @@
                             <h3>Editar registro</h3>
                             <p class="tm-modal-subtitle">{{ $module->name }}</p>
                         </div>
-                        <button type="button" class="tm-modal-close" data-close-module-preview>&times;</button>
+                        <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
                     </div>
 
                     <div class="tm-modal-body">
@@ -244,23 +259,24 @@
 
                         <form action="{{ route('temporary-modules.submit', $module->id) }}" method="POST" enctype="multipart/form-data" class="tm-form tm-entry-form">
                             @csrf
-                            @if ($mostrarSelectorMicrorregion)
-                                <label class="tm-col-full tm-entry-field">
-                                    Microrregion de captura *
-                                    <select name="selected_microrregion_id" class="tm-mr-selector" required>
-                                        @foreach ($microsAsignadas as $micro)
-                                            <option value="{{ $micro->id }}" @selected((int) ($entry->microrregion_id ?? 0) === (int) $micro->id)>
-                                                MR {{ $micro->microrregion }} - {{ $micro->cabecera }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </label>
-                            @elseif ($microsAsignadas->isNotEmpty())
+                            @if ($microsAsignadas->isNotEmpty() && !$mostrarSelectorMicrorregion)
                                 <input type="hidden" name="selected_microrregion_id" value="{{ $entry->microrregion_id ?? $microsAsignadas->first()->id }}">
                             @endif
+                            <input type="hidden" name="entry_id" value="{{ $entry->id }}">
 
                             <div class="tm-grid tm-grid-2 tm-entry-grid">
-                                <input type="hidden" name="entry_id" value="{{ $entry->id }}">
+                                @if ($mostrarSelectorMicrorregion)
+                                    <label class="tm-entry-field">
+                                        Microrregion de captura *
+                                        <select name="selected_microrregion_id" class="tm-mr-selector" required>
+                                            @foreach ($microsAsignadas as $micro)
+                                                <option value="{{ $micro->id }}" @selected((int) ($entry->microrregion_id ?? 0) === (int) $micro->id)>
+                                                    MR {{ $micro->microrregion }} - {{ $micro->cabecera }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                @endif
                                 @foreach ($orderedFields as $field)
                                     @php
                                         $name = 'values['.$field->key.']';
@@ -349,22 +365,32 @@
                                                 <option value="0" @selected((string) $value === '0')>No</option>
                                             </select>
                                         @elseif (in_array($field->type, ['image', 'file'], true))
-                                            <div class="tm-file-paste-wrap" data-paste-upload-wrap>
-                                                <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" {{ ($field->is_required && !$hasExistingImage) ? 'required' : '' }}>
-                                                <div class="tm-file-paste-actions">
-                                                    <button type="button" class="tm-btn tm-btn-icon" data-paste-image-button data-target-input="{{ $id }}" aria-label="Pegar imagen" title="Pegar imagen">
-                                                        <i class="fa-regular fa-paste" aria-hidden="true"></i>
+                                            <div class="tm-upload-evidence">
+                                                <div class="tm-upload-evidence-toolbar">
+                                                    <button type="button" class="tm-btn tm-btn-outline" data-upload-trigger data-target-input="{{ $id }}" aria-label="Cargar imagen">
+                                                        <i class="fa-solid fa-upload" aria-hidden="true"></i> Cargar
+                                                    </button>
+                                                    <button type="button" class="tm-btn tm-btn-outline" data-paste-image-button data-target-input="{{ $id }}" aria-label="Pegar imagen" title="Pegar imagen">
+                                                        <i class="fa-solid fa-paste" aria-hidden="true"></i> Pegar
                                                     </button>
                                                 </div>
-                                            </div>
-                                            <input type="hidden" name="remove_images[{{ $field->key }}]" value="0" data-remove-flag>
-                                            <div class="tm-image-preview" data-image-preview {{ is_string($value) && $value !== '' ? '' : 'hidden' }}>
-                                                <img
-                                                    src="{{ is_string($value) && $value !== '' ? route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) : '' }}"
-                                                    alt="{{ $field->label }}"
-                                                    data-image-preview-img
-                                                >
-                                                <button type="button" class="tm-image-clear" data-image-remove aria-label="Quitar imagen">&times;</button>
+                                                <input type="hidden" name="remove_images[{{ $field->key }}]" value="0" data-remove-flag>
+                                                <small class="tm-upload-evidence-hint">Arrastra aquí o usa los botones.</small>
+                                                <div class="tm-upload-evidence-dropzone" data-paste-upload-wrap>
+                                                    <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" class="d-none" {{ ($field->is_required && !$hasExistingImage) ? 'required' : '' }}>
+                                                    <div class="tm-upload-evidence-placeholder">
+                                                        <i class="fa-solid fa-images" aria-hidden="true"></i>
+                                                        <p>Suelta la imagen aquí</p>
+                                                    </div>
+                                                    <div class="tm-image-preview" data-image-preview {{ is_string($value) && $value !== '' ? '' : 'hidden' }}>
+                                                        <img
+                                                            src="{{ is_string($value) && $value !== '' ? route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) : '' }}"
+                                                            alt="{{ $field->label }}"
+                                                            data-image-preview-img
+                                                        >
+                                                        <button type="button" class="tm-image-clear" data-image-remove aria-label="Quitar imagen">&times;</button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         @else
                                             <input id="{{ $id }}" type="text" name="{{ $name }}" value="{{ $value }}" {{ $field->is_required ? 'required' : '' }}>
@@ -592,7 +618,9 @@
         <div class="tm-modal-dialog tm-image-modal-dialog">
             <div class="tm-modal-head">
                 <h3 id="tmImagePreviewTitle">Vista previa</h3>
-                <button type="button" class="tm-modal-close" data-close-image-preview>&times;</button>
+                <button type="button" class="tm-modal-close" data-close-image-preview aria-label="Cerrar">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
             </div>
 
             <div class="tm-modal-body">
@@ -799,6 +827,13 @@
                 lastFocusedImageInput = input;
             });
 
+            area.addEventListener('click', function (event) {
+                if (event.target.closest('[data-image-remove]') || event.target.closest('.tm-image-preview img')) {
+                    return;
+                }
+                input.click();
+            });
+
             area.addEventListener('dragenter', function (event) {
                 event.preventDefault();
                 area.classList.add('is-dragover');
@@ -826,6 +861,16 @@
                 const wasAssigned = setSelectedFileOnInput(input, imageFile);
                 if (!wasAssigned) {
                     notify('Aviso', 'No se pudo adjuntar la imagen arrastrada.', 'warning');
+                }
+            });
+        });
+
+        Array.from(document.querySelectorAll('[data-upload-trigger]')).forEach(function (button) {
+            button.addEventListener('click', function () {
+                const targetId = button.getAttribute('data-target-input') || '';
+                const input = targetId ? document.getElementById(targetId) : null;
+                if (input instanceof HTMLInputElement) {
+                    input.click();
                 }
             });
         });
