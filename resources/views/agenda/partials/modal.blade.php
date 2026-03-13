@@ -116,7 +116,8 @@
                 </div>
 
                 <div class="mt-4 agenda-row-two-cols">
-                    <div class="agenda-col-40">
+                    {{-- Solo Gira/Pre-Gira: el delegado es el de la microrregión elegida --}}
+                    <div class="agenda-col-40" id="agendaDelegadoLabelWrap" style="display: none;">
                         <p id="agendaDelegadoLabel" class="agenda-delegado-label">
                             Delegad@ encargado: —
                         </p>

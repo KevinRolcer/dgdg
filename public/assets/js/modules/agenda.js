@@ -102,7 +102,17 @@ function openAgendaModal(id = null, tipo = 'asunto') {
     if (tipoSelector) {
         tipoSelector.style.display = isGira ? 'block' : 'none';
     }
-    
+    const delegadoWrap = document.getElementById('agendaDelegadoLabelWrap');
+    if (delegadoWrap) {
+        delegadoWrap.style.display = isGira ? 'block' : 'none';
+    }
+    if (isGira) {
+        const microSel = document.getElementById('modalMicrorregion');
+        if (microSel && typeof microSel.dispatchEvent === 'function') {
+            microSel.dispatchEvent(new Event('change'));
+        }
+    }
+
     modal.style.display = 'flex';
 }
 
