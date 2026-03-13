@@ -21,16 +21,20 @@ class AdminTestUserSeeder extends Seeder
             $adminRole = Role::findOrCreate('Administrador', 'web');
         }
 
-        $adminPermission = Permission::findOrCreate('Modulos-Temporales-Admin', 'web');
+        $adminPermissions = [
+            'Modulos-Temporales-Admin',
+            'Administrar-Usuarios',
+            'Tableros-incidencias',
+        ];
+
+        foreach ($adminPermissions as $permissionName) {
+            Permission::findOrCreate($permissionName, 'web');
+        }
 
         $webPermissions = Permission::query()
             ->where('guard_name', 'web')
             ->pluck('name')
             ->all();
-
-        if (!in_array($adminPermission->name, $webPermissions, true)) {
-            $webPermissions[] = $adminPermission->name;
-        }
 
         if (!empty($webPermissions)) {
             $adminRole->syncPermissions($webPermissions);

@@ -384,7 +384,7 @@
                                                     </div>
                                                     <div class="tm-image-preview" data-image-preview {{ is_string($value) && $value !== '' ? '' : 'hidden' }}>
                                                         <img
-                                                            src="{{ is_string($value) && $value !== '' ? route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) : '' }}"
+                                                            src="{{ is_string($value) && $value !== '' ? route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) : '' }}"
                                                             alt="{{ $field->label }}"
                                                             data-image-preview-img
                                                         >
@@ -473,7 +473,7 @@
                                                             type="button"
                                                             class="tm-thumb-link"
                                                             data-open-image-preview
-                                                            data-image-src="{{ route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) }}"
+                                                            data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) }}"
                                                             data-image-title="{{ $field->label }}"
                                                             title="Ver imagen"
                                                         >
@@ -550,7 +550,7 @@
                                                             type="button"
                                                             class="tm-thumb-link"
                                                             data-open-image-preview
-                                                            data-image-src="{{ route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) }}"
+                                                            data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) }}"
                                                             data-image-title="{{ $field->label }}"
                                                             title="Ver imagen"
                                                         >

@@ -6,6 +6,8 @@ use App\Models\TemporaryModule;
 use App\Models\TemporaryModuleEntry;
 use App\Services\TemporaryModules\TemporaryModuleAccessService;
 use App\Services\TemporaryModules\TemporaryModuleEntryDataService;
+use App\Jobs\GenerateTemporaryModuleAnalysisWordJob;
+use App\Services\TemporaryModules\TemporaryModuleAnalysisWordService;
 use App\Services\TemporaryModules\TemporaryModuleExportService;
 use App\Services\TemporaryModules\TemporaryModuleFieldService;
 use Illuminate\Http\RedirectResponse;
@@ -27,6 +29,7 @@ class TemporaryModuleController extends Controller
         private readonly TemporaryModuleFieldService $fieldService,
         private readonly TemporaryModuleEntryDataService $entryDataService,
         private readonly TemporaryModuleExportService $exportService,
+        private readonly TemporaryModuleAnalysisWordService $analysisWordService,
     )
     {
     }
@@ -768,7 +771,7 @@ class TemporaryModuleController extends Controller
         if (!in_array($mode, ['single', 'mr'], true)) {
             $mode = 'single';
         }
-        $includeAnalysis = (bool) $request->boolean('analysis', false);
+        $includeAnalysis = false;
 
         $rawConfig = $request->query('cfg');
         $exportConfig = null;
@@ -787,7 +790,7 @@ class TemporaryModuleController extends Controller
         $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$module;
 
         $exportRequestId = Str::uuid()->toString();
-        $request->user()->notify(new \App\Notifications\ExcelExportPending($exportRequestId, $fileName));
+        $request->user()->notify(new \App\Notifications\ExcelExportPending($exportRequestId, $fileName, 'excel'));
 
         \App\Jobs\GenerateTemporaryModuleExcelJob::dispatchAfterResponse(
             $module,
@@ -901,12 +904,84 @@ class TemporaryModuleController extends Controller
         return $cols;
     }
 
+    public function analysisPreviewJson(Request $request, int $module): JsonResponse
+    {
+        abort_unless($request->user()->can('Modulos-Temporales-Admin'), 403);
+        $config = [
+            'include_summary' => $request->boolean('include_summary', true),
+            'include_mr_table' => $request->boolean('include_mr_table', true),
+            'doc_title' => (string) $request->query('doc_title', ''),
+            'title_align' => (string) $request->query('title_align', 'center'),
+            'subtitle' => (string) $request->query('subtitle', ''),
+            'orientation' => strtolower(trim((string) $request->query('orientation', 'portrait'))) === 'landscape' ? 'landscape' : 'portrait',
+            'column_keys' => $request->query('column_keys', '[]'),
+            'table_font_pt' => $request->query('table_font_pt'),
+            'table_cell_pad' => $request->query('table_cell_pad'),
+            'table_cell_max_px' => $request->query('table_cell_max_px'),
+            'include_dynamic_table' => $request->boolean('include_dynamic_table', true),
+            'table_align' => (string) $request->query('table_align', 'left'),
+            'summary_kpi_keys' => $request->query('summary_kpi_keys', '[]'),
+            'totals_column_keys' => $request->query('totals_column_keys', '[]'),
+        ];
+
+        return response()->json($this->analysisWordService->buildPreviewPayload($module, $config));
+    }
+
+    public function exportAnalysisWord(Request $request, int $module): RedirectResponse
+    {
+        abort_unless($request->user()->can('Modulos-Temporales-Admin'), 403);
+        $validated = $request->validate([
+            'include_summary' => 'nullable|in:0,1',
+            'include_mr_table' => 'nullable|in:0,1',
+            'doc_title' => 'nullable|string|max:240',
+            'title_align' => 'nullable|in:left,center,right',
+            'subtitle' => 'nullable|string|max:500',
+            'orientation' => 'nullable|in:portrait,landscape',
+            'column_keys' => 'nullable|string|max:8000',
+            'table_font_pt' => 'nullable|integer|min:7|max:12',
+            'table_cell_pad' => 'nullable|integer|min:2|max:16',
+            'table_cell_max_px' => 'nullable|integer|min:72|max:280',
+            'include_dynamic_table' => 'nullable|in:0,1',
+            'table_align' => 'nullable|in:left,center,right,stretch',
+            'summary_kpi_keys' => 'nullable|string|max:4000',
+            'totals_column_keys' => 'nullable|string|max:4000',
+        ]);
+        $config = [
+            'include_summary' => ($validated['include_summary'] ?? '1') === '1',
+            'include_mr_table' => ($validated['include_mr_table'] ?? '1') === '1',
+            'include_dynamic_table' => ($validated['include_dynamic_table'] ?? '1') === '1',
+            'doc_title' => trim((string) ($validated['doc_title'] ?? '')),
+            'title_align' => $validated['title_align'] ?? 'center',
+            'subtitle' => trim((string) ($validated['subtitle'] ?? '')),
+            'orientation' => $validated['orientation'] ?? 'portrait',
+            'column_keys' => $validated['column_keys'] ?? '[]',
+            'table_font_pt' => $validated['table_font_pt'] ?? 9,
+            'table_cell_pad' => $validated['table_cell_pad'] ?? 6,
+            'table_cell_max_px' => $validated['table_cell_max_px'] ?? 140,
+            'table_align' => $validated['table_align'] ?? 'left',
+            'summary_kpi_keys' => $validated['summary_kpi_keys'] ?? '[]',
+            'totals_column_keys' => $validated['totals_column_keys'] ?? '[]',
+        ];
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+        $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$module;
+        $exportRequestId = Str::uuid()->toString();
+        $request->user()->notify(new \App\Notifications\ExcelExportPending($exportRequestId, $fileName, 'word'));
+        GenerateTemporaryModuleAnalysisWordJob::dispatchAfterResponse(
+            $module,
+            $request->user()->id,
+            $exportRequestId,
+            $config
+        );
+
+        return redirect()->back()->with('toast', 'Generación del informe Word en segundo plano. Revisa notificaciones.');
+    }
+
     public function downloadExport(Request $request, string $file): BinaryFileResponse
     {
         abort_unless($request->user()->can('Modulos-Temporales-Admin'), 403);
 
         $file = trim($file);
-        abort_unless($file !== '' && preg_match('/\A[A-Za-z0-9_\-]+\.xlsx\z/', $file) === 1, 404);
+        abort_unless($file !== '' && preg_match('/\A[A-Za-z0-9_\-]+\.(xlsx|docx)\z/', $file) === 1, 404);
 
         $path = storage_path('app/public/temporary-exports/'.$file);
         abort_unless(is_file($path), 404);
@@ -914,11 +989,12 @@ class TemporaryModuleController extends Controller
         return response()->download($path, $file);
     }
 
-    public function previewEntryFile(Request $request, int $entry, string $fieldKey)
+    public function previewEntryFile(Request $request, int $module, int $entry, string $fieldKey)
     {
         $entryModel = TemporaryModuleEntry::query()->with('module')->findOrFail($entry);
+        abort_unless((int) $entryModel->temporary_module_id === $module, 404);
 
-        if (!$request->user()->can('Modulos-Temporales-Admin')) {
+        if (! $request->user()->can('Modulos-Temporales-Admin')) {
             abort_unless((int) $entryModel->user_id === (int) $request->user()->id, 403);
             abort_unless($this->accessService->userCanAccessModule($entryModel->module, (int) $request->user()->id), 403);
         }

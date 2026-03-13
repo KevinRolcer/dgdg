@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         }
                     })
                     .catch(function () {});
-            }, 10000);
+            }, 4000);
             exportPollIntervals[id] = intervalId;
         });
     }

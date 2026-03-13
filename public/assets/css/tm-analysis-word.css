@@ -1,0 +1,451 @@
+/* Modal informe Word análisis — módulos temporales */
+.tm-analysis-word-dialog {
+    max-width: min(96vw, 1100px);
+    width: 100%;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+}
+.tm-analysis-word-body {
+    display: grid;
+    grid-template-columns: minmax(240px, 280px) 1fr;
+    gap: 16px;
+    align-items: start;
+    overflow: auto;
+    max-height: calc(92vh - 140px);
+    padding: 12px 0;
+}
+@media (max-width: 768px) {
+    .tm-analysis-word-body { grid-template-columns: 1fr; }
+}
+.tm-analysis-sidebar {
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 14px;
+    border: 1px solid var(--clr-border, #e2e8f0);
+}
+.tm-analysis-sidebar-title {
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+    margin: 0 0 8px;
+}
+.tm-analysis-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.tm-analysis-hr { margin: 12px 0; border: none; border-top: 1px solid #e2e8f0; }
+.tm-analysis-grid-inputs {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.tm-analysis-grid-inputs label { font-size: 0.8rem; display: flex; flex-direction: column; gap: 4px; }
+.tm-input-sm { max-width: 72px; }
+.tm-analysis-build-grid, #tmAnalysisRefreshPreview { width: 100%; margin-bottom: 8px; justify-content: center; }
+.tm-analysis-hint { font-size: 0.7rem; color: #64748b; margin: 10px 0 0; line-height: 1.35; }
+.tm-analysis-preview-panel {
+    min-width: 0;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px;
+}
+.tm-analysis-preview-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 8px;
+}
+.tm-analysis-preview-doc {
+    background: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    min-height: 280px;
+    padding: 20px 24px;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.03);
+    overflow: auto;
+    max-height: 55vh;
+}
+.tm-analysis-doc-inner { font-family: Calibri, 'Segoe UI', sans-serif; font-size: 11pt; color: #111; }
+.tm-analysis-doc-title { color: #861E34; font-size: 16pt; margin: 0 0 4px; }
+.tm-analysis-doc-sub { font-size: 9pt; color: #666; margin: 0 0 12px; }
+.tm-analysis-mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+    font-size: 10pt;
+}
+.tm-analysis-mini-table th, .tm-analysis-mini-table td {
+    border: 1px solid #861E34;
+    padding: 6px 10px;
+    text-align: left;
+}
+.tm-analysis-mini-table th { background: #861E34; color: #fff; width: 42%; }
+.tm-analysis-big-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8pt;
+    margin-bottom: 12px;
+}
+.tm-analysis-big-table th, .tm-analysis-big-table td {
+    border: 1px solid #861E34;
+    padding: 4px 6px;
+    vertical-align: top;
+}
+.tm-analysis-big-table thead th { background: #861E34; color: #fff; }
+.tm-analysis-grid-table { border-collapse: collapse; margin-top: 8px; }
+.tm-analysis-grid-table td {
+    border: 1px solid #999;
+    min-width: 48px;
+    height: 28px;
+    background: #fff;
+}
+.tm-analysis-preview-loading { padding: 24px; text-align: center; color: #64748b; }
+.tm-analysis-err { color: #b91c1c; padding: 16px; }
+
+.tm-analysis-word-head-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.tm-analysis-word-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+/* Modal personalizar Word encima del modal simple */
+.tm-analysis-word-personalize-modal.is-open {
+    z-index: 10060;
+}
+.tm-analysis-word-personalize-modal .tm-modal-backdrop {
+    z-index: 10059;
+}
+.tm-analysis-word-personalize-dialog {
+    z-index: 10061;
+    max-width: min(96vw, 1200px);
+    width: min(96vw, 1200px);
+}
+/* Mismo layout que Excel: formulario izquierda, vista previa derecha */
+.tm-analysis-word-personalize-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0 1rem 0.5rem;
+}
+.tm-analysis-word-personalize-content.tm-export-personalize-content {
+    flex: 1;
+    min-height: 0;
+    max-height: min(72vh, 640px);
+}
+.tm-analysis-word-preview-wrap {
+    min-height: 280px;
+}
+.tm-analysis-word-preview-wrap .tm-export-preview-toolbar {
+    flex-wrap: wrap;
+}
+.tm-analysis-word-preview-wrap .tm-export-toolbar-controls {
+    margin-left: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+/* Área gris: scroll para ver hoja A4 completa; zoom con Ctrl+rueda / pellizco */
+.tm-analysis-word-preview-a4 {
+    min-height: 240px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    padding: 12px 16px;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+.tm-word-preview-zoom-hint {
+    font-weight: 500;
+    color: #64748b;
+    font-size: 0.72em;
+}
+/* ISO 216 A4: 210 mm × 297 mm (vertical); apaisado 297 mm × 210 mm */
+.tm-word-preview-page {
+    margin: 0 auto;
+    background: #fff;
+    border: 2px dotted #c00;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    box-sizing: border-box;
+    flex-shrink: 0;
+    flex-grow: 0;
+    transition: transform 0.12s ease-out;
+}
+.tm-word-preview-page--portrait {
+    width: 210mm;
+    height: 297mm;
+    min-width: 210mm;
+    min-height: 297mm;
+    max-width: 210mm;
+    max-height: 297mm;
+    overflow: hidden;
+}
+.tm-word-preview-page--landscape {
+    width: 297mm;
+    height: 210mm;
+    min-width: 297mm;
+    min-height: 210mm;
+    max-width: 297mm;
+    max-height: 210mm;
+    overflow: hidden;
+}
+.tm-word-preview-zoom-wrap {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    box-sizing: border-box;
+    overflow: auto;
+}
+.tm-analysis-preview-doc--personalize {
+    min-height: 280px;
+    max-height: none;
+    height: 100%;
+    box-sizing: border-box;
+}
+/* Rellena el marco A4; el scroll es dentro del marco */
+.tm-analysis-word-preview-a4 .tm-analysis-preview-doc--personalize {
+    min-height: 100%;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    min-height: min(100%, 280px);
+    box-sizing: border-box;
+    padding: 10px 12px;
+}
+.tm-analysis-word-preview-a4.tm-word-a4-portrait .tm-word-preview-page--portrait .tm-analysis-preview-doc--personalize {
+    max-height: calc(297mm - 8px);
+    min-height: min-content;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+.tm-analysis-word-preview-a4.tm-word-a4-landscape .tm-word-preview-page--landscape .tm-analysis-preview-doc--personalize {
+    max-height: calc(210mm - 8px);
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+/* Vista previa: imagen de la hoja real (plantilla); el informe se dibuja encima del área de cuerpo */
+.tm-word-sheet-preview {
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    aspect-ratio: 8.5 / 11; /* hoja en blanco vertical */
+    background-size: 100% 100%;
+    background-position: center top;
+    background-repeat: no-repeat;
+    background-color: #e8e8e8;
+    position: relative;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+    border-radius: 2px;
+}
+.tm-word-sheet-overlay {
+    position: absolute;
+    /* Zona bajo el membrete y sobre la marca de agua (ajustable si cambias la captura) */
+    top: 26%;
+    left: 7.5%;
+    right: 7.5%;
+    bottom: 9%;
+    overflow: auto;
+    font-size: 0.62rem;
+    line-height: 1.35;
+    -webkit-overflow-scrolling: touch;
+}
+.tm-word-overlay-inner .tm-analysis-doc-title {
+    font-size: 11pt;
+    margin: 0 0 4px;
+}
+.tm-word-overlay-inner .tm-analysis-mini-table,
+.tm-word-overlay-inner .tm-analysis-big-table {
+    font-size: 0.55rem;
+}
+.tm-word-overlay-inner .tm-analysis-mini-table th,
+.tm-word-overlay-inner .tm-analysis-mini-table td {
+    padding: 4px 6px;
+}
+@media (max-width: 768px) {
+    .tm-analysis-word-personalize-content.tm-export-personalize-content {
+        flex-direction: column;
+        max-height: none;
+    }
+    .tm-analysis-word-personalize-content .tm-export-personalize-form {
+        max-width: 100%;
+        border-right: 0;
+        border-bottom: 1px solid var(--clr-border, #e2e8f0);
+        max-height: 42vh;
+    }
+    .tm-analysis-word-preview-a4 {
+        min-height: 200px;
+        max-height: 50vh;
+    }
+}
+
+/* Word personalizar: orientación, paleta arrastrable, columnas */
+.tm-word-orient-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.tm-word-orient-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--clr-border, #e2e8f0);
+    border-radius: 8px;
+    background: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.tm-word-orient-btn.is-active {
+    background: var(--clr-primary, #861E34);
+    color: #fff;
+    border-color: var(--clr-primary, #861E34);
+}
+.tm-word-field-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 120px;
+    overflow-y: auto;
+    padding: 8px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px dashed #cbd5e1;
+    margin-top: 6px;
+}
+.tm-word-field-chip {
+    display: inline-block;
+    padding: 4px 8px;
+    font-size: 0.68rem;
+    background: #fff;
+    border: 1px solid #861E34;
+    border-radius: 6px;
+    cursor: grab;
+    max-width: 100%;
+    word-break: break-word;
+}
+.tm-word-field-chip:active { cursor: grabbing; }
+.tm-word-column-slots-wrap { margin-top: 10px; }
+.tm-word-column-slots {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+    margin-top: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+.tm-word-slot {
+    border: 2px dashed #94a3b8;
+    border-radius: 8px;
+    min-height: 72px;
+    padding: 6px;
+    font-size: 0.65rem;
+    position: relative;
+    background: #fff;
+}
+.tm-word-slot.is-filled { border-style: solid; border-color: #861E34; }
+.tm-word-slot.is-dragover { background: #fef2f2; }
+.tm-word-slot-num {
+    position: absolute;
+    top: 4px;
+    left: 6px;
+    font-size: 0.6rem;
+    color: #94a3b8;
+    font-weight: 700;
+}
+.tm-word-slot-body { padding-top: 14px; }
+.tm-word-slot-label { display: block; font-size: 0.68rem; color: #1e293b; }
+.tm-word-slot-ref {
+    margin-top: 4px;
+    font-size: 0.6rem;
+    color: #475569;
+    line-height: 1.3;
+    max-height: 3.2em;
+    overflow: hidden;
+    word-break: break-word;
+}
+.tm-word-slot-clear {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    border: none;
+    background: none;
+    color: #b91c1c;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 4px;
+}
+.tm-word-slot-drop { color: #94a3b8; font-size: 0.65rem; }
+.tm-word-preview-sheet { width: 100%; }
+.tm-word-prev-section { font-weight: 700; font-size: 0.65rem; margin: 8px 0 4px; color: #64748b; }
+.tm-word-table-block { margin-bottom: 10px; width: 100%; }
+.tm-word-table-block--left .tm-word-table-scroll,
+.tm-word-table-block--left .tm-word-dyn-scroll { margin-left: 0; margin-right: auto; }
+.tm-word-table-block--center .tm-word-table-scroll,
+.tm-word-table-block--center .tm-word-dyn-scroll { margin-left: auto; margin-right: auto; }
+.tm-word-table-block--right .tm-word-table-scroll,
+.tm-word-table-block--right .tm-word-dyn-scroll { margin-left: auto; margin-right: 0; }
+.tm-word-table-block--stretch .tm-word-table-scroll--stretch,
+.tm-word-table-block--stretch .tm-word-dyn-scroll.tm-word-table-scroll--stretch {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+}
+.tm-word-table-scroll {
+    overflow: auto;
+    max-width: 100%;
+    margin-bottom: 0;
+    -webkit-overflow-scrolling: touch;
+}
+.tm-word-table-stretch {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse;
+}
+.tm-word-table-stretch th,
+.tm-word-table-stretch td { max-width: none !important; width: auto !important; min-width: 0 !important; }
+.tm-word-tables-fixed .tm-analysis-mini-table.tm-word-table-fixed,
+.tm-word-tables-fixed .tm-analysis-big-table.tm-word-table-fixed,
+.tm-word-dyn-table.tm-word-table-fixed {
+    width: max-content !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+.tm-word-dyn-scroll { overflow: auto; max-height: 180px; margin-top: 4px; max-width: 100%; }
+.tm-word-dyn-table {
+    border-collapse: collapse;
+    width: max-content;
+    min-width: 0;
+    table-layout: fixed;
+}
+.tm-word-dyn-table th, .tm-word-dyn-table td {
+    border: 1px solid #cbd5e1;
+    vertical-align: top;
+    word-break: break-word;
+}
+.tm-word-dyn-table th { background: #f1f5f9; font-weight: 700; }
+.tm-word-accounting-fields { max-height: 160px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #fafafa; margin-bottom: 8px; }
+.tm-word-acc-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.78rem; }
+.tm-word-acc-row:last-child { border-bottom: 0; }
+.tm-word-acc-label { flex: 1; min-width: 100px; font-weight: 600; color: #334155; }
+.tm-word-accounting-summary { border-collapse: collapse; width: max-content; max-width: 100%; margin-bottom: 10px; font-size: 0.68rem; }
+.tm-word-accounting-summary th { background: #861E34; color: #fff; padding: 6px 10px; border: 1px solid #861E34; font-weight: 700; text-align: center; white-space: nowrap; }
+.tm-word-accounting-summary td.tm-word-accounting-val { background: #fff; color: #b91c1c; font-weight: 700; padding: 8px 10px; border: 1px solid #861E34; text-align: center; }
+.tm-word-totals-row td { font-weight: 700 !important; }

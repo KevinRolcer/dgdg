@@ -67,8 +67,9 @@ class GenerateTemporaryModuleExcelJob implements ShouldQueue
             $notification->update([
                 'type' => ExcelExportCompleted::class,
                 'data' => [
+                    'export_request_id' => $this->exportRequestId,
                     'icon' => 'fa-solid fa-file-excel',
-                    'title' => 'Documento generado exitosamente: '.$fileName,
+                    'title' => 'Excel listo: '.$fileName,
                     'url' => $downloadUrl,
                     'file_name' => $fileName,
                     'export_status' => 'completed',
@@ -88,6 +89,7 @@ class GenerateTemporaryModuleExcelJob implements ShouldQueue
             $notification->update([
                 'type' => ExcelExportCompleted::class,
                 'data' => [
+                    'export_request_id' => $this->exportRequestId,
                     'icon' => 'fa-solid fa-circle-exclamation',
                     'title' => 'Error al generar el Excel',
                     'url' => null,

@@ -80,20 +80,11 @@ class TemporaryModuleExportService
             ? 'landscape'
             : 'portrait';
 
-        // Si hay hoja de análisis, la primera hoja se usa para eso.
-        // Si NO hay análisis, la primera hoja se reserva para datos y no creamos una vacía adicional.
-        $usedDataSheet = $includeAnalysis;
-
         $fechaCorte = now();
 
-        if ($includeAnalysis) {
-            $analysisSheet = $spreadsheet->getActiveSheet();
-            $analysisSheet->setTitle('Análisis General');
-            $this->fillAnalysisSheet($analysisSheet, $temporaryModule);
-            $this->applyPrintSetup($analysisSheet, $orientation);
-        } else {
-            $spreadsheet->getActiveSheet()->setTitle('Registros');
-        }
+        // Sin hoja de análisis en Excel (informe Word aparte). Primera hoja = datos.
+        $usedDataSheet = false;
+        $spreadsheet->getActiveSheet()->setTitle('Registros');
 
         $microrregionIds = $temporaryModule->entries()
             ->withoutGlobalScopes()

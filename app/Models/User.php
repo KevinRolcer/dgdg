@@ -52,4 +52,14 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Microrregione::class, 'user_microrregion', 'user_id', 'microrregion_id');
     }
+
+    public function delegado()
+    {
+        return $this->hasOne(\App\Models\Delegado::class, 'user_id');
+    }
+
+    public function enlace()
+    {
+        return $this->hasOne(\App\Models\Enlace::class, 'user_id');
+    }
 }

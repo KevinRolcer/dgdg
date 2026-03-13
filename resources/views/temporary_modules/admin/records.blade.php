@@ -2,6 +2,7 @@
 
 @push('css')
 <link rel="stylesheet" href="{{ asset('assets/css/modules/temporary-modules.css') }}?v={{ @filemtime(public_path('assets/css/modules/temporary-modules.css')) ?: time() }}">
+<link rel="stylesheet" href="{{ asset('assets/css/tm-analysis-word.css') }}?v={{ @filemtime(public_path('assets/css/tm-analysis-word.css')) ?: time() }}">
 @endpush
 
 @push('scripts')
@@ -64,6 +65,8 @@
                                     data-open-export-options
                                     data-export-url="{{ route('temporary-modules.admin.export', $module->id) }}"
                                     data-structure-url="{{ route('temporary-modules.admin.export-preview-structure', $module->id) }}"
+                                    data-analysis-preview-url="{{ route('temporary-modules.admin.analysis-preview', $module->id) }}"
+                                    data-analysis-word-url="{{ route('temporary-modules.admin.export-analysis-word', $module->id) }}"
                                 >
                                     Exportar Excel
                                 </button>
@@ -165,7 +168,7 @@
                                                         type="button"
                                                         class="tm-thumb-link"
                                                         data-open-image-preview
-                                                        data-image-src="{{ route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) }}"
+                                                        data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) }}"
                                                         data-image-title="{{ $field->label }}"
                                                         title="Ver imagen"
                                                     >
@@ -302,6 +305,169 @@
             </div>
         </div>
     </div>
+
+    {{-- Informe de análisis (Word): vista previa + opciones --}}
+    <div class="tm-modal tm-analysis-word-modal" id="tmAnalysisWordModal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="tm-modal-backdrop" data-close-analysis-word></div>
+        <div class="tm-modal-dialog tm-analysis-word-dialog">
+            <div class="tm-modal-head tm-analysis-word-head-row">
+                <h3>Informe de análisis (Word)</h3>
+                <div class="tm-analysis-word-head-actions">
+                    <button type="button" class="tm-btn tm-btn-primary" id="tmAnalysisOpenPersonalize" title="Título, alineación y vista previa del .docx">
+                        <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Editar y exportar
+                    </button>
+                    <button type="button" class="tm-modal-close" data-close-analysis-word aria-label="Cerrar">&times;</button>
+                </div>
+            </div>
+            <div class="tm-modal-body tm-analysis-word-body">
+                <aside class="tm-analysis-sidebar">
+                    <p class="tm-analysis-sidebar-title">Qué incluir</p>
+                    <label class="tm-analysis-check"><input type="checkbox" id="tmAnalysisIncludeSummary" checked> Resumen (totales)</label>
+                    <label class="tm-analysis-check"><input type="checkbox" id="tmAnalysisIncludeMrTable" checked> Tabla por microrregión / municipios</label>
+                    <hr class="tm-analysis-hr">
+                    <p class="tm-analysis-sidebar-title">Tabla vacía extra</p>
+                    <div class="tm-analysis-grid-inputs">
+                        <label>Filas <input type="number" id="tmAnalysisCustomRows" min="0" max="30" value="0" class="tm-input tm-input-sm"></label>
+                        <label>Columnas <input type="number" id="tmAnalysisCustomCols" min="0" max="12" value="0" class="tm-input tm-input-sm"></label>
+                    </div>
+                    <button type="button" class="tm-btn tm-btn-outline tm-analysis-build-grid" id="tmAnalysisBuildGridBtn">Crear tabla N×M en vista previa</button>
+                    <button type="button" class="tm-btn tm-btn-outline" id="tmAnalysisRefreshPreview">Actualizar vista previa</button>
+                    <p class="tm-analysis-hint">Basado en el mismo criterio que el antiguo Excel de análisis. El Excel de datos ya no incluye esa hoja.</p>
+                </aside>
+                <div class="tm-analysis-preview-panel">
+                    <div class="tm-analysis-preview-label">Vista previa (estilo informe)</div>
+                    <div class="tm-analysis-preview-doc" id="tmAnalysisPreviewDoc">
+                        <div class="tm-analysis-preview-loading" id="tmAnalysisPreviewLoading">Cargando…</div>
+                    </div>
+                </div>
+            </div>
+            <div class="tm-modal-foot">
+                <button type="button" class="tm-btn tm-btn-outline" data-close-analysis-word>Cancelar</button>
+                <form method="POST" id="tmAnalysisWordForm" class="tm-inline-form">
+                    @csrf
+                    <input type="hidden" name="include_summary" id="tmAnalysisFormSummary" value="1">
+                    <input type="hidden" name="include_mr_table" id="tmAnalysisFormMrTable" value="1">
+                    <input type="hidden" name="custom_rows" id="tmAnalysisFormRows" value="0">
+                    <input type="hidden" name="custom_cols" id="tmAnalysisFormCols" value="0">
+                    <button type="submit" class="tm-btn tm-btn-success">Generar Word (notificación al terminar)</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- Personalizar informe Word (.docx) — se abre con «Editar y exportar» --}}
+    <div class="tm-modal tm-export-personalize-modal tm-analysis-word-personalize-modal" id="tmAnalysisWordPersonalizeModal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="tm-modal-backdrop" data-close-analysis-word-personalize></div>
+        <div class="tm-modal-dialog tm-export-personalize-dialog tm-analysis-word-personalize-dialog">
+            <div class="tm-modal-head">
+                <h3>Personalizar informe Word (.docx)</h3>
+                <button type="button" class="tm-modal-close" data-close-analysis-word-personalize aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="tm-modal-body tm-analysis-word-personalize-body">
+                <div class="tm-export-personalize-content tm-analysis-word-personalize-content">
+                    <div class="tm-export-personalize-form tm-analysis-word-personalize-form">
+                        <div class="tm-export-personalize-field">
+                            <label for="tmWordDocTitle">Título del documento</label>
+                            <input type="text" id="tmWordDocTitle" class="tm-input" placeholder="Ej. Análisis general — nombre del módulo">
+                        </div>
+                        <div class="tm-export-personalize-field">
+                            <label for="tmWordSubtitle">Subtítulo (opcional)</label>
+                            <input type="text" id="tmWordSubtitle" class="tm-input" placeholder="Línea bajo el título">
+                        </div>
+                        <div class="tm-export-personalize-field tm-export-title-align">
+                            <span class="tm-export-label-inline">Alineación del título</span>
+                            <div class="tm-export-align-btns" role="group">
+                                <button type="button" class="tm-export-align-btn" data-word-title-align="left">Izq</button>
+                                <button type="button" class="tm-export-align-btn is-active" data-word-title-align="center">Centro</button>
+                                <button type="button" class="tm-export-align-btn" data-word-title-align="right">Der</button>
+                            </div>
+                        </div>
+                        <p class="tm-analysis-sidebar-title" style="margin-top:14px;">Qué tablas incluir en el informe</p>
+                        <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeSummary" checked> Resumen (totales)</label>
+                        <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeMrTable" checked> Tabla microrregión / municipios</label>
+                        <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeDynamic" checked> Tabla por registro (columnas elegidas)</label>
+                        <p class="tm-analysis-sidebar-title" style="margin-top:12px;">Alineación / ancho de tablas</p>
+                        <div class="tm-export-align-btns tm-word-table-align-btns" role="group" aria-label="Alineación tablas" style="flex-wrap:wrap;margin-bottom:10px;">
+                            <button type="button" class="tm-export-align-btn is-active" data-word-table-align="left">Izquierda</button>
+                            <button type="button" class="tm-export-align-btn" data-word-table-align="center">Centrada</button>
+                            <button type="button" class="tm-export-align-btn" data-word-table-align="right">Derecha</button>
+                            <button type="button" class="tm-export-align-btn" data-word-table-align="stretch" title="Ocupa todo el ancho útil">Ajustar ancho</button>
+                        </div>
+                        <p class="tm-analysis-sidebar-title" style="margin-top:12px;">Tablas (texto y celdas)</p>
+                        <div class="tm-word-table-opts" style="display:grid;gap:8px;margin-bottom:10px;">
+                            <label class="tm-analysis-hint" style="display:flex;align-items:center;gap:8px;margin:0;">Texto (pt)
+                                <select id="tmWordTableFontPt" class="tm-input tm-input-sm" style="max-width:80px;">
+                                    @foreach ([7,8,9,10,11,12] as $pt)<option value="{{ $pt }}" {{ $pt === 9 ? 'selected' : '' }}>{{ $pt }}</option>@endforeach
+                                </select>
+                            </label>
+                            <label class="tm-analysis-hint" style="display:flex;align-items:center;gap:8px;margin:0;">Relleno celdas (px)
+                                <select id="tmWordTableCellPad" class="tm-input tm-input-sm" style="max-width:80px;">
+                                    @foreach ([3,4,6,8,10,12] as $px)<option value="{{ $px }}" {{ $px === 6 ? 'selected' : '' }}>{{ $px }}</option>@endforeach
+                                </select>
+                            </label>
+                            <label class="tm-analysis-hint" style="display:flex;align-items:center;gap:8px;margin:0;">Ancho máx. celda dinámica (px)
+                                <input type="number" id="tmWordTableCellMax" class="tm-input tm-input-sm" min="72" max="280" value="140" style="max-width:80px;">
+                            </label>
+                        </div>
+                        <p class="tm-analysis-hint" style="margin:10px 0 6px;">Tabla dinámica: arrastra cada campo a una columna (máx. 12). Referencia = primer registro.</p>
+                        <div class="tm-word-field-palette" id="tmWordFieldPalette" aria-label="Campos del módulo"></div>
+                        <div class="tm-word-column-slots-wrap">
+                            <span class="tm-export-label-inline">Columnas a exportar</span>
+                            <div class="tm-word-column-slots" id="tmWordColumnSlots"></div>
+                        </div>
+                        <p class="tm-analysis-sidebar-title" style="margin-top:12px;">Estándar contable (desglose)</p>
+                        <p class="tm-analysis-hint" style="margin:0 0 6px;">Arriba: KPIs en una fila. Abajo de la tabla: totales (suma números ≥0; en Sí/No solo cuenta <strong>Sí</strong>).</p>
+                        <div id="tmWordAccountingFields" class="tm-word-accounting-fields"></div>
+                        <button type="button" class="tm-btn tm-btn-outline" id="tmWordRefreshPreviewBtn" style="width:100%;margin-top:10px;">Actualizar vista previa</button>
+                    </div>
+                    <div class="tm-export-personalize-preview-wrap tm-analysis-word-preview-wrap">
+                        <div class="tm-export-preview-toolbar">
+                            <span class="tm-export-preview-label">Vista previa A4 <span class="tm-word-preview-zoom-hint" title="Pellizco en trackpad o Ctrl + rueda">· zoom con trackpad</span></span>
+                            <div class="tm-export-toolbar-controls" aria-label="Zoom y orientación">
+                                <div class="tm-export-zoom-btns">
+                                    <button type="button" class="tm-export-zoom-btn" data-word-zoom-out title="Alejar" aria-label="Alejar">−</button>
+                                    <button type="button" class="tm-export-zoom-reset" data-word-zoom-reset title="100%" aria-label="Zoom 100%"><span id="tmWordZoomValue">100</span>%</button>
+                                    <button type="button" class="tm-export-zoom-btn" data-word-zoom-in title="Acercar" aria-label="Acercar">+</button>
+                                </div>
+                                <div class="tm-word-orient-btns tm-export-orient-group" role="group" aria-label="Orientación de la hoja">
+                                    <button type="button" class="tm-word-orient-btn is-active" data-word-orient="portrait">Vertical</button>
+                                    <button type="button" class="tm-word-orient-btn" data-word-orient="landscape">Horizontal</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tm-export-preview-a4 tm-analysis-word-preview-a4" id="tmWordPreviewA4Area" title="Hoja A4 · Ctrl + rueda o pellizco para zoom">
+                            <div class="tm-word-preview-page tm-word-preview-page--portrait" id="tmWordPreviewPage">
+                                <div class="tm-export-preview-zoom-wrap tm-word-preview-zoom-wrap" id="tmWordPreviewZoomWrap">
+                                    <div class="tm-analysis-preview-doc tm-analysis-preview-doc--personalize" id="tmWordPersonalizePreview"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tm-modal-foot">
+                <button type="button" class="tm-btn tm-btn-outline" data-close-analysis-word-personalize>Volver</button>
+                <form method="POST" id="tmAnalysisWordPersonalizeForm" class="tm-inline-form">
+                    @csrf
+                    <input type="hidden" name="include_summary" id="tmWordFormSummary" value="1">
+                    <input type="hidden" name="include_mr_table" id="tmWordFormMrTable" value="1">
+                    <input type="hidden" name="include_dynamic_table" id="tmWordFormDynamic" value="1">
+                    <input type="hidden" name="table_align" id="tmWordFormTableAlign" value="left">
+                    <input type="hidden" name="doc_title" id="tmWordFormDocTitle" value="">
+                    <input type="hidden" name="title_align" id="tmWordFormTitleAlign" value="center">
+                    <input type="hidden" name="subtitle" id="tmWordFormSubtitle" value="">
+                    <input type="hidden" name="orientation" id="tmWordFormOrientation" value="portrait">
+                    <input type="hidden" name="column_keys" id="tmWordFormColumnKeys" value="[]">
+                    <input type="hidden" name="table_font_pt" id="tmWordFormTableFontPt" value="9">
+                    <input type="hidden" name="table_cell_pad" id="tmWordFormTableCellPad" value="6">
+                    <input type="hidden" name="table_cell_max_px" id="tmWordFormTableCellMax" value="140">
+                    <input type="hidden" name="summary_kpi_keys" id="tmWordFormSummaryKpiKeys" value="[]">
+                    <input type="hidden" name="totals_column_keys" id="tmWordFormTotalsColumnKeys" value="[]">
+                    <button type="submit" class="tm-btn tm-btn-success">Generar Word con esta configuración</button>
+                </form>
+            </div>
+        </div>
+    </div>
 </section>
 @endsection
 
@@ -332,6 +498,522 @@
         const textToggleButtons = Array.from(document.querySelectorAll('[data-text-toggle]'));
         const cellExpandButtons = Array.from(document.querySelectorAll('[data-cell-expand]'));
         const exportButtons = Array.from(document.querySelectorAll('[data-open-export-options]'));
+        const analysisModal = document.getElementById('tmAnalysisWordModal');
+        const analysisForm = document.getElementById('tmAnalysisWordForm');
+        const analysisPreviewDoc = document.getElementById('tmAnalysisPreviewDoc');
+        const analysisLoading = document.getElementById('tmAnalysisPreviewLoading');
+
+        function openAnalysisWordModal(previewUrl, wordUrl) {
+            if (!analysisModal || !analysisForm) return;
+            window._tmAnalysisPreviewUrl = previewUrl;
+            window._tmAnalysisWordUrl = wordUrl;
+            analysisForm.setAttribute('action', wordUrl);
+            analysisModal.classList.add('is-open');
+            analysisModal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+            loadAnalysisPreview(previewUrl);
+        }
+        function closeAnalysisWordModal() {
+            if (!analysisModal) return;
+            analysisModal.classList.remove('is-open');
+            analysisModal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+        }
+        function loadAnalysisPreview(baseUrl) {
+            if (!analysisPreviewDoc) return;
+            var sum = document.getElementById('tmAnalysisIncludeSummary');
+            var mr = document.getElementById('tmAnalysisIncludeMrTable');
+            var rows = document.getElementById('tmAnalysisCustomRows');
+            var cols = document.getElementById('tmAnalysisCustomCols');
+            var u = baseUrl + '?include_summary=' + (sum && sum.checked ? '1' : '0')
+                + '&include_mr_table=' + (mr && mr.checked ? '1' : '0')
+                + '&custom_rows=' + (rows ? rows.value : '0')
+                + '&custom_cols=' + (cols ? cols.value : '0');
+            if (analysisLoading) { analysisLoading.hidden = false; analysisLoading.style.display = 'block'; }
+            fetch(u, { headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (analysisLoading) { analysisLoading.hidden = true; analysisLoading.style.display = 'none'; }
+                    var html = '<div class="tm-analysis-doc-inner">';
+                    html += '<h4 class="tm-analysis-doc-title">' + escapeHtml(data.module_name || 'Módulo') + '</h4>';
+                    html += '<p class="tm-analysis-doc-sub">Análisis general</p>';
+                    if (data.summary) {
+                        html += '<table class="tm-analysis-mini-table">';
+                        Object.keys(data.summary).forEach(function (k) {
+                            html += '<tr><th>' + escapeHtml(k) + '</th><td>' + escapeHtml(String(data.summary[k])) + '</td></tr>';
+                        });
+                        html += '</table>';
+                    }
+                    if (data.mr_table && data.mr_headers) {
+                        html += '<table class="tm-analysis-big-table"><thead><tr>';
+                        data.mr_headers.forEach(function (h) { html += '<th>' + escapeHtml(h) + '</th>'; });
+                        html += '</tr></thead><tbody>';
+                        data.mr_table.slice(0, 8).forEach(function (row) {
+                            html += '<tr>';
+                            html += '<td>' + escapeHtml(String(row.microrregion || '')).substring(0, 40) + '</td>';
+                            html += '<td>' + escapeHtml(String(row.registros)) + '</td>';
+                            html += '<td>' + escapeHtml(String(row.municipios_capturados)) + '</td>';
+                            html += '<td>' + escapeHtml(String(row.lista_capturados || '').substring(0, 80)) + '</td>';
+                            html += '<td>' + escapeHtml(String(row.faltantes_count)) + '</td>';
+                            html += '<td>' + escapeHtml(String(row.lista_faltantes || '').substring(0, 80)) + '</td>';
+                            html += '</tr>';
+                        });
+                        if (data.mr_table.length > 8) html += '<tr><td colspan="6">… +' + (data.mr_table.length - 8) + ' filas</td></tr>';
+                        html += '</tbody></table>';
+                    }
+                    if (data.custom_table && data.custom_table.rows) {
+                        html += '<p class="tm-analysis-doc-sub">Tabla personalizada</p><table class="tm-analysis-grid-table">';
+                        for (var i = 0; i < data.custom_table.rows; i++) {
+                            html += '<tr>';
+                            for (var j = 0; j < data.custom_table.cols; j++) html += '<td>&nbsp;</td>';
+                            html += '</tr>';
+                        }
+                        html += '</table>';
+                    }
+                    html += '</div>';
+                    analysisPreviewDoc.innerHTML = html;
+                })
+                .catch(function () {
+                    if (analysisLoading) { analysisLoading.hidden = true; }
+                    analysisPreviewDoc.innerHTML = '<p class="tm-analysis-err">No se pudo cargar la vista previa.</p>';
+                });
+        }
+        var wordPersonalizeModal = document.getElementById('tmAnalysisWordPersonalizeModal');
+        var wordPersonalizeForm = document.getElementById('tmAnalysisWordPersonalizeForm');
+        var wordPersonalizePreview = document.getElementById('tmWordPersonalizePreview');
+        var tmWordSlotKeys = new Array(12).fill('');
+        function tmWordColumnKeysJson() {
+            return JSON.stringify(tmWordSlotKeys.filter(function (k) { return k; }));
+        }
+        function tmWordRebuildPalette(fields) {
+            var pal = document.getElementById('tmWordFieldPalette');
+            if (!pal || !fields || !fields.length) return;
+            pal.innerHTML = '';
+            fields.forEach(function (f) {
+                var chip = document.createElement('span');
+                chip.className = 'tm-word-field-chip';
+                chip.draggable = true;
+                chip.setAttribute('data-field-key', f.key);
+                chip.setAttribute('data-field-label', f.label);
+                chip.setAttribute('data-field-type', f.type);
+                chip.textContent = f.label + ' (' + f.type + ')';
+                chip.addEventListener('dragstart', function (e) {
+                    e.dataTransfer.setData('text/plain', f.key);
+                    e.dataTransfer.setData('application/x-tm-field-label', f.label);
+                });
+                pal.appendChild(chip);
+            });
+        }
+        function tmWordRebuildSlots(referenceRow, fieldsByKey) {
+            var wrap = document.getElementById('tmWordColumnSlots');
+            if (!wrap) return;
+            wrap.innerHTML = '';
+            for (var i = 0; i < 12; i++) {
+                (function (idx) {
+                    var slot = document.createElement('div');
+                    slot.className = 'tm-word-slot' + (tmWordSlotKeys[idx] ? ' is-filled' : '');
+                    slot.setAttribute('data-slot-index', idx);
+                    var key = tmWordSlotKeys[idx];
+                    var ref = key && referenceRow ? referenceRow[key] : '';
+                    var label = key && fieldsByKey[key] ? fieldsByKey[key].label : '';
+                    var slotBody = key
+                        ? '<strong class="tm-word-slot-label">' + escapeHtml(label || key) + '</strong>'
+                            + '<div class="tm-word-slot-ref" title="' + escapeHtml(ref || '') + '">' + escapeHtml(ref || '—') + '</div>'
+                            + '<button type="button" class="tm-word-slot-clear" aria-label="Quitar">&times;</button>'
+                        : '<span class="tm-word-slot-drop">Soltar campo aquí</span>';
+                    slot.innerHTML = '<span class="tm-word-slot-num">' + (idx + 1) + '</span>'
+                        + '<div class="tm-word-slot-body">' + slotBody + '</div>';
+                    slot.addEventListener('dragover', function (e) { e.preventDefault(); slot.classList.add('is-dragover'); });
+                    slot.addEventListener('dragleave', function () { slot.classList.remove('is-dragover'); });
+                    slot.addEventListener('drop', function (e) {
+                        e.preventDefault();
+                        slot.classList.remove('is-dragover');
+                        var k = e.dataTransfer.getData('text/plain');
+                        if (!k) return;
+                        tmWordSlotKeys[idx] = k;
+                        loadWordPersonalizePreview();
+                    });
+                    var clr = slot.querySelector('.tm-word-slot-clear');
+                    if (clr) clr.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        tmWordSlotKeys[idx] = '';
+                        loadWordPersonalizePreview();
+                    });
+                    wrap.appendChild(slot);
+                })(i);
+            }
+        }
+        function applyWordPreviewSheetOrientation(orient) {
+            orient = orient === 'landscape' ? 'landscape' : 'portrait';
+            var modal = document.getElementById('tmAnalysisWordPersonalizeModal');
+            var a4 = modal && modal.querySelector('.tm-analysis-word-preview-a4');
+            var wordPage = document.getElementById('tmWordPreviewPage');
+            if (a4) {
+                a4.classList.toggle('tm-word-a4-landscape', orient === 'landscape');
+                a4.classList.toggle('tm-word-a4-portrait', orient !== 'landscape');
+            }
+            if (wordPage) {
+                wordPage.classList.remove('tm-word-preview-page--portrait', 'tm-word-preview-page--landscape');
+                wordPage.classList.add(orient === 'landscape' ? 'tm-word-preview-page--landscape' : 'tm-word-preview-page--portrait');
+            }
+            if (wordPersonalizeModal) { applyWordPageZoom(wordPersonalizeModal._wordPreviewZoom || 100); }
+        }
+        function renderWordPreviewInto(el, data) {
+            if (!el || !data) return;
+            var align = data.title_align || 'center';
+            var orient = (data.page_layout && data.page_layout.orientation) || 'portrait';
+            if (orient !== 'landscape' && orient !== 'portrait') { orient = 'portrait'; }
+            var btnOrient = document.querySelector('#tmAnalysisWordPersonalizeModal .tm-word-orient-btn.is-active');
+            if (btnOrient) {
+                var btnVal = btnOrient.getAttribute('data-word-orient');
+                if (btnVal === 'landscape' || btnVal === 'portrait') { orient = btnVal; }
+            }
+            var tblAlign = (data.table_align || 'left');
+            if (['left', 'center', 'right', 'stretch'].indexOf(tblAlign) < 0) { tblAlign = 'left'; }
+            var tBtn = document.querySelector('#tmAnalysisWordPersonalizeModal .tm-word-table-align-btns .tm-export-align-btn.is-active');
+            if (tBtn && tBtn.getAttribute('data-word-table-align')) { tblAlign = tBtn.getAttribute('data-word-table-align'); }
+            var stretch = tblAlign === 'stretch';
+            var ts = data.table_style || {};
+            var fontPt = Math.min(12, Math.max(7, parseInt(ts.font_pt, 10) || 9));
+            var padPx = Math.min(16, Math.max(2, parseInt(ts.cell_pad_px, 10) || 6));
+            var maxPx = Math.min(280, Math.max(72, parseInt(ts.cell_max_px, 10) || 140));
+            var cellStyle = stretch
+                ? ('font-size:' + fontPt + 'pt;padding:' + padPx + 'px;box-sizing:border-box;vertical-align:top;word-break:break-word;')
+                : ('font-size:' + fontPt + 'pt;padding:' + padPx + 'px;max-width:' + maxPx + 'px;width:' + maxPx + 'px;min-width:72px;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;vertical-align:top;');
+            var thStyle = cellStyle + 'font-weight:700;';
+            var mrColW = [112, 56, 56, maxPx, 48, maxPx];
+            var wrapCls = 'tm-word-table-block tm-word-table-block--' + tblAlign;
+            var inner = '';
+            inner += '<div class="tm-word-preview-sheet tm-word-preview-sheet--' + orient + '">';
+            inner += '<div class="tm-analysis-doc-inner tm-word-overlay-inner tm-word-tables-fixed tm-word-tables-align-' + tblAlign + '" style="text-align:' + align + ';--tw-table-font:' + fontPt + 'pt;--tw-cell-pad:' + padPx + 'px;--tw-cell-max:' + maxPx + 'px">';
+            inner += '<h4 class="tm-analysis-doc-title" style="text-align:' + align + '">' + escapeHtml(data.doc_title || data.module_name || 'Módulo') + '</h4>';
+            if (data.subtitle) inner += '<p class="tm-analysis-doc-sub" style="text-align:' + align + '">' + escapeHtml(data.subtitle) + '</p>';
+            inner += '<p class="tm-analysis-doc-sub">Vista previa · ' + (orient === 'landscape' ? 'Horizontal' : 'Vertical') + '</p>';
+            inner += '<div class="tm-word-preview-body-inner" style="margin-top:8px">';
+            if (data.summary) {
+                inner += '<p class="tm-word-prev-section">Resumen</p><div class="' + wrapCls + '"><div class="tm-word-table-scroll' + (stretch ? ' tm-word-table-scroll--stretch' : '') + '"><table class="tm-analysis-mini-table' + (stretch ? ' tm-word-table-stretch' : ' tm-word-table-fixed') + '"><colgroup><col' + (stretch ? '' : ' style="width:11em"') + '><col' + (stretch ? '' : ' style="width:14em"') + '></colgroup>';
+                Object.keys(data.summary).forEach(function (k) {
+                    inner += '<tr><th style="' + thStyle + (stretch ? '' : 'width:11em') + '">' + escapeHtml(k) + '</th><td style="' + cellStyle + (stretch ? '' : 'width:14em') + '">' + escapeHtml(String(data.summary[k])) + '</td></tr>';
+                });
+                inner += '</table></div></div>';
+            }
+            if (data.mr_table && data.mr_headers) {
+                inner += '<p class="tm-word-prev-section">Microrregiones</p><div class="' + wrapCls + '"><div class="tm-word-table-scroll' + (stretch ? ' tm-word-table-scroll--stretch' : '') + '"><table class="tm-analysis-big-table' + (stretch ? ' tm-word-table-stretch' : ' tm-word-table-fixed') + '"><thead><tr>';
+                data.mr_headers.forEach(function (h, i) {
+                    inner += '<th style="' + thStyle + (stretch ? '' : 'width:' + mrColW[i] + 'px') + '">' + escapeHtml(h) + '</th>';
+                });
+                inner += '</tr></thead><tbody>';
+                data.mr_table.slice(0, 5).forEach(function (row) {
+                    inner += '<tr>';
+                    inner += '<td style="' + cellStyle + (stretch ? '' : 'width:' + mrColW[0] + 'px') + '">' + escapeHtml(String(row.microrregion || '').substring(0, 48)) + '</td>';
+                    inner += '<td style="' + cellStyle + (stretch ? '' : 'width:' + mrColW[1] + 'px') + '">' + escapeHtml(String(row.registros)) + '</td>';
+                    inner += '<td style="' + cellStyle + (stretch ? '' : 'width:' + mrColW[2] + 'px') + '">' + escapeHtml(String(row.municipios_capturados)) + '</td>';
+                    inner += '<td style="' + cellStyle + (stretch ? '' : 'width:' + mrColW[3] + 'px') + '">' + escapeHtml(String(row.lista_capturados || '').substring(0, 80)) + '</td>';
+                    inner += '<td style="' + cellStyle + (stretch ? '' : 'width:' + mrColW[4] + 'px') + '">' + escapeHtml(String(row.faltantes_count)) + '</td>';
+                    inner += '<td style="' + cellStyle + (stretch ? '' : 'width:' + mrColW[5] + 'px') + '">' + escapeHtml(String(row.lista_faltantes || '').substring(0, 80)) + '</td>';
+                    inner += '</tr>';
+                });
+                if (data.mr_table.length > 5) inner += '<tr><td colspan="6" style="' + cellStyle + '">… +' + (data.mr_table.length - 5) + ' filas</td></tr>';
+                inner += '</tbody></table></div></div>';
+            }
+            if (data.dynamic_table && data.dynamic_table.headers && data.dynamic_table.headers.length) {
+                var acc = data.dynamic_table.accounting_summary || [];
+                if (acc.length) {
+                    inner += '<p class="tm-word-prev-section">Resumen (indicadores)</p><div class="' + wrapCls + '"><div class="tm-word-table-scroll"><table class="tm-word-accounting-summary"><tr>';
+                    acc.forEach(function (k) { inner += '<th>' + escapeHtml(k.label) + '</th>'; });
+                    inner += '</tr><tr>';
+                    acc.forEach(function (k) { inner += '<td class="tm-word-accounting-val">' + escapeHtml(String(k.value)) + '</td>'; });
+                    inner += '</tr></table></div></div>';
+                }
+                inner += '<p class="tm-word-prev-section">Desglose por registro</p><div class="' + wrapCls + '"><div class="tm-word-dyn-scroll' + (stretch ? ' tm-word-table-scroll--stretch' : '') + '"><table class="tm-word-dyn-table' + (stretch ? ' tm-word-table-stretch' : ' tm-word-table-fixed') + '"><thead><tr>';
+                data.dynamic_table.headers.forEach(function (h) { inner += '<th style="' + thStyle + '">' + escapeHtml(h) + '</th>'; });
+                inner += '</tr></thead><tbody>';
+                (data.dynamic_table.rows || []).slice(0, 8).forEach(function (row) {
+                    inner += '<tr>';
+                    row.forEach(function (cell) { inner += '<td style="' + cellStyle + '">' + escapeHtml(String(cell)) + '</td>'; });
+                    inner += '</tr>';
+                });
+                var trow = data.dynamic_table.totals_row;
+                if (trow && trow.length === data.dynamic_table.headers.length) {
+                    inner += '<tr class="tm-word-totals-row">';
+                    trow.forEach(function (cell) { inner += '<td style="' + thStyle + 'background:#fef2f2;color:#b91c1c">' + escapeHtml(String(cell)) + '</td>'; });
+                    inner += '</tr>';
+                }
+                inner += '</tbody></table></div></div>';
+            }
+            inner += '</div></div></div>';
+            el.innerHTML = inner;
+            applyWordPreviewSheetOrientation(orient);
+        }
+        var WORD_PREVIEW_ZOOM_STEPS = [50, 75, 100, 125, 150, 175, 200];
+        function applyWordPageZoom(level) {
+            var pageEl = document.getElementById('tmWordPreviewPage');
+            var valueEl = document.getElementById('tmWordZoomValue');
+            if (!pageEl) { return; }
+            var steps = WORD_PREVIEW_ZOOM_STEPS;
+            var zoom = Math.min(Math.max(level, steps[0]), steps[steps.length - 1]);
+            if (wordPersonalizeModal) { wordPersonalizeModal._wordPreviewZoom = zoom; }
+            pageEl.style.transform = 'scale(' + (zoom / 100) + ')';
+            pageEl.style.transformOrigin = 'top center';
+            if (valueEl) { valueEl.textContent = zoom; }
+        }
+        function wordPreviewZoomStep(delta) {
+            if (!wordPersonalizeModal) { return; }
+            var steps = WORD_PREVIEW_ZOOM_STEPS;
+            var cur = wordPersonalizeModal._wordPreviewZoom || 100;
+            var idx = steps.indexOf(cur);
+            if (idx < 0) { idx = steps.indexOf(100); }
+            idx = Math.min(Math.max(idx + delta, 0), steps.length - 1);
+            applyWordPageZoom(steps[idx]);
+        }
+        function setupWordPreviewZoom() {
+            if (!wordPersonalizeModal) { return; }
+            var steps = WORD_PREVIEW_ZOOM_STEPS;
+            var out = wordPersonalizeModal.querySelector('[data-word-zoom-out]');
+            var inn = wordPersonalizeModal.querySelector('[data-word-zoom-in]');
+            var reset = wordPersonalizeModal.querySelector('[data-word-zoom-reset]');
+            applyWordPageZoom(wordPersonalizeModal._wordPreviewZoom || 100);
+            if (out) {
+                out.onclick = function () {
+                    var idx = steps.indexOf(wordPersonalizeModal._wordPreviewZoom || 100);
+                    if (idx <= 0) { idx = 0; } else { idx -= 1; }
+                    applyWordPageZoom(steps[idx]);
+                };
+            }
+            if (inn) {
+                inn.onclick = function () {
+                    var idx = steps.indexOf(wordPersonalizeModal._wordPreviewZoom || 100);
+                    if (idx < 0) { idx = steps.indexOf(100); }
+                    if (idx >= steps.length - 1) { idx = steps.length - 1; } else { idx += 1; }
+                    applyWordPageZoom(steps[idx]);
+                };
+            }
+            if (reset) {
+                reset.onclick = function () { applyWordPageZoom(100); };
+            }
+            var a4Area = document.getElementById('tmWordPreviewA4Area');
+            if (a4Area && !a4Area._tmWordWheelZoomBound) {
+                a4Area._tmWordWheelZoomBound = true;
+                a4Area.addEventListener('wheel', function (e) {
+                    var pinch = e.ctrlKey || e.metaKey;
+                    if (!pinch) { return; }
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var dy = e.deltaY;
+                    if (dy > 0) { wordPreviewZoomStep(-1); }
+                    else if (dy < 0) { wordPreviewZoomStep(1); }
+                }, { passive: false });
+            }
+        }
+        function tmWordSlotKeysList() {
+            return tmWordSlotKeys.filter(function (k) { return k; });
+        }
+        function tmWordSummaryKpiJson() {
+            if (!wordPersonalizeModal) { return '[]'; }
+            var kpi = wordPersonalizeModal._summaryKpiKeys;
+            if (!kpi || !kpi.length) { return JSON.stringify(tmWordSlotKeysList().slice(0, 6)); }
+            return JSON.stringify(kpi);
+        }
+        function tmWordTotalsColumnJson() {
+            if (!wordPersonalizeModal) { return '[]'; }
+            var t = wordPersonalizeModal._totalsColumnKeys;
+            if (!t || !t.length) { return JSON.stringify(tmWordSlotKeysList()); }
+            return JSON.stringify(t);
+        }
+        function tmWordRebuildAccountingUI(fieldsByKey) {
+            var wrap = document.getElementById('tmWordAccountingFields');
+            if (!wrap || !wordPersonalizeModal) { return; }
+            if (!wordPersonalizeModal._summaryKpiKeys) { wordPersonalizeModal._summaryKpiKeys = tmWordSlotKeysList().slice(0, 6); }
+            if (!wordPersonalizeModal._totalsColumnKeys) { wordPersonalizeModal._totalsColumnKeys = tmWordSlotKeysList().slice(); }
+            var keys = tmWordSlotKeysList();
+            wrap.innerHTML = '';
+            if (!keys.length) {
+                wrap.innerHTML = '<p class="tm-analysis-hint">Asigna columnas en las ranuras para activar KPIs y totales.</p>';
+                return;
+            }
+            keys.forEach(function (key) {
+                var f = fieldsByKey[key] || { label: key, type: 'text', canonical: 'text' };
+                var row = document.createElement('div');
+                row.className = 'tm-word-acc-row';
+                var kpiOn = wordPersonalizeModal._summaryKpiKeys.indexOf(key) >= 0;
+                var totOn = wordPersonalizeModal._totalsColumnKeys.indexOf(key) >= 0;
+                var numOrBool = f.type === 'bool' || f.canonical === 'bool' || ['number', 'integer', 'float'].indexOf(f.type) >= 0;
+                row.innerHTML = '<span class="tm-word-acc-label">' + escapeHtml(f.label) + '</span>' +
+                    '<label class="tm-analysis-check tm-word-acc-kpi"><input type="checkbox" data-acc-kpi="' + escapeHtml(key) + '"' + (kpiOn ? ' checked' : '') + '> KPI resumen</label>' +
+                    '<label class="tm-analysis-check tm-word-acc-tot"' + (numOrBool ? '' : ' title="Solo numéricos o Sí/No"') + '><input type="checkbox" data-acc-total="' + escapeHtml(key) + '"' + (totOn && numOrBool ? ' checked' : '') + (numOrBool ? '' : ' disabled') + '> Total pie</label>';
+                wrap.appendChild(row);
+            });
+            wrap.querySelectorAll('[data-acc-kpi]').forEach(function (inp) {
+                inp.addEventListener('change', function () {
+                    var k = inp.getAttribute('data-acc-kpi');
+                    var a = wordPersonalizeModal._summaryKpiKeys;
+                    if (inp.checked && a.indexOf(k) < 0) { a.push(k); }
+                    if (!inp.checked) { wordPersonalizeModal._summaryKpiKeys = a.filter(function (x) { return x !== k; }); }
+                    loadWordPersonalizePreview();
+                });
+            });
+            wrap.querySelectorAll('[data-acc-total]').forEach(function (inp) {
+                if (inp.disabled) { return; }
+                inp.addEventListener('change', function () {
+                    var k = inp.getAttribute('data-acc-total');
+                    var a = wordPersonalizeModal._totalsColumnKeys;
+                    if (inp.checked && a.indexOf(k) < 0) { a.push(k); }
+                    if (!inp.checked) { wordPersonalizeModal._totalsColumnKeys = a.filter(function (x) { return x !== k; }); }
+                    loadWordPersonalizePreview();
+                });
+            });
+        }
+        function loadWordPersonalizePreview() {
+            var baseUrl = window._tmAnalysisPreviewUrl;
+            if (!baseUrl || !wordPersonalizePreview) return;
+            var title = document.getElementById('tmWordDocTitle');
+            var sub = document.getElementById('tmWordSubtitle');
+            var alignBtn = document.querySelector('#tmAnalysisWordPersonalizeModal .tm-export-align-btn.is-active');
+            var align = alignBtn ? alignBtn.getAttribute('data-word-title-align') : 'center';
+            var orientBtn = document.querySelector('#tmAnalysisWordPersonalizeModal .tm-word-orient-btn.is-active');
+            var orient = orientBtn ? orientBtn.getAttribute('data-word-orient') : 'portrait';
+            var sum = document.getElementById('tmWordIncludeSummary');
+            var mr = document.getElementById('tmWordIncludeMrTable');
+            var q = baseUrl.indexOf('?') === -1 ? '?' : '&';
+            var u = baseUrl + q + 'include_summary=' + (sum && sum.checked ? '1' : '0')
+                + '&include_mr_table=' + (mr && mr.checked ? '1' : '0')
+                + '&doc_title=' + encodeURIComponent(title ? title.value : '')
+                + '&title_align=' + encodeURIComponent(align)
+                + '&subtitle=' + encodeURIComponent(sub ? sub.value : '')
+                + '&orientation=' + encodeURIComponent(orient)
+                + '&column_keys=' + encodeURIComponent(tmWordColumnKeysJson())
+                + '&table_font_pt=' + encodeURIComponent(document.getElementById('tmWordTableFontPt') ? document.getElementById('tmWordTableFontPt').value : '9')
+                + '&table_cell_pad=' + encodeURIComponent(document.getElementById('tmWordTableCellPad') ? document.getElementById('tmWordTableCellPad').value : '6')
+                + '&table_cell_max_px=' + encodeURIComponent(document.getElementById('tmWordTableCellMax') ? document.getElementById('tmWordTableCellMax').value : '140')
+                + '&include_dynamic_table=' + (document.getElementById('tmWordIncludeDynamic') && document.getElementById('tmWordIncludeDynamic').checked ? '1' : '0')
+                + '&table_align=' + encodeURIComponent((document.querySelector('#tmAnalysisWordPersonalizeModal .tm-word-table-align-btns .tm-export-align-btn.is-active') || {}).getAttribute ? (document.querySelector('#tmAnalysisWordPersonalizeModal .tm-word-table-align-btns .tm-export-align-btn.is-active').getAttribute('data-word-table-align') || 'left') : 'left')
+                + '&summary_kpi_keys=' + encodeURIComponent(tmWordSummaryKpiJson())
+                + '&totals_column_keys=' + encodeURIComponent(tmWordTotalsColumnJson())
+                + '&_=' + Date.now();
+            applyWordPreviewSheetOrientation(orient);
+            wordPersonalizePreview.innerHTML = '<div class="tm-analysis-preview-loading">Actualizando…</div>';
+            fetch(u, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (title && !title.value.trim() && data.module_name) {
+                        title.value = 'Análisis general — ' + data.module_name;
+                    }
+                    var fields = data.exportable_fields || [];
+                    var byKey = {};
+                    fields.forEach(function (f) { byKey[f.key] = f; });
+                    tmWordRebuildPalette(fields);
+                    tmWordRebuildSlots(data.reference_row || {}, byKey);
+                    tmWordRebuildAccountingUI(byKey);
+                    renderWordPreviewInto(wordPersonalizePreview, data);
+                })
+                .catch(function () { wordPersonalizePreview.innerHTML = '<p class="tm-analysis-err">Error vista previa</p>'; });
+        }
+        function openWordPersonalizeModal() {
+            if (!wordPersonalizeModal || !wordPersonalizeForm) return;
+            wordPersonalizeForm.setAttribute('action', window._tmAnalysisWordUrl || '');
+            var s = document.getElementById('tmAnalysisIncludeSummary');
+            var m = document.getElementById('tmAnalysisIncludeMrTable');
+            if (document.getElementById('tmWordIncludeSummary')) document.getElementById('tmWordIncludeSummary').checked = s ? s.checked : true;
+            if (document.getElementById('tmWordIncludeMrTable')) document.getElementById('tmWordIncludeMrTable').checked = m ? m.checked : true;
+            if (document.getElementById('tmWordIncludeDynamic') && !document.getElementById('tmWordIncludeDynamic').dataset.touched) document.getElementById('tmWordIncludeDynamic').checked = true;
+            var titleIn = document.getElementById('tmWordDocTitle');
+            if (titleIn && !titleIn.value.trim()) titleIn.value = '';
+            wordPersonalizeModal.classList.add('is-open');
+            wordPersonalizeModal.setAttribute('aria-hidden', 'false');
+            wordPersonalizeModal._wordPreviewZoom = 100;
+            wordPersonalizeModal._summaryKpiKeys = null;
+            wordPersonalizeModal._totalsColumnKeys = null;
+            setupWordPreviewZoom();
+            loadWordPersonalizePreview();
+        }
+        function closeWordPersonalizeModal() {
+            if (!wordPersonalizeModal) return;
+            wordPersonalizeModal.classList.remove('is-open');
+            wordPersonalizeModal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+        }
+        document.getElementById('tmAnalysisOpenPersonalize') && document.getElementById('tmAnalysisOpenPersonalize').addEventListener('click', openWordPersonalizeModal);
+        if (wordPersonalizeModal) {
+            wordPersonalizeModal.querySelectorAll('[data-close-analysis-word-personalize]').forEach(function (el) {
+                el.addEventListener('click', closeWordPersonalizeModal);
+            });
+            document.querySelectorAll('[data-word-title-align]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    document.querySelectorAll('[data-word-title-align]').forEach(function (b) { b.classList.remove('is-active'); });
+                    btn.classList.add('is-active');
+                });
+            });
+            wordPersonalizeModal.querySelectorAll('[data-word-orient]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    wordPersonalizeModal.querySelectorAll('[data-word-orient]').forEach(function (b) { b.classList.remove('is-active'); });
+                    btn.classList.add('is-active');
+                    var o = btn.getAttribute('data-word-orient') || 'portrait';
+                    applyWordPreviewSheetOrientation(o);
+                    loadWordPersonalizePreview();
+                });
+            });
+            document.getElementById('tmWordRefreshPreviewBtn') && document.getElementById('tmWordRefreshPreviewBtn').addEventListener('click', loadWordPersonalizePreview);
+            wordPersonalizeForm && wordPersonalizeForm.addEventListener('submit', function () {
+                document.getElementById('tmWordFormSummary').value = document.getElementById('tmWordIncludeSummary').checked ? '1' : '0';
+                document.getElementById('tmWordFormMrTable').value = document.getElementById('tmWordIncludeMrTable').checked ? '1' : '0';
+                document.getElementById('tmWordFormDynamic').value = document.getElementById('tmWordIncludeDynamic') && document.getElementById('tmWordIncludeDynamic').checked ? '1' : '0';
+                document.getElementById('tmWordFormDocTitle').value = document.getElementById('tmWordDocTitle').value || '';
+                var ab = document.querySelector('#tmAnalysisWordPersonalizeModal .tm-export-title-align .tm-export-align-btn.is-active');
+                document.getElementById('tmWordFormTitleAlign').value = ab ? ab.getAttribute('data-word-title-align') : 'center';
+                var tab = document.querySelector('#tmAnalysisWordPersonalizeModal .tm-word-table-align-btns .tm-export-align-btn.is-active');
+                document.getElementById('tmWordFormTableAlign').value = tab ? tab.getAttribute('data-word-table-align') : 'left';
+                document.getElementById('tmWordFormSubtitle').value = document.getElementById('tmWordSubtitle').value || '';
+                var ob = document.querySelector('#tmAnalysisWordPersonalizeModal .tm-word-orient-btn.is-active');
+                document.getElementById('tmWordFormOrientation').value = ob ? ob.getAttribute('data-word-orient') : 'portrait';
+                document.getElementById('tmWordFormColumnKeys').value = tmWordColumnKeysJson();
+                document.getElementById('tmWordFormTableFontPt').value = document.getElementById('tmWordTableFontPt') ? document.getElementById('tmWordTableFontPt').value : '9';
+                document.getElementById('tmWordFormTableCellPad').value = document.getElementById('tmWordTableCellPad') ? document.getElementById('tmWordTableCellPad').value : '6';
+                document.getElementById('tmWordFormTableCellMax').value = document.getElementById('tmWordTableCellMax') ? document.getElementById('tmWordTableCellMax').value : '140';
+                document.getElementById('tmWordFormSummaryKpiKeys').value = tmWordSummaryKpiJson();
+                document.getElementById('tmWordFormTotalsColumnKeys').value = tmWordTotalsColumnJson();
+            });
+            ['tmWordTableFontPt', 'tmWordTableCellPad', 'tmWordTableCellMax'].forEach(function (id) {
+                var n = document.getElementById(id);
+                if (n) {
+                    n.addEventListener('change', function () { loadWordPersonalizePreview(); });
+                    if (id === 'tmWordTableCellMax') n.addEventListener('input', function () { clearTimeout(n._tmDeb); n._tmDeb = setTimeout(loadWordPersonalizePreview, 400); });
+                }
+            });
+            wordPersonalizeModal.querySelectorAll('.tm-word-table-align-btns [data-word-table-align]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    wordPersonalizeModal.querySelectorAll('.tm-word-table-align-btns [data-word-table-align]').forEach(function (b) { b.classList.remove('is-active'); });
+                    btn.classList.add('is-active');
+                    loadWordPersonalizePreview();
+                });
+            });
+            ['tmWordIncludeSummary', 'tmWordIncludeMrTable', 'tmWordIncludeDynamic'].forEach(function (id) {
+                var c = document.getElementById(id);
+                if (c) {
+                    c.addEventListener('change', function () { if (id === 'tmWordIncludeDynamic') c.dataset.touched = '1'; loadWordPersonalizePreview(); });
+                }
+            });
+        }
+        function escapeHtml(s) {
+            if (!s) return '';
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+        if (analysisModal) {
+            analysisModal.querySelectorAll('[data-close-analysis-word]').forEach(function (el) {
+                el.addEventListener('click', closeAnalysisWordModal);
+            });
+            var refPrev = function () { if (window._tmAnalysisPreviewUrl) loadAnalysisPreview(window._tmAnalysisPreviewUrl); };
+            document.getElementById('tmAnalysisRefreshPreview') && document.getElementById('tmAnalysisRefreshPreview').addEventListener('click', refPrev);
+            document.getElementById('tmAnalysisBuildGridBtn') && document.getElementById('tmAnalysisBuildGridBtn').addEventListener('click', refPrev);
+            analysisForm && analysisForm.addEventListener('submit', function () {
+                document.getElementById('tmAnalysisFormSummary').value = document.getElementById('tmAnalysisIncludeSummary').checked ? '1' : '0';
+                document.getElementById('tmAnalysisFormMrTable').value = document.getElementById('tmAnalysisIncludeMrTable').checked ? '1' : '0';
+                document.getElementById('tmAnalysisFormRows').value = document.getElementById('tmAnalysisCustomRows').value || '0';
+                document.getElementById('tmAnalysisFormCols').value = document.getElementById('tmAnalysisCustomCols').value || '0';
+            });
+        }
+
         const personalizeModal = document.getElementById('tmExportPersonalizeModal');
         const imageModal = document.getElementById('tmImagePreviewModal');
         const imageModalImg = document.getElementById('tmImagePreviewImg');
@@ -553,51 +1235,47 @@
 
         function buildPersonalizeColumnsList(columns, container) {
             container.innerHTML = '';
+            var colorMenuHtml = TEMPLATE_COLORS.map(function (c, i) {
+                return '<button type="button" class="tm-export-color-option' + (i === 0 ? ' is-active' : '') + '" data-color="' + escapeHtml(c.value) + '">' +
+                    '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c.value) + '"></span>' +
+                    '<span class="tm-export-color-name">' + escapeHtml(c.name) + '</span></button>';
+            }).join('');
             columns.forEach(function (col, index) {
-                const item = document.createElement('div');
+                var item = document.createElement('div');
                 item.className = 'tm-export-personalize-col' + (col.is_image ? ' is-image' : '');
                 item.setAttribute('role', 'listitem');
                 item.dataset.key = col.key;
                 item.dataset.index = String(index);
                 item.draggable = true;
+                var mid = '';
+                if (col.is_image) {
+                    mid = '<div class="tm-export-col-image-opts">' +
+                        '<label>Ancho <input type="number" min="40" max="400" value="120" class="tm-export-image-width" data-key="' + escapeHtml(col.key) + '"></label>' +
+                        '<label>Alto <input type="number" min="30" max="300" value="' + String(col.image_height || 80) + '" class="tm-export-image-height" data-key="' + escapeHtml(col.key) + '"></label></div>';
+                } else {
+                    var mw = Math.min(col.max_width_chars || 10, 40);
+                    var approx = String(col.max_width_chars || 10);
+                    mid = '<div class="tm-export-col-width-preview" style="min-width:' + mw + 'ch" data-width-hint="' + escapeHtml(approx) + '">' +
+                        '<span class="tm-export-col-width-num">' + approx + '</span> ch</div>';
+                }
                 item.innerHTML =
                     '<span class="tm-export-drag-handle" aria-hidden="true">&#9776;</span>' +
                     '<span class="tm-export-col-label">' + escapeHtml(col.label) + '</span>' +
                     '<div class="tm-export-col-color">' +
-                        '<button type="button" class="tm-export-color-trigger" data-color="' + escapeHtml(TEMPLATE_COLORS[0].value) + '" aria-haspopup="listbox" aria-expanded="false">' +
-                            '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(TEMPLATE_COLORS[0].value) + '"></span>' +
-                        '</button>' +
-                        '<div class="tm-export-color-menu" role="listbox" hidden>' +
-                            TEMPLATE_COLORS.map(function (c, i) {
-                                return '<button type="button" class="tm-export-color-option' + (i === 0 ? ' is-active' : '') + '" data-color="' + escapeHtml(c.value) + '">' +
-                                    '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c.value) + '"></span>' +
-                                    '<span class="tm-export-color-name">' + escapeHtml(c.name) + '</span>' +
-                                '</button>';
-                            }).join('') +
-                        '</div>' +
-                    '</div>' +
-                    (col.is_image
-                        ? '<div class="tm-export-col-image-opts">' +
-                            '<label>Ancho <input type="number" min="40" max="400" value="120" class="tm-export-image-width" data-key="' + escapeHtml(col.key) + '"></label>' +
-                            '<label>Alto <input type="number" min="30" max="300" value="' + String(col.image_height || 80) + '" class="tm-export-image-height" data-key="' + escapeHtml(col.key) + '"></label>' +
-                            '</div>'
-                        : '<div class="tm-export-col-width-preview" style="min-width:' + Math.min(col.max_width_chars || 10, 40) + 'ch" title="Ancho aprox. ' + (col.max_width_chars || 10) + ' caracteres">' +
-                            '<span class="tm-export-col-width-num">' + (col.max_width_chars || 10) + '</span> ch' +
-                            '</div>') +
-                    '<button type="button" class="tm-export-omit-btn" title="Omitir en el reporte" aria-label="Omitir en el reporte">&times;</button>';
+                    '<button type="button" class="tm-export-color-trigger" data-color="' + escapeHtml(TEMPLATE_COLORS[0].value) + '" aria-haspopup="listbox" aria-expanded="false">' +
+                    '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(TEMPLATE_COLORS[0].value) + '"></span></button>' +
+                    '<div class="tm-export-color-menu" role="listbox" hidden>' + colorMenuHtml + '</div></div>' +
+                    mid +
+                    '<button type="button" class="tm-export-omit-btn" title="Omitir en el reporte" aria-label="Omitir">&times;</button>';
                 container.appendChild(item);
             });
         }
 
-        function escapeHtml(s) {
-            const div = document.createElement('div');
-            div.textContent = s;
-            return div.innerHTML;
-        }
-
         function getPersonalizeState() {
-            const container = document.getElementById('tmExportPersonalizeColumns');
-            if (!container) { return { title: '', titleAlign: 'center', columns: [], sampleRow: {} }; }
+            var container = document.getElementById('tmExportPersonalizeColumns');
+            if (!container) {
+                return { title: '', titleAlign: 'center', columns: [], sampleRow: {} };
+            }
             const titleEl = document.getElementById('tmExportPersonalizeTitle');
             const alignBtn = document.querySelector('.tm-export-align-btn.is-active');
             const titleAlign = (alignBtn && alignBtn.getAttribute('data-title-align')) || 'center';
@@ -615,7 +1293,7 @@
                 }
                 return { key, color, imageWidth, imageHeight };
             });
-            return { title: titleEl ? titleEl.value : '', titleAlign: titleAlign, columns };
+            return { title: titleEl ? titleEl.value : '', titleAlign: titleAlign, columns: columns };
         }
 
         function readSampleRowFromPreview(previewEl) {
@@ -898,22 +1576,22 @@
                     return;
                 }
                 templateSwal.fire({
-                    title: 'Tipo de exportacion',
-                    html: '<div style="text-align:left">'
-                        + '<label style="display:flex;gap:.5rem;align-items:center;margin-bottom:.65rem;">'
-                        + '<input type="radio" name="tm-export-mode" value="single" checked> '
-                        + '<span>Una sola hoja</span>'
+                    title: 'Tipo de exportación',
+                    html: '<div class="tm-swal-export-options" style="text-align:left">'
+                        + '<p style="margin:0 0 .5rem;font-size:.8rem;color:#64748b;">Elige qué generar. «Personalizar» abre el editor según tu elección (Excel o Word).</p>'
+                        + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
+                        + '<input type="radio" name="tm-export-choice" value="single" checked style="margin-top:.2rem;"> '
+                        + '<span><strong>Excel — Una sola hoja</strong><br><small style="color:#64748b">Todos los registros en una hoja.</small></span>'
                         + '</label>'
-                        + '<label style="display:flex;gap:.5rem;align-items:center;">'
-                        + '<input type="radio" name="tm-export-mode" value="mr"> '
-                        + '<span>1 pagina por Microrregion</span>'
+                        + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
+                        + '<input type="radio" name="tm-export-choice" value="mr" style="margin-top:.2rem;"> '
+                        + '<span><strong>Excel — 1 hoja por microrregión</strong><br><small style="color:#64748b">Una página por microrregión.</small></span>'
                         + '</label>'
-                        + '<hr style="margin:.7rem 0;">'
-                        + '<label style="display:flex;gap:.5rem;align-items:center;">'
-                        + '<input type="checkbox" name="tm-include-analysis" value="1">'
-                        + '<span>Incluir hoja de análisis</span>'
+                        + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.65rem;cursor:pointer;">'
+                        + '<input type="radio" name="tm-export-choice" value="word" style="margin-top:.2rem;"> '
+                        + '<span><strong>Informe de análisis (Word)</strong><br><small style="color:#64748b">Documento .docx con resumen y tablas (mismo criterio que el antiguo Excel de análisis).</small></span>'
                         + '</label>'
-                        + '<hr style="margin:.7rem 0;">'
+                        + '<hr style="margin:.65rem 0;border:none;border-top:1px solid #e2e8f0;">'
                         + '<p style="margin:0;"><button type="button" class="tm-btn tm-btn-outline tm-swal-personalize-btn">Personalizar columnas y diseño</button></p>'
                         + '</div>',
                     icon: 'question',
@@ -924,7 +1602,22 @@
                         var personalizeBtn = document.querySelector('.swal2-html-container .tm-swal-personalize-btn');
                         if (personalizeBtn) {
                             personalizeBtn.addEventListener('click', function () {
+                                var choice = document.querySelector('input[name="tm-export-choice"]:checked');
+                                var val = choice ? choice.value : 'single';
                                 Swal.close();
+                                if (val === 'word') {
+                                    var previewUrl = exportBtnRef.getAttribute('data-analysis-preview-url');
+                                    var wordUrl = exportBtnRef.getAttribute('data-analysis-word-url');
+                                    if (previewUrl && wordUrl) {
+                                        window._tmAnalysisPreviewUrl = previewUrl;
+                                        window._tmAnalysisWordUrl = wordUrl;
+                                        var wpf = document.getElementById('tmAnalysisWordPersonalizeForm');
+                                        if (wpf) { wpf.setAttribute('action', wordUrl); }
+                                        document.body.style.overflow = 'hidden';
+                                        openWordPersonalizeModal();
+                                    }
+                                    return;
+                                }
                                 var structureUrl = exportBtnRef.getAttribute('data-structure-url');
                                 var expUrl = exportBtnRef.getAttribute('data-export-url');
                                 if (structureUrl && expUrl) { openExportPersonalizeModal(structureUrl, expUrl); }
@@ -932,19 +1625,29 @@
                         }
                     },
                     preConfirm: function () {
-                        const checkedMode = document.querySelector('input[name="tm-export-mode"]:checked');
-                        const includeAnalysis = document.querySelector('input[name="tm-include-analysis"]')?.checked || false;
-                        return {
-                            mode: checkedMode ? checkedMode.value : 'single',
-                            analysis: includeAnalysis ? 1 : 0
-                        };
+                        const choice = document.querySelector('input[name="tm-export-choice"]:checked');
+                        const v = choice ? choice.value : 'single';
+                        return { choice: v };
                     }
                 }).then(function (result) {
                     if (!result.isConfirmed) { return; }
-                    const mode = result.value && result.value.mode === 'mr' ? 'mr' : 'single';
-                    const analysis = result.value && result.value.analysis ? 1 : 0;
+                    var choice = result.value && result.value.choice;
+                    if (choice === 'word') {
+                        var previewUrl = exportBtnRef.getAttribute('data-analysis-preview-url');
+                        var wordUrl = exportBtnRef.getAttribute('data-analysis-word-url');
+                        if (previewUrl && wordUrl) {
+                            window._tmAnalysisPreviewUrl = previewUrl;
+                            window._tmAnalysisWordUrl = wordUrl;
+                            var wpf = document.getElementById('tmAnalysisWordPersonalizeForm');
+                            if (wpf) { wpf.setAttribute('action', wordUrl); }
+                            document.body.style.overflow = 'hidden';
+                            openWordPersonalizeModal();
+                        }
+                        return;
+                    }
+                    const mode = choice === 'mr' ? 'mr' : 'single';
                     const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
-                    window.location.href = exportUrl + separator + 'mode=' + mode + '&analysis=' + String(analysis);
+                    window.location.href = exportUrl + separator + 'mode=' + mode + '&analysis=0';
                 });
             });
         });

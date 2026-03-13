@@ -8,7 +8,9 @@ class ExcelExportPending extends Notification
 {
     public function __construct(
         public string $exportRequestId,
-        public string $fileName = 'archivo'
+        public string $fileName = 'archivo',
+        /** @var 'excel'|'word' */
+        public string $kind = 'excel',
     ) {
     }
 
@@ -27,11 +29,13 @@ class ExcelExportPending extends Notification
     {
         $name = $this->fileName !== '' ? $this->fileName : 'archivo';
 
+        $suffix = $this->kind === 'word' ? ' (Word)' : ' (.xlsx)';
+
         return [
             'type' => 'excel_export_pending',
             'export_request_id' => $this->exportRequestId,
             'icon' => 'fa-solid fa-spinner fa-spin',
-            'title' => 'Generando "'.$name.'"....xlsx',
+            'title' => 'Generando: '.$name.$suffix,
             'url' => null,
         ];
     }

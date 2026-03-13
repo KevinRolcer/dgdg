@@ -194,7 +194,7 @@
                                             type="button"
                                             class="tm-thumb-link"
                                             data-open-image-preview
-                                            data-image-src="{{ route('temporary-modules.entry-file.preview', ['entry' => $entry->id, 'fieldKey' => $field->key]) }}"
+                                            data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $temporaryModule->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) }}"
                                             data-image-title="{{ $field->label }}"
                                             title="Ver imagen"
                                         >

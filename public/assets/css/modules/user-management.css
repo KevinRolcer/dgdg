@@ -1,0 +1,421 @@
+/* =========================================================
+   User Management — Gestión de Usuarios
+   ========================================================= */
+
+/* ---- Títulos de sección dentro del formulario ---- */
+.um-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--clr-primary-dark);
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--clr-border);
+    margin-bottom: 4px;
+}
+
+/* ---- Indicador de campo requerido ---- */
+.um-required {
+    color: var(--clr-primary);
+    font-size: 0.85em;
+}
+
+/* ---- Sección condicional (delegado / enlace) ---- */
+.um-conditional-section {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--clr-border);
+    border-radius: 12px;
+    background: rgba(247, 247, 248, 0.6);
+}
+
+/* ---- Checkbox inline en el formulario ---- */
+.um-check-label {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 36px;
+}
+
+.um-check-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--clr-primary);
+    flex: 0 0 16px;
+}
+
+/* ---- Grid de 3 columnas para formularios compactos ---- */
+.um-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px 14px;
+    align-items: start;
+}
+
+@media (max-width: 768px) {
+    .um-grid-3 { grid-template-columns: 1fr; }
+}
+
+/* ---- Fila inline: rol + checkbox activo ---- */
+.um-role-activo-row {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.um-role-activo-row > label:first-child {
+    flex: 1;
+    min-width: 120px;
+}
+
+
+/* ---- Tabla (igual que agenda directiva) ---- */
+.um-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 640px;
+}
+
+.um-table th,
+.um-table td {
+    border-bottom: 1px solid var(--clr-border);
+    padding: 9px 10px;
+    text-align: left;
+    vertical-align: middle;
+    font-size: 0.82rem;
+    color: var(--clr-text-main);
+}
+
+.tm-table-wrap {
+    max-height: calc(100vh - 280px); /* Ajustamos la altura para dejar espacio al header/filtros/paginación */
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+}
+
+/* Scrollbar personalizado para la tabla */
+.tm-table-wrap::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.tm-table-wrap::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tm-table-wrap::-webkit-scrollbar-thumb {
+    background: var(--clr-accent);
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+}
+
+.tm-table-wrap::-webkit-scrollbar-thumb:hover {
+    background: #b58b5a; /* Un tono ligeramente más oscuro del accent */
+}
+
+/* Fijar los encabezados de la tabla al hacer scroll */
+.um-table th {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 10;
+    color: var(--clr-primary-dark);
+    font-weight: 700;
+    white-space: nowrap;
+    box-shadow: 0 1px 0 var(--clr-border); /* Usar sombra para el borde inferior al hacer sticky */
+}
+
+/* Eliminar el border natural de th si usamos sticky con sombra */
+.um-table th {
+    border-bottom: none;
+}
+
+.um-table tbody tr:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+/* nombre con avatar y email debajo */
+.um-table td:first-child {
+    vertical-align: middle;
+}
+
+.um-user-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.um-user-data {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.um-user-data strong {
+    display: block;
+    line-height: 1.2;
+    font-size: 0.86rem;
+}
+
+.um-user-data .um-text-muted {
+    font-size: 0.76rem;
+}
+
+/* ---- Avatar inicial ---- */
+.um-user-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    flex: 0 0 28px;
+    background: rgba(134, 30, 52, 0.10);
+    color: var(--clr-primary-dark);
+    font-size: 0.76rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ---- Texto secundario ---- */
+.um-text-muted {
+    color: var(--clr-text-light);
+    font-size: var(--fs-small);
+}
+
+/* ---- Pill de rol ---- */
+.um-role-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    border-radius: 999px;
+    padding: 0 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border: 1px solid var(--clr-border);
+    background: #fff;
+    white-space: nowrap;
+    min-width: 75px;
+}
+
+.um-role-pill.um-role-delegado {
+    background: rgba(36, 98, 87, 0.10);
+    border-color: rgba(36, 98, 87, 0.28);
+    color: #246257;
+}
+
+.um-role-pill.um-role-enlace {
+    background: rgba(199, 155, 102, 0.14);
+    border-color: rgba(199, 155, 102, 0.44);
+    color: #a07838;
+}
+
+/* ---- Números de microrregiones ---- */
+.um-micros-text {
+    font-size: var(--fs-small);
+    color: var(--clr-text-main);
+    font-weight: 600;
+}
+
+/* ---- Botones de acción compactos (mismo estilo que agenda-btn-table) ---- */
+.um-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+.um-actions .tm-btn {
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 6px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-width: 1px;
+    border-style: solid;
+    transition: all 0.2s;
+    width: auto;
+}
+
+/* Forma cuadrada exacta para botones de solo icono */
+.um-actions .um-btn-icon {
+    width: 28px;
+    padding: 0;
+    flex: 0 0 28px;
+}
+
+/* Colores de botones (basados en variables institucionales) */
+/* Editar: Accent #c79b66 */
+.um-btn-edit {
+    background: rgba(199, 155, 102, 0.08);
+    border-color: rgba(199, 155, 102, 0.35);
+    color: #a07838;
+}
+.um-btn-edit:hover {
+    background: rgba(199, 155, 102, 0.15);
+    border-color: #c79b66;
+    color: #8a652d;
+}
+
+/* Activar: Secondary #246257 */
+.um-btn-status-on {
+    background: rgba(36, 98, 87, 0.08);
+    border-color: rgba(36, 98, 87, 0.35);
+    color: #246257;
+}
+.um-btn-status-on:hover {
+    background: rgba(36, 98, 87, 0.15);
+    border-color: #246257;
+    color: #1a4a42;
+}
+
+/* Desactivar: Primary #861e34 */
+.um-btn-status-off {
+    background: rgba(134, 30, 52, 0.06);
+    border-color: rgba(134, 30, 52, 0.30);
+    color: #861e34;
+}
+.um-btn-status-off:hover {
+    background: rgba(134, 30, 52, 0.12);
+    border-color: #861e34;
+    color: #6a1829;
+}
+
+/* Eliminar: Primary #861e34 */
+.um-btn-delete {
+    background: rgba(134, 30, 52, 0.06);
+    border-color: rgba(134, 30, 52, 0.30);
+    color: #861e34;
+}
+.um-btn-delete:hover {
+    background: rgba(134, 30, 52, 0.12);
+    border-color: #861e34;
+    color: #6a1829;
+}
+
+/* ---- Estado vacío ---- */
+.um-empty {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--clr-text-light);
+    font-size: var(--fs-body);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.um-empty i {
+    font-size: 1.8rem;
+    opacity: 0.35;
+}
+
+/* ---- Barra de filtros ---- */
+.um-filter-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.um-filter-actions {
+    margin-left: auto;
+}
+
+.um-filter-actions .tm-btn-primary {
+    background: var(--clr-primary-dark);
+    border-color: var(--clr-primary-dark);
+}
+
+.um-filter-actions .tm-btn-primary:hover {
+    background: #4a1422; /* Un poco más oscuro para el hover */
+    border-color: #4a1422;
+}
+
+.um-filter-divider {
+    display: inline-block;
+    width: 1px;
+    height: 28px;
+    background: var(--clr-border);
+    border-radius: 999px;
+}
+
+/* ---- Paginación ---- */
+.um-pagination-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--clr-border);
+    margin-top: 4px;
+}
+
+.um-pagination-info {
+    font-size: var(--fs-small);
+    color: var(--clr-text-light);
+    margin: 0;
+}
+
+.um-pagination nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.um-pagination .pagination {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.um-pagination .page-item .page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: 1px solid var(--clr-border);
+    background: #fff;
+    color: var(--clr-text-main);
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.um-pagination .page-item .page-link:hover {
+    background: rgba(134, 30, 52, 0.06);
+    border-color: var(--clr-primary);
+    color: var(--clr-primary);
+}
+
+.um-pagination .page-item.active .page-link {
+    background: var(--clr-primary);
+    border-color: var(--clr-primary);
+    color: #fff;
+}
+
+.um-pagination .page-item.disabled .page-link {
+    opacity: 0.4;
+    pointer-events: none;
+}

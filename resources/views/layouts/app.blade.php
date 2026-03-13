@@ -139,6 +139,13 @@
                                 <span>Mi perfil</span>
                             </a>
 
+                            @can('Administrar-Usuarios')
+                                <a href="{{ route('admin.usuarios.index') }}" class="topbar-menu-link {{ request()->routeIs('admin.usuarios.*') ? 'is-active' : '' }}">
+                                    <i class="fa-solid fa-users-gear" aria-hidden="true"></i>
+                                    <span>Gestión de Usuarios</span>
+                                </a>
+                            @endcan
+
                             <form method="POST" action="{{ route('logout') }}" class="topbar-menu-form">
                                 @csrf
                                 <button type="submit" class="topbar-menu-link topbar-menu-link-danger">

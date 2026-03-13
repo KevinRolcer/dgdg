@@ -81,8 +81,14 @@ Route::middleware('auth')->group(function () {
             Route::get('/{module}/exportar-excel', [TemporaryModuleController::class, 'exportExcel'])
                 ->whereNumber('module')
                 ->name('temporary-modules.admin.export');
+            Route::get('/{module}/analisis-preview', [TemporaryModuleController::class, 'analysisPreviewJson'])
+                ->whereNumber('module')
+                ->name('temporary-modules.admin.analysis-preview');
+            Route::post('/{module}/exportar-analisis-word', [TemporaryModuleController::class, 'exportAnalysisWord'])
+                ->whereNumber('module')
+                ->name('temporary-modules.admin.export-analysis-word');
             Route::get('/exportaciones/{file}', [TemporaryModuleController::class, 'downloadExport'])
-                ->where('file', '[A-Za-z0-9_\-]+\.xlsx')
+                ->where('file', '[A-Za-z0-9_\-]+\.(xlsx|docx)')
                 ->name('temporary-modules.admin.exports.download');
             Route::delete('/{module}/registros', [TemporaryModuleController::class, 'clearEntries'])
                 ->whereNumber('module')
@@ -114,7 +120,7 @@ Route::middleware('auth')->group(function () {
             ->whereNumber('module')
             ->name('temporary-modules.submit');
 
-        Route::get('/registros/{entry}/archivo/{fieldKey}', [TemporaryModuleController::class, 'previewEntryFile'])
+        Route::get('/{module}/registros/{entry}/archivo/{fieldKey}', [TemporaryModuleController::class, 'previewEntryFile'])
             ->middleware('can:Modulos-Temporales')
             ->whereNumber('entry')
             ->where('fieldKey', '[A-Za-z0-9_\-]+')
@@ -131,4 +137,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/canva/auth', [CanvaController::class, 'authRedirect'])->name('canva.auth');
 
     Route::post('/canva/generar-documento', [CanvaController::class, 'generarDocumento'])->name('canva.generar-documento');
+
+    Route::prefix('admin/usuarios')->middleware('can:Administrar-Usuarios')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\UserManagementController::class, 'index'])->name('admin.usuarios.index');
+        Route::get('/crear', [\App\Http\Controllers\Admin\UserManagementController::class, 'create'])->name('admin.usuarios.create');
+        Route::post('/crear', [\App\Http\Controllers\Admin\UserManagementController::class, 'store'])->name('admin.usuarios.store');
+        Route::get('/{id}/editar', [\App\Http\Controllers\Admin\UserManagementController::class, 'edit'])->name('admin.usuarios.edit');
+        Route::post('/{id}/editar', [\App\Http\Controllers\Admin\UserManagementController::class, 'update'])->name('admin.usuarios.update');
+        Route::delete('/{id}', [\App\Http\Controllers\Admin\UserManagementController::class, 'destroy'])->name('admin.usuarios.destroy');
+        Route::post('/{id}/toggle-status', [\App\Http\Controllers\Admin\UserManagementController::class, 'toggleStatus'])->name('admin.usuarios.toggle-status');
+    });
 });
