@@ -20,8 +20,36 @@
                 <h2>Editar módulo temporal</h2>
                 <p>Actualiza vigencia, alcance y agrega datos extra requeridos.</p>
             </div>
-            <a href="{{ route('temporary-modules.admin.index') }}" class="tm-btn">Volver</a>
+            <div class="tm-inline-actions">
+                @if (!is_null($temporaryModule->seed_discard_log))
+                    <script type="application/json" id="tm-seed-discard-edit">{!! json_encode($temporaryModule->seed_discard_log ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}</script>
+                    <button type="button" class="tm-btn tm-btn-secondary" id="tmEditSeedLogBtn" data-module-name="{{ e($temporaryModule->name) }}">Log (filas omitidas)</button>
+                @endif
+                <a href="{{ route('temporary-modules.admin.index') }}" class="tm-btn">Volver</a>
+            </div>
         </div>
+
+        @if (!is_null($temporaryModule->seed_discard_log))
+        <div class="tm-modal" id="tmSeedDiscardLogModalEdit" aria-hidden="true" role="dialog" aria-modal="true">
+            <div class="tm-modal-backdrop" data-tm-seed-log-close-edit></div>
+            <div class="tm-modal-dialog tm-seed-log-dialog">
+                <div class="tm-modal-head">
+                    <h3>Log — filas no cargadas</h3>
+                    <button type="button" class="tm-modal-close" data-tm-seed-log-close-edit aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="tm-modal-body tm-seed-log-body">
+                    <p class="tm-seed-log-module" id="tmSeedDiscardLogModuleEdit"></p>
+                    <p class="tm-muted" id="tmSeedDiscardLogEmptyEdit" hidden>Sin filas descartadas.</p>
+                    <div class="tm-table-wrap tm-seed-log-table-wrap" id="tmSeedDiscardLogTableWrapEdit" hidden>
+                        <table class="tm-table tm-table-sm">
+                            <thead><tr><th>Fila</th><th>Motivo</th><th>MR</th><th>Municipio</th><th>Acción</th></tr></thead>
+                            <tbody id="tmSeedDiscardLogTbodyEdit"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
 
         <form action="{{ route('temporary-modules.admin.update', $temporaryModule->id) }}" method="POST" class="tm-form tm-edit-compact" id="tmEditForm">
             @csrf
@@ -738,6 +766,56 @@
                 });
             });
         }
+
+        @if (!is_null($temporaryModule->seed_discard_log))
+        (function () {
+            var btn = document.getElementById('tmEditSeedLogBtn');
+            var modal = document.getElementById('tmSeedDiscardLogModalEdit');
+            var jsonEl = document.getElementById('tm-seed-discard-edit');
+            if (!btn || !modal || !jsonEl) return;
+            function esc(s) {
+                if (s == null || s === '') return '—';
+                var d = document.createElement('div');
+                d.textContent = String(s);
+                return d.innerHTML;
+            }
+            function openLog() {
+                var list = [];
+                try { list = JSON.parse(jsonEl.textContent || '[]'); } catch (e) {}
+                if (!Array.isArray(list)) list = [];
+                document.getElementById('tmSeedDiscardLogModuleEdit').textContent = btn.getAttribute('data-module-name') || '';
+                var tbody = document.getElementById('tmSeedDiscardLogTbodyEdit');
+                var empty = document.getElementById('tmSeedDiscardLogEmptyEdit');
+                var wrap = document.getElementById('tmSeedDiscardLogTableWrapEdit');
+                tbody.innerHTML = '';
+                if (list.length === 0) {
+                    empty.hidden = false;
+                    wrap.hidden = true;
+                } else {
+                    empty.hidden = true;
+                    wrap.hidden = false;
+                    list.forEach(function (row) {
+                        var tr = document.createElement('tr');
+                        tr.innerHTML = '<td>' + esc(row.row) + '</td><td>' + esc(row.reason) + '</td><td>' + esc(row.microrregion) + '</td><td>' + esc(row.municipio) + '</td><td class="tm-seed-log-accion">' + esc(row.accion) + '</td>';
+                        tbody.appendChild(tr);
+                    });
+                }
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLog() {
+                modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+            }
+            btn.addEventListener('click', openLog);
+            modal.querySelectorAll('[data-tm-seed-log-close-edit]').forEach(function (el) { el.addEventListener('click', closeLog); });
+            @if (session('show_seed_log'))
+            openLog();
+            @endif
+        })();
+        @endif
     });
 </script>
 @endpush

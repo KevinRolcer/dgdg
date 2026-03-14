@@ -1,0 +1,198 @@
+.settings-card {
+    max-width: 560px;
+    padding: 1.25rem 1.35rem;
+}
+
+.settings-card-head {
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+.settings-card-title {
+    margin: 0 0 0.35rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--clr-primary-dark);
+}
+
+html.theme-dark .settings-card-title {
+    color: var(--clr-accent);
+}
+
+.settings-card-desc {
+    margin: 0;
+    font-size: 0.86rem;
+    color: var(--clr-text-light);
+    line-height: 1.45;
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 0;
+}
+
+.settings-row-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.settings-row-text strong {
+    font-size: 0.92rem;
+}
+
+.settings-row-text span {
+    font-size: 0.8rem;
+    color: var(--clr-text-light);
+}
+
+.settings-toggle {
+    position: relative;
+    display: inline-flex;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.settings-toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.settings-toggle-track {
+    width: 48px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--clr-border);
+    transition: background 0.2s ease;
+    position: relative;
+}
+
+.settings-toggle-track::after {
+    content: '';
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--clr-card);
+    top: 3px;
+    left: 3px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    transition: transform 0.2s ease;
+}
+
+.settings-toggle input:checked + .settings-toggle-track {
+    background: var(--clr-primary);
+}
+
+.settings-toggle input:checked + .settings-toggle-track::after {
+    transform: translateX(20px);
+    background: #fff;
+}
+
+.settings-hint {
+    margin: 0.5rem 0 0;
+    font-size: 0.75rem;
+    color: var(--clr-text-light);
+}
+
+/* Gammas modo oscuro (círculos de referencia) */
+.settings-dark-variants {
+    margin-top: 0.5rem;
+    padding: 1rem 0 0;
+    border-top: 1px solid var(--clr-border);
+}
+
+.settings-dark-variants-label {
+    margin: 0 0 0.65rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .settings-dark-variants-label {
+    color: var(--clr-text-main);
+}
+
+.settings-variant-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.settings-variant-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.5rem 0.5rem;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--clr-text-main);
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.settings-variant-btn:hover {
+    background: rgba(134, 30, 52, 0.06);
+}
+
+html.theme-dark .settings-variant-btn:hover {
+    background: rgba(199, 155, 102, 0.1);
+}
+
+.settings-variant-btn.is-active {
+    border-color: var(--clr-primary);
+    background: rgba(134, 30, 52, 0.06);
+}
+
+html.theme-dark .settings-variant-btn.is-active {
+    border-color: var(--clr-accent);
+    background: rgba(199, 155, 102, 0.14);
+}
+
+.settings-variant-swatch {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: none;
+    flex-shrink: 0;
+}
+
+.settings-variant-swatch--deep {
+    background: #0e1015;
+}
+
+.settings-variant-swatch--soft {
+    background: #484e59;
+}
+
+.settings-variant-swatch--slate {
+    background: #1a2330;
+}
+
+.settings-variant-name {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-align: center;
+    max-width: 72px;
+    line-height: 1.2;
+    color: var(--clr-text-light);
+}
+
+.settings-variant-btn.is-active .settings-variant-name {
+    color: var(--clr-primary-dark);
+}
+
+html.theme-dark .settings-variant-btn.is-active .settings-variant-name {
+    color: var(--clr-accent);
+}

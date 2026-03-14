@@ -1,0 +1,203 @@
+/**
+ * Agenda Directiva — modo oscuro (html.theme-dark)
+ */
+html.theme-dark .agenda-filters-form.agenda-filters-compact {
+    background: var(--tm-muted-bg) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .agenda-btn-clear-extra {
+    background: var(--clr-card) !important;
+    color: var(--clr-text-light) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .agenda-btn-clear-extra:hover {
+    background: rgba(232, 136, 156, 0.12) !important;
+    border-color: var(--clr-border) !important;
+    color: #fca5a5 !important;
+}
+
+html.theme-dark .agenda-ajax-loading {
+    background: rgba(22, 25, 32, 0.88) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .agenda-card {
+    background: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+    box-shadow: var(--shadow-soft);
+}
+
+html.theme-dark .agenda-head-title {
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .agenda-btn:not(.agenda-btn-primary):not(.agenda-btn-danger) {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .agenda-btn-secondary:hover {
+    background: rgba(199, 155, 102, 0.12) !important;
+}
+
+html.theme-dark .agenda-modulo-list li {
+    background: var(--tm-muted-bg) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .modal-agenda-content {
+    background: var(--clr-card) !important;
+    border: 1px solid var(--clr-border);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+html.theme-dark .modal-agenda-header {
+    border-bottom-color: var(--clr-border) !important;
+    background: var(--clr-card) !important;
+}
+
+html.theme-dark .modal-agenda-header h3 {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .modal-close-btn {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .modal-body-scroll {
+    background: var(--clr-card) !important;
+    overflow-x: auto !important;
+}
+
+html.theme-dark .modal-body-scroll::-webkit-scrollbar-track {
+    background: var(--clr-bg) !important;
+}
+
+html.theme-dark .modal-agenda-footer {
+    border-top-color: var(--clr-border) !important;
+    background: var(--clr-bg) !important;
+}
+
+html.theme-dark .btn-secondary-agenda {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .form-label-agenda,
+html.theme-dark .agenda-delegado-label,
+html.theme-dark .agenda-aforo-label {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .form-control-agenda,
+html.theme-dark .form-control-agenda-sm {
+    background: var(--tm-input-bg) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .form-control-agenda::placeholder,
+html.theme-dark .form-control-agenda-sm::placeholder {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .agenda-type-pill:not(.is-active) {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .btn-toggle-unfold {
+    background: var(--tm-muted-bg) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .btn-toggle-unfold.is-active {
+    background: rgba(199, 155, 102, 0.15) !important;
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .unfold-container {
+    background: var(--tm-muted-bg) !important;
+    border-color: var(--clr-border) !important;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+html.theme-dark .agenda-table th {
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .agenda-table td strong {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .agenda-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.04) !important;
+}
+
+html.theme-dark .agenda-badge.is-pasado {
+    background: var(--tm-surface) !important;
+}
+
+html.theme-dark .user-item-mini:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+
+html.theme-dark .u-name {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .u-email {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .slider-mini {
+    background-color: #4a5568 !important;
+}
+
+html.theme-dark .slider-mini:before {
+    background-color: var(--clr-card) !important;
+}
+
+html.theme-dark .dia-pill span {
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-light) !important;
+    background: var(--tm-surface) !important;
+}
+
+html.theme-dark .agenda-phone-input-wrap {
+    background: var(--tm-muted-bg) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .agenda-phone-icon {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .agenda-phone-input {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .agenda-phones-hint {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .status-dot {
+    box-shadow: 0 0 0 2px var(--clr-card) !important;
+}
+
+html.theme-dark .agenda-page {
+    background: transparent;
+}
+
+/* Chips borrar filtro heredan tm-module-chip — refuerzo */
+html.theme-dark .agenda-filters-compact .tm-module-chip.tm-btn-clear {
+    background: rgba(232, 136, 156, 0.1) !important;
+    color: var(--clr-accent) !important;
+    border-color: var(--clr-border) !important;
+}

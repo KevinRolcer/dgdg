@@ -1,0 +1,712 @@
+/**
+ * Modo oscuro — módulos (TM, perfil, home, agenda, mesas, usuarios, Word).
+ * Cargar después de theme-dark.css y de los CSS de cada módulo.
+ */
+html.theme-dark {
+    --tm-surface: #1a1f28;
+    --tm-surface-2: #222830;
+    --tm-input-bg: #1e242e;
+    --tm-muted-bg: #252b36;
+    /* Repite acento por si el bloque :root de otro CSS pisa variables */
+    --clr-accent: #c79b66;
+    /* Vista previa Excel/Word: escritorio (más oscuro) vs hoja (gris medio) vs celdas */
+    --tm-preview-desk: #383e4a;
+    --tm-preview-sheet: #636b7b;
+    --tm-preview-cell: #565e6e;
+    --tm-preview-cell-alt: #5e6676;
+    --tm-preview-border: rgba(255, 255, 255, 0.11);
+    --tm-preview-sheet-edge: rgba(199, 155, 102, 0.42);
+}
+
+/* ---------- Formularios globales en área autenticada ---------- */
+html.theme-dark .app-content input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="file"]):not([type="hidden"]),
+html.theme-dark .app-content select,
+html.theme-dark .app-content textarea,
+html.theme-dark .app-content .form-control,
+html.theme-dark .app-content input.form-control {
+    background: var(--tm-input-bg) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+/* Tablas TM / admin: celdas con inputs (evita cajas blancas) */
+html.theme-dark .tm-table td input,
+html.theme-dark .tm-table td select,
+html.theme-dark .tm-table td textarea,
+html.theme-dark .tm-admin-preview-table input,
+html.theme-dark .tm-admin-preview-table select,
+html.theme-dark .tm-admin-preview-table textarea {
+    background: var(--tm-input-bg) !important;
+    color: var(--clr-text-main) !important;
+    border: 1px solid var(--clr-border) !important;
+    border-radius: 8px;
+    padding: 6px 8px;
+    min-height: 32px;
+}
+
+html.theme-dark .app-content .table,
+html.theme-dark .app-content table {
+    color: var(--clr-text-main);
+}
+
+/* ---------- Módulos temporales (.tm-*) ---------- */
+html.theme-dark .tm-section-switch,
+html.theme-dark .tm-upload-meta-pill,
+html.theme-dark .tm-btn:not(.tm-btn-primary):not(.tm-btn-success),
+html.theme-dark .tm-btn-outline,
+html.theme-dark .tm-seed-panel,
+html.theme-dark .tm-seed-step-badge,
+html.theme-dark .tm-seed-input,
+html.theme-dark .tm-seed-panel .tm-input,
+html.theme-dark .tm-seed-file-label,
+html.theme-dark .tm-inline-image-preview,
+html.theme-dark .tm-record-card,
+html.theme-dark .tm-paginator-btn:not(.is-active):not(.tm-btn-primary),
+html.theme-dark .tm-module-chip,
+html.theme-dark .tm-modal-dialog,
+html.theme-dark .tm-swal-cancel,
+html.theme-dark .tm-paginator-btn.is-disabled,
+html.theme-dark .tm-upload-evidence-dropzone,
+html.theme-dark .tm-upload-evidence-placeholder,
+html.theme-dark .tm-table-wrap-scroll,
+html.theme-dark .tm-target-box,
+html.theme-dark .tm-field-row,
+html.theme-dark .tm-delegate-card,
+html.theme-dark .tm-analysis-slot,
+html.theme-dark .tm-word-panel,
+html.theme-dark .tm-export-personalize-form {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main);
+    border-color: var(--clr-border);
+}
+
+html.theme-dark .tm-pagination--footer {
+    background: var(--tm-muted-bg) !important;
+}
+
+html.theme-dark .tm-seed-panel-head {
+    background: var(--tm-muted-bg) !important;
+}
+
+html.theme-dark .tm-form input:not([type="checkbox"]):not([type="radio"]),
+html.theme-dark .tm-form textarea,
+html.theme-dark .tm-form select,
+html.theme-dark .tm-entry-field input:not([type="checkbox"]):not([type="radio"]),
+html.theme-dark .tm-entry-field textarea,
+html.theme-dark .tm-entry-field select,
+html.theme-dark .tm-modal-body .tm-entry-field input:not([type="checkbox"]):not([type="radio"]),
+html.theme-dark .tm-modal-body .tm-entry-field select,
+html.theme-dark .tm-modal-body .tm-entry-field textarea {
+    background: var(--tm-input-bg) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .tm-table thead th {
+    background: rgba(199, 155, 102, 0.12) !important;
+    color: var(--clr-accent) !important;
+    border-bottom: 1px solid rgba(199, 155, 102, 0.35);
+}
+
+html.theme-dark .tm-table tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+html.theme-dark .tm-table th,
+html.theme-dark .tm-table td {
+    border-color: var(--clr-border);
+}
+
+/* Encabezados = acento de marca (Mis registros / tablas delegado) */
+html.theme-dark .tm-table th {
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .tm-admin-preview-table th,
+html.theme-dark .tm-admin-col-title {
+    color: var(--clr-accent) !important;
+    background: rgba(199, 155, 102, 0.1) !important;
+}
+
+/* Chips de módulo activo + pestañas Subir / Registros: mismo acento */
+html.theme-dark .tm-module-chip.is-active {
+    border-color: rgba(199, 155, 102, 0.85) !important;
+    background: rgba(199, 155, 102, 0.22) !important;
+    color: #e8c9a0 !important;
+    box-shadow: 0 0 0 1px rgba(199, 155, 102, 0.25);
+}
+
+html.theme-dark .tm-module-chip:not(.is-active) {
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .tm-section-tab.is-active {
+    border-color: rgba(199, 155, 102, 0.75) !important;
+    background: rgba(199, 155, 102, 0.2) !important;
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .tm-section-switch {
+    border-color: rgba(199, 155, 102, 0.25);
+}
+
+html.theme-dark .tm-thumb-link,
+html.theme-dark .tm-image-preview {
+    background: var(--tm-surface) !important;
+}
+
+/* ---------- Modales TM (refuerzo: pie, cabecera, cuerpo) ---------- */
+html.theme-dark .tm-modal-dialog,
+html.theme-dark .tm-modal-head,
+html.theme-dark .tm-modal-body,
+html.theme-dark .tm-entry-form .tm-actions,
+html.theme-dark .tm-modal-foot {
+    background: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .tm-modal-foot {
+    background: var(--clr-bg) !important;
+}
+
+html.theme-dark .tm-entry-form .tm-actions {
+    box-shadow: 0 -12px 24px rgba(0, 0, 0, 0.35);
+}
+
+html.theme-dark .tm-modal-body::-webkit-scrollbar-track {
+    background: var(--clr-bg) !important;
+}
+
+html.theme-dark .tm-upload-evidence-toolbar .tm-btn {
+    background: var(--tm-surface) !important;
+}
+
+html.theme-dark .tm-export-color-option:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ---------- Admin TM: Alcance del módulo (create/edit) ---------- */
+html.theme-dark .tm-target-users {
+    background: var(--clr-bg) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .tm-target-user-filters .tm-btn:not(.is-active):not(.tm-btn-clear) {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .tm-target-user-filters .tm-btn.is-active {
+    background: var(--clr-secondary) !important;
+    color: #fff !important;
+}
+
+html.theme-dark .tm-target-user-filters .tm-btn.tm-btn-clear {
+    background: rgba(232, 136, 156, 0.12) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .tm-delegate-list {
+    background: var(--tm-surface) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .tm-delegate-list::-webkit-scrollbar-track {
+    background: var(--clr-bg) !important;
+}
+
+html.theme-dark .tm-delegate-list::-webkit-scrollbar-thumb {
+    background: var(--clr-secondary) !important;
+}
+
+html.theme-dark .tm-delegate-item {
+    background: var(--clr-bg) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .tm-delegate-item small {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .tm-target-options .tm-inline-check,
+html.theme-dark .tm-target-choice {
+    background: var(--tm-surface) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .tm-target-users-title {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .tm-fields-foot {
+    background: transparent;
+    border-color: var(--clr-border);
+}
+
+html.theme-dark .tm-image-modal-preview {
+    background: var(--tm-muted-bg) !important;
+}
+
+html.theme-dark .tm-head h2,
+html.theme-dark .tm-record-card-title,
+html.theme-dark .tm-record-item strong,
+html.theme-dark .tm-fields-head h3,
+html.theme-dark .tm-module-subtitle {
+    color: var(--clr-accent);
+}
+
+html.theme-dark .tm-badge.is-active {
+    color: var(--clr-secondary);
+}
+
+html.theme-dark a.tm-paginator-btn:hover {
+    background: rgba(199, 155, 102, 0.18) !important;
+    border-color: var(--clr-accent) !important;
+    color: var(--clr-accent) !important;
+}
+
+/* ---------- Perfil ---------- */
+html.theme-dark .profile-hero-card {
+    background-color: var(--tm-surface);
+    border-color: var(--clr-border);
+}
+
+html.theme-dark .profile-avatar-wrap {
+    background: var(--tm-muted-bg) !important;
+    border-color: rgba(199, 155, 102, 0.45);
+}
+
+html.theme-dark .profile-info-card,
+html.theme-dark .profile-texture-panel,
+html.theme-dark .profile-password-modal__dialog,
+html.theme-dark .profile-micro-pane,
+html.theme-dark .profile-info-card-micro {
+    background: var(--clr-card) !important;
+    border-color: var(--clr-border);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .profile-password-modal__dialog {
+    color: var(--clr-text-main);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+html.theme-dark .profile-password-modal__backdrop {
+    background: rgba(0, 0, 0, 0.72);
+}
+
+html.theme-dark .profile-password-modal__head h3 {
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .profile-password-modal__close {
+    background: var(--tm-input-bg) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .profile-password-modal__close:hover {
+    background: rgba(199, 155, 102, 0.15) !important;
+    border-color: rgba(199, 155, 102, 0.35) !important;
+}
+
+html.theme-dark .profile-section-head h3,
+html.theme-dark .profile-info-card h3 {
+    color: var(--clr-accent);
+}
+
+html.theme-dark .profile-save-btn {
+    color: #fff !important;
+}
+
+html.theme-dark .profile-save-btn:hover {
+    color: #fff !important;
+}
+
+html.theme-dark .profile-open-password-modal,
+html.theme-dark .profile-open-texture-panel {
+    border-color: var(--clr-border);
+    background: rgba(199, 155, 102, 0.12);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .profile-open-password-modal:hover {
+    background: rgba(199, 155, 102, 0.2);
+    border-color: rgba(199, 155, 102, 0.4);
+}
+
+html.theme-dark .profile-hero-card.texture-tone-blanco .profile-open-texture-panel {
+    border-color: var(--clr-border);
+    background: rgba(199, 155, 102, 0.12);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .profile-micro-chip {
+    background: var(--tm-input-bg) !important;
+    border-color: var(--clr-border);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .profile-micro-chip:hover {
+    border-color: rgba(199, 155, 102, 0.4);
+}
+
+html.theme-dark .profile-micro-chip.is-active {
+    border-color: rgba(199, 155, 102, 0.85);
+    background: rgba(199, 155, 102, 0.18) !important;
+    color: var(--clr-accent);
+}
+
+html.theme-dark .profile-municipios-list li {
+    background: var(--tm-muted-bg) !important;
+    border-color: var(--clr-border);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .profile-page-layout .text-muted {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .profile-password-form label {
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .profile-password-form input {
+    background: var(--tm-input-bg) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .texture-option.is-active {
+    box-shadow: 0 0 0 2px rgba(199, 155, 102, 0.55);
+}
+
+/* ---------- Home + calendario ---------- */
+html.theme-dark .calendar-card {
+    background: var(--clr-card) !important;
+    border: 1px solid var(--clr-border);
+    box-shadow: var(--shadow-soft);
+}
+
+html.theme-dark .calendar-drawer-close,
+html.theme-dark .calendar-connect-btn,
+html.theme-dark .calendar-disconnect-btn,
+html.theme-dark .home-pill,
+html.theme-dark .home-stat-card {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main);
+    border-color: var(--clr-border);
+}
+
+html.theme-dark .calendar-card-header h3 {
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .calendar-event-form,
+html.theme-dark .calendar-panel,
+html.theme-dark .calendar-toolbar,
+html.theme-dark .calendar-view-btn:not(.is-active),
+html.theme-dark .calendar-nav-btn,
+html.theme-dark .calendar-day:not(.is-today),
+html.theme-dark .calendar-grid {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main);
+    border-color: var(--clr-border);
+}
+
+html.theme-dark .calendar-day.is-today {
+    background: rgba(232, 136, 156, 0.15) !important;
+}
+
+html.theme-dark .calendar-event-form input,
+html.theme-dark .calendar-event-form textarea {
+    background: var(--tm-input-bg) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .inline-alert-success {
+    background: rgba(90, 157, 145, 0.15);
+    border-color: rgba(90, 157, 145, 0.35);
+    color: var(--clr-secondary);
+}
+
+html.theme-dark .inline-alert-error {
+    background: rgba(232, 136, 156, 0.12);
+    border-color: rgba(232, 136, 156, 0.3);
+    color: var(--clr-text-main);
+}
+
+/* ---------- Gestión de usuarios ---------- */
+html.theme-dark .um-conditional-section {
+    background: var(--tm-muted-bg) !important;
+    border-color: var(--clr-border);
+}
+
+html.theme-dark .um-table th {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main);
+    box-shadow: 0 1px 0 var(--clr-border);
+}
+
+html.theme-dark .um-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+html.theme-dark .um-pagination-wrap,
+html.theme-dark .um-pagination .page-item .page-link:not(.active) {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border);
+}
+
+html.theme-dark .um-pagination .page-item.active .page-link {
+    background: var(--clr-primary) !important;
+    border-color: var(--clr-primary);
+    color: #fff !important;
+}
+
+/* Agenda Directiva: ver theme-dark-agenda.css */
+
+html.theme-dark input:checked + .slider-mini {
+    background-color: var(--clr-primary) !important;
+}
+
+html.theme-dark .slider-mini:before,
+html.theme-dark input:checked + .slider-mini:before {
+    background-color: var(--clr-card) !important;
+}
+
+/* ---------- Mesas de paz (#mesasPazApp) ---------- */
+html.theme-dark #mesasPazApp .mesa-micro-page:not(.is-active) {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main);
+}
+
+html.theme-dark #mesasPazApp .mesa-date-btn-wrapper {
+    background: var(--tm-muted-bg) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border);
+}
+
+html.theme-dark .swal-modal {
+    background: var(--clr-card) !important;
+    border: 1px solid var(--clr-border);
+}
+
+html.theme-dark .swal-title,
+html.theme-dark .swal-text {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .swal-button--cancel {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main) !important;
+}
+
+/* ---------- Supervisión evidencias ---------- */
+html.theme-dark .supervision-layout .card,
+html.theme-dark .supervision-layout table thead th {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main);
+}
+
+/* ---------- Análisis Word (tm-analysis) — paleta arrastrable etc. ---------- */
+html.theme-dark .tm-analysis-root,
+html.theme-dark .tm-word-slot,
+html.theme-dark .tm-word-dyn-table td,
+html.theme-dark .tm-word-accounting-fields,
+html.theme-dark .tm-word-acc-row {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main);
+    border-color: var(--clr-border);
+}
+
+html.theme-dark .tm-word-accounting-summary td.tm-word-accounting-val {
+    background: var(--tm-input-bg) !important;
+    color: #f87171 !important;
+}
+
+html.theme-dark .tm-word-dyn-table th {
+    background: var(--tm-muted-bg) !important;
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .tm-word-slot.is-dragover {
+    background: rgba(232, 136, 156, 0.12) !important;
+}
+
+html.theme-dark .tm-analysis-toolbar {
+    background: var(--tm-muted-bg) !important;
+    border-color: var(--clr-border);
+}
+
+/* ---------- Ajustes toggle ---------- */
+html.theme-dark .settings-toggle-track::after {
+    background: var(--clr-card);
+}
+
+/* ---------- SweetAlert / swal si aplica ---------- */
+html.theme-dark .swal2-popup {
+    background: var(--clr-card) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .swal2-html-container,
+html.theme-dark .swal2-title {
+    color: var(--clr-text-main) !important;
+}
+
+/* =============================================================================
+   Vista previa Excel + Word — solo tema oscuro
+   Solo hoja (página) + celdas de CONTENIDO/EJEMPLO (.tm-export-preview-data-cell).
+   Título, encabezados y th no se tocan (siguen color configurable en UI).
+   ============================================================================= */
+
+/* --- Excel: escritorio + hoja A4 --- */
+html.theme-dark .tm-export-preview-a4 {
+    background: var(--tm-preview-desk) !important;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25) !important;
+}
+
+html.theme-dark .tm-export-preview-page {
+    background: var(--tm-preview-sheet) !important;
+    border: 2px dashed var(--tm-preview-sheet-edge) !important;
+    box-shadow:
+        0 4px 28px rgba(0, 0, 0, 0.45),
+        0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+html.theme-dark .tm-export-personalize-preview {
+    background: transparent !important;
+}
+
+/* Solo fila de datos / ejemplo (no título ni encabezados de columna) */
+html.theme-dark .tm-export-preview-data-cell {
+    background: var(--tm-preview-cell) !important;
+    border: 1px solid var(--tm-preview-border) !important;
+    color: #e8eaef !important;
+}
+
+html.theme-dark .tm-export-preview-row.tm-export-preview-data .tm-export-preview-data-cell:nth-child(even) {
+    background: var(--tm-preview-cell-alt) !important;
+}
+
+/* --- Word: modal simple (panel + doc) --- */
+html.theme-dark .tm-analysis-preview-panel {
+    background: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .tm-analysis-preview-doc {
+    background: var(--tm-preview-sheet) !important;
+    border: 1px solid var(--tm-preview-border) !important;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2) !important;
+}
+
+html.theme-dark .tm-analysis-doc-inner {
+    color: #e8eaef !important;
+}
+
+html.theme-dark .tm-analysis-doc-title {
+    color: #e8c9a0 !important;
+}
+
+html.theme-dark .tm-analysis-doc-sub {
+    color: #a8b0c0 !important;
+}
+
+/* Word: no tocar th / thead (color configurable). Solo td = contenido. */
+html.theme-dark .tm-analysis-mini-table td,
+html.theme-dark .tm-analysis-big-table tbody td {
+    background: var(--tm-preview-cell) !important;
+    color: #e8eaef !important;
+    border-color: var(--tm-preview-border) !important;
+}
+
+html.theme-dark .tm-analysis-big-table tbody tr:nth-child(even) td {
+    background: var(--tm-preview-cell-alt) !important;
+}
+
+/* Rejilla N×M = solo celdas de contenido */
+html.theme-dark .tm-analysis-grid-table td {
+    background: var(--tm-preview-cell) !important;
+    border-color: var(--tm-preview-border) !important;
+}
+
+html.theme-dark .tm-analysis-sidebar {
+    background: var(--tm-muted-bg) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .tm-analysis-hr {
+    border-top-color: var(--clr-border) !important;
+}
+
+html.theme-dark .tm-analysis-preview-label,
+html.theme-dark .tm-analysis-sidebar-title,
+html.theme-dark .tm-word-preview-zoom-hint {
+    color: var(--clr-text-light) !important;
+}
+
+/* --- Word: A4 personalizar (misma caja que Excel) --- */
+html.theme-dark .tm-analysis-word-preview-a4 {
+    background: var(--tm-preview-desk) !important;
+}
+
+html.theme-dark .tm-word-preview-page {
+    background: var(--tm-preview-sheet) !important;
+    border-color: var(--tm-preview-sheet-edge) !important;
+    box-shadow:
+        0 4px 28px rgba(0, 0, 0, 0.45),
+        0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+html.theme-dark .tm-analysis-preview-doc--personalize {
+    background: transparent !important;
+}
+
+html.theme-dark .tm-word-sheet-preview {
+    background-color: var(--tm-preview-desk) !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+html.theme-dark .tm-word-overlay-inner .tm-analysis-mini-table td,
+html.theme-dark .tm-word-overlay-inner .tm-analysis-big-table tbody td {
+    background: var(--tm-preview-cell) !important;
+    color: #e8eaef !important;
+}
+
+html.theme-dark .tm-word-orient-btn:not(.is-active) {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main) !important;
+}
+
+/* ---------- Variantes de modo oscuro (Ajustes) ---------- */
+html.theme-dark.theme-dark--soft {
+    --tm-surface: #505660;
+    --tm-surface-2: #565c68;
+    --tm-input-bg: #555c68;
+    --tm-muted-bg: #525865;
+    --tm-preview-desk: #5c6370;
+    --tm-preview-sheet: #6d7585;
+    --tm-preview-cell: #606878;
+    --tm-preview-cell-alt: #687080;
+    --tm-preview-border: rgba(255, 255, 255, 0.12);
+    --tm-preview-sheet-edge: rgba(199, 155, 102, 0.38);
+}
+
+html.theme-dark.theme-dark--slate {
+    --tm-surface: #1e2838;
+    --tm-surface-2: #243044;
+    --tm-input-bg: #222b3a;
+    --tm-muted-bg: #202a3a;
+    --tm-preview-desk: #2a3548;
+    --tm-preview-sheet: #4a5568;
+    --tm-preview-cell: #3d4758;
+    --tm-preview-cell-alt: #455060;
+    --tm-preview-border: rgba(140, 170, 210, 0.12);
+    --tm-preview-sheet-edge: rgba(130, 170, 220, 0.35);
+}

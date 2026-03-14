@@ -9,6 +9,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Pagination\Paginator;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -93,5 +94,8 @@ class AppServiceProvider extends ServiceProvider
         if (!app()->isLocal() && config('app.force_https', false)) {
             URL::forceScheme('https');
         }
+
+        // Sin Tailwind, la vista por defecto (tailwind) rompe la UI (SVG gigantes). Bootstrap encaja con el layout.
+        Paginator::useBootstrapFive();
     }
 }

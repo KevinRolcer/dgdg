@@ -6,6 +6,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 
+use App\Models\TemporaryModule;
 use App\Models\User;
 use App\Services\TemporaryModules\TemporaryModuleExportService;
 use App\Notifications\ExcelExportCompleted;
@@ -37,6 +38,7 @@ class GenerateTemporaryModuleExcelJob implements ShouldQueue
             $result = $exportService->exportExcel($this->moduleId, $this->mode, $this->includeAnalysis, $this->exportConfig);
 
             if (is_array($result) && isset($result['name'], $result['url'])) {
+                TemporaryModule::query()->whereKey($this->moduleId)->update(['exported_at' => now()]);
                 if ($this->exportRequestId !== null) {
                     $this->updatePendingNotificationToCompleted($user, $result['name'], $result['url']);
                 } else {

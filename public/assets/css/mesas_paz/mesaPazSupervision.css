@@ -82,6 +82,7 @@
 #supervisionEvidenciasPage .form-select {
     border-color: var(--clr-border);
     color: var(--clr-text-main);
+    background-color: var(--clr-card);
     border-radius: var(--mesa-radius-sm);
 }
 
@@ -146,6 +147,8 @@
 #supervisionEvidenciasPage .modal-content {
     border: 1px solid var(--clr-border);
     border-radius: var(--mesa-radius-md);
+    background: var(--clr-card);
+    color: var(--clr-text-main);
 }
 
 @media (min-width: 992px) {

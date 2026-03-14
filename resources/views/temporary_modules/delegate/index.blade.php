@@ -27,38 +27,7 @@
     </div>
 
     <section class="tm-section-panel {{ $isUploadSection ? 'is-active' : '' }}" id="tmUploadView" role="tabpanel" aria-hidden="{{ $isUploadSection ? 'false' : 'true' }}">
-        <div class="tm-module-grid">
-            @forelse ($modules as $module)
-                <article class="content-card tm-card tm-module-card tm-upload-card">
-                    <div class="tm-upload-card-head">
-                        <h2>{{ $module->name }}</h2>
-                        <p>{{ $module->description ?: 'Sin descripcion adicional.' }}</p>
-                    </div>
-
-                    <div class="tm-upload-meta-row">
-                        <span class="tm-upload-meta-pill"><strong>Vence:</strong> {{ optional($module->expires_at)->format('d/m/Y H:i') ?? 'Sin limite' }}</span>
-                        <span class="tm-upload-meta-pill"><strong>Mis registros:</strong> {{ $module->my_entries_count }}</span>
-                    </div>
-
-                    <div class="tm-upload-card-foot">
-                        <button
-                            type="button"
-                            class="tm-btn tm-btn-primary"
-                            data-open-module-preview="delegate-preview-{{ $module->id }}"
-                        >
-                            Registrar informacion
-                        </button>
-                    </div>
-                </article>
-            @empty
-                <article class="content-card tm-card">
-                    <p>No hay modulos temporales activos en este momento.</p>
-                </article>
-            @endforelse
-            <div class="tm-pagination">
-                {{ $modules->links() }}
-            </div>
-        </div>
+        @include('temporary_modules.delegate.partials.upload_modules', ['modules' => $modules, 'fragmentUploadUrl' => $fragmentUploadUrl ?? '#'])
     </section>
 
     @foreach ($modules as $module)
@@ -410,7 +379,7 @@
         @endforeach
     @endforeach
 
-    <section class="tm-section-panel {{ !$isUploadSection ? 'is-active' : '' }}" id="tmRecordsView" role="tabpanel" aria-hidden="{{ !$isUploadSection ? 'false' : 'true' }}" data-records-url="{{ route('temporary-modules.records') }}">
+    <section class="tm-section-panel {{ !$isUploadSection ? 'is-active' : '' }}" id="tmRecordsView" role="tabpanel" aria-hidden="{{ !$isUploadSection ? 'false' : 'true' }}" data-records-url="{{ route('temporary-modules.records') }}" data-fragment-records-url="{{ $fragmentRecordsUrl ?? '' }}">
     @if ($modules->isNotEmpty())
         <article class="content-card tm-card tm-records-container">
             <h2>Mis registros</h2>
@@ -444,163 +413,28 @@
                         role="tabpanel"
                         aria-hidden="{{ $isModuleActive ? 'false' : 'true' }}"
                     >
-                        <p class="tm-module-subtitle">{{ $module->name }}</p>
-
-                        <div class="tm-records-mobile tm-scroll-panel">
-                            @forelse ($entries as $entry)
-                                @php
-                                    $municipioValue = $municipioField ? ($entry->data[$municipioField->key] ?? null) : null;
-                                    $cardTitle = (is_string($municipioValue) && trim($municipioValue) !== '')
-                                        ? $municipioValue
-                                        : 'Registro '.($loop->iteration);
-                                @endphp
-                                <details class="tm-record-card">
-                                    <summary>
-                                        <span class="tm-record-card-title">{{ $cardTitle }}</span>
-                                        <small>MR {{ $entry->microrregion->microrregion ?? '?' }}</small>
-                                    </summary>
-
-                                    <div class="tm-record-card-body">
-                                        @foreach ($module->fields as $field)
-                                            @php
-                                                $cell = $entry->data[$field->key] ?? null;
-                                            @endphp
-                                            <div class="tm-record-item">
-                                                <strong>{{ $field->label }}</strong>
-                                                <div>
-                                                    @if (in_array($field->type, ['file', 'image'], true) && is_string($cell) && $cell !== '')
-                                                        <button
-                                                            type="button"
-                                                            class="tm-thumb-link"
-                                                            data-open-image-preview
-                                                            data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) }}"
-                                                            data-image-title="{{ $field->label }}"
-                                                            title="Ver imagen"
-                                                        >
-                                                            <i class="fa fa-image" aria-hidden="true"></i> Ver imagen
-                                                        </button>
-                                                    @elseif (is_bool($cell))
-                                                        {{ $cell ? 'Si' : 'No' }}
-                                                    @else
-                                                        @php
-                                                            if (is_array($cell)) {
-                                                                $displayText = implode(', ', array_map(function ($item) {
-                                                                    return is_scalar($item)
-                                                                        ? (string) $item
-                                                                        : json_encode($item, JSON_UNESCAPED_UNICODE);
-                                                                }, $cell));
-                                                            } elseif (is_scalar($cell)) {
-                                                                $displayText = (string) $cell;
-                                                            } else {
-                                                                $displayText = '-';
-                                                            }
-                                                            $displayText = trim($displayText) !== '' ? $displayText : '-';
-                                                            $isLongText = mb_strlen($displayText) > 120;
-                                                        @endphp
-                                                        @if ($isLongText)
-                                                            <span class="tm-cell-text-wrap" data-text-wrap>
-                                                                <span class="tm-cell-text is-collapsed" data-text-content>{{ $displayText }}</span>
-                                                                <button type="button" class="tm-cell-text-toggle" data-text-toggle>Ver mas</button>
-                                                            </span>
-                                                        @else
-                                                            {{ $displayText }}
-                                                        @endif
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        @endforeach
-
-                                        <div class="tm-record-card-actions">
-                                            <button type="button" class="tm-btn" data-open-module-preview="delegate-edit-{{ $entry->id }}">Editar</button>
-                                        </div>
-                                    </div>
-                                </details>
-                            @empty
-                                <div class="tm-record-empty">Sin registros capturados.</div>
-                            @endforelse
-                            @if ($isModuleActive)
-                                <div class="tm-pagination">
-                                    {{ $entries->links() }}
-                                </div>
+                        @php
+                            $recordsLoaded = $isModuleActive && isset($myEntries);
+                        @endphp
+                        <div
+                            class="tm-records-fragment-host"
+                            data-fragment-url="{{ $fragmentRecordsUrl ?? '' }}"
+                            data-module-id="{{ $module->id }}"
+                            @unless ($recordsLoaded) hidden @endunless
+                        >
+                            @if ($recordsLoaded)
+                                @include('temporary_modules.delegate.partials.records_entries', [
+                                    'module' => $module,
+                                    'entries' => $myEntries,
+                                    'municipioField' => $municipioField,
+                                ])
                             @endif
                         </div>
-
-                        <div class="tm-table-wrap tm-table-wrap-scroll tm-records-desktop">
-                            <table class="tm-table">
-                                <thead>
-                                    <tr>
-                                        <th>Microrregión</th>
-                                        @foreach ($module->fields as $field)
-                                            <th>{{ $field->label }}</th>
-                                        @endforeach
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse ($entries as $entry)
-                                        <tr>
-                                            <td>MR {{ $entry->microrregion->microrregion ?? '-' }}</td>
-                                            @foreach ($module->fields as $field)
-                                                @php
-                                                    $cell = $entry->data[$field->key] ?? null;
-                                                @endphp
-                                                <td>
-                                                    @if (in_array($field->type, ['file', 'image'], true) && is_string($cell) && $cell !== '')
-                                                        <button
-                                                            type="button"
-                                                            class="tm-thumb-link"
-                                                            data-open-image-preview
-                                                            data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) }}"
-                                                            data-image-title="{{ $field->label }}"
-                                                            title="Ver imagen"
-                                                        >
-                                                            <i class="fa fa-image" aria-hidden="true"></i> Ver imagen
-                                                        </button>
-                                                    @elseif (is_bool($cell))
-                                                        {{ $cell ? 'Si' : 'No' }}
-                                                    @else
-                                                        @php
-                                                            if (is_array($cell)) {
-                                                                $displayText = implode(', ', array_map(function ($item) {
-                                                                    return is_scalar($item)
-                                                                        ? (string) $item
-                                                                        : json_encode($item, JSON_UNESCAPED_UNICODE);
-                                                                }, $cell));
-                                                            } elseif (is_scalar($cell)) {
-                                                                $displayText = (string) $cell;
-                                                            } else {
-                                                                $displayText = '-';
-                                                            }
-                                                            $displayText = trim($displayText) !== '' ? $displayText : '-';
-                                                            $isLongText = mb_strlen($displayText) > 120;
-                                                        @endphp
-                                                        @if ($isLongText)
-                                                            <span class="tm-cell-text-wrap" data-text-wrap>
-                                                                <span class="tm-cell-text is-collapsed" data-text-content>{{ $displayText }}</span>
-                                                                <button type="button" class="tm-cell-text-toggle" data-text-toggle>Ver mas</button>
-                                                            </span>
-                                                        @else
-                                                            {{ $displayText }}
-                                                        @endif
-                                                    @endif
-                                                </td>
-                                            @endforeach
-                                            <td>
-                                                <button type="button" class="tm-btn" data-open-module-preview="delegate-edit-{{ $entry->id }}">Editar</button>
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="{{ $module->fields->count() + 2 }}">Sin registros capturados.</td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                            @if ($isModuleActive)
-                                <div class="tm-pagination">
-                                    {{ $entries->links() }}
-                                </div>
-                            @endif
+                        <div class="tm-records-panel-placeholder" @if ($recordsLoaded) hidden @endif>
+                            <p class="tm-module-subtitle">{{ $module->name }}</p>
+                            @unless ($recordsLoaded)
+                                <p class="tm-muted" style="font-size:0.85rem;">Selecciona este módulo arriba para cargar el listado.</p>
+                            @endunless
                         </div>
                     </section>
                 @endforeach
@@ -652,6 +486,9 @@
         const imageInputSelector = 'input[type="file"][accept="image/*"]';
         const recordsViewPanel = document.getElementById('tmRecordsView');
         const recordsUrl = recordsViewPanel ? String(recordsViewPanel.getAttribute('data-records-url') || '') : '';
+        const fragmentRecordsBase = recordsViewPanel
+            ? String(recordsViewPanel.getAttribute('data-fragment-records-url') || '')
+            : '';
         let lastFocusedImageInput = null;
         const modalOpeners = new Map();
         const notify = function (title, message, type) {
@@ -1052,16 +889,18 @@
             }
         };
 
-        openButtons.forEach(function (button) {
-            button.addEventListener('click', function () {
-                const modalId = button.getAttribute('data-open-module-preview');
-                const modal = modalId ? document.getElementById(modalId) : null;
-                if (!modal) {
-                    return;
-                }
-
-                openModal(modal, button);
-            });
+        document.addEventListener('click', function (event) {
+            const btn = event.target.closest('[data-open-module-preview]');
+            if (!btn) {
+                return;
+            }
+            const modalId = btn.getAttribute('data-open-module-preview');
+            const modal = modalId ? document.getElementById(modalId) : null;
+            if (!modal) {
+                return;
+            }
+            event.preventDefault();
+            openModal(modal, btn);
         });
 
         Array.from(document.querySelectorAll('.tm-form.tm-entry-form')).forEach(function (form) {
@@ -1170,11 +1009,111 @@
             });
         });
 
+        const loadRecordsFragment = function (host, moduleId, queryString) {
+            if (!host || !fragmentRecordsBase || !moduleId) {
+                return Promise.resolve();
+            }
+            const qs = queryString || ('module=' + encodeURIComponent(moduleId) + '&entries_page=1');
+            host.innerHTML = '<p class="tm-muted tm-records-loading">Cargando…</p>';
+            host.hidden = false;
+            const sep = fragmentRecordsBase.indexOf('?') >= 0 ? '&' : '?';
+            return fetch(fragmentRecordsBase + sep + qs.replace(/^\?/, ''), {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }
+            }).then(function (res) {
+                if (!res.ok) {
+                    throw new Error('Error ' + res.status);
+                }
+                return res.text();
+            }).then(function (html) {
+                host.innerHTML = html;
+            }).catch(function () {
+                host.innerHTML = '<p class="inline-alert inline-alert-error">No se pudo cargar el listado. <a href="' + (recordsUrl ? recordsUrl + '?module=' + moduleId : '#') + '">Recargar página</a></p>';
+            });
+        };
+
         moduleFilterButtons.forEach(function (button) {
             button.addEventListener('click', function () {
                 const targetId = button.getAttribute('data-module-target') || '';
                 activateModulePanel(targetId);
+                const panel = targetId ? document.getElementById(targetId) : null;
+                if (!panel || !fragmentRecordsBase) {
+                    return;
+                }
+                const host = panel.querySelector('.tm-records-fragment-host');
+                const placeholder = panel.querySelector('.tm-records-panel-placeholder');
+                const moduleId = String(host && host.getAttribute('data-module-id') || '').replace(/[^\d]/g, '');
+                if (!host || !moduleId) {
+                    return;
+                }
+                const inner = host.querySelector('.tm-records-fragment-inner');
+                if (inner) {
+                    if (placeholder) {
+                        placeholder.hidden = true;
+                    }
+                    host.hidden = false;
+                    return;
+                }
+                if (placeholder) {
+                    placeholder.hidden = true;
+                }
+                loadRecordsFragment(host, moduleId, 'module=' + encodeURIComponent(moduleId) + '&entries_page=1').then(function () {
+                    if (placeholder) {
+                        placeholder.hidden = true;
+                    }
+                });
             });
+        });
+
+        if (recordsViewPanel && fragmentRecordsBase) {
+            recordsViewPanel.addEventListener('click', function (event) {
+                const anchor = event.target.closest('a.tm-paginator-btn[href]');
+                if (!anchor || !anchor.getAttribute('href')) {
+                    return;
+                }
+                const host = anchor.closest('.tm-records-fragment-host');
+                if (!host || !recordsViewPanel.contains(host)) {
+                    return;
+                }
+                event.preventDefault();
+                const url = new URL(anchor.href, window.location.origin);
+                const moduleId = host.getAttribute('data-module-id') || url.searchParams.get('module');
+                const entriesPage = url.searchParams.get('entries_page') || '1';
+                const qs = 'module=' + encodeURIComponent(moduleId) + '&entries_page=' + encodeURIComponent(entriesPage);
+                loadRecordsFragment(host, moduleId, qs);
+            });
+        }
+
+        document.addEventListener('click', function (event) {
+            const imgBtn = event.target.closest('[data-open-image-preview]');
+            if (imgBtn && recordsViewPanel && recordsViewPanel.contains(imgBtn)) {
+                if (!imageModal || !imageModalImg) {
+                    return;
+                }
+                const src = imgBtn.getAttribute('data-image-src') || '';
+                const title = imgBtn.getAttribute('data-image-title') || 'Vista previa';
+                if (src === '') {
+                    return;
+                }
+                event.preventDefault();
+                imageModalImg.src = src;
+                imageModalImg.alt = title;
+                if (imageModalTitle) {
+                    imageModalTitle.textContent = title;
+                }
+                openModal(imageModal, imgBtn);
+                return;
+            }
+            const textBtn = event.target.closest('[data-text-toggle]');
+            if (textBtn && recordsViewPanel && recordsViewPanel.contains(textBtn)) {
+                const wrap = textBtn.closest('[data-text-wrap]');
+                const content = wrap ? wrap.querySelector('[data-text-content]') : null;
+                if (content instanceof HTMLElement) {
+                    const isCollapsed = content.classList.contains('is-collapsed');
+                    content.classList.toggle('is-collapsed', !isCollapsed);
+                    textBtn.textContent = isCollapsed ? 'Ver menos' : 'Ver mas';
+                }
+            }
         });
 
         sectionTabs.forEach(function (button) {

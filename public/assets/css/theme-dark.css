@@ -1,0 +1,256 @@
+/**
+ * Modo oscuro: activado con clase html.theme-dark (preferencia en localStorage).
+ */
+/**
+ * Variantes: añadir theme-dark--deep | theme-dark--soft | theme-dark--slate en <html>.
+ * Por defecto, solo theme-dark equivale a profundo (misma paleta que --deep).
+ */
+html.theme-dark,
+html.theme-dark.theme-dark--deep {
+    --clr-bg: #0e1015;
+    --clr-card: #161920;
+    --clr-text-main: #e8e9ed;
+    --clr-text-light: #9aa3b2;
+    --clr-border: rgba(255, 255, 255, 0.08);
+    --shadow-soft: 0 8px 28px rgba(0, 0, 0, 0.45);
+    --clr-accent: #c79b66;
+    --clr-primary-dark: #c75a70;
+    --clr-primary: #d47288;
+    --clr-secondary: #5a9d91;
+    --tm-input-bg: #1e222c;
+    color-scheme: dark;
+}
+
+/* Gris tenue: menos contraste, fondos más claros */
+html.theme-dark.theme-dark--soft {
+    --clr-bg: #3d424b;
+    --clr-card: #484e59;
+    --clr-text-main: #f0f1f4;
+    --clr-text-light: #b8bec8;
+    --clr-border: rgba(255, 255, 255, 0.14);
+    --shadow-soft: 0 8px 28px rgba(0, 0, 0, 0.28);
+    --tm-input-bg: #555c68;
+    color-scheme: dark;
+}
+
+/* Pizarra: tono azulado */
+html.theme-dark.theme-dark--slate {
+    --clr-bg: #121922;
+    --clr-card: #1a2330;
+    --clr-text-main: #e6eaf0;
+    --clr-text-light: #8e9aaf;
+    --clr-border: rgba(130, 160, 200, 0.14);
+    --shadow-soft: 0 8px 28px rgba(0, 0, 0, 0.42);
+    --tm-input-bg: #222b3a;
+    color-scheme: dark;
+}
+
+html.theme-dark body {
+    background: var(--clr-bg);
+    color: var(--clr-text-main);
+}
+
+/* Superficies que en claro usan #fff fijo */
+html.theme-dark .app-sidebar,
+html.theme-dark .sidebar-header,
+html.theme-dark .sidebar-collapse-btn {
+    background: var(--clr-card);
+    color: var(--clr-text-main);
+    border-color: var(--clr-border);
+}
+
+html.theme-dark .submenu-link {
+    background: var(--clr-card);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .topbar-notify,
+html.theme-dark .topbar-profile,
+html.theme-dark .menu-toggle {
+    background: var(--clr-card);
+    color: var(--clr-text-main);
+    border-color: var(--clr-border);
+}
+
+html.theme-dark .topbar-notify:hover,
+html.theme-dark .topbar-profile:hover {
+    background: rgba(199, 155, 102, 0.12);
+}
+
+html.theme-dark .topbar-dropdown {
+    background: var(--clr-card);
+    border-color: var(--clr-border);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+html.theme-dark .topbar-notify-view-all {
+    background: var(--clr-card);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .topbar-notify-list li.is-active {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+html.theme-dark .topbar-menu-link.is-active {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+html.theme-dark .notifications-drawer {
+    background: var(--clr-card);
+    box-shadow: -12px 0 32px rgba(0, 0, 0, 0.5);
+}
+
+html.theme-dark .notifications-drawer-clear,
+html.theme-dark .notifications-drawer-close,
+html.theme-dark .notifications-drawer-list li {
+    background: var(--clr-card);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .app-main {
+    background: var(--clr-bg);
+}
+
+html.theme-dark .app-topbar {
+    background: var(--clr-card);
+    border-bottom: 1px solid var(--clr-border);
+}
+
+html.theme-dark .app-content {
+    background: var(--clr-bg);
+}
+
+html.theme-dark .content-card {
+    background: var(--clr-card);
+    border-color: var(--clr-border);
+}
+
+html.theme-dark .page-header h1 {
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .topbar-avatar {
+    background: rgba(199, 155, 102, 0.18);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .topbar-notify-icon {
+    background: rgba(199, 155, 102, 0.14);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .menu-link:hover,
+html.theme-dark .menu-link-toggle:hover,
+html.theme-dark .submenu-link:hover {
+    background: rgba(199, 155, 102, 0.1);
+}
+
+html.theme-dark .menu-group.is-active > .menu-link,
+html.theme-dark .menu-link.is-current,
+html.theme-dark .menu-group.is-active > .menu-link-toggle {
+    background: rgba(199, 155, 102, 0.18);
+    color: var(--clr-accent);
+}
+
+/* Login (misma clase en html) */
+html.theme-dark.auth-page body {
+    background: var(--clr-bg);
+}
+
+html.theme-dark.auth-page .auth-card {
+    background: var(--clr-card);
+    border-color: var(--clr-border);
+    box-shadow: var(--shadow-soft);
+}
+
+html.theme-dark.auth-page .auth-title,
+html.theme-dark.auth-page label {
+    color: var(--clr-text-main);
+}
+
+html.theme-dark.auth-page .form-input {
+    background: var(--tm-input-bg);
+    border-color: var(--clr-border);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark.auth-page .btn-primary {
+    background: var(--clr-primary);
+    color: #fff;
+}
+
+html.theme-dark.auth-page .form-label,
+html.theme-dark.auth-page .form-options span {
+    color: var(--clr-text-main);
+}
+
+html.theme-dark.auth-page .pass-toggle-btn {
+    color: var(--clr-text-light);
+}
+
+html.theme-dark.auth-page .auth-alert {
+    background: rgba(199, 155, 102, 0.1);
+    border-color: rgba(199, 155, 102, 0.28);
+    color: var(--clr-text-main);
+}
+
+/* Logos: claro = logo-gobierno / ícono Puebla; oscuro = Gobierno de Puebla_2-Versión horizontal */
+.auth-logo-dark,
+.sidebar-logo-dark,
+.sidebar-logo-collapsed-dark {
+    display: none !important;
+}
+
+html.theme-dark .auth-logo-light {
+    display: none !important;
+}
+
+html.theme-dark .auth-logo-dark {
+    display: block !important;
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    margin: 0 auto;
+}
+
+html.theme-dark .sidebar-logo,
+html.theme-dark .sidebar-logo-collapsed {
+    display: none !important;
+    max-height: 0 !important;
+    opacity: 0 !important;
+    margin: 0 !important;
+    pointer-events: none;
+}
+
+html.theme-dark .sidebar-logo-dark {
+    display: block !important;
+    width: 100%;
+    max-width: 170px;
+    max-height: 56px;
+    margin: 0 auto 4px;
+    opacity: 1 !important;
+    object-fit: contain;
+}
+
+html.theme-dark .sidebar-logo-collapsed-dark {
+    display: none !important;
+    width: 100%;
+    max-width: 46px;
+    max-height: 44px;
+    margin: 0 auto 10px;
+    object-fit: contain;
+    opacity: 0;
+}
+
+html.theme-dark body.sidebar-collapsed .sidebar-logo-dark {
+    display: none !important;
+    max-height: 0 !important;
+    opacity: 0 !important;
+    margin: 0 !important;
+}
+
+html.theme-dark body.sidebar-collapsed .sidebar-logo-collapsed-dark {
+    display: block !important;
+    opacity: 1 !important;
+}

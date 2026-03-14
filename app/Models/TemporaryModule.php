@@ -22,12 +22,16 @@ class TemporaryModule extends Model
         'is_active',
         'applies_to_all',
         'created_by',
+        'exported_at',
+        'seed_discard_log',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'applies_to_all' => 'boolean',
         'expires_at' => 'datetime',
+        'exported_at' => 'datetime',
+        'seed_discard_log' => 'array',
     ];
 
     public function targetUsers(): BelongsToMany

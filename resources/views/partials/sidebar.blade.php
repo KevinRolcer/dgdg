@@ -80,8 +80,10 @@
 
 <aside class="app-sidebar" id="appSidebar" aria-label="Menú principal">
     <div class="sidebar-header">
-        <img src="{{ asset('images/logo-gobierno.png') }}" alt="Gobierno de Puebla" class="sidebar-logo">
-        <img src="{{ asset('images/Gobierno de Puebla_1-Puebla.png') }}" alt="Gobierno de Puebla" class="sidebar-logo-collapsed">
+        <img src="{{ asset('images/logo-gobierno.png') }}" alt="Gobierno de Puebla" class="sidebar-logo" decoding="async">
+        <img src="{{ asset('images/Gobierno de Puebla_1-Puebla.png') }}" alt="Gobierno de Puebla" class="sidebar-logo-collapsed" decoding="async">
+        <img src="{{ asset('images/Gobierno de Puebla_2-Versión horizontal.png') }}" alt="Gobierno de Puebla" class="sidebar-logo-dark" decoding="async">
+        <img src="{{ asset('images/Gobierno de Puebla_2-Versión horizontal.png') }}" alt="Gobierno de Puebla" class="sidebar-logo-collapsed-dark" decoding="async">
     </div>
 
     <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseToggle" aria-label="Ocultar menú lateral" aria-expanded="true">

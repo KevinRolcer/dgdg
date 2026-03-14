@@ -70,6 +70,18 @@
                                 >
                                     Exportar Excel
                                 </button>
+                                @if (!is_null($module->seed_discard_log))
+                                    <script type="application/json" id="tm-seed-discard-{{ $module->id }}">{!! json_encode($module->seed_discard_log ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}</script>
+                                    <button
+                                        type="button"
+                                        class="tm-btn tm-btn-secondary"
+                                        data-tm-seed-log-open
+                                        data-module-name="{{ e($module->name) }}"
+                                        data-json-id="tm-seed-discard-{{ $module->id }}"
+                                    >
+                                        Log
+                                    </button>
+                                @endif
                                 <button
                                     type="button"
                                     class="tm-btn"
@@ -102,8 +114,8 @@
         </div>
 
         @if (method_exists($modules, 'links'))
-            <div class="tm-pagination-wrap">
-                {{ $modules->links() }}
+            <div class="tm-pagination-wrap tm-pagination--footer">
+                {{ $modules->withQueryString()->links('vendor.pagination.tm') }}
             </div>
         @endif
     </article>
@@ -111,7 +123,7 @@
     @foreach ($modules as $module)
         <div class="tm-modal" id="admin-preview-{{ $module->id }}" aria-hidden="true" role="dialog" aria-modal="true">
             <div class="tm-modal-backdrop" data-close-module-preview></div>
-            <div class="tm-modal-dialog">
+            <div class="tm-modal-dialog tm-modal-dialog-admin-preview">
                 <div class="tm-modal-head">
                     <h3>{{ $module->name }}</h3>
                     <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
@@ -468,6 +480,37 @@
             </div>
         </div>
     </div>
+
+    {{-- Log de filas descartadas al crear módulo desde Excel (solo si ya exportó) --}}
+    <div class="tm-modal" id="tmSeedDiscardLogModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="tmSeedDiscardLogTitle">
+        <div class="tm-modal-backdrop" data-tm-seed-log-close></div>
+        <div class="tm-modal-dialog tm-seed-log-dialog">
+            <div class="tm-modal-head">
+                <h3 id="tmSeedDiscardLogTitle">Log — filas no cargadas</h3>
+                <button type="button" class="tm-modal-close" data-tm-seed-log-close aria-label="Cerrar">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="tm-modal-body tm-seed-log-body">
+                <p class="tm-seed-log-module" id="tmSeedDiscardLogModule"></p>
+                <p class="tm-muted" id="tmSeedDiscardLogEmpty" hidden>No hay filas descartadas registradas (módulo anterior a esta función o sin omisiones).</p>
+                <div class="tm-table-wrap tm-seed-log-table-wrap" id="tmSeedDiscardLogTableWrap" hidden>
+                    <table class="tm-table tm-table-sm">
+                        <thead>
+                            <tr>
+                                <th>Fila Excel</th>
+                                <th>Motivo</th>
+                                <th>MR</th>
+                                <th>Municipio (celda)</th>
+                                <th>Acción / texto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tmSeedDiscardLogTbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </section>
 @endsection
 
@@ -498,6 +541,66 @@
         const textToggleButtons = Array.from(document.querySelectorAll('[data-text-toggle]'));
         const cellExpandButtons = Array.from(document.querySelectorAll('[data-cell-expand]'));
         const exportButtons = Array.from(document.querySelectorAll('[data-open-export-options]'));
+        const seedLogModal = document.getElementById('tmSeedDiscardLogModal');
+        const seedLogTbody = document.getElementById('tmSeedDiscardLogTbody');
+        const seedLogModuleEl = document.getElementById('tmSeedDiscardLogModule');
+        const seedLogEmpty = document.getElementById('tmSeedDiscardLogEmpty');
+        const seedLogTableWrap = document.getElementById('tmSeedDiscardLogTableWrap');
+
+        function openSeedDiscardLog(moduleName, jsonId) {
+            if (!seedLogModal || !seedLogTbody) return;
+            var el = document.getElementById(jsonId);
+            var list = [];
+            try {
+                list = el && el.textContent ? JSON.parse(el.textContent) : [];
+            } catch (e) {
+                list = [];
+            }
+            if (!Array.isArray(list)) list = [];
+            seedLogModuleEl.textContent = moduleName || 'Módulo';
+            seedLogTbody.innerHTML = '';
+            if (list.length === 0) {
+                seedLogEmpty.hidden = false;
+                seedLogTableWrap.hidden = true;
+            } else {
+                seedLogEmpty.hidden = true;
+                seedLogTableWrap.hidden = false;
+                list.forEach(function (row) {
+                    var tr = document.createElement('tr');
+                    var esc = function (s) {
+                        if (s == null || s === '') return '—';
+                        var d = document.createElement('div');
+                        d.textContent = String(s);
+                        return d.innerHTML;
+                    };
+                    tr.innerHTML =
+                        '<td>' + esc(row.row) + '</td>' +
+                        '<td>' + esc(row.reason) + '</td>' +
+                        '<td>' + esc(row.microrregion) + '</td>' +
+                        '<td>' + esc(row.municipio) + '</td>' +
+                        '<td class="tm-seed-log-accion">' + esc(row.accion) + '</td>';
+                    seedLogTbody.appendChild(tr);
+                });
+            }
+            seedLogModal.classList.add('is-open');
+            seedLogModal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeSeedDiscardLog() {
+            if (!seedLogModal) return;
+            seedLogModal.classList.remove('is-open');
+            seedLogModal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+        }
+        document.querySelectorAll('[data-tm-seed-log-open]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                openSeedDiscardLog(btn.getAttribute('data-module-name'), btn.getAttribute('data-json-id'));
+            });
+        });
+        document.querySelectorAll('[data-tm-seed-log-close]').forEach(function (el) {
+            el.addEventListener('click', closeSeedDiscardLog);
+        });
+
         const analysisModal = document.getElementById('tmAnalysisWordModal');
         const analysisForm = document.getElementById('tmAnalysisWordForm');
         const analysisPreviewDoc = document.getElementById('tmAnalysisPreviewDoc');

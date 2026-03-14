@@ -372,6 +372,7 @@
     max-width: 650px;
     height: auto;
     max-height: 87vh;
+    min-height: 0;
     border-radius: 12px;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
     display: flex;
@@ -412,8 +413,8 @@
     padding: 1rem 1.25rem;
     overflow-y: auto !important;
     overflow-x: hidden !important;
-    flex: 1;
-    min-height: 200px;
+    flex: 1 1 auto;
+    min-height: 0; /* scroll dentro de max-height del modal */
 }
 
 .modal-body-scroll::-webkit-scrollbar {

@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="auth-page">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ingreso al Sistema | Dirección General de Delegaciones</title>
-
+    <script>
+    (function(){try{var k='segob_theme',d='segob_dark_variant';if(localStorage.getItem(k)!=='dark')return;var v=localStorage.getItem(d)||'deep';if(v!=='soft'&&v!=='slate')v='deep';document.documentElement.classList.add('theme-dark','theme-dark--'+v);}catch(e){}})();
+    </script>
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="Sat, 01 Jan 2000 00:00:00 GMT">
@@ -13,6 +15,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('assets/css/login.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/css/theme-dark.css') }}">
 </head>
 <body>
 
@@ -21,7 +24,8 @@
 
             <header class="auth-header">
                 <div class="auth-logo-box">
-                    <img src="{{ asset('images/logo-gobierno.png') }}" alt="Logo Gobierno de Puebla">
+                    <img class="auth-logo-light" src="{{ asset('images/logo-gobierno.png') }}" alt="Logo Gobierno de Puebla">
+                    <img class="auth-logo-dark" src="{{ asset('images/Gobierno de Puebla_2-Versión horizontal.png') }}" alt="Logo Gobierno de Puebla">
                 </div>
                 <h1 class="auth-title">Dirección General de Delegaciones</h1>
             </header>

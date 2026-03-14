@@ -100,6 +100,43 @@ class TemporaryModuleAccessService
         return $module->targetUsers()->where('users.id', $userId)->exists();
     }
 
+    /**
+     * Usuarios (delegado + enlaces) ligados a alguna de las microrregiones indicadas.
+     *
+     * @param  array<int>  $microrregionIds
+     * @return array<int>
+     */
+    public function userIdsForMicrorregionIds(array $microrregionIds): array
+    {
+        $microrregionIds = array_values(array_unique(array_filter(array_map('intval', $microrregionIds))));
+        if ($microrregionIds === []) {
+            return [];
+        }
+        $fromDelegados = DB::table('delegados')
+            ->whereIn('microrregion_id', $microrregionIds)
+            ->whereNotNull('user_id')
+            ->pluck('user_id')
+            ->all();
+        $fromEnlaces = DB::table('user_microrregion')
+            ->whereIn('microrregion_id', $microrregionIds)
+            ->pluck('user_id')
+            ->all();
+
+        return array_values(array_unique(array_map('intval', array_merge($fromDelegados, $fromEnlaces))));
+    }
+
+    /**
+     * El usuario puede ver/editar la entrada si la MR de la entrada está en sus asignaciones.
+     */
+    public function userCanAccessEntryByMicrorregion(int $userId, ?int $entryMicrorregionId): bool
+    {
+        if ($entryMicrorregionId === null || $entryMicrorregionId < 1) {
+            return false;
+        }
+
+        return in_array($entryMicrorregionId, $this->microrregionIdsPorUsuario($userId), true);
+    }
+
     public function delegates(): Collection
     {
         $delegados = DB::table('delegados as d')

@@ -1,0 +1,298 @@
+/**
+ * Mesas de Paz + Supervisión evidencias — modo oscuro (admin, delegados, enlaces).
+ * Cargar después de Bootstrap y mesaPaz.css / mesaPazSupervision.css.
+ *
+ * Los modales viven FUERA de #mesasPazApp / #supervisionEvidenciasPage → reglas globales
+ * solo en páginas que incluyen este archivo.
+ */
+html.theme-dark .modal-backdrop {
+    --bs-backdrop-bg: #000;
+    --bs-backdrop-opacity: 0.65;
+}
+
+html.theme-dark .modal-content {
+    background: var(--clr-card) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+html.theme-dark .modal-header {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-bottom-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .modal-title {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .modal-body {
+    background: var(--clr-card) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .modal-footer {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-top-color: var(--clr-border) !important;
+}
+
+html.theme-dark .modal .form-label {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .modal .form-control,
+html.theme-dark .modal .form-select {
+    background-color: #1e222c !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .modal .form-control:focus,
+html.theme-dark .modal .form-select:focus {
+    background-color: #1e222c !important;
+    border-color: rgba(199, 155, 102, 0.55) !important;
+    color: var(--clr-text-main) !important;
+    box-shadow: 0 0 0 0.2rem rgba(199, 155, 102, 0.2);
+}
+
+html.theme-dark .modal .text-muted {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .mesa-dropzone-excel,
+html.theme-dark #dropzoneExcel {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .mesa-dropzone-excel:hover,
+html.theme-dark #dropzoneExcel:hover {
+    background-color: rgba(199, 155, 102, 0.1) !important;
+    border-color: rgba(199, 155, 102, 0.35) !important;
+}
+
+html.theme-dark .mesa-dropzone-excel p,
+html.theme-dark #dropzoneExcel p {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .modal .btn-default,
+html.theme-dark .modal .btn-light {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--clr-text-main) !important;
+    border: 1px solid var(--clr-border) !important;
+}
+
+html.theme-dark .modal .btn-default:hover,
+html.theme-dark .modal .btn-light:hover {
+    background: rgba(199, 155, 102, 0.15) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .modal .btn-secondary {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .modal .btn-success {
+    filter: brightness(1.05);
+}
+
+html.theme-dark .modal .alert-danger {
+    background: rgba(220, 53, 69, 0.18) !important;
+    border-color: rgba(220, 53, 69, 0.45) !important;
+    color: #f8b4bc !important;
+}
+
+html.theme-dark .modal .alert-info {
+    background: rgba(13, 110, 253, 0.15) !important;
+    border-color: rgba(13, 110, 253, 0.35) !important;
+    color: #9ec5fe !important;
+}
+
+html.theme-dark .modal .btn-close {
+    filter: invert(1) grayscale(100%);
+    opacity: 0.8;
+}
+
+/* Alertas Bootstrap (vacíos, avisos, etc.) — evitar cajas grises claras en oscuro */
+html.theme-dark #mesasPazApp .alert,
+html.theme-dark #supervisionEvidenciasPage .alert {
+    border-width: 1px;
+    border-style: solid;
+}
+
+html.theme-dark #mesasPazApp .alert-secondary,
+html.theme-dark #supervisionEvidenciasPage .alert-secondary {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark #mesasPazApp .alert-info,
+html.theme-dark #supervisionEvidenciasPage .alert-info {
+    background: rgba(13, 110, 253, 0.14) !important;
+    border-color: rgba(110, 168, 254, 0.35) !important;
+    color: #b6d4fe !important;
+}
+
+html.theme-dark #mesasPazApp .alert-warning,
+html.theme-dark #supervisionEvidenciasPage .alert-warning {
+    background: rgba(255, 193, 7, 0.12) !important;
+    border-color: rgba(255, 202, 40, 0.35) !important;
+    color: #ffe69c !important;
+}
+
+html.theme-dark #mesasPazApp .alert-success,
+html.theme-dark #supervisionEvidenciasPage .alert-success {
+    background: rgba(25, 135, 84, 0.14) !important;
+    border-color: rgba(117, 183, 152, 0.4) !important;
+    color: #a3cfbb !important;
+}
+
+html.theme-dark #mesasPazApp .alert-danger,
+html.theme-dark #supervisionEvidenciasPage .alert-danger {
+    background: rgba(220, 53, 69, 0.14) !important;
+    border-color: rgba(234, 134, 143, 0.4) !important;
+    color: #f5c2c7 !important;
+}
+
+html.theme-dark #mesasPazApp .mesa-date-btn-wrapper,
+html.theme-dark #supervisionEvidenciasPage .mesa-date-btn-wrapper {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--clr-border);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark #mesasPazApp .table,
+html.theme-dark #supervisionEvidenciasPage .table {
+    --bs-table-bg: var(--clr-card);
+    --bs-table-color: var(--clr-text-main);
+    --bs-table-border-color: var(--clr-border);
+    --bs-table-striped-bg: rgba(255, 255, 255, 0.04);
+    --bs-table-hover-bg: rgba(199, 155, 102, 0.12);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark #mesasPazApp .table thead th,
+html.theme-dark #supervisionEvidenciasPage .table thead th {
+    background: var(--tm-muted-bg, rgba(255, 255, 255, 0.06));
+    color: var(--clr-text-main);
+    border-color: var(--clr-border);
+}
+
+html.theme-dark #mesasPazApp .accordion-item,
+html.theme-dark #supervisionEvidenciasPage .accordion-item {
+    background: var(--clr-card);
+    border-color: var(--clr-border);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark #mesasPazApp .accordion-button,
+html.theme-dark #supervisionEvidenciasPage .accordion-button {
+    background: var(--tm-muted-bg, rgba(255, 255, 255, 0.06));
+    color: var(--clr-text-main);
+    box-shadow: none;
+}
+
+html.theme-dark #mesasPazApp .accordion-button:not(.collapsed),
+html.theme-dark #supervisionEvidenciasPage .accordion-button:not(.collapsed) {
+    background: rgba(199, 155, 102, 0.15);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark #mesasPazApp .accordion-body,
+html.theme-dark #supervisionEvidenciasPage .accordion-body {
+    background: var(--clr-card);
+    color: var(--clr-text-muted);
+}
+
+html.theme-dark #mesasPazApp .list-group-item,
+html.theme-dark #supervisionEvidenciasPage .list-group-item {
+    background: var(--clr-card);
+    border-color: var(--clr-border);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark #mesasPazApp .bg-white,
+html.theme-dark #supervisionEvidenciasPage .bg-white {
+    background-color: var(--clr-card) !important;
+}
+
+html.theme-dark #mesasPazApp .modal-header,
+html.theme-dark #mesasPazApp .modal-footer,
+html.theme-dark #supervisionEvidenciasPage .modal-header,
+html.theme-dark #supervisionEvidenciasPage .modal-footer {
+    background: var(--clr-surface);
+    border-color: var(--clr-border);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark #mesasPazApp .modal-body,
+html.theme-dark #supervisionEvidenciasPage .modal-body {
+    background: var(--clr-card);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark #mesasPazApp .btn-close,
+html.theme-dark #supervisionEvidenciasPage .btn-close {
+    filter: invert(1) grayscale(100%);
+    opacity: 0.75;
+}
+
+/* SweetAlert v1 (sweetalert.min.js) */
+html.theme-dark .sweet-alert,
+html.theme-dark .sweet-overlay {
+    background: rgba(0, 0, 0, 0.65) !important;
+}
+
+html.theme-dark .sweet-alert {
+    background: var(--clr-card) !important;
+    color: var(--clr-text-main) !important;
+    border: 1px solid var(--clr-border) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+}
+
+html.theme-dark .sweet-alert h2,
+html.theme-dark .sweet-alert p {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .sweet-alert .sa-button-container .cancel {
+    background: var(--clr-surface) !important;
+    color: var(--clr-text-main) !important;
+    border: 1px solid var(--clr-border) !important;
+}
+
+/* SweetAlert2 por si se usa en otra pantalla */
+html.theme-dark .swal2-popup {
+    background: var(--clr-card) !important;
+    color: var(--clr-text-main) !important;
+    border: 1px solid var(--clr-border) !important;
+}
+
+html.theme-dark .swal2-title,
+html.theme-dark .swal2-html-container {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .swal2-styled.swal2-cancel {
+    background: var(--clr-surface) !important;
+    color: var(--clr-text-main) !important;
+    border: 1px solid var(--clr-border) !important;
+}
+
+html.theme-dark .swal2-styled:focus {
+    box-shadow: 0 0 0 3px rgba(199, 155, 102, 0.35) !important;
+}
+
+html.theme-dark #supervisionEvidenciasPage .supervision-table-row {
+    background: var(--clr-card);
+    border-color: var(--clr-border);
+}
+
+html.theme-dark #supervisionEvidenciasPage .supervision-table-row:hover {
+    background: rgba(199, 155, 102, 0.1);
+}

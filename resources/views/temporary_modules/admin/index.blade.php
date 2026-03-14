@@ -17,6 +17,7 @@
             </div>
             <div class="tm-inline-actions">
                 <a href="{{ route('temporary-modules.admin.records') }}" class="tm-btn">Ver registros</a>
+                <a href="{{ route('temporary-modules.admin.create-from-excel') }}" class="tm-btn">Módulo desde Excel (base)</a>
                 <a href="{{ route('temporary-modules.admin.create') }}" class="tm-btn tm-btn-primary">Nuevo módulo</a>
             </div>
         </div>

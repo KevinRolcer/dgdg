@@ -6,6 +6,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\PowerPointController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\MesasPazController;
 use App\Http\Controllers\MesasPazSupervisionController;
 use App\Http\Controllers\TemporaryModuleController;
@@ -25,6 +26,7 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 Route::middleware('auth')->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
     Route::get('/mi-perfil', [ProfileController::class, 'show'])->name('profile.show');
+    Route::get('/ajustes', [SettingsController::class, 'index'])->name('settings.index');
     Route::post('/mi-perfil/password', [ProfileController::class, 'updatePassword'])
         ->middleware('throttle:6,1')
         ->name('profile.password.update');
@@ -63,6 +65,9 @@ Route::middleware('auth')->group(function () {
             Route::get('/', [TemporaryModuleController::class, 'adminIndex'])->name('temporary-modules.admin.index');
             Route::get('/registros', [TemporaryModuleController::class, 'adminRecords'])->name('temporary-modules.admin.records');
             Route::get('/crear', [TemporaryModuleController::class, 'create'])->name('temporary-modules.admin.create');
+            Route::get('/crear-desde-excel', [TemporaryModuleController::class, 'createFromExcel'])->name('temporary-modules.admin.create-from-excel');
+            Route::post('/semilla-preview', [TemporaryModuleController::class, 'seedPreview'])->name('temporary-modules.admin.seed-preview');
+            Route::post('/semilla-guardar', [TemporaryModuleController::class, 'seedStore'])->name('temporary-modules.admin.seed-store');
             Route::get('/export-status/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
                 ->where('exportRequest', '[a-f0-9\-]+')
                 ->name('temporary-modules.admin.export-status');
@@ -110,6 +115,23 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [TemporaryModuleController::class, 'delegateIndex'])
             ->middleware('can:Modulos-Temporales')
             ->name('temporary-modules.index');
+
+        Route::get('/fragmento/modulos', [TemporaryModuleController::class, 'delegatePartialUpload'])
+            ->middleware('can:Modulos-Temporales')
+            ->name('temporary-modules.fragment.upload');
+        Route::get('/fragmento/registros', [TemporaryModuleController::class, 'delegatePartialRecords'])
+            ->middleware('can:Modulos-Temporales')
+            ->name('temporary-modules.fragment.records');
+
+        Route::post('/{module}/importar-excel-preview', [TemporaryModuleController::class, 'importExcelPreview'])
+            ->middleware('can:Modulos-Temporales')
+            ->whereNumber('module')
+            ->name('temporary-modules.import-excel-preview');
+
+        Route::post('/{module}/importar-excel', [TemporaryModuleController::class, 'importExcel'])
+            ->middleware('can:Modulos-Temporales')
+            ->whereNumber('module')
+            ->name('temporary-modules.import-excel');
 
         Route::get('/{module}', [TemporaryModuleController::class, 'show'])
             ->middleware('can:Modulos-Temporales')

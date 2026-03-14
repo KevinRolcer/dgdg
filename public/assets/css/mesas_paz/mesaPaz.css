@@ -56,7 +56,7 @@
     transition: all 0.25s ease;
     font-size: 0.88rem;
     font-weight: 700;
-    color: var(--bs-heading-color, #333);
+    color: var(--clr-text-main);
 }
 
 #mesasPazApp .mesa-date-btn-wrapper:hover {
@@ -110,7 +110,7 @@
     min-height: 34px;
     border: 1px solid var(--clr-border);
     border-radius: 999px;
-    background: #fff;
+    background: var(--clr-card);
     color: var(--clr-text-main);
     text-decoration: none;
     font-size: 0.82rem;
@@ -195,6 +195,7 @@
 #mesasPazApp .form-control {
     border-color: var(--clr-border);
     color: var(--clr-text-main);
+    background-color: var(--clr-card);
     border-radius: var(--mesa-radius-sm);
 }
 
@@ -308,9 +309,30 @@
     border-radius: 999px;
 }
 
+/* Modales (varios están fuera de #mesasPazApp; reglas sin prefijo para que apliquen) */
+.modal-content {
+    border: 1px solid var(--clr-border);
+    border-radius: var(--mesa-radius-md);
+    background: var(--clr-card);
+    color: var(--clr-text-main);
+}
+
 #mesasPazApp .modal-content {
     border: 1px solid var(--clr-border);
     border-radius: var(--mesa-radius-md);
+    background: var(--clr-card);
+    color: var(--clr-text-main);
+}
+
+/* Dropzone Excel (modal Cargar Excel) — claro por defecto */
+.mesa-dropzone-excel {
+    cursor: pointer;
+    background-color: #f8f9fa;
+    border-color: rgba(72, 71, 71, 0.2) !important;
+}
+
+.mesa-dropzone-excel:hover {
+    background-color: #eef0f2;
 }
 
 #mesasPazApp .modal-header {

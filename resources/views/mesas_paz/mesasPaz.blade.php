@@ -5,6 +5,7 @@
 @push('css')
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
 <link href="{{ asset('assets/css/mesas_paz/mesaPaz.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesaPaz.css')) ?: time() }}" rel="stylesheet" />
+<link href="{{ asset('assets/css/theme-dark-mesas-paz.css') }}?v={{ @filemtime(public_path('assets/css/theme-dark-mesas-paz.css')) ?: time() }}" rel="stylesheet" />
 @endpush
 
 @push('scripts')
@@ -416,7 +417,7 @@
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Archivo Excel (.xls, .xlsx)</label>
-                        <div id="dropzoneExcel" class="border border-2 border-dashed rounded p-4 text-center position-relative" style="cursor: pointer; background-color: #f8f9fa;">
+                        <div id="dropzoneExcel" class="mesa-dropzone-excel border border-2 border-dashed rounded p-4 text-center position-relative">
                             <p class="mb-1 text-muted">Arrastra y suelta aquí tu archivo Excel o haz clic para seleccionarlo.</p>
                             <div id="excelFileStatus" class="d-none align-items-center justify-content-center gap-2">
                                 <span id="excelFileNameDisplay" class="fw-bold text-success"></span>

@@ -8,6 +8,9 @@ use App\Services\TemporaryModules\TemporaryModuleAccessService;
 use App\Services\TemporaryModules\TemporaryModuleEntryDataService;
 use App\Jobs\GenerateTemporaryModuleAnalysisWordJob;
 use App\Services\TemporaryModules\TemporaryModuleAnalysisWordService;
+use App\Services\TemporaryModules\TemporaryModuleAdminSeedService;
+use App\Services\TemporaryModules\TemporaryModuleSlugService;
+use App\Services\TemporaryModules\TemporaryModuleExcelImportService;
 use App\Services\TemporaryModules\TemporaryModuleExportService;
 use App\Services\TemporaryModules\TemporaryModuleFieldService;
 use Illuminate\Http\RedirectResponse;
@@ -29,6 +32,9 @@ class TemporaryModuleController extends Controller
         private readonly TemporaryModuleFieldService $fieldService,
         private readonly TemporaryModuleEntryDataService $entryDataService,
         private readonly TemporaryModuleExportService $exportService,
+        private readonly TemporaryModuleExcelImportService $excelImportService,
+        private readonly TemporaryModuleAdminSeedService $adminSeedService,
+        private readonly TemporaryModuleSlugService $slugService,
     ) {}
 
     /** Solo se resuelve al usar preview Word (evita cargar PhpWord en el resto de acciones). */
@@ -73,6 +79,9 @@ class TemporaryModuleController extends Controller
         $modules = TemporaryModule::query()
             ->whereHas('entries')
             ->withCount(['fields', 'entries'])
+            ->select([
+                'id', 'name', 'description', 'expires_at', 'exported_at', 'seed_discard_log',
+            ])
             ->latest()
             ->paginate(15);
 
@@ -99,6 +108,140 @@ class TemporaryModuleController extends Controller
             'delegates' => $this->accessService->delegates(),
             'modulesForCopy' => $modulesForCopy,
         ]);
+    }
+
+    public function createFromExcel(): View
+    {
+        return view('temporary_modules.admin.create_from_excel', [
+            'pageTitle' => 'Módulo desde base (Excel)',
+            'pageDescription' => 'Carga un archivo con microrregión, municipio y columnas de datos; se crean los campos y un registro por fila para cada enlace.',
+            'topbarNotifications' => [],
+        ]);
+    }
+
+    public function seedPreview(Request $request): JsonResponse
+    {
+        $request->validate([
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:20480'],
+            'header_row' => ['nullable', 'integer', 'min:1', 'max:200'],
+            'auto_detect' => ['nullable', 'boolean'],
+        ]);
+        $file = $request->file('archivo_excel');
+        $autoDetect = $request->boolean('auto_detect', true);
+        $headerRow = (int) ($request->input('header_row') ?: 1);
+        $detected = null;
+
+        if ($autoDetect) {
+            try {
+                $detected = $this->adminSeedService->detectTableLayout($file);
+                if ($detected !== null) {
+                    $headerRow = $detected['header_row'];
+                }
+            } catch (\Throwable) {
+                // sigue con header_row manual o 1
+            }
+        }
+
+        try {
+            $preview = $this->adminSeedService->previewHeaders($file, $headerRow);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        $payload = [
+            'success' => true,
+            'headers' => $preview['headers'],
+            'header_row' => $headerRow,
+            'data_start_row' => $headerRow + 1,
+        ];
+        if ($autoDetect && isset($detected)) {
+            $payload['auto_detected'] = true;
+            $payload['header_row'] = $detected['header_row'];
+            $payload['data_start_row'] = $detected['data_start_row'];
+            $payload['detection_note'] = $detected['note'];
+        } elseif ($autoDetect) {
+            $payload['auto_detected'] = false;
+            $payload['detection_note'] = 'No se detectó tabla con MUNICIPIO + MICRORREGIÓN; usa fila de encabezados manual.';
+        }
+
+        return response()->json($payload);
+    }
+
+    public function seedStore(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'expires_at' => ['nullable', 'date', 'after_or_equal:today'],
+            'is_indefinite' => ['nullable', 'boolean'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:20480'],
+            'header_row' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'data_start_row' => ['nullable', 'integer', 'min:2', 'max:50000'],
+            'col_microrregion' => ['nullable', 'integer', 'min:-1'],
+            'col_municipio' => ['nullable', 'integer', 'min:-1'],
+            'field_columns' => ['required', 'string'],
+        ]);
+
+        $colMr = (int) $request->input('col_microrregion', -1);
+        $colMun = (int) $request->input('col_municipio', -1);
+        if ($colMun < 0 && $colMr < 0) {
+            throw ValidationException::withMessages([
+                'col_municipio' => 'Indica columna Municipio o columna Microrregión (o ambas).',
+            ]);
+        }
+
+        $fieldColumns = json_decode((string) $request->input('field_columns'), true);
+        if (!is_array($fieldColumns) || $fieldColumns === []) {
+            throw ValidationException::withMessages(['field_columns' => 'Elige al menos una columna como campo del módulo.']);
+        }
+        $fieldColumns = array_map('intval', $fieldColumns);
+
+        $isIndefinite = (bool) $request->boolean('is_indefinite');
+        $expiresAt = null;
+        if (!$isIndefinite) {
+            $request->validate(['expires_at' => ['required', 'date']]);
+            $expiresAt = Carbon::parse($request->input('expires_at'));
+        }
+
+        $stats = [];
+        try {
+            $module = $this->adminSeedService->createModuleFromExcel(
+                (int) $request->user()->id,
+                $request->input('name'),
+                $request->input('description'),
+                $expiresAt,
+                $isIndefinite,
+                $request->file('archivo_excel'),
+                (int) ($request->input('header_row') ?: 1),
+                (int) ($request->input('data_start_row') ?: ((int) ($request->input('header_row') ?: 1) + 1)),
+                $colMr,
+                $colMun,
+                $fieldColumns,
+                $stats,
+            );
+        } catch (\InvalidArgumentException $e) {
+            throw ValidationException::withMessages(['archivo_excel' => $e->getMessage()]);
+        } catch (\Throwable $e) {
+            throw ValidationException::withMessages(['archivo_excel' => 'Error: '.$e->getMessage()]);
+        }
+
+        if (($stats['created'] ?? 0) < 1) {
+            $module->forceDelete();
+
+            return redirect()
+                ->route('temporary-modules.admin.create-from-excel')
+                ->withErrors(['archivo_excel' => 'No se creó ningún registro. Revisa MR/municipio y que exista delegado o enlace por microrregión. Filas no coincidentes: '.count($stats['unmatched'] ?? []).'.']);
+        }
+
+        $msg = "Módulo creado con {$stats['created']} registro(s) precargado(s). Los enlaces pueden completar campos adicionales desde Editar módulo.";
+        if (($stats['skipped'] ?? 0) > 0) {
+            $msg .= ' Revisa el botón Log si hubo filas omitidas.';
+        }
+
+        return redirect()
+            ->route('temporary-modules.admin.edit', $module->id)
+            ->with('status', $msg)
+            ->with('show_seed_log', true);
     }
 
     public function fieldsJson(int $module): JsonResponse
@@ -137,7 +280,7 @@ class TemporaryModuleController extends Controller
     public function edit(int $module): View
     {
         $temporaryModule = TemporaryModule::query()
-            ->select(['id', 'name', 'description', 'expires_at', 'applies_to_all', 'is_active'])
+            ->select(['id', 'name', 'description', 'expires_at', 'applies_to_all', 'is_active', 'seed_discard_log'])
             ->with(['fields', 'targetUsers:id'])
             ->findOrFail($module);
         $fieldUsage = $this->fieldService->countFieldDataUsage((int) $temporaryModule->id);
@@ -198,11 +341,16 @@ class TemporaryModuleController extends Controller
 
         DB::transaction(function () use ($request, $validated, $preparedFields, $selectedDelegateIds): void {
             $slug = Str::slug($validated['name']);
+            $this->slugService->forcePurgeTrashedBySlug($slug);
             $baseSlug = $slug;
             $suffix = 2;
-            while (TemporaryModule::withTrashed()->where('slug', $slug)->exists()) {
+            while (TemporaryModule::query()->where('slug', $slug)->exists()) {
                 $slug = $baseSlug.'-'.$suffix;
                 $suffix++;
+                if ($suffix > 999) {
+                    $slug = $baseSlug.'-'.substr(sha1(uniqid((string) mt_rand(), true)), 0, 8);
+                    break;
+                }
             }
 
             $module = TemporaryModule::query()->create([
@@ -410,9 +558,10 @@ class TemporaryModuleController extends Controller
 
         DB::transaction(function () use ($temporaryModule, $validated, $selectedDelegateIds, $existingDefinitions, $deletedFieldIds, $preparedExtraFields, $invalidMainImageKeys): void {
             $slug = Str::slug($validated['name']);
+            $this->slugService->forcePurgeTrashedBySlug($slug);
             $baseSlug = $slug;
             $suffix = 2;
-            while (TemporaryModule::withTrashed()->where('slug', $slug)->where('id', '!=', $temporaryModule->id)->exists()) {
+            while (TemporaryModule::query()->where('slug', $slug)->where('id', '!=', $temporaryModule->id)->exists()) {
                 $slug = $baseSlug.'-'.$suffix;
                 $suffix++;
             }
@@ -488,7 +637,7 @@ class TemporaryModuleController extends Controller
         return Carbon::parse($date)->endOfDay();
     }
 
-    public function delegateIndex(Request $request): View
+    public function delegateIndex(Request $request): View|RedirectResponse
     {
         $user = $request->user();
 
@@ -498,6 +647,7 @@ class TemporaryModuleController extends Controller
 
         [, $municipios] = $this->accessService->delegadoMunicipios((int) $user->id);
         $microrregionesAsignadas = $this->accessService->microrregionesConMunicipiosPorUsuario((int) $user->id);
+        $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
 
         $modules = TemporaryModule::query()
             ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all'])
@@ -514,17 +664,36 @@ class TemporaryModuleController extends Controller
                 'fields' => fn ($q) => $q->select('id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required', 'comment')->orderBy('sort_order'),
             ])
             ->withCount([
-                'entries as my_entries_count' => fn ($query) => $query->where('user_id', $user->id),
+                'entries as my_entries_count' => fn ($query) => $query->when(
+                    $microrregionIdsUsuario !== [],
+                    fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
+                    fn ($q) => $q->whereRaw('1 = 0')
+                ),
             ])
             ->latest()
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
+
+        if ($modules->isEmpty() && (int) $request->get('page', 1) > 1 && $modules->total() > 0) {
+            return redirect()->route($request->route()->getName(), array_merge(
+                $request->except('page'),
+                ['page' => 1]
+            ));
+        }
+        if ($modules->isEmpty() && $modules->total() === 0 && (int) $request->get('page', 1) > 1) {
+            return redirect()->route($request->route()->getName(), $request->except('page'));
+        }
 
         $moduleIds = $modules->getCollection()->pluck('id')->all();
         $entriesByModule = collect();
         if ($moduleIds !== []) {
             $entriesByModule = TemporaryModuleEntry::query()
                 ->whereIn('temporary_module_id', $moduleIds)
-                ->where('user_id', $user->id)
+                ->when(
+                    $microrregionIdsUsuario !== [],
+                    fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
+                    fn ($q) => $q->whereRaw('1 = 0')
+                )
                 ->with('microrregion:id,microrregion,cabecera')
                 ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
                 ->latest('submitted_at')
@@ -552,11 +721,17 @@ class TemporaryModuleController extends Controller
         if ($activeModule) {
             $fields = $activeModule->fields()->select(['id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required'])->get();
             $myEntries = $activeModule->entries()
-                ->where('user_id', $user->id)
+                ->when(
+                    $microrregionIdsUsuario !== [],
+                    fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
+                    fn ($q) => $q->whereRaw('1 = 0')
+                )
                 ->with('microrregion:id,microrregion,cabecera')
                 ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
                 ->latest('submitted_at')
-                ->paginate(20);
+                ->paginate(10, ['*'], 'entries_page')
+                ->appends(array_merge($request->except('entries_page'), ['module' => $activeModuleId]))
+                ->withQueryString();
         }
 
         $activeSection = optional($request->route())->getName() === 'temporary-modules.records'
@@ -574,6 +749,78 @@ class TemporaryModuleController extends Controller
             'microrregionesAsignadas' => $microrregionesAsignadas,
             'activeSection' => $activeSection,
             'activeModuleId' => $activeModuleId,
+            'fragmentUploadUrl' => route('temporary-modules.fragment.upload'),
+            'fragmentRecordsUrl' => route('temporary-modules.fragment.records'),
+        ]);
+    }
+
+    /** HTML parcial: grid de módulos + paginación (AJAX). */
+    public function delegatePartialUpload(Request $request): View
+    {
+        $user = $request->user();
+        abort_if($user->can('Modulos-Temporales-Admin'), 404);
+        $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
+        $modules = TemporaryModule::query()
+            ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all'])
+            ->where('is_active', true)
+            ->where(function ($query) use ($user) {
+                $query->where('applies_to_all', true)
+                    ->orWhereHas('targetUsers', fn ($targetQuery) => $targetQuery->where('users.id', $user->id));
+            })
+            ->where(function ($query) {
+                $query->whereNull('expires_at')
+                    ->orWhere('expires_at', '>=', Carbon::now());
+            })
+            ->with([
+                'fields' => fn ($q) => $q->select('id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required', 'comment')->orderBy('sort_order'),
+            ])
+            ->withCount([
+                'entries as my_entries_count' => fn ($query) => $query->when(
+                    $microrregionIdsUsuario !== [],
+                    fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
+                    fn ($q) => $q->whereRaw('1 = 0')
+                ),
+            ])
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('temporary_modules.delegate.partials.upload_modules', [
+            'modules' => $modules,
+            'fragmentUploadUrl' => route('temporary-modules.fragment.upload'),
+        ]);
+    }
+
+    /** HTML parcial: tabla/cards de registros + paginación (AJAX). */
+    public function delegatePartialRecords(Request $request): View
+    {
+        $user = $request->user();
+        abort_if($user->can('Modulos-Temporales-Admin'), 404);
+        $moduleId = (int) $request->query('module', 0);
+        abort_unless($moduleId > 0, 404);
+        $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($moduleId);
+        abort_unless($temporaryModule->isAvailable(), 404);
+        abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $user->id), 403);
+        $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
+        $myEntries = $temporaryModule->entries()
+            ->when(
+                $microrregionIdsUsuario !== [],
+                fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
+                fn ($q) => $q->whereRaw('1 = 0')
+            )
+            ->with('microrregion:id,microrregion,cabecera')
+            ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
+            ->latest('submitted_at')
+            ->paginate(10, ['*'], 'entries_page')
+            ->appends(['module' => $moduleId])
+            ->withQueryString();
+        $municipioField = $temporaryModule->fields->firstWhere('type', 'municipio');
+
+        return view('temporary_modules.delegate.partials.records_entries', [
+            'module' => $temporaryModule,
+            'entries' => $myEntries,
+            'municipioField' => $municipioField,
+            'fragmentRecordsUrl' => route('temporary-modules.fragment.records'),
         ]);
     }
 
@@ -593,10 +840,27 @@ class TemporaryModuleController extends Controller
         [$microrregionId, $municipios] = $this->accessService->delegadoMunicipios($request->user()->id, $requestedMicrorregionId);
         $microrregionesAsignadas = $this->accessService->microrregionesConMunicipiosPorUsuario((int) $request->user()->id);
 
+        $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
         $entries = $temporaryModule->entries()
-            ->where('user_id', $request->user()->id)
-            ->take(20)
+            ->when(
+                $microrregionIdsUsuario !== [],
+                fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
+                fn ($q) => $q->whereRaw('1 = 0')
+            )
+            ->latest('submitted_at')
+            ->take(200)
             ->get();
+
+        $editingEntry = null;
+        $editId = (int) $request->query('entry', 0);
+        if ($editId > 0) {
+            $editingEntry = $temporaryModule->entries()
+                ->whereKey($editId)
+                ->first();
+            if ($editingEntry && ! $this->accessService->userCanAccessEntryByMicrorregion((int) $request->user()->id, (int) $editingEntry->microrregion_id)) {
+                $editingEntry = null;
+            }
+        }
 
         return view('temporary_modules.delegate.show', [
             'pageTitle' => $temporaryModule->name,
@@ -605,10 +869,11 @@ class TemporaryModuleController extends Controller
             'temporaryModule' => $temporaryModule,
             'fields' => $temporaryModule->fields,
             'municipios' => $municipios,
-            'microrregionId' => $microrregionId,
+            'microrregionId' => $editingEntry ? (int) $editingEntry->microrregion_id : $microrregionId,
             'microrregionesAsignadas' => $microrregionesAsignadas,
             'entries' => $entries,
             'fieldTypes' => self::FIELD_TYPES,
+            'editingEntry' => $editingEntry,
         ]);
     }
 
@@ -637,10 +902,15 @@ class TemporaryModuleController extends Controller
             $existingEntry = TemporaryModuleEntry::query()
                 ->where('id', $entryId)
                 ->where('temporary_module_id', $temporaryModule->id)
-                ->where('user_id', $request->user()->id)
                 ->first();
-
-            abort_unless($existingEntry !== null, 403);
+            abort_unless(
+                $existingEntry !== null
+                && $this->accessService->userCanAccessEntryByMicrorregion(
+                    (int) $request->user()->id,
+                    (int) $existingEntry->microrregion_id
+                ),
+                403
+            );
         }
 
         $rules = [];
@@ -744,6 +1014,147 @@ class TemporaryModuleController extends Controller
         return redirect()
             ->route('temporary-modules.records', ['module' => $temporaryModule->id])
             ->with('status', 'Registro guardado correctamente.');
+    }
+
+    /**
+     * Paso 1: sube Excel y devuelve columnas detectadas + sugerencia de mapeo a campos del módulo.
+     */
+    public function importExcelPreview(Request $request, int $module): JsonResponse
+    {
+        $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
+        abort_unless($temporaryModule->isAvailable(), 404);
+        abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
+
+        $request->validate([
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:15360'],
+            'header_row' => ['nullable', 'integer', 'min:1', 'max:200'],
+            'auto_detect' => ['nullable', 'boolean'],
+        ]);
+
+        $file = $request->file('archivo_excel');
+        $headerRow = (int) ($request->input('header_row') ?: 1);
+        $detected = null;
+        if ($request->boolean('auto_detect', true)) {
+            try {
+                $detected = $this->adminSeedService->detectTableLayout($file);
+                if ($detected !== null) {
+                    $headerRow = $detected['header_row'];
+                }
+            } catch (\Throwable) {
+            }
+        }
+
+        $importable = $this->excelImportService->importableFields($temporaryModule->fields);
+        if ($importable->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Este módulo no tiene campos importables desde Excel (texto, número, fecha, lista, municipio, etc.).',
+            ], 422);
+        }
+
+        try {
+            $preview = $this->excelImportService->preview($file, $headerRow);
+            $preview['suggested_map'] = $this->excelImportService->suggestMap($importable, $preview['headers']);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo leer el Excel: '.$e->getMessage(),
+            ], 422);
+        }
+
+        $out = [
+            'success' => true,
+            'header_row' => $headerRow,
+            'data_start_row' => $detected['data_start_row'] ?? ($headerRow + 1),
+            'headers' => $preview['headers'],
+            'suggested_map' => $preview['suggested_map'],
+            'fields' => $importable->map(fn ($f) => [
+                'key' => $f->key,
+                'label' => $f->label,
+                'type' => $f->type,
+                'is_required' => (bool) $f->is_required,
+            ])->values()->all(),
+        ];
+        if ($detected) {
+            $out['detection_note'] = $detected['note'];
+        }
+
+        return response()->json($out);
+    }
+
+    /**
+     * Paso 2: importa filas según mapeo campo → índice de columna (0 = A).
+     */
+    public function importExcel(Request $request, int $module): JsonResponse
+    {
+        $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
+        abort_unless($temporaryModule->isAvailable(), 404);
+        abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
+
+        $request->validate([
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:15360'],
+            'header_row' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'data_start_row' => ['nullable', 'integer', 'min:2', 'max:1000'],
+            'mapping' => ['required', 'string'],
+            'selected_microrregion_id' => ['nullable', 'integer'],
+        ]);
+
+        $mapping = json_decode((string) $request->input('mapping'), true);
+        if (!is_array($mapping)) {
+            return response()->json(['success' => false, 'message' => 'Mapeo inválido.'], 422);
+        }
+        $normalizedMap = [];
+        foreach ($mapping as $key => $idx) {
+            if ($idx === '' || $idx === null) {
+                $normalizedMap[(string) $key] = null;
+            } elseif (is_numeric($idx)) {
+                $normalizedMap[(string) $key] = (int) $idx;
+            }
+        }
+
+        $requestedMicrorregionId = $request->filled('selected_microrregion_id')
+            ? (int) $request->input('selected_microrregion_id')
+            : null;
+        $microrregionIdsPermitidos = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
+        if ($requestedMicrorregionId !== null && !in_array($requestedMicrorregionId, $microrregionIdsPermitidos, true)) {
+            return response()->json(['success' => false, 'message' => 'Microrregión no permitida.'], 403);
+        }
+
+        [$microrregionId, $municipios] = $this->accessService->delegadoMunicipios($request->user()->id, $requestedMicrorregionId);
+        $allowedMunicipios = array_values($municipios);
+
+        $headerRow = (int) ($request->input('header_row') ?: 1);
+        $dataStartRow = (int) ($request->input('data_start_row') ?: $headerRow + 1);
+        $fieldsByKey = $temporaryModule->fields->keyBy('key');
+
+        try {
+            $result = $this->excelImportService->importRows(
+                $temporaryModule,
+                (int) $request->user()->id,
+                (int) $microrregionId,
+                $request->file('archivo_excel'),
+                $headerRow,
+                $dataStartRow,
+                $normalizedMap,
+                $fieldsByKey,
+                $allowedMunicipios,
+            );
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al importar: '.$e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'imported' => $result['imported'],
+            'skipped' => $result['skipped'],
+            'row_errors' => $result['row_errors'],
+            'message' => $result['imported'] > 0
+                ? "Se importaron {$result['imported']} registro(s)."
+                : 'No se importó ninguna fila (revisa mapeo y datos).',
+        ]);
     }
 
     public function destroy(int $module): RedirectResponse
@@ -998,8 +1409,11 @@ class TemporaryModuleController extends Controller
         abort_unless((int) $entryModel->temporary_module_id === $module, 404);
 
         if (! $request->user()->can('Modulos-Temporales-Admin')) {
-            abort_unless((int) $entryModel->user_id === (int) $request->user()->id, 403);
             abort_unless($this->accessService->userCanAccessModule($entryModel->module, (int) $request->user()->id), 403);
+            abort_unless(
+                $this->accessService->userCanAccessEntryByMicrorregion((int) $request->user()->id, (int) $entryModel->microrregion_id),
+                403
+            );
         }
 
         $path = $entryModel->data[$fieldKey] ?? null;

@@ -5,6 +5,9 @@
 @endpush
 
 @section('content')
+@php
+    $tmImportable = $temporaryModule->fields->filter(fn ($f) => in_array($f->type, \App\Services\TemporaryModules\TemporaryModuleExcelImportService::IMPORTABLE_TYPES, true));
+@endphp
 <section class="tm-page">
     <article class="content-card tm-card">
         @if (session('status'))
@@ -20,27 +23,45 @@
                 <h2>{{ $temporaryModule->name }}</h2>
                 <p>{{ $temporaryModule->description ?: 'Completa los datos requeridos para este modulo.' }}</p>
             </div>
-            <a href="{{ route('temporary-modules.index') }}" class="tm-btn">Volver</a>
+            <div class="tm-inline-actions">
+                @if ($tmImportable->isNotEmpty())
+                    <button type="button" class="tm-btn tm-btn-primary" id="tmBtnImportarExcel" aria-haspopup="dialog">
+                        Cargar Excel
+                    </button>
+                @endif
+                <a href="{{ route('temporary-modules.index') }}" class="tm-btn">Volver</a>
+            </div>
         </div>
 
         <form action="{{ route('temporary-modules.submit', $temporaryModule->id) }}" method="POST" enctype="multipart/form-data" class="tm-form tm-entry-form">
             @csrf
+            @if (!empty($editingEntry))
+                <input type="hidden" name="entry_id" value="{{ $editingEntry->id }}">
+                <div class="inline-alert inline-alert-success tm-col-full" role="status">
+                    Completando registro #{{ $editingEntry->id }} (precargado). Puedes agregar o cambiar datos y guardar.
+                    <a href="{{ route('temporary-modules.show', $temporaryModule->id) }}" class="tm-btn" style="margin-left:8px;">Cancelar / Nuevo registro</a>
+                </div>
+            @endif
 
             @php
                 $microsAsignadas = ($microrregionesAsignadas ?? collect())->values();
                 $mostrarSelectorMicrorregion = $microsAsignadas->count() > 1;
+                $bloquearMicro = !empty($editingEntry);
             @endphp
 
             @if ($mostrarSelectorMicrorregion)
                 <label class="tm-col-full">
                     Microrregion de captura *
-                    <select id="tmMicrorregionSelector" name="selected_microrregion_id" required>
+                    <select id="tmMicrorregionSelector" name="selected_microrregion_id" required @disabled($bloquearMicro)>
                         @foreach ($microsAsignadas as $micro)
                             <option value="{{ $micro->id }}" @selected((int) $microrregionId === (int) $micro->id)>
                                 MR {{ $micro->microrregion }} - {{ $micro->cabecera }}
                             </option>
                         @endforeach
                     </select>
+                    @if ($bloquearMicro)
+                        <input type="hidden" name="selected_microrregion_id" value="{{ $microrregionId }}">
+                    @endif
                 </label>
             @else
                 <input type="hidden" name="selected_microrregion_id" value="{{ $microrregionId }}">
@@ -51,7 +72,10 @@
                     @php
                         $name = 'values['.$field->key.']';
                         $id = 'field_'.$field->key;
-                        $value = old('values.'.$field->key);
+                        $value = old('values.'.$field->key, $editingEntry->data[$field->key] ?? null);
+                        if ($field->type === 'boolean' && $value !== null && $value !== '') {
+                            $value = $value === true || $value === 1 || $value === '1' ? '1' : '0';
+                        }
                     @endphp
                     @if ($field->type === 'seccion')
                         @php
@@ -163,10 +187,58 @@
             </div>
 
             <div class="tm-actions">
-                <button type="submit" class="tm-btn tm-btn-primary">Guardar registro</button>
+                <button type="submit" class="tm-btn tm-btn-primary">{{ !empty($editingEntry) ? 'Actualizar registro' : 'Guardar registro' }}</button>
             </div>
         </form>
     </article>
+
+    @if ($tmImportable->isNotEmpty())
+    <div class="tm-modal" id="tmImportarExcelModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="tmImportarExcelModalLabel">
+        <div class="tm-modal-backdrop" data-tm-excel-close></div>
+        <div class="tm-modal-dialog tm-excel-modal-dialog" style="max-width:720px;">
+            <div class="tm-modal-head">
+                <h3 id="tmImportarExcelModalLabel">Importar desde Excel</h3>
+                <button type="button" class="tm-modal-close" data-tm-excel-close aria-label="Cerrar"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            </div>
+            <div class="tm-modal-body tm-excel-modal-body">
+                <p class="tm-field-help" style="margin-bottom:12px;">Si el archivo trae totales o títulos arriba, al leer columnas se <strong>detecta</strong> la fila de la tabla (MUNICIPIO, MICROREGION, ACCION…) y la primera fila de ítems. Luego asocia cada campo del módulo con una columna.</p>
+                <div id="tmExcelStep1">
+                    <div class="tm-excel-grid">
+                        <label>Fila encabezados <input type="number" id="tmExcelHeaderRow" value="1" min="1" max="500"></label>
+                        <label>Primera fila datos <input type="number" id="tmExcelDataStartRow" value="2" min="2" max="50000"></label>
+                        <label>Microrregión
+                            <select id="tmExcelMicrorregionId">
+                                @foreach (($microrregionesAsignadas ?? collect()) as $micro)
+                                    <option value="{{ $micro->id }}" @selected((int) $microrregionId === (int) $micro->id)>MR {{ $micro->microrregion }} — {{ $micro->cabecera }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                    </div>
+                    <label class="tm-col-full" style="margin-top:10px;">Archivo <input type="file" id="tmExcelFile" accept=".xlsx,.xls"></label>
+                    <div id="tmExcelPreviewErr" class="inline-alert inline-alert-error tm-hidden" role="alert"></div>
+                    <div id="tmExcelDetectNote" class="inline-alert inline-alert-success tm-hidden" style="margin-top:8px;" role="status"></div>
+                    <div class="tm-actions" style="margin-top:10px;">
+                        <button type="button" class="tm-btn tm-btn-primary" id="tmExcelLeerColumnas">Leer columnas</button>
+                    </div>
+                </div>
+                <div id="tmExcelStep2" class="tm-hidden">
+                    <div class="tm-table-wrap" style="max-height:240px; overflow:auto;">
+                        <table class="tm-table tm-table-sm">
+                            <thead><tr><th>Campo del módulo</th><th>Tipo</th><th>Columna Excel</th></tr></thead>
+                            <tbody id="tmExcelMapBody"></tbody>
+                        </table>
+                    </div>
+                    <div id="tmExcelImportErr" class="inline-alert inline-alert-error tm-hidden" role="alert"></div>
+                    <div id="tmExcelImportOk" class="inline-alert inline-alert-success tm-hidden" role="alert"></div>
+                    <div class="tm-actions" style="margin-top:10px;">
+                        <button type="button" class="tm-btn" id="tmExcelVolver">Volver</button>
+                        <button type="button" class="tm-btn tm-btn-primary" id="tmExcelImportar">Importar filas</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
     <article class="content-card tm-card">
         <h2>Mis registros recientes</h2>
@@ -183,7 +255,11 @@
                 <tbody>
                     @forelse ($entries as $entry)
                         <tr>
-                            <td>{{ optional($entry->submitted_at)->format('d/m/Y H:i') }}</td>
+                            <td>
+                                {{ optional($entry->submitted_at)->format('d/m/Y H:i') }}
+                                <br>
+                                <a href="{{ route('temporary-modules.show', ['module' => $temporaryModule->id, 'entry' => $entry->id]) }}" class="tm-btn tm-btn-outline" style="margin-top:6px;font-size:12px;padding:4px 8px;">Completar</a>
+                            </td>
                             @foreach ($fields as $field)
                                 @php
                                     $cell = $entry->data[$field->key] ?? null;
@@ -617,6 +693,148 @@
             if (event.key === 'Escape' && imageModal && imageModal.classList.contains('is-open')) {
                 closeImageModal();
             }
+        });
+
+        /* Importar Excel */
+        const excelModal = document.getElementById('tmImportarExcelModal');
+        const excelPreviewUrl = @json(route('temporary-modules.import-excel-preview', $temporaryModule->id));
+        const excelImportUrl = @json(route('temporary-modules.import-excel', $temporaryModule->id));
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json(csrf_token());
+        let excelHeaders = [];
+        let excelFields = [];
+        let excelSuggested = {};
+
+        const openExcelModal = function () {
+            if (!excelModal) return;
+            excelModal.classList.add('is-open');
+            excelModal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+            document.getElementById('tmExcelStep1')?.classList.remove('tm-hidden');
+            document.getElementById('tmExcelStep2')?.classList.add('tm-hidden');
+            ['tmExcelPreviewErr', 'tmExcelImportErr', 'tmExcelImportOk'].forEach(function (id) {
+                const el = document.getElementById(id);
+                if (el) { el.textContent = ''; el.classList.add('tm-hidden'); }
+            });
+        };
+        const closeExcelModal = function () {
+            if (!excelModal) return;
+            excelModal.classList.remove('is-open');
+            excelModal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+        };
+        document.getElementById('tmBtnImportarExcel')?.addEventListener('click', openExcelModal);
+        excelModal?.querySelectorAll('[data-tm-excel-close]').forEach(function (el) {
+            el.addEventListener('click', closeExcelModal);
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && excelModal && excelModal.classList.contains('is-open')) closeExcelModal();
+        });
+
+        document.getElementById('tmExcelLeerColumnas')?.addEventListener('click', function () {
+            const fileInput = document.getElementById('tmExcelFile');
+            const file = fileInput && fileInput.files && fileInput.files[0];
+            const err = document.getElementById('tmExcelPreviewErr');
+            if (!file) {
+                if (err) { err.textContent = 'Selecciona un archivo Excel.'; err.classList.remove('tm-hidden'); }
+                return;
+            }
+            const fd = new FormData();
+            fd.append('archivo_excel', file);
+            fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
+            fd.append('auto_detect', '1');
+            fd.append('_token', csrfToken);
+            if (err) err.classList.add('tm-hidden');
+            const noteEl = document.getElementById('tmExcelDetectNote');
+            if (noteEl) { noteEl.classList.add('tm-hidden'); }
+            fetch(excelPreviewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, credentials: 'same-origin' })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                .then(function (_ref) {
+                    if (!_ref.ok || !_ref.j.success) {
+                        if (err) { err.textContent = _ref.j.message || 'Error al leer el archivo.'; err.classList.remove('tm-hidden'); }
+                        return;
+                    }
+                    const hr = document.getElementById('tmExcelHeaderRow');
+                    const dataStart = document.getElementById('tmExcelDataStartRow');
+                    if (typeof _ref.j.header_row === 'number' && hr) hr.value = String(_ref.j.header_row);
+                    if (typeof _ref.j.data_start_row === 'number' && dataStart) dataStart.value = String(_ref.j.data_start_row);
+                    if (_ref.j.detection_note && noteEl) {
+                        noteEl.textContent = _ref.j.detection_note;
+                        noteEl.classList.remove('tm-hidden');
+                    }
+                    excelHeaders = _ref.j.headers || [];
+                    excelFields = _ref.j.fields || [];
+                    excelSuggested = _ref.j.suggested_map || {};
+                    const tbody = document.getElementById('tmExcelMapBody');
+                    if (tbody) {
+                        tbody.innerHTML = '';
+                        excelFields.forEach(function (f) {
+                            const tr = document.createElement('tr');
+                            const sug = excelSuggested[f.key];
+                            let opts = '<option value="">— No importar —</option>';
+                            excelHeaders.forEach(function (h) {
+                                const sel = (sug === h.index) ? ' selected' : '';
+                                const lab = (h.letter + ': ' + (h.label || '(vacío)')).replace(/</g, '');
+                                opts += '<option value="' + h.index + '"' + sel + '>' + lab + '</option>';
+                            });
+                            tr.innerHTML = '<td>' + String(f.label).replace(/</g, '') + (f.is_required ? ' *' : '') + '</td><td>' + String(f.type).replace(/</g, '') + '</td><td><select class="tm-excel-map-select" data-field-key="' + String(f.key).replace(/"/g, '') + '">' + opts + '</select></td>';
+                            tbody.appendChild(tr);
+                        });
+                    }
+                    document.getElementById('tmExcelStep1')?.classList.add('tm-hidden');
+                    document.getElementById('tmExcelStep2')?.classList.remove('tm-hidden');
+                })
+                .catch(function () {
+                    if (err) { err.textContent = 'Error de red al subir el archivo.'; err.classList.remove('tm-hidden'); }
+                });
+        });
+
+        document.getElementById('tmExcelVolver')?.addEventListener('click', function () {
+            document.getElementById('tmExcelStep2')?.classList.add('tm-hidden');
+            document.getElementById('tmExcelStep1')?.classList.remove('tm-hidden');
+        });
+
+        document.getElementById('tmExcelImportar')?.addEventListener('click', function () {
+            const fileInput = document.getElementById('tmExcelFile');
+            const file = fileInput && fileInput.files && fileInput.files[0];
+            const errEl = document.getElementById('tmExcelImportErr');
+            const okEl = document.getElementById('tmExcelImportOk');
+            if (!file) {
+                if (errEl) { errEl.textContent = 'Vuelve al paso 1 y selecciona el archivo.'; errEl.classList.remove('tm-hidden'); }
+                return;
+            }
+            const mapping = {};
+            document.querySelectorAll('.tm-excel-map-select').forEach(function (sel) {
+                const key = sel.getAttribute('data-field-key');
+                if (!key) return;
+                const v = sel.value;
+                mapping[key] = v === '' ? null : parseInt(v, 10);
+            });
+            const fd = new FormData();
+            fd.append('archivo_excel', file);
+            fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
+            fd.append('data_start_row', document.getElementById('tmExcelDataStartRow')?.value || '2');
+            fd.append('mapping', JSON.stringify(mapping));
+            fd.append('selected_microrregion_id', document.getElementById('tmExcelMicrorregionId')?.value || '');
+            fd.append('_token', csrfToken);
+            if (errEl) errEl.classList.add('tm-hidden');
+            if (okEl) okEl.classList.add('tm-hidden');
+            fetch(excelImportUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, credentials: 'same-origin' })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                .then(function (_ref) {
+                    if (!_ref.ok || !_ref.j.success) {
+                        if (errEl) { errEl.textContent = _ref.j.message || 'Error al importar.'; errEl.classList.remove('tm-hidden'); }
+                        return;
+                    }
+                    let msg = _ref.j.message || 'Listo.';
+                    if (_ref.j.row_errors && _ref.j.row_errors.length) {
+                        msg += ' Avisos: ' + _ref.j.row_errors.slice(0, 5).map(function (e) { return 'fila ' + e.row; }).join(', ');
+                    }
+                    if (okEl) { okEl.textContent = msg; okEl.classList.remove('tm-hidden'); }
+                    if (_ref.j.imported > 0) setTimeout(function () { window.location.reload(); }, 1200);
+                })
+                .catch(function () {
+                    if (errEl) { errEl.textContent = 'Error de red.'; errEl.classList.remove('tm-hidden'); }
+                });
         });
     });
 </script>

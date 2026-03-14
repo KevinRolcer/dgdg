@@ -5,13 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ ($pageTitle ?? 'Inicio') . ' | Dirección General de Delegaciones' }}</title>
-
+    <script>
+    (function(){try{var k='segob_theme',d='segob_dark_variant';if(localStorage.getItem(k)!=='dark')return;var v=localStorage.getItem(d)||'deep';if(v!=='soft'&&v!=='slate')v='deep';document.documentElement.classList.add('theme-dark','theme-dark--'+v);}catch(e){}})();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="{{ asset('assets/css/app-shell.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/css/theme-dark.css') }}">
     @stack('css')
+    <link rel="stylesheet" href="{{ asset('assets/css/theme-dark-modules.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/css/theme-dark-agenda.css') }}">
     {{-- jQuery vía cdnjs (CSP solo permite cdnjs/jsdelivr/unpkg, no code.jquery.com) --}}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="{{ asset('assets/js/vendor/simple-expand.min.js') }}"></script>
@@ -137,6 +142,10 @@
                             <a href="{{ route('profile.show') }}" class="topbar-menu-link {{ request()->routeIs('profile.show') ? 'is-active' : '' }}">
                                 <i class="fa-regular fa-user" aria-hidden="true"></i>
                                 <span>Mi perfil</span>
+                            </a>
+                            <a href="{{ route('settings.index') }}" class="topbar-menu-link {{ request()->routeIs('settings.index') ? 'is-active' : '' }}">
+                                <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                                <span>Ajustes</span>
                             </a>
 
                             @can('Administrar-Usuarios')
