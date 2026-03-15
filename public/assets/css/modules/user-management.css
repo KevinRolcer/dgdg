@@ -92,32 +92,98 @@
 
 .um-table th,
 .um-table td {
-    border-bottom: 1px solid var(--clr-border);
-    padding: 9px 10px;
+    padding: 10px 12px;
     text-align: left;
     vertical-align: middle;
     font-size: 0.82rem;
     color: var(--clr-text-main);
+    border-bottom: none;
 }
 
+.um-table tbody tr {
+    background: transparent;
+}
+
+
+/* Gestión de Usuarios: todo cabe en el body sin scroll; solo la tabla hace scroll */
+.app-content:has(> .um-page) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.um-page {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    width: 100%;
+}
+
+.um-page .inline-alert {
+    max-width: 100%;
+    word-wrap: break-word;
+}
+
+.um-page .um-card-wrap {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 100%;
+    border: none;
+}
+
+/* Contenedor de tabla: scroll interno, altura limitada (scroll en tabla, no en body) */
+.um-table-scroll-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: min(44vh, 320px);
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+    background: var(--clr-card, #fff);
+}
+
+.um-page .um-card-wrap .um-filter-bar {
+    flex-shrink: 0;
+}
+
+.um-page .um-card-wrap .um-table-scroll-wrap {
+    margin-bottom: 0;
+}
+
+.um-page .um-card-wrap .um-pagination-wrap {
+    flex-shrink: 0;
+    margin-top: 0;
+}
+
+/* Compatibilidad: tm-table-wrap fuera de UM (otros módulos) */
 .tm-table-wrap {
-    max-height: calc(100vh - 280px); /* Ajustamos la altura para dejar espacio al header/filtros/paginación */
+    max-height: calc(100vh - 280px);
     overflow-y: auto;
     overflow-x: auto;
     border: 1px solid var(--clr-border);
     border-radius: 8px;
 }
 
-/* Scrollbar personalizado para la tabla */
+/* Scrollbar personalizado para la tabla UM */
+.um-table-scroll-wrap::-webkit-scrollbar,
 .tm-table-wrap::-webkit-scrollbar {
     width: 6px;
     height: 6px;
 }
 
+.um-table-scroll-wrap::-webkit-scrollbar-track,
 .tm-table-wrap::-webkit-scrollbar-track {
     background: transparent;
 }
 
+.um-table-scroll-wrap::-webkit-scrollbar-thumb,
 .tm-table-wrap::-webkit-scrollbar-thumb {
     background: var(--clr-accent);
     border-radius: 10px;
@@ -125,29 +191,71 @@
     background-clip: padding-box;
 }
 
+.um-table-scroll-wrap::-webkit-scrollbar-thumb:hover,
 .tm-table-wrap::-webkit-scrollbar-thumb:hover {
-    background: #b58b5a; /* Un tono ligeramente más oscuro del accent */
+    background: #b58b5a;
 }
 
-/* Fijar los encabezados de la tabla al hacer scroll */
+/* Encabezados de tabla: fijos al hacer scroll, UI limpia */
+.um-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
 .um-table th {
     position: sticky;
     top: 0;
-    background: #fff;
+    background: var(--clr-card, #fff);
     z-index: 10;
-    color: var(--clr-primary-dark);
-    font-weight: 700;
+    color: var(--clr-text-light);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
     white-space: nowrap;
-    box-shadow: 0 1px 0 var(--clr-border); /* Usar sombra para el borde inferior al hacer sticky */
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--clr-border);
+    box-shadow: none;
 }
 
-/* Eliminar el border natural de th si usamos sticky con sombra */
-.um-table th {
-    border-bottom: none;
+/* Filtros: estilo limpio como Ajustes (sin bloque gris) */
+.um-page .um-filter-bar .tm-section-switch {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    gap: 8px;
+}
+
+.um-page .um-filter-bar .tm-section-tab {
+    border-radius: 999px;
+    border: 1px solid var(--clr-border);
+    background: transparent;
+    color: var(--clr-text-main);
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.um-page .um-filter-bar .tm-section-tab:not(.is-active) {
+    background: transparent;
+    color: var(--clr-text-main);
+    border-color: var(--clr-border);
+}
+
+.um-page .um-filter-bar .tm-section-tab:not(.is-active):hover {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: var(--clr-text-light);
+}
+
+.um-page .um-filter-bar .tm-section-tab.is-active {
+    background: rgba(199, 155, 102, 0.14);
+    border-color: rgba(199, 155, 102, 0.55);
+    color: var(--clr-accent, #a07838);
+    box-shadow: 0 0 0 1px rgba(199, 155, 102, 0.2);
 }
 
 .um-table tbody tr:hover {
-    background: rgba(0, 0, 0, 0.02);
+    background: rgba(0, 0, 0, 0.03);
 }
 
 /* nombre con avatar y email debajo */
@@ -244,7 +352,7 @@
     border: 1px solid var(--clr-border);
     border-radius: 12px;
     padding: 14px;
-    background: #fff;
+    background: var(--clr-card, #fff);
 }
 
 .um-card-head {
@@ -304,23 +412,241 @@
     min-width: 44px;
 }
 
-@media (max-width: 768px) {
-    .um-table-desktop {
-        display: none !important;
+/* Título/descripción de página: no desbordar en móvil */
+.app-content:has(> .um-page) .page-header {
+    max-width: 100%;
+    overflow-wrap: break-word;
+}
+.app-content:has(> .um-page) .page-header h1 {
+    word-break: break-word;
+}
+.app-content:has(> .um-page) .page-header p {
+    word-break: break-word;
+}
+
+/* ========== Responsive: tablet (tabla con scroll horizontal o cards) ========== */
+@media (max-width: 992px) {
+    .um-filter-bar {
+        gap: 10px;
     }
-    .um-cards {
-        display: grid;
+    .um-filter-bar .tm-section-switch {
+        flex-wrap: wrap;
     }
-    .tm-table-wrap.um-table-desktop {
-        display: none !important;
-    }
-    .tm-page .tm-card {
-        padding-bottom: 16px;
+    .um-table-scroll-wrap {
+        max-height: min(40vh, 280px);
     }
 }
 
-@media (min-width: 769px) {
-    .um-cards {
+/* Filtros: desde 800px se apilan en bloques (Rol / Estado), más limpios y adaptables */
+@media (max-width: 800px) {
+    .um-filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 18px;
+        padding-bottom: 18px;
+        margin-bottom: 18px;
+    }
+    .um-filter-bar .um-filter-form {
+        width: 100%;
+        display: block;
+    }
+    .um-filter-bar .um-filter-form:first-of-type::before {
+        content: 'Rol';
+        display: block;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--clr-text-light);
+        margin-bottom: 10px;
+    }
+    .um-filter-bar .um-filter-form:nth-of-type(2)::before {
+        content: 'Estado';
+        display: block;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--clr-text-light);
+        margin-bottom: 10px;
+    }
+    .um-filter-bar .tm-section-switch {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        max-width: 100%;
+        border: none;
+        background: transparent;
+        padding: 0;
+    }
+    .um-filter-bar .tm-section-tab {
+        flex: 0 0 auto;
+        width: auto;
+        min-height: 34px;
+        padding: 6px 12px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        border-radius: 999px;
+        border: 1px solid var(--clr-border);
+        white-space: nowrap;
+    }
+    .um-filter-bar .tm-section-tab:not(.is-active) {
+        background: transparent;
+    }
+    .um-filter-divider {
+        display: none;
+    }
+    .um-filter-actions {
+        margin-left: 0;
+        width: 100%;
+        margin-top: 6px;
+    }
+    .um-filter-actions .tm-btn {
+        width: 100%;
+        min-height: 44px;
+        justify-content: center;
+    }
+}
+
+/* A partir de 800px: vista tarjetas (mismo color que el tema), body con scroll */
+@media (max-width: 800px) {
+    .app-content:has(> .um-page) {
+        overflow-x: hidden;
+        max-width: 100%;
+    }
+    .um-page {
+        overflow-x: hidden;
+    }
+    .um-page .um-table-scroll-wrap.um-table-desktop {
+        display: none !important;
+    }
+    .um-page .um-cards {
+        display: grid !important;
+        gap: 10px;
+    }
+    .um-page .um-card-wrap {
+        max-height: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .tm-page .tm-card {
+        padding-bottom: 16px;
+    }
+    .um-filter-bar {
+        gap: 10px;
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+    }
+    .um-filter-actions .tm-btn {
+        width: 100%;
+        justify-content: center;
+        min-height: 44px;
+    }
+    .um-pagination-wrap {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 12px 0 0;
+    }
+    .um-pagination-info {
+        text-align: center;
+    }
+    .um-pagination nav {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 640px) {
+    .um-page .um-card-wrap {
+        padding: 1rem;
+    }
+    .um-page {
+        overflow-x: hidden;
+    }
+    .um-card {
+        padding: 12px;
+    }
+    .um-card-head {
+        gap: 8px;
+    }
+    .um-card-actions {
+        gap: 6px;
+    }
+    .um-card-actions .tm-btn {
+        min-height: 44px;
+        flex: 1 1 auto;
+        min-width: 0;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .um-page .um-card-wrap {
+        padding: 0.75rem;
+    }
+    .um-card {
+        padding: 10px 12px;
+    }
+    .um-card-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .um-card-head .um-user-avatar {
+        order: 0;
+    }
+    .um-card-head .um-role-pill {
+        align-self: flex-start;
+    }
+    .um-card-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .um-card-actions .tm-btn,
+    .um-card-actions .tm-inline-form .tm-btn {
+        width: auto;
+        min-width: 0;
+        min-height: 38px;
+        padding: 8px 12px;
+        font-size: 0.8rem;
+        justify-content: center;
+    }
+    .um-card-actions .um-btn-edit {
+        padding: 8px 10px;
+        font-size: 0.78rem;
+    }
+    .um-card-actions .um-btn-delete,
+    .um-card-actions .tm-inline-form .um-btn-delete {
+        min-width: 38px;
+        width: 38px;
+        padding: 8px;
+    }
+    .um-pagination .page-item .page-link {
+        min-width: 36px;
+        height: 36px;
+    }
+}
+
+@media (max-width: 360px) {
+    .um-page .um-card-wrap {
+        padding: 0.5rem;
+    }
+    .um-filter-bar {
+        gap: 8px;
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+    }
+    .um-card-name {
+        font-size: 0.875rem;
+    }
+    .um-card-email {
+        font-size: 0.7rem;
+    }
+}
+
+@media (min-width: 801px) {
+    .um-page .um-cards {
         display: none !important;
     }
 }
@@ -429,13 +755,16 @@
     opacity: 0.35;
 }
 
-/* ---- Barra de filtros ---- */
+/* ---- Barra de filtros: más limpia ---- */
 .um-filter-bar {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 12px;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--clr-border);
+    min-width: 0;
 }
 
 @media (max-width: 640px) {
@@ -453,10 +782,12 @@
         justify-content: flex-start;
     }
     .um-filter-bar .tm-section-tab {
-        flex: 1 1 auto;
-        min-height: 44px;
-        padding: 10px 12px;
-        font-size: 0.8rem;
+        flex: 0 0 auto;
+        width: auto;
+        min-height: 36px;
+        padding: 7px 12px;
+        font-size: 0.78rem;
+        white-space: nowrap;
     }
     .um-filter-divider {
         display: none;
@@ -494,16 +825,17 @@
     border-radius: 999px;
 }
 
-/* ---- Paginación ---- */
+/* ---- Paginación: siempre visible debajo de la tabla ---- */
 .um-pagination-wrap {
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 10px;
-    padding-top: 12px;
+    gap: 12px;
+    padding: 14px 0 4px;
     border-top: 1px solid var(--clr-border);
-    margin-top: 4px;
+    margin-top: 12px;
+    flex-shrink: 0;
 }
 
 .um-pagination-info {
@@ -538,7 +870,7 @@
     font-size: 0.82rem;
     font-weight: 600;
     border: 1px solid var(--clr-border);
-    background: #fff;
+    background: var(--clr-card, #fff);
     color: var(--clr-text-main);
     text-decoration: none;
     transition: background 0.15s, border-color 0.15s, color 0.15s;

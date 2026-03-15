@@ -1,0 +1,244 @@
+# 📧 Funcionalidad de Envío de Correo — Proyecto OfficeGG (SIGEV)
+
+> **Proyecto:** OfficeGG · Sistema SIGEV  
+> **Framework:** Laravel (PHP)  
+> **Fecha de revisión:** Marzo 2026
+
+---
+
+## Resumen General
+
+El sistema cuenta con **dos clases Mailable** de Laravel que gestionan el envío de correos electrónicos. Ambas se disparan en tres flujos distintos del sistema:
+
+| Mailable | Asunto del correo | Cuándo se envía |
+|---|---|---|
+| [BienvenidaUsuario](file:///c:/laragon/www/officegg/app/Mail/BienvenidaUsuario.php#11-29) | `¡Bienvenido a SIGEV!` | Al registrar un usuario interno o un socio |
+| [RecuperarPassword](file:///c:/laragon/www/officegg/app/Mail/RecuperarPassword.php#9-28) | `Recuperación de Contraseña - SIGEV` | Al solicitar recuperar contraseña |
+
+---
+
+## Arquitectura de Archivos
+
+```
+app/
+├── Mail/
+│   ├── BienvenidaUsuario.php       ← Clase Mailable de bienvenida
+│   └── RecuperarPassword.php       ← Clase Mailable de recuperación
+├── Http/Controllers/
+│   ├── UsuarioController.php       ← Envía correo al crear usuario interno
+│   └── SocioController.php         ← Envía correo al registrar socio/tanque
+└── Models/
+    └── User.php                    ← Contiene lógica de correo de recuperación
+
+resources/views/emails/
+├── bienvenida.blade.php            ← Plantilla HTML del correo de bienvenida
+└── recuperar_password.blade.php    ← Plantilla HTML del correo de recuperación
+```
+
+---
+
+## Clases Mailable
+
+### 1. [BienvenidaUsuario](file:///c:/laragon/www/officegg/app/Mail/BienvenidaUsuario.php#11-29)
+**Archivo:** [app/Mail/BienvenidaUsuario.php](file:///c:/laragon/www/officegg/app/Mail/BienvenidaUsuario.php)
+
+```php
+class BienvenidaUsuario extends Mailable
+{
+    public $user; // Instancia de TanqueSocio o User
+
+    public function __construct(TanqueSocio $user)
+    {
+        $this->user = $user;
+    }
+
+    public function build()
+    {
+        return $this->subject('¡Bienvenido a SIGEV!')
+                    ->view('emails.bienvenida');
+    }
+}
+```
+
+**Vista blade:** [resources/views/emails/bienvenida.blade.php](file:///c:/laragon/www/officegg/resources/views/emails/bienvenida.blade.php)
+
+```html
+<h1>¡Hola, {{ $user->name }}!</h1>
+<p>Te damos la bienvenida al sistema SIGEV.</p>
+<p>Tu cuenta ha sido registrada exitosamente con el correo: {{ $user->email }}</p>
+<p>Saludos, Equipo de SIGEV</p>
+```
+
+> **Variables disponibles en la vista:** `$user->name`, `$user->email`
+
+---
+
+### 2. [RecuperarPassword](file:///c:/laragon/www/officegg/app/Mail/RecuperarPassword.php#9-28)
+**Archivo:** [app/Mail/RecuperarPassword.php](file:///c:/laragon/www/officegg/app/Mail/RecuperarPassword.php)
+
+```php
+class RecuperarPassword extends Mailable
+{
+    public $token;
+    public $email;
+
+    public function __construct($token, $email)
+    {
+        $this->token = $token;
+        $this->email = $email;
+    }
+
+    public function build()
+    {
+        return $this->subject('Recuperación de Contraseña - SIGEV')
+                    ->view('emails.recuperar_password');
+    }
+}
+```
+
+**Vista blade:** [resources/views/emails/recuperar_password.blade.php](file:///c:/laragon/www/officegg/resources/views/emails/recuperar_password.blade.php)
+
+```html
+<h1>Recuperación de Contraseña</h1>
+<p>Has solicitado restablecer tu contraseña en el sistema SIGEV.</p>
+<a href="{{ url('/reset-password/'.$token.'?email='.$email) }}">
+    Restablecer mi contraseña
+</a>
+<p>Si no solicitaste este cambio, ignora este correo.</p>
+```
+
+> **Variables disponibles en la vista:** `$token`, `$email`
+
+---
+
+## Flujos de Envío
+
+### Flujo 1 — Registro de Usuario Interno
+**Archivo:** [app/Http/Controllers/UsuarioController.php](file:///c:/laragon/www/officegg/app/Http/Controllers/UsuarioController.php) · Línea 73–78
+
+**Cuándo:** Al registrar un nuevo usuario desde el panel administrativo.
+
+```php
+// En registroUsuario()
+try {
+    Mail::to($userNew->email)->send(new BienvenidaUsuario($userNew));
+} catch (Throwable $e) {
+    \Log::error("Error al enviar correo: " . $e->getMessage());
+}
+```
+
+**Comportamiento:**
+- Si el correo falla, el error se registra en el log pero **el usuario igual se crea**.
+- El envío se ejecuta **después** del `DB::commit()`.
+
+---
+
+### Flujo 2 — Registro de Socio / Tanque
+**Archivo:** [app/Http/Controllers/SocioController.php](file:///c:/laragon/www/officegg/app/Http/Controllers/SocioController.php)
+
+Se dispara en **dos métodos distintos**:
+
+#### 2a. [registroSocio()](file:///c:/laragon/www/officegg/app/Http/Controllers/SocioController.php#36-88) — Línea 74–84
+Registro de socio desde el panel administrativo.
+
+```php
+try {
+    Mail::to($socio->socio_email)->send(new BienvenidaUsuario($socio));
+    dd("ÉXITO: El correo intentó salir hacia " . $socio->socio_email); // ⚠️ debug activo
+} catch (\Throwable $e) {
+    dd("ERROR AL ENVIAR CORREO: " . $e->getMessage()); // ⚠️ debug activo
+}
+```
+
+> [!WARNING]
+> Este método tiene **`dd()` activo** — detendrá la ejecución y mostrará el mensaje en pantalla en lugar de redirigir. Debe ser removido antes de producción.
+
+#### 2b. [postRegistroTanque()](file:///c:/laragon/www/officegg/app/Http/Controllers/SocioController.php#312-415) — Línea 383–387
+Autoregistro de socio desde formulario público con código de referido.
+
+```php
+try {
+    \Illuminate\Support\Facades\Mail::to($TanqueNew->email)
+        ->send(new \App\Mail\BienvenidaUsuario($TanqueNew));
+} catch (\Throwable $e) {
+    \Log::error("Error enviando correo en postRegistroTanque: " . $e->getMessage());
+}
+```
+
+**Comportamiento:**
+- El correo se envía **después** del `DB::commit()`.
+- Si falla, solo escribe en el log y continúa con el flujo normal.
+
+---
+
+### Flujo 3 — Recuperación de Contraseña
+**Archivo:** [app/Models/User.php](file:///c:/laragon/www/officegg/app/Models/User.php) · Línea 69–98
+
+```php
+public function enviarCorreoRecuperacion(Request $request)
+{
+    // 1. Valida que el correo existe en la BD
+    $request->validate(['email' => 'required|email|exists:users,email']);
+
+    // 2. Genera token de 64 caracteres
+    $token = \Illuminate\Support\Str::random(64);
+
+    // 3. Guarda el token en la tabla password_resets
+    DB::table('password_resets')->insert([
+        'email'      => $request->email,
+        'token'      => $token,
+        'created_at' => \Carbon\Carbon::now()
+    ]);
+
+    // 4. Envía el correo
+    try {
+        \Illuminate\Support\Facades\Mail::to($request->email)
+            ->send(new \App\Mail\RecuperarPassword($token, $request->email));
+        return back()->with('success', 'Te hemos enviado un enlace...');
+    } catch (\Throwable $e) {
+        \Log::error("Error enviando correo de recuperación: " . $e->getMessage());
+        return back()->withErrors(['email' => 'Hubo un error al enviar el correo.']);
+    }
+}
+```
+
+**Flujo del link de recuperación:**
+```
+/reset-password/{token}?email={correo}
+```
+La vista de restablecimiento está en [resources/views/emails/reset.blade.php](file:///c:/laragon/www/officegg/resources/views/emails/reset.blade.php) (formulario HTML con campos de nueva contraseña).
+
+---
+
+## Configuración de Correo (.env)
+
+El driver de correo se configura en el archivo [.env](file:///c:/laragon/www/officegg/.env) del proyecto. Variables relevantes:
+
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.tuservidor.com
+MAIL_PORT=587
+MAIL_USERNAME=tu@correo.com
+MAIL_PASSWORD=tu_password
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=tu@correo.com
+MAIL_FROM_NAME="SIGEV"
+```
+
+> [!NOTE]
+> Para pruebas locales se puede usar **Mailtrap** (`smtp.mailtrap.io`) o configurar `MAIL_MAILER=log` para que los correos se escriban en [storage/logs/laravel.log](file:///c:/laragon/www/officegg/storage/logs/laravel.log) sin enviarlos realmente.
+
+---
+
+## Observaciones y Pendientes
+
+| # | Descripción | Archivo | Línea | Prioridad |
+|---|---|---|---|---|
+| 1 | `dd()` de debug activo en [registroSocio()](file:///c:/laragon/www/officegg/app/Http/Controllers/SocioController.php#36-88) — bloquea el flujo | [SocioController.php](file:///c:/laragon/www/officegg/app/Http/Controllers/SocioController.php) | 79, 83 | 🔴 Alta |
+| 2 | [BienvenidaUsuario](file:///c:/laragon/www/officegg/app/Mail/BienvenidaUsuario.php#11-29) recibe `TanqueSocio` en su constructor pero también se usa con [User](file:///c:/laragon/www/officegg/app/Models/User.php#17-100) — puede causar error de tipo | [BienvenidaUsuario.php](file:///c:/laragon/www/officegg/app/Mail/BienvenidaUsuario.php) | 17 | 🟡 Media |
+| 3 | La vista [bienvenida.blade.php](file:///c:/laragon/www/officegg/resources/views/emails/bienvenida.blade.php) es muy básica, sin diseño HTML | [emails/bienvenida.blade.php](file:///c:/laragon/www/officegg/resources/views/emails/bienvenida.blade.php) | — | 🟢 Baja |
+| 4 | La función [enviarCorreoRecuperacion](file:///c:/laragon/www/officegg/app/Models/User.php#68-99) está en el Model [User](file:///c:/laragon/www/officegg/app/Models/User.php#17-100), debería estar en un Controller | [User.php](file:///c:/laragon/www/officegg/app/Models/User.php) | 69 | 🟢 Baja |
+
+---
+
+*Documento generado automáticamente a partir del análisis del código fuente del proyecto.*

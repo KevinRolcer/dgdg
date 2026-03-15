@@ -35,15 +35,15 @@
         </div>
     @endif
 
-    {{-- Microrregiones: distribuir municipios desde Excel --}}
+    {{-- Microregiones: distribuir municipios desde Excel --}}
     <section class="settings-panel-block settings-micro-block">
         <div class="settings-micro-heading-row">
-            <h2 class="settings-panel-heading">Microrregiones</h2>
+            <h2 class="settings-panel-heading">Microregiones</h2>
             <button type="button" class="settings-help-btn" id="btnMicroHelp" aria-label="Ayuda" aria-expanded="false" aria-controls="microHelpPopover" title="Ver ayuda">
                 <i class="fa-solid fa-circle-question" aria-hidden="true"></i>
             </button>
             <div class="settings-help-popover" id="microHelpPopover" role="tooltip" aria-hidden="true">
-                <p class="settings-help-popover-text">Distribuir municipios con base de datos según un Excel. El archivo debe tener columnas <strong>Microrregión</strong>, <strong>NO</strong> (opcional) y <strong>Municipio</strong> o <strong>NOMBRE DE MUNICIPIO</strong> (se buscan sin importar mayúsculas ni acentos). Los datos van agrupados por microrregión; se actualiza la asignación de cada municipio a su microrregión.</p>
+                <p class="settings-help-popover-text">Distribuir municipios con base de datos según un Excel. El archivo debe tener columnas <strong>Microrregión</strong>, <strong>NO</strong> (opcional) y <strong>Municipio</strong> o <strong>NOMBRE DE MUNICIPIO</strong> (se buscan sin importar mayúsculas ni acentos). Los datos van agrupados por microregión; se actualiza la asignación de cada municipio a su microregión.</p>
                 <button type="button" class="settings-help-popover-close" aria-label="Cerrar">×</button>
             </div>
         </div>
@@ -64,7 +64,7 @@
                     <button type="submit" class="tm-btn tm-btn-primary settings-micro-btn-primary">
                         <i class="fa-solid fa-upload" aria-hidden="true"></i> Distribuir
                     </button>
-                    <button type="button" class="tm-btn tm-btn-outline settings-micro-btn-secondary" id="btnAbrirListaMicrorregiones" aria-haspopup="dialog" aria-controls="modalListaMicrorregiones">
+                    <button type="button" class="tm-btn tm-btn-outline settings-micro-btn-secondary" id="btnAbrirListaMicroregiones" aria-haspopup="dialog" aria-controls="modalListaMicroregiones">
                         <i class="fa-solid fa-list" aria-hidden="true"></i> Ver lista
                     </button>
                 </div>
@@ -161,7 +161,7 @@
                     @endif
 
                     @if (!empty($dr['missing_microrregiones']))
-                    <dt>Microrregiones no encontradas en BD ({{ count($dr['missing_microrregiones']) }})</dt>
+                    <dt>Microregiones no encontradas en BD ({{ count($dr['missing_microrregiones']) }})</dt>
                     <dd class="settings-log-list-wrap">
                         <ul class="settings-log-list">
                             @foreach ($dr['missing_microrregiones'] as $mr)
@@ -176,7 +176,7 @@
                     <dd class="settings-log-list-wrap">
                         <ul class="settings-log-list">
                             @foreach ($dr['missing_municipios'] as $m)
-                                <li><strong>{{ $m['municipio'] }}</strong> — microrregión en Excel: {{ $m['microrregion'] ?? '—' }}</li>
+                                <li><strong>{{ $m['municipio'] }}</strong> — microregión en Excel: {{ $m['microrregion'] ?? '—' }}</li>
                             @endforeach
                         </ul>
                     </dd>
@@ -188,11 +188,11 @@
     @endif
 
     {{-- Modal: lista de microrregiones y municipios --}}
-    <div class="tm-modal settings-modal-microrregiones" id="modalListaMicrorregiones" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modalListaMicrorregionesTitle">
+    <div class="tm-modal settings-modal-microrregiones" id="modalListaMicroregiones" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modalListaMicroregionesTitle">
         <div class="tm-modal-backdrop" data-close-microrregiones-modal></div>
         <div class="tm-modal-dialog settings-modal-dialog-list" style="max-width: 560px;">
             <div class="tm-modal-head">
-                <h3 id="modalListaMicrorregionesTitle">Microrregiones y municipios</h3>
+                <h3 id="modalListaMicroregionesTitle">Microregiones y municipios</h3>
                 <button type="button" class="tm-modal-close" data-close-microrregiones-modal aria-label="Cerrar">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
@@ -220,8 +220,8 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', function () {
-        var btn = document.getElementById('btnAbrirListaMicrorregiones');
-        var modal = document.getElementById('modalListaMicrorregiones');
+        var btn = document.getElementById('btnAbrirListaMicroregiones');
+        var modal = document.getElementById('modalListaMicroregiones');
         if (!btn || !modal) return;
         function openModal() {
             modal.classList.add('is-open');

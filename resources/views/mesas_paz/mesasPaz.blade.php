@@ -23,7 +23,7 @@
     <div class="mesas-paz-shell-main">
         <header class="mesas-paz-shell-head">
             <h1 class="mesas-paz-shell-title">Mesas de Paz y Seguridad</h1>
-            <p class="mesas-paz-shell-desc">Registro de asistencias por microrregión, evidencias y acuerdos de sesión.</p>
+            <p class="mesas-paz-shell-desc">Registro de asistencias por microregión, evidencias y acuerdos de sesión.</p>
         </header>
 
 <div
@@ -46,7 +46,7 @@
         <div class="col-12 mb-2">
             <div class="mesa-micro-pagination-wrap">
                 <div class="mesa-micro-pagination-title">Microrregiones</div>
-                <div class="mesa-micro-pagination" role="tablist" aria-label="Selector de microrregión">
+                <div class="mesa-micro-pagination" role="tablist" aria-label="Selector de microregión">
                     @foreach ($microrregionesAsignadas as $micro)
                         <a
                             href="{{ request()->fullUrlWithQuery(['microrregion_id' => $micro->id]) }}"
@@ -72,7 +72,7 @@
                 @endphp
                 <div class="mesa-heading-row">
                     <h4 class="panel-title">
-                        Microrregión asignada
+                        Microregión asignada
                         @if (!empty($microrregionNumero))
                             <span class="ms-1">#{{ $microrregionNumero }}</span>
                         @endif

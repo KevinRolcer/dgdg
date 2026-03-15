@@ -166,6 +166,13 @@ html.theme-dark .content-card {
     border-color: var(--clr-border);
 }
 
+/* Card/tabla en shell: mismo fondo que app-main (UI más limpia), sin borde */
+html.theme-dark .um-page .content-card.tm-card.um-card-wrap,
+html.theme-dark .um-page .um-card-wrap {
+    background: var(--clr-bg) !important;
+    border: none !important;
+}
+
 html.theme-dark .page-header h1 {
     color: var(--clr-text-main);
 }

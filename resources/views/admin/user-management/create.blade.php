@@ -83,9 +83,9 @@
 
             {{-- ===== Delegado: solo microrregión ===== --}}
             <div id="section-delegado" class="um-conditional-section" style="display:none;">
-                <div class="um-section-title"><i class="fa-solid fa-map-location-dot"></i> Microrregión asignada</div>
+                <div class="um-section-title"><i class="fa-solid fa-map-location-dot"></i> Microregión asignada</div>
                 <label for="microrregion_id">
-                    Microrregión <span class="um-required">*</span>
+                    Microregión <span class="um-required">*</span>
                     <select id="microrregion_id" name="microrregion_id">
                         <option value="">— Selecciona —</option>
                         @foreach($microrregiones as $mr)
@@ -105,9 +105,9 @@
 
             {{-- ===== Enlace: varias microrregiones ===== --}}
             <div id="section-enlace" class="um-conditional-section" style="display:none;">
-                <div class="um-section-title"><i class="fa-solid fa-map-location-dot"></i> Microrregiones asignadas</div>
+                <div class="um-section-title"><i class="fa-solid fa-map-location-dot"></i> Microregiones asignadas</div>
                 <label for="microrregion_ids">
-                    Microrregiones <span class="um-required">*</span>
+                    Microregiones <span class="um-required">*</span>
                     <small style="font-weight:400;color:var(--clr-text-light);">(Ctrl para seleccionar varias)</small>
                     <select id="microrregion_ids" name="microrregion_ids[]" multiple style="min-height:110px;">
                         @foreach($microrregiones as $mr)

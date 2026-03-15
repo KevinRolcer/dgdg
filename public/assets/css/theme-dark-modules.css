@@ -58,17 +58,17 @@ html.theme-dark .tm-shell .tm-shell-desc {
 }
 html.theme-dark .tm-shell .tm-card-in-shell,
 html.theme-dark .tm-shell .tm-module-grid .tm-card {
-    background: transparent !important;
+    background: var(--clr-bg) !important;
     border: none !important;
     box-shadow: none !important;
     border-bottom: 1px solid var(--clr-border);
 }
-/* Evitar caja en el contenedor de la tabla de registros */
+/* Contenedor tabla: mismo fondo que app-main */
 html.theme-dark .tm-shell .tm-table-wrap,
 html.theme-dark .tm-shell .tm-table-wrap-scroll {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
+    background: var(--clr-bg) !important;
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
 }
 /* Pie de paginación dentro del shell: sin caja */
 html.theme-dark .tm-shell .tm-pagination-wrap.tm-pagination--footer {
@@ -140,14 +140,29 @@ html.theme-dark .tm-table tbody tr:nth-child(even) {
     background: rgba(255, 255, 255, 0.02);
 }
 
+/* Tabla en shell (admin Eventos temporales): UI más limpia, mismo fondo que app-main */
+html.theme-dark .tm-shell .tm-table thead th {
+    background: var(--clr-bg) !important;
+    color: var(--clr-text-light) !important;
+    border-bottom: 1px solid var(--clr-border) !important;
+}
+
+html.theme-dark .tm-shell .tm-table tbody tr,
+html.theme-dark .tm-shell .tm-table tbody tr:nth-child(even) {
+    background: transparent !important;
+}
+
 html.theme-dark .tm-table th,
 html.theme-dark .tm-table td {
     border-color: var(--clr-border);
 }
 
-/* Encabezados = acento de marca (Mis registros / tablas delegado) */
+/* Encabezados = acento de marca (Mis registros / tablas delegado); shell = texto suave */
 html.theme-dark .tm-table th {
     color: var(--clr-accent) !important;
+}
+html.theme-dark .tm-shell .tm-table th {
+    color: var(--clr-text-light) !important;
 }
 
 html.theme-dark .tm-admin-preview-table th,
@@ -519,26 +534,96 @@ html.theme-dark .um-conditional-section {
     border-color: var(--clr-border);
 }
 
-html.theme-dark .um-table th {
-    background: var(--tm-surface) !important;
-    color: var(--clr-text-main);
-    box-shadow: 0 1px 0 var(--clr-border);
+/* Tarjetas de usuario en vista móvil: mismo fondo que la página en tema oscuro */
+html.theme-dark .um-page .um-card {
+    background: var(--clr-bg) !important;
+    border-color: var(--clr-border) !important;
+}
+html.theme-dark .um-page .um-card-head {
+    border-bottom-color: var(--clr-border) !important;
+}
+html.theme-dark .um-page .um-card-name {
+    color: var(--clr-text-main) !important;
+}
+html.theme-dark .um-page .um-card-email {
+    color: var(--clr-text-light) !important;
+}
+html.theme-dark .um-page .um-card-label {
+    color: var(--clr-text-light) !important;
+}
+
+/* Gestión de Usuarios: anular estilos .tm-table; fondo homogéneo como app-main */
+html.theme-dark .um-page .um-table-scroll-wrap {
+    background: var(--clr-bg) !important;
+}
+
+html.theme-dark .um-page .um-table thead th,
+html.theme-dark .um-page .tm-table.um-table thead th {
+    background: var(--clr-bg) !important;
+    color: var(--clr-text-light) !important;
+    border-bottom: 1px solid var(--clr-border) !important;
+    box-shadow: none !important;
+}
+
+html.theme-dark .um-page .um-table th,
+html.theme-dark .um-page .um-table td {
+    border-bottom: none !important;
+}
+
+html.theme-dark .um-page .um-table tbody tr,
+html.theme-dark .um-page .um-table tbody tr:nth-child(even),
+html.theme-dark .um-page .tm-table.um-table tbody tr:nth-child(even) {
+    background: transparent !important;
+}
+
+/* Gestión de Usuarios: filtros sin gris, como Ajustes */
+html.theme-dark .um-page .um-filter-bar .tm-section-switch {
+    background: transparent !important;
+    border: none !important;
+}
+
+html.theme-dark .um-page .um-filter-bar .tm-section-tab:not(.is-active) {
+    background: transparent !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .um-page .um-filter-bar .tm-section-tab:not(.is-active):hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .um-page .um-filter-bar .tm-section-tab.is-active {
+    background: rgba(199, 155, 102, 0.18) !important;
+    border-color: rgba(199, 155, 102, 0.6) !important;
+    color: var(--clr-accent) !important;
+    box-shadow: 0 0 0 1px rgba(199, 155, 102, 0.25) !important;
 }
 
 html.theme-dark .um-table tbody tr:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.04) !important;
 }
 
-html.theme-dark .um-pagination-wrap,
+/* Paginación UM: mismo criterio que filtros (sin bloque gris), todos los temas oscuros */
+html.theme-dark .um-pagination-wrap {
+    background: transparent !important;
+    border-top-color: var(--clr-border) !important;
+}
+
 html.theme-dark .um-pagination .page-item .page-link:not(.active) {
-    background: var(--tm-surface) !important;
+    background: transparent !important;
     color: var(--clr-text-main) !important;
-    border-color: var(--clr-border);
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .um-pagination .page-item .page-link:not(.active):hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: var(--clr-border) !important;
 }
 
 html.theme-dark .um-pagination .page-item.active .page-link {
     background: var(--clr-primary) !important;
-    border-color: var(--clr-primary);
+    border-color: var(--clr-primary) !important;
     color: #fff !important;
 }
 

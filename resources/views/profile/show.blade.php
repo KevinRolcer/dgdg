@@ -99,7 +99,7 @@
             <section class="profile-info-grid profile-info-grid-single">
                 <article class="profile-info-card profile-info-card-micro">
                     <div class="profile-section-head">
-                        <h3>Microrregiones y municipios</h3>
+                        <h3>Microregiones y municipios</h3>
                         <button type="button" class="profile-open-password-modal" data-open-password-modal>
                             Cambiar contraseña
                         </button>
@@ -120,7 +120,7 @@
                     @endphp
 
                     @if ($micros->isNotEmpty())
-                        <div class="profile-micro-chips" role="tablist" aria-label="Microrregiones asignadas">
+                        <div class="profile-micro-chips" role="tablist" aria-label="Microregiones asignadas">
                             @foreach ($micros as $micro)
                                 @php $microMunicipios = collect($micro->municipios ?? []); @endphp
                                 <button
@@ -152,14 +152,14 @@
                                                 <span>{{ $municipio }}</span>
                                             </li>
                                         @empty
-                                            <li>Sin municipios registrados para esta microrregión.</li>
+                                            <li>Sin municipios registrados para esta microregión.</li>
                                         @endforelse
                                     </ul>
                                 </section>
                             @endforeach
                         </div>
                     @else
-                        <div class="text-muted">Sin microrregiones asignadas.</div>
+                        <div class="text-muted">Sin microregiones asignadas.</div>
                     @endif
                 </article>
             </section>

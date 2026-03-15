@@ -346,7 +346,7 @@
                 <aside class="tm-analysis-sidebar">
                     <p class="tm-analysis-sidebar-title">Qué incluir</p>
                     <label class="tm-analysis-check"><input type="checkbox" id="tmAnalysisIncludeSummary" checked> Resumen (totales)</label>
-                    <label class="tm-analysis-check"><input type="checkbox" id="tmAnalysisIncludeMrTable" checked> Tabla por microrregión / municipios</label>
+                    <label class="tm-analysis-check"><input type="checkbox" id="tmAnalysisIncludeMrTable" checked> Tabla por microregión / municipios</label>
                     <hr class="tm-analysis-hr">
                     <p class="tm-analysis-sidebar-title">Tabla vacía extra</p>
                     <div class="tm-analysis-grid-inputs">
@@ -407,7 +407,7 @@
                         </div>
                         <p class="tm-analysis-sidebar-title" style="margin-top:14px;">Qué tablas incluir en el informe</p>
                         <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeSummary" checked> Resumen (totales)</label>
-                        <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeMrTable" checked> Tabla microrregión / municipios</label>
+                        <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeMrTable" checked> Tabla microregión / municipios</label>
                         <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeDynamic" checked> Tabla por registro (columnas elegidas)</label>
                         <p class="tm-analysis-sidebar-title" style="margin-top:12px;">Alineación / ancho de tablas</p>
                         <div class="tm-export-align-btns tm-word-table-align-btns" role="group" aria-label="Alineación tablas" style="flex-wrap:wrap;margin-bottom:10px;">
@@ -812,7 +812,7 @@
                 inner += '</table></div></div>';
             }
             if (data.mr_table && data.mr_headers) {
-                inner += '<p class="tm-word-prev-section">Microrregiones</p><div class="' + wrapCls + '"><div class="tm-word-table-scroll' + (stretch ? ' tm-word-table-scroll--stretch' : '') + '"><table class="tm-analysis-big-table' + (stretch ? ' tm-word-table-stretch' : ' tm-word-table-fixed') + '"><thead><tr>';
+                inner += '<p class="tm-word-prev-section">Microregiones</p><div class="' + wrapCls + '"><div class="tm-word-table-scroll' + (stretch ? ' tm-word-table-scroll--stretch' : '') + '"><table class="tm-analysis-big-table' + (stretch ? ' tm-word-table-stretch' : ' tm-word-table-fixed') + '"><thead><tr>';
                 data.mr_headers.forEach(function (h, i) {
                     inner += '<th style="' + thStyle + (stretch ? '' : 'width:' + mrColW[i] + 'px') + '">' + escapeHtml(h) + '</th>';
                 });
@@ -1699,7 +1699,7 @@
                         + '</label>'
                         + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
                         + '<input type="radio" name="tm-export-choice" value="mr" style="margin-top:.2rem;"> '
-                        + '<span><strong>Excel — 1 hoja por microrregión</strong><br><small style="color:#64748b">Una página por microrregión.</small></span>'
+                        + '<span><strong>Excel — 1 hoja por microregión</strong><br><small style="color:#64748b">Una página por microregión.</small></span>'
                         + '</label>'
                         + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.65rem;cursor:pointer;">'
                         + '<input type="radio" name="tm-export-choice" value="word" style="margin-top:.2rem;"> '

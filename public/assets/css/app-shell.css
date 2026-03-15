@@ -75,7 +75,23 @@ select {
     min-height: 100vh;
     display: grid;
     grid-template-columns: var(--sidebar-width) 1fr;
+    grid-template-rows: minmax(0, 1fr);
     transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Páginas tipo shell (UM, Agenda): sin scroll en body solo en viewport ≥ 801px */
+@media (min-width: 801px) {
+    .app-shell:has(.um-page),
+    .app-shell:has(.agenda-shell) {
+        height: 100vh;
+        max-height: 100vh;
+        overflow: hidden;
+    }
+    body:has(.app-shell .um-page),
+    body:has(.app-shell .agenda-shell) {
+        overflow: hidden;
+        height: 100vh;
+    }
 }
 
 body.sidebar-collapsed .app-shell {
@@ -483,6 +499,7 @@ body.sidebar-collapsed .sidebar-logout-btn {
 
 .app-main {
     min-width: 0;
+    min-height: 0;
     background: var(--clr-card);
     display: flex;
     flex-direction: column;
@@ -959,13 +976,14 @@ body.sidebar-collapsed .sidebar-logout-btn {
     flex: 1;
 }
 
-/* Ajustes / Inicio / Mesas de Paz / Agenda / Eventos temporales: plano continuo con el main — sin padding extra */
+/* Ajustes / Inicio / Mesas de Paz / Agenda / Eventos temporales / UM: mismo plano, padding moderado */
 .app-content:has(> .settings-shell),
 .app-content:has(> .home-shell),
 .app-content:has(> .mesas-paz-shell),
 .app-content:has(> .agenda-shell),
-.app-content:has(> .tm-shell) {
-    padding: 0;
+.app-content:has(> .tm-shell),
+.app-content:has(> .um-page) {
+    padding: 1.25rem 1.5rem;
 }
 
 .app-content > .content-card:first-child {
@@ -1154,8 +1172,9 @@ body.sidebar-collapsed .sidebar-logout-btn {
     .app-content:has(> .home-shell),
     .app-content:has(> .mesas-paz-shell),
     .app-content:has(> .agenda-shell),
-    .app-content:has(> .tm-shell) {
-        padding: 0;
+    .app-content:has(> .tm-shell),
+    .app-content:has(> .um-page) {
+        padding: 1rem 1.25rem;
     }
 
 }
@@ -1208,8 +1227,9 @@ body.sidebar-collapsed .sidebar-logout-btn {
     .app-content:has(> .home-shell),
     .app-content:has(> .mesas-paz-shell),
     .app-content:has(> .agenda-shell),
-    .app-content:has(> .tm-shell) {
-        padding: 0;
+    .app-content:has(> .tm-shell),
+    .app-content:has(> .um-page) {
+        padding: 0.75rem 1rem;
     }
 
 }

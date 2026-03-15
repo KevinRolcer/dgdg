@@ -11,8 +11,8 @@
 @endpush
 
 @section('content')
-<section class="tm-page">
-    <article class="content-card tm-card">
+<section class="tm-page um-page">
+    <article class="content-card tm-card um-card-wrap">
 
         @if (session('success'))
             <div class="inline-alert inline-alert-success" role="alert">{{ session('success') }}</div>
@@ -68,7 +68,7 @@
                     <span class="um-role-pill um-role-{{ strtolower($roleName) }}">{{ ucfirst($roleName) }}</span>
                 </div>
                 <div class="um-card-body">
-                    <div><span class="um-card-label">Microrregiones</span>
+                    <div><span class="um-card-label">Microregiones</span>
                         @php $nums = $user->microrregionesAsignadas->pluck('microrregion')->sort()->values(); @endphp
                         <span>{{ $nums->isNotEmpty() ? $nums->implode(', ') : '—' }}</span>
                     </div>
@@ -87,13 +87,13 @@
             @endforeach
         </div>
 
-        <div class="tm-table-wrap um-table-desktop">
+        <div class="um-table-scroll-wrap um-table-desktop">
             <table class="tm-table um-table">
                 <thead>
                     <tr>
                         <th>Usuario</th>
                         <th>Rol</th>
-                        <th>Microrregiones</th>
+                        <th>Microregiones</th>
                         <th>Estado</th>
                         <th>Acciones</th>
                     </tr>
@@ -174,17 +174,15 @@
             </table>
         </div>
 
-        {{-- Paginación --}}
-        @if($users->lastPage() > 1)
+        {{-- Paginación: siempre visible debajo de la tabla, sin duplicar texto --}}
         <div class="um-pagination-wrap">
             <p class="um-pagination-info">
                 Mostrando {{ $users->firstItem() }}–{{ $users->lastItem() }} de {{ $users->total() }} usuarios
             </p>
-            <div class="um-pagination">
-                {{ $users->withQueryString()->links('pagination::bootstrap-5') }}
+            <div class="um-pagination" aria-label="Paginación">
+                {{ $users->withQueryString()->links('vendor.pagination.um') }}
             </div>
         </div>
-        @endif
 
     </article>
 </section>

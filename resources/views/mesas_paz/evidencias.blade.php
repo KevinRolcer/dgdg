@@ -22,7 +22,7 @@
     <div class="mesas-paz-shell-main">
         <header class="mesas-paz-shell-head">
             <h1 class="mesas-paz-shell-title">Evidencias Mesas de Paz</h1>
-            <p class="mesas-paz-shell-desc">Consulta de evidencias y asistencias por delegado. Filtros por fecha y análisis por microrregión.</p>
+            <p class="mesas-paz-shell-desc">Consulta de evidencias y asistencias por delegado. Filtros por fecha y análisis por microregión.</p>
         </header>
 
 <div id="supervisionEvidenciasPage">
@@ -97,7 +97,7 @@
                         >
                     </div>
                     <div class="col-md-5 col-lg-4 ms-md-auto">
-                        <label for="analisis_microrregion_id" class="form-label">Microrregión</label>
+                        <label for="analisis_microrregion_id" class="form-label">Microregión</label>
                         <select id="analisis_microrregion_id" name="analisis_microrregion_id" form="supervisionFiltersForm" class="form-select">
                             <option value="">Todas</option>
                             @foreach(($microrregionesDisponibles ?? []) as $microrregion)
@@ -119,7 +119,7 @@
                 <div class="row g-2 mb-3 align-items-start">
                     <div class="col-12">
                         <div class="border rounded p-2 bg-white">
-                            <h6 class="mb-2">Asistentes por microrregión</h6>
+                            <h6 class="mb-2">Asistentes por microregión</h6>
                             @if(!empty($asistentesPorMicrorregion))
                                 @php
                                     $microrregionFiltroLabel = '';
@@ -135,7 +135,7 @@
                                 <div class="mb-2">
                                     <div class="row g-2">
                                         <div class="col-12 col-md-6">
-                                            <label for="asistentesMicroSearch" class="form-label small mb-1">Buscar microrregión</label>
+                                            <label for="asistentesMicroSearch" class="form-label small mb-1">Buscar microregión</label>
                                             <input
                                                 type="text"
                                                 id="asistentesMicroSearch"
@@ -168,7 +168,7 @@
                                         <table class="table table-sm align-middle mb-0">
                                             <thead>
                                                 <tr>
-                                                    <th class="text-nowrap">Microrregión</th>
+                                                    <th class="text-nowrap">Microregión</th>
                                                     <th class="text-nowrap">Presentes</th>
                                                     <th class="text-nowrap" title="Presidente Municipal">Pres. Mpal.</th>
                                                     <th class="text-nowrap" title="Director de Seguridad Municipal">Dir. Seg. Mpal.</th>
@@ -279,7 +279,7 @@
 
                 <div class="row g-3 mb-3 d-none">
                     <div class="col-12">
-                        <h6 class="mb-2">Representante por microrregión</h6>
+                        <h6 class="mb-2">Representante por microregión</h6>
                     </div>
                     @if(!empty($listadoRepresentante))
                         <div class="accordion" id="accordionRepresentante">
@@ -354,7 +354,7 @@
         @if(isset($evidencias) && collect($evidencias)->isNotEmpty())
             <div class="evidencias-list-header d-none d-md-flex px-3 pb-2 small border-bottom mb-2">
                 <div class="col-md-2">Delegado</div>
-                <div class="col-md-2">Microrregión</div>
+                <div class="col-md-2">Microregión</div>
                 <div class="col-md-4">Municipios con asistencia</div>
                 <div class="col-md-2" title="Parte / Acuerdos / Observaciones">Parte/Acuerdos</div>
                 <div class="col-md-2">Evidencia</div>
@@ -370,7 +370,7 @@
                         </div>
 
                         <div class="col-12 col-md-2">
-                            <small class="text-muted d-md-none d-block">Microrregión</small>
+                            <small class="text-muted d-md-none d-block">Microregión</small>
                             @if(!empty($item['microrregion_label']))
                                 <span class="text-muted" style="font-size: 0.8rem;" title="{{ $item['microrregion_label'] }}">{{ $item['microrregion_label'] }}</span>
                             @elseif(!empty($item['microrregion_id']))

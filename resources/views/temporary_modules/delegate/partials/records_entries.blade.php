@@ -59,7 +59,7 @@
         <table class="tm-table">
             <thead>
                 <tr>
-                    <th>Microrregión</th>
+                    <th>Microregión</th>
                     @foreach ($module->fields as $field)
                         <th>{{ $field->label }}</th>
                     @endforeach

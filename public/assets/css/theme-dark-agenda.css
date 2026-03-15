@@ -180,7 +180,8 @@ html.theme-dark .unfold-container {
 
 html.theme-dark .agenda-table th {
     color: var(--clr-text-light) !important;
-    background: transparent !important;
+    background: var(--clr-card) !important;
+    border-bottom-color: var(--clr-border) !important;
 }
 
 html.theme-dark .agenda-table td strong {

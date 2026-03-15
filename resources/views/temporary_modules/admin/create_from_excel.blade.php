@@ -89,13 +89,13 @@
 
                     <h4 class="tm-seed-subtitle">Mapeo de columnas</h4>
                     <label class="tm-inline-check tm-seed-check tm-seed-check--block">
-                        <input type="checkbox" id="tmSeedMrOnly"> Sin columna <strong>Municipio</strong> (solo microrregión)
+                        <input type="checkbox" id="tmSeedMrOnly"> Sin columna <strong>Municipio</strong> (solo microregión)
                     </label>
                     <div class="tm-excel-grid">
                         <label class="tm-seed-label" id="tmSeedWrapMun">Municipio <span class="tm-seed-hint">(principal)</span>
                             <select name="col_municipio" id="tmSeedColMun" class="tm-input"></select>
                         </label>
-                        <label class="tm-seed-label" id="tmSeedWrapMr">Microrregión <span class="tm-seed-hint" id="tmSeedMrHint">(opcional)</span>
+                        <label class="tm-seed-label" id="tmSeedWrapMr">Microregión <span class="tm-seed-hint" id="tmSeedMrHint">(opcional)</span>
                             <select name="col_microrregion" id="tmSeedColMr" class="tm-input"></select>
                         </label>
                     </div>

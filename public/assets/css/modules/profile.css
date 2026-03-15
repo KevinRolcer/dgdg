@@ -363,15 +363,40 @@
     background: rgba(134, 30, 52, 0.14);
 }
 
+/* Contenedor de chips: una sola fila con scroll horizontal para evitar scroll vertical de la página */
 .profile-micro-chips {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 10px;
     margin-bottom: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+}
+
+.profile-micro-chips::-webkit-scrollbar {
+    height: 6px;
+}
+
+.profile-micro-chips::-webkit-scrollbar-track {
+    background: var(--clr-bg, #f1f5f9);
+    border-radius: 3px;
+}
+
+.profile-micro-chips::-webkit-scrollbar-thumb {
+    background: var(--clr-border);
+    border-radius: 3px;
+}
+
+.profile-micro-chips::-webkit-scrollbar-thumb:hover {
+    background: var(--clr-text-light);
 }
 
 .profile-micro-chip {
     min-height: 34px;
+    flex-shrink: 0;
     border: 1px solid var(--clr-border);
     border-radius: 999px;
     background: #fff;
@@ -384,7 +409,6 @@
     align-items: center;
     gap: 6px;
     cursor: pointer;
-    max-width: 100%;
     transition: border-color 0.16s ease, color 0.16s ease, background-color 0.16s ease;
 }
 

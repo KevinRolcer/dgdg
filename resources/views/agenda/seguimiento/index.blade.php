@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                                             <label>Asunto <input type="text" name="asunto" value="{{ old('asunto', $item->asunto) }}" required class="form-control"></label>
                                                             <label>Fecha inicio <input type="date" name="fecha_inicio" value="{{ old('fecha_inicio', $item->fecha_inicio->format('Y-m-d')) }}" required class="form-control"></label>
                                                             <label>Fecha fin <input type="date" name="fecha_fin" value="{{ old('fecha_fin', optional($item->fecha_fin)->format('Y-m-d')) }}" class="form-control"></label>
-                                                            <label>Microrregión <input type="text" name="microrregion" value="{{ old('microrregion', $item->microrregion) }}" class="form-control"></label>
+                                                            <label>Microregión <input type="text" name="microrregion" value="{{ old('microrregion', $item->microrregion) }}" class="form-control"></label>
                                                             <label>Municipio <input type="text" name="municipio" value="{{ old('municipio', $item->municipio) }}" class="form-control"></label>
                                                             <label>Lugar <input type="text" name="lugar" value="{{ old('lugar', $item->lugar) }}" class="form-control"></label>
                                                             <label>Semáforo

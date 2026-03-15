@@ -36,9 +36,9 @@
                 <div id="fieldsGira" style="display: none;">
                     <div class="agenda-row-two-cols mb-3">
                         <div class="agenda-col-40">
-                            <label class="form-label-agenda">Microrregión</label>
+                            <label class="form-label-agenda">Microregión</label>
                             <select name="microrregion" id="modalMicrorregion" class="form-control-agenda">
-                                <option value="">Seleccione Microrregión</option>
+                                <option value="">Seleccione Microregión</option>
                                 @foreach($microrregiones as $micro)
                                     <option value="{{ $micro->microrregion }}"
                                             data-id="{{ $micro->id }}"

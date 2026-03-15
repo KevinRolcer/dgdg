@@ -206,7 +206,7 @@
                     <div class="tm-excel-grid">
                         <label>Fila encabezados <input type="number" id="tmExcelHeaderRow" value="1" min="1" max="500"></label>
                         <label>Primera fila datos <input type="number" id="tmExcelDataStartRow" value="2" min="2" max="50000"></label>
-                        <label>Microrregión
+                        <label>Microregión
                             <select id="tmExcelMicrorregionId">
                                 @foreach (($microrregionesAsignadas ?? collect()) as $micro)
                                     <option value="{{ $micro->id }}" @selected((int) $microrregionId === (int) $micro->id)>MR {{ $micro->microrregion }} — {{ $micro->cabecera }}</option>
