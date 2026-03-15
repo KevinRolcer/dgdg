@@ -1,3 +1,105 @@
+/* =========================================================
+   Eventos temporales — UI limpia (como Ajustes/Agenda):
+   shell sin caja exterior, cabecera + bloques con borde
+   ========================================================= */
+.tm-shell {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    background: var(--clr-bg);
+    box-shadow: none;
+}
+
+.tm-shell-main {
+    padding: 0.85rem 1.25rem 1.25rem;
+    min-width: 0;
+    background: var(--clr-bg);
+}
+
+@media (min-width: 900px) {
+    .tm-shell-main {
+        padding: 1rem 1.5rem 1.5rem;
+    }
+}
+
+.tm-shell-head {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+.tm-shell-title {
+    margin: 0 0 0.1rem;
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--clr-accent);
+}
+
+.tm-shell-desc {
+    margin: 0;
+    font-size: 0.76rem;
+    color: var(--clr-text-light);
+    line-height: 1.45;
+}
+
+.tm-shell .tm-card-in-shell {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 0 1rem;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+.tm-shell .tm-card-in-shell:last-child {
+    border-bottom: none;
+}
+
+/* Tarjetas de la grid “Subir información” sin caja extra dentro del shell */
+.tm-shell .tm-module-grid .tm-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-bottom: 1px solid var(--clr-border);
+    padding-bottom: 1rem;
+    margin-bottom: 0;
+}
+.tm-shell .tm-module-grid .tm-card:last-child {
+    border-bottom: none;
+}
+
+.tm-shell .tm-head {
+    margin-bottom: 0.75rem;
+}
+
+.tm-shell .tm-section-switch {
+    margin-bottom: 1rem;
+    background: transparent;
+    border: 1px solid var(--clr-border);
+}
+
+.tm-shell .tm-section-panel {
+    padding-top: 0;
+}
+
+.tm-shell .tm-table-wrap,
+.tm-shell .tm-table-wrap-scroll {
+    margin-top: 0;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.tm-shell .tm-pagination-wrap.tm-pagination--footer {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0;
+    padding: 0.75rem 0 0;
+    margin-top: 0.5rem;
+}
+
 .tm-page {
     display: grid;
     gap: 14px;
@@ -41,7 +143,7 @@
 
 .tm-head h2 {
     margin: 0 0 6px;
-    color: var(--clr-primary-dark);
+    color: var(--clr-accent);
     font-size: var(--tm-fs-section-title);
     line-height: 1.25;
 }
@@ -394,7 +496,7 @@
 .tm-seed-panel-title {
     margin: 0 0 4px;
     font-size: var(--fs-subtitle);
-    color: var(--clr-primary-dark);
+    color: var(--clr-accent);
     font-weight: 700;
 }
 
@@ -1913,7 +2015,7 @@ a.tm-paginator-btn:hover {
     margin: 0 0 0.35rem;
     font-size: 1rem;
     font-weight: 700;
-    color: var(--clr-primary-dark);
+    color: var(--clr-accent);
 }
 
 .tm-section-subsections {
@@ -2032,6 +2134,7 @@ a.tm-paginator-btn:hover {
 .tm-modal-body .tm-entry-field .tm-section-title {
     font-size: 0.85rem;
     font-weight: 700;
+    color: var(--clr-accent);
 }
 
 .tm-modal-body .tm-entry-grid.tm-grid-2:has(.tm-entry-field.is-media),

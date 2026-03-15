@@ -163,6 +163,25 @@
     gap: 8px;
 }
 
+.profile-ajustes-link-wrap {
+    margin: 12px 0 0;
+    padding: 0;
+}
+
+.profile-ajustes-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--clr-primary-dark, #861e34);
+    text-decoration: none;
+}
+
+.profile-ajustes-link:hover {
+    text-decoration: underline;
+}
+
 .profile-role-badge,
 .profile-phone-pill,
 .profile-region-count {

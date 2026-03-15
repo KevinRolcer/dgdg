@@ -21,10 +21,13 @@ class AgendaController extends Controller
             'per_page' => (int) $request->query('per_page', 20),
         ];
 
-        $agendas = $this->agendaService->paginateAgendas($filters);
+        $agendas = $this->agendaService->paginateAgendas($filters, $request->user());
 
         if ($request->boolean('fragment')) {
-            return response()->view('agenda.partials.list-fragment', ['agendas' => $agendas]);
+            return response()->view('agenda.partials.list-fragment', [
+                'agendas' => $agendas,
+                'puedeEditarAgenda' => $this->agendaService->puedeEditarAgendaCompleta($request->user()),
+            ]);
         }
 
         $clasificacion = in_array($filters['clasificacion'], ['', 'gira', 'pre_gira', 'agenda'], true)
@@ -40,6 +43,8 @@ class AgendaController extends Controller
             'microrregiones' => $this->agendaService->microrregionesParaFormulario(),
             'municipios' => $this->agendaService->municipiosParaFormulario(),
             'puedeAsignarModuloAgenda' => $this->agendaService->usuarioPuedeAsignarModuloAgenda($request->user()),
+            'puedeEditarAgenda' => $this->agendaService->puedeEditarAgendaCompleta($request->user()),
+            'soloAsignaciones' => $this->agendaService->usuarioVeSoloSusAsignaciones($request->user()),
             'clasificacion' => $clasificacion,
             'buscar' => $buscar,
             'fechaDia' => $fechaDia,
@@ -83,6 +88,7 @@ class AgendaController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless($this->agendaService->puedeEditarAgendaCompleta($request->user()), 403);
         $validated = $request->validate($this->reglasAgenda());
         $this->agendaService->crear($validated, $request);
 
@@ -91,6 +97,7 @@ class AgendaController extends Controller
 
     public function update(Request $request, Agenda $agenda)
     {
+        abort_unless($this->agendaService->puedeEditarAgendaCompleta($request->user()), 403);
         $validated = $request->validate($this->reglasAgenda());
         $this->agendaService->actualizar($agenda, $validated, $request);
 
@@ -99,6 +106,7 @@ class AgendaController extends Controller
 
     public function destroy(Agenda $agenda)
     {
+        abort_unless($this->agendaService->puedeEditarAgendaCompleta(auth()->user()), 403);
         $this->agendaService->eliminar($agenda);
 
         return redirect()->route('agenda.index')->with('toast', 'Entrada eliminada de la agenda');

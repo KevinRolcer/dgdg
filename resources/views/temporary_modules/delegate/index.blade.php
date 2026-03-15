@@ -4,24 +4,34 @@
 <link rel="stylesheet" href="{{ asset('assets/css/modules/temporary-modules.css') }}?v={{ @filemtime(public_path('assets/css/modules/temporary-modules.css')) ?: time() }}">
 @endpush
 
+@php
+    $hidePageHeader = true;
+@endphp
+
 @section('content')
-<section class="tm-page">
-    @if (session('status'))
-        <div class="inline-alert inline-alert-success" role="alert">{{ session('status') }}</div>
-    @endif
+<section class="tm-page tm-shell app-density-compact">
+    <div class="tm-shell-main">
+        <header class="tm-shell-head">
+            <h1 class="tm-shell-title">Eventos temporales</h1>
+            <p class="tm-shell-desc">Sube información a los módulos asignados y consulta tus registros y evidencias.</p>
+        </header>
 
-    @if ($errors->any())
-        <div class="inline-alert inline-alert-error" role="alert">{{ $errors->first() }}</div>
-    @endif
+        @if (session('status'))
+            <div class="inline-alert inline-alert-success" role="alert">{{ session('status') }}</div>
+        @endif
 
-    @php
-        $activeSection = $activeSection ?? 'upload';
-        $isUploadSection = $activeSection !== 'records';
-        $microsAsignadas = ($microrregionesAsignadas ?? collect())->values();
-        $mostrarSelectorMicrorregion = $microsAsignadas->count() > 1;
-    @endphp
+        @if ($errors->any())
+            <div class="inline-alert inline-alert-error" role="alert">{{ $errors->first() }}</div>
+        @endif
 
-    <div class="tm-section-switch" role="tablist" aria-label="Cambiar vista de captura temporal">
+        @php
+            $activeSection = $activeSection ?? 'upload';
+            $isUploadSection = $activeSection !== 'records';
+            $microsAsignadas = ($microrregionesAsignadas ?? collect())->values();
+            $mostrarSelectorMicrorregion = $microsAsignadas->count() > 1;
+        @endphp
+
+        <div class="tm-section-switch" role="tablist" aria-label="Cambiar vista de captura temporal">
         <button type="button" class="tm-section-tab {{ $isUploadSection ? 'is-active' : '' }}" data-section-tab data-section-target="tmUploadView" role="tab" aria-selected="{{ $isUploadSection ? 'true' : 'false' }}">Subir informacion</button>
         <button type="button" class="tm-section-tab {{ !$isUploadSection ? 'is-active' : '' }}" data-section-tab data-section-target="tmRecordsView" role="tab" aria-selected="{{ !$isUploadSection ? 'true' : 'false' }}">Ver mis registros</button>
     </div>
@@ -381,8 +391,8 @@
 
     <section class="tm-section-panel {{ !$isUploadSection ? 'is-active' : '' }}" id="tmRecordsView" role="tabpanel" aria-hidden="{{ !$isUploadSection ? 'false' : 'true' }}" data-records-url="{{ route('temporary-modules.records') }}" data-fragment-records-url="{{ $fragmentRecordsUrl ?? '' }}">
     @if ($modules->isNotEmpty())
-        <article class="content-card tm-card tm-records-container">
-            <h2>Mis registros</h2>
+        <article class="content-card tm-card tm-card-in-shell tm-records-container">
+            <h2 class="tm-panel-title">Mis registros</h2>
 
             <div class="tm-module-filters" role="tablist" aria-label="Filtrar por modulo temporal">
                 @foreach ($modules as $module)
@@ -441,11 +451,12 @@
             </div>
         </article>
     @else
-        <article class="content-card tm-card">
+        <article class="content-card tm-card tm-card-in-shell">
             <p>No hay modulos temporales para mostrar registros.</p>
         </article>
     @endif
     </section>
+    </div>
 
     <div class="tm-modal" id="tmImagePreviewModal" aria-hidden="true" role="dialog" aria-modal="true">
         <div class="tm-modal-backdrop" data-close-image-preview></div>

@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             SupervisorMesasPazSeeder::class,
             EnlacesSeeder::class,
             AdminTestUserSeeder::class,
+            AuditorRoleSeeder::class,
         ]);
     }
 }

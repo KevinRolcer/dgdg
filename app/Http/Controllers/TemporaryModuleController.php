@@ -18,6 +18,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -76,12 +78,19 @@ class TemporaryModuleController extends Controller
 
     public function adminRecords(): View
     {
+        // Evita 500 si en producción no corrió la migración de exported_at / seed_discard_log
+        $select = ['id', 'name', 'description', 'expires_at'];
+        if (Schema::hasColumn('temporary_modules', 'exported_at')) {
+            $select[] = 'exported_at';
+        }
+        if (Schema::hasColumn('temporary_modules', 'seed_discard_log')) {
+            $select[] = 'seed_discard_log';
+        }
+
         $modules = TemporaryModule::query()
             ->whereHas('entries')
             ->withCount(['fields', 'entries'])
-            ->select([
-                'id', 'name', 'description', 'expires_at', 'exported_at', 'seed_discard_log',
-            ])
+            ->select($select)
             ->latest()
             ->paginate(15);
 
@@ -641,7 +650,7 @@ class TemporaryModuleController extends Controller
     {
         $user = $request->user();
 
-        if ($user->can('Modulos-Temporales-Admin')) {
+        if (Gate::forUser($user)->allows('modulos-temporales-admin-ver')) {
             return $this->adminIndex();
         }
 
@@ -1408,7 +1417,7 @@ class TemporaryModuleController extends Controller
         $entryModel = TemporaryModuleEntry::query()->with('module')->findOrFail($entry);
         abort_unless((int) $entryModel->temporary_module_id === $module, 404);
 
-        if (! $request->user()->can('Modulos-Temporales-Admin')) {
+        if (! Gate::forUser($request->user())->allows('modulos-temporales-admin-ver')) {
             abort_unless($this->accessService->userCanAccessModule($entryModel->module, (int) $request->user()->id), 403);
             abort_unless(
                 $this->accessService->userCanAccessEntryByMicrorregion((int) $request->user()->id, (int) $entryModel->microrregion_id),

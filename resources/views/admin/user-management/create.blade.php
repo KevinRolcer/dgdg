@@ -2,7 +2,7 @@
 
 @php
     $pageTitle = 'Nuevo Usuario';
-    $pageDescription = 'Crea un nuevo usuario Delegado o Enlace.';
+    $pageDescription = 'Delegado/Enlace capturan; Auditor solo consulta (permisos tipo PAP).';
 @endphp
 
 @push('css')
@@ -37,7 +37,7 @@
             {{-- ===== Datos de cuenta ===== --}}
             <div class="um-section-title"><i class="fa-solid fa-user-circle"></i> Datos de cuenta</div>
 
-            <div class="tm-grid um-grid-3">
+            <div class="tm-grid um-grid-3 um-grid-create">
                 <label for="name">
                     Nombre completo <span class="um-required">*</span>
                     <input type="text" id="name" name="name" value="{{ old('name') }}" required placeholder="Ej. Juan Pérez López">
@@ -70,6 +70,7 @@
                             <option value="">Selecciona…</option>
                             <option value="Delegado" {{ old('role') === 'Delegado' ? 'selected' : '' }}>Delegado</option>
                             <option value="Enlace"   {{ old('role') === 'Enlace'   ? 'selected' : '' }}>Enlace</option>
+                            <option value="Auditor" {{ old('role') === 'Auditor' ? 'selected' : '' }}>Auditor (solo lectura)</option>
                         </select>
                     </label>
 
@@ -94,6 +95,12 @@
                         @endforeach
                     </select>
                 </label>
+            </div>
+
+            {{-- ===== Auditor: sin microrregiones ===== --}}
+            <div id="section-auditor" class="um-conditional-section" style="display:none;">
+                <div class="um-section-title"><i class="fa-solid fa-eye"></i> Auditor</div>
+                <p class="um-text-muted" style="margin:0;font-size:0.85rem;">Rol con permisos *-consulta (como en PAP: acceso por permiso, no por middleware). Sin crear/editar/exportar ni guardar en Mesas/Agenda/Módulos.</p>
             </div>
 
             {{-- ===== Enlace: varias microrregiones ===== --}}
@@ -128,19 +135,25 @@
 function onRoleChange(role) {
     const sd   = document.getElementById('section-delegado');
     const se   = document.getElementById('section-enlace');
+    const sa   = document.getElementById('section-auditor');
     const mrD  = document.getElementById('microrregion_id');
     const mrE  = document.getElementById('microrregion_ids');
+    const r = (role || '').toLowerCase();
 
-    if (role === 'Delegado' || role === 'delegado') {
-        sd.style.display = 'block'; se.style.display = 'none';
+    if (sd) sd.style.display = 'none';
+    if (se) se.style.display = 'none';
+    if (sa) sa.style.display = 'none';
+    if (mrD) mrD.required = false;
+    if (mrE) mrE.required = false;
+
+    if (r === 'delegado') {
+        if (sd) sd.style.display = 'block';
         if (mrD) mrD.required = true;
-        if (mrE) mrE.required = false;
-    } else if (role === 'Enlace' || role === 'enlace') {
-        sd.style.display = 'none'; se.style.display = 'block';
-        if (mrD) mrD.required = false;
+    } else if (r === 'enlace') {
+        if (se) se.style.display = 'block';
         if (mrE) mrE.required = true;
-    } else {
-        sd.style.display = 'none'; se.style.display = 'none';
+    } else if (r === 'auditor') {
+        if (sa) sa.style.display = 'block';
     }
 }
 document.addEventListener('DOMContentLoaded', () => {

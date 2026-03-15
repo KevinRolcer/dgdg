@@ -4,6 +4,7 @@
 
 @push('css')
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+<link href="{{ asset('assets/css/mesas_paz/mesas-paz-shell.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesas-paz-shell.css')) ?: time() }}" rel="stylesheet" />
 <link href="{{ asset('assets/css/mesas_paz/mesaPaz.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesaPaz.css')) ?: time() }}" rel="stylesheet" />
 <link href="{{ asset('assets/css/theme-dark-mesas-paz.css') }}?v={{ @filemtime(public_path('assets/css/theme-dark-mesas-paz.css')) ?: time() }}" rel="stylesheet" />
 @endpush
@@ -15,6 +16,16 @@
 @endpush
 
 @section('content')
+@php
+    $hidePageHeader = true;
+@endphp
+<div class="mesas-paz-shell app-density-compact">
+    <div class="mesas-paz-shell-main">
+        <header class="mesas-paz-shell-head">
+            <h1 class="mesas-paz-shell-title">Mesas de Paz y Seguridad</h1>
+            <p class="mesas-paz-shell-desc">Registro de asistencias por microrregión, evidencias y acuerdos de sesión.</p>
+        </header>
+
 <div
     id="mesasPazApp"
     class="row"
@@ -52,8 +63,8 @@
     @endif
 
     <div class="col-lg-7 order-1 order-lg-1">
-        <div class="panel panel-inverse inline-asistencia">
-            <div class="panel-heading">
+        <div class="mesas-paz-panel panel panel-inverse inline-asistencia">
+            <div class="mesas-paz-panel-head panel-heading">
                 @php
                     $fechaSolo = \Carbon\Carbon::parse($fechaHoyIso ?? now()->toDateString())
                         ->locale('es')
@@ -91,7 +102,7 @@
                     @endif
                 </div>
             </div>
-            <div class="panel-body">
+            <div class="mesas-paz-panel-body panel-body">
                 <div class="border rounded p-3 mb-3">
                     <label for="modalidad_global" class="form-label fw-bold mb-1">Modalidad de la sesión (obligatoria antes de registrar)</label>
                     <select id="modalidad_global" class="form-select">
@@ -257,11 +268,11 @@
     </div>
 
     <div class="col-lg-5 order-2 order-lg-2 historial-col">
-        <div class="panel panel-inverse">
-            <div class="panel-heading">
+        <div class="mesas-paz-panel panel panel-inverse">
+            <div class="mesas-paz-panel-head panel-heading">
                 <h4 class="panel-title">Historial</h4>
             </div>
-            <div class="panel-body">
+            <div class="mesas-paz-panel-body panel-body">
                 <div class="border rounded p-3 mb-3">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                         <h6 class="mb-0">Herramientas de sesión ({{ $fechaHoyIso }})</h6>
@@ -362,6 +373,8 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
     </div>
 </div>
 

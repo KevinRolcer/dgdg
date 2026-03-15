@@ -15,10 +15,13 @@ class AgendaService
 
     public const PERMISO_AGENDA_DIRECTIVA = 'Agenda-Directiva';
 
+    /** Al asignar a un evento, puede ver Agenda (solo sus filas) + Seguimiento sin dar módulo completo Agenda-Directiva */
+    public const PERMISO_AGENDA_SEGUIMIENTO = 'Agenda-Seguimiento';
+
     /**
      * @param  array{clasificacion?: string, buscar?: string, fecha?: string|null, per_page?: int, page?: int}  $filters
      */
-    public function paginateAgendas(array $filters): LengthAwarePaginator
+    public function paginateAgendas(array $filters, ?User $viewer = null): LengthAwarePaginator
     {
         $clasificacion = $filters['clasificacion'] ?? '';
         if (!in_array($clasificacion, ['', 'gira', 'pre_gira', 'agenda'], true)) {
@@ -29,6 +32,7 @@ class AgendaService
         $perPage = min(max((int) ($filters['per_page'] ?? 20), 5), 100);
 
         $query = Agenda::query()
+            ->activas()
             ->with(['creador', 'usuariosAsignados'])
             ->orderByDesc('fecha_inicio')
             ->orderByDesc('id');
@@ -60,6 +64,10 @@ class AgendaService
             } catch (\Throwable) {
                 // ignore invalid date
             }
+        }
+
+        if ($viewer && $this->usuarioVeSoloSusAsignaciones($viewer)) {
+            $query->whereHas('usuariosAsignados', fn ($q) => $q->where('users.id', $viewer->id));
         }
 
         return $query->paginate($perPage)->withQueryString();
@@ -156,6 +164,8 @@ class AgendaService
         return DB::transaction(function () use ($validated, $request) {
             $agenda = Agenda::create(array_merge($validated, [
                 'creado_por' => $request->user()->id,
+                'estado_seguimiento' => Agenda::ESTADO_ACTIVO,
+                'es_actualizacion' => false,
                 'habilitar_hora' => $request->has('habilitar_hora'),
                 'repite' => $request->has('repite'),
                 'tipo' => $request->input('tipo', 'asunto'),
@@ -166,6 +176,8 @@ class AgendaService
             if (!empty($validated['usuarios_asignados'])) {
                 $agenda->usuariosAsignados()->sync($validated['usuarios_asignados']);
             }
+            $agenda->load('usuariosAsignados');
+            $this->sincronizarPermisoSeguimientoAsignados($agenda);
 
             return $agenda;
         });
@@ -185,7 +197,42 @@ class AgendaService
                 'direcciones_adicionales' => array_values(array_filter(array_map('trim', $request->input('direcciones_adicionales', [])))),
             ]));
             $agenda->usuariosAsignados()->sync($request->input('usuarios_asignados', []));
+            $this->sincronizarPermisoSeguimientoAsignados($agenda->fresh());
         });
+    }
+
+    /**
+     * Vista completa de Agenda (todos los activos): admin TM o módulo Agenda-Directiva.
+     * Solo asignados: tiene Agenda-Seguimiento y no la vista completa.
+     */
+    public function usuarioVeSoloSusAsignaciones(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        if ($user->can('Modulos-Temporales-Admin') || $user->can(self::PERMISO_AGENDA_DIRECTIVA)) {
+            return false;
+        }
+
+        return $user->can(self::PERMISO_AGENDA_SEGUIMIENTO);
+    }
+
+    public function puedeEditarAgendaCompleta(?User $user): bool
+    {
+        return $user && ($user->can('Modulos-Temporales-Admin') || $user->can(self::PERMISO_AGENDA_DIRECTIVA));
+    }
+
+    public function sincronizarPermisoSeguimientoAsignados(?Agenda $agenda): void
+    {
+        if (!$agenda) {
+            return;
+        }
+        Permission::findOrCreate(self::PERMISO_AGENDA_SEGUIMIENTO, 'web');
+        foreach ($agenda->usuariosAsignados as $u) {
+            if (!$u->can(self::PERMISO_AGENDA_SEGUIMIENTO)) {
+                $u->givePermissionTo(self::PERMISO_AGENDA_SEGUIMIENTO);
+            }
+        }
     }
 
     public function eliminar(Agenda $agenda): void

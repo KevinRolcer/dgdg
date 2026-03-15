@@ -67,7 +67,7 @@ class MesasPazSupervisionService
         }
 
         $query = MesaPazAsistencia::query()
-            ->select(['id', 'municipio_id', 'delegado_id', 'user_id', 'microrregion_id', 'fecha_asist', 'created_at', 'presidente', 'asiste', 'delegado_asistio', 'evidencia', 'acuerdo_items', 'parte_items'])
+            ->select(['asist_id', 'municipio_id', 'delegado_id', 'user_id', 'microrregion_id', 'fecha_asist', 'created_at', 'presidente', 'asiste', 'delegado_asistio', 'evidencia', 'acuerdo_observacion', 'parte_observacion'])
             ->with([
                 'municipio:id,municipio',
                 'delegado:id,nombre,ap_paterno,ap_materno,microrregion_id',

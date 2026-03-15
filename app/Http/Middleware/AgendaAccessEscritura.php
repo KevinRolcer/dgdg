@@ -6,7 +6,11 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class AgendaAccess
+/**
+ * Igual que PAP: acceso a mutaciones de agenda solo con permisos de escritura
+ * (sin permiso solo-consulta).
+ */
+class AgendaAccessEscritura
 {
     public function handle(Request $request, Closure $next): Response
     {
@@ -14,8 +18,7 @@ class AgendaAccess
         if (!$user) {
             abort(403);
         }
-        if ($user->can('Agenda-consulta')
-            || $user->can('Modulos-Temporales-Admin')
+        if ($user->can('Modulos-Temporales-Admin')
             || $user->can('Agenda-Directiva')
             || $user->can('Agenda-Seguimiento')) {
             return $next($request);

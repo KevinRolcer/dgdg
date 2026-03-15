@@ -5,20 +5,30 @@
 <link rel="stylesheet" href="{{ asset('assets/css/tm-analysis-word.css') }}?v={{ @filemtime(public_path('assets/css/tm-analysis-word.css')) ?: time() }}">
 @endpush
 
+@php
+    $hidePageHeader = true;
+@endphp
+
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 @endpush
 
 @section('content')
-<section class="tm-page">
-    @if (session('status'))
-        <div class="inline-alert inline-alert-success" role="alert">{{ session('status') }}</div>
-    @endif
+<section class="tm-page tm-shell app-density-compact">
+    <div class="tm-shell-main">
+        <header class="tm-shell-head">
+            <h1 class="tm-shell-title">Registros de eventos temporales</h1>
+            <p class="tm-shell-desc">Visualiza módulos con registros capturados, exportación a Excel y análisis en Word.</p>
+        </header>
 
-    <article class="content-card tm-card">
+        @if (session('status'))
+            <div class="inline-alert inline-alert-success" role="alert">{{ session('status') }}</div>
+        @endif
+
+        <article class="content-card tm-card tm-card-in-shell">
         <div class="tm-head">
             <div>
-                <p>Visualiza módulos con registros capturados, vista previa y exportación a Excel.</p>
+                <p class="tm-head-desc-only">Filtra por módulo y exporta datos o análisis.</p>
             </div>
             <div class="tm-inline-actions">
                 <a href="{{ route('temporary-modules.admin.index') }}" class="tm-btn">Gestión de módulos</a>
@@ -118,7 +128,8 @@
                 {{ $modules->withQueryString()->links('vendor.pagination.tm') }}
             </div>
         @endif
-    </article>
+        </article>
+    </div>
 
     @foreach ($modules as $module)
         <div class="tm-modal" id="admin-preview-{{ $module->id }}" aria-hidden="true" role="dialog" aria-modal="true">

@@ -1,50 +1,3 @@
-@extends('layouts.app')
-
-@push('css')
-<link rel="stylesheet" href="{{ asset('assets/css/modules/settings.css') }}?v={{ @filemtime(public_path('assets/css/modules/settings.css')) ?: time() }}">
-@endpush
-
-@section('content')
-<article class="content-card settings-card">
-    <header class="settings-card-head">
-        <h2 class="settings-card-title">Apariencia</h2>
-        <p class="settings-card-desc">El modo oscuro se aplica en todo el sistema y se recuerda aunque cierres sesión o entres desde otra pestaña en este mismo navegador.</p>
-    </header>
-
-    <div class="settings-row">
-        <div class="settings-row-text">
-            <strong>Modo oscuro</strong>
-            <span>Reduce el brillo.</span>
-        </div>
-        <label class="settings-toggle">
-            <input type="checkbox" id="settingsThemeDark" name="theme_dark" value="1" aria-describedby="settingsThemeHint">
-            <span class="settings-toggle-track" aria-hidden="true"></span>
-        </label>
-    </div>
-
-    <div class="settings-dark-variants" id="settingsDarkVariants" hidden>
-        <p class="settings-dark-variants-label" id="settingsVariantsLabel">Gama del modo oscuro</p>
-        <div class="settings-variant-row" role="radiogroup" aria-labelledby="settingsVariantsLabel">
-            <button type="button" class="settings-variant-btn" data-variant="deep" title="Profundo — casi negro" aria-pressed="false">
-                <span class="settings-variant-swatch settings-variant-swatch--deep" aria-hidden="true"></span>
-                <span class="settings-variant-name">Profundo</span>
-            </button>
-            <button type="button" class="settings-variant-btn" data-variant="soft" title="Gris tenue — más suave" aria-pressed="false">
-                <span class="settings-variant-swatch settings-variant-swatch--soft" aria-hidden="true"></span>
-                <span class="settings-variant-name">Gris tenue</span>
-            </button>
-            <button type="button" class="settings-variant-btn" data-variant="slate" title="Pizarra — tono azulado" aria-pressed="false">
-                <span class="settings-variant-swatch settings-variant-swatch--slate" aria-hidden="true"></span>
-                <span class="settings-variant-name">Pizarra</span>
-            </button>
-        </div>
-    </div>
-
-    <p class="settings-hint" id="settingsThemeHint">La preferencia se guarda solo en este dispositivo y navegador.</p>
-</article>
-@endsection
-
-@push('scripts')
 <script>
 (function () {
     var KEY_THEME = 'segob_theme';
@@ -117,4 +70,3 @@
     });
 })();
 </script>
-@endpush

@@ -13,10 +13,11 @@ html.theme-dark.theme-dark--deep {
     --clr-text-light: #9aa3b2;
     --clr-border: rgba(255, 255, 255, 0.08);
     --shadow-soft: 0 8px 28px rgba(0, 0, 0, 0.45);
+    /* Misma identidad que app-shell (:root) — botones y marca */
     --clr-accent: #c79b66;
-    --clr-primary-dark: #c75a70;
-    --clr-primary: #d47288;
-    --clr-secondary: #5a9d91;
+    --clr-primary-dark: #5f1b2d;
+    --clr-primary: #861e34;
+    --clr-secondary: #246257;
     --tm-input-bg: #1e222c;
     color-scheme: dark;
 }
@@ -48,6 +49,45 @@ html.theme-dark.theme-dark--slate {
 html.theme-dark body {
     background: var(--clr-bg);
     color: var(--clr-text-main);
+}
+
+/* Botones: misma plantilla que :root (primary / secondary) en todo el oscuro */
+html.theme-dark .btn-primary {
+    background-color: var(--clr-primary) !important;
+    border-color: var(--clr-primary) !important;
+    color: #fff !important;
+}
+
+html.theme-dark .btn-primary:hover,
+html.theme-dark .btn-primary:focus {
+    background-color: var(--clr-primary-dark) !important;
+    border-color: var(--clr-primary-dark) !important;
+    color: #fff !important;
+}
+
+html.theme-dark .btn-success {
+    background-color: var(--clr-secondary) !important;
+    border-color: var(--clr-secondary) !important;
+    color: #fff !important;
+}
+
+html.theme-dark .btn-success:hover,
+html.theme-dark .btn-success:focus {
+    background-color: #1a5049 !important;
+    border-color: #1a5049 !important;
+    color: #fff !important;
+}
+
+html.theme-dark .btn-outline-primary {
+    color: var(--clr-primary) !important;
+    border-color: var(--clr-primary) !important;
+    background: transparent !important;
+}
+
+html.theme-dark .btn-outline-primary:hover {
+    background: var(--clr-primary) !important;
+    border-color: var(--clr-primary) !important;
+    color: #fff !important;
 }
 
 /* Superficies que en claro usan #fff fijo */
@@ -253,4 +293,66 @@ html.theme-dark body.sidebar-collapsed .sidebar-logo-dark {
 html.theme-dark body.sidebar-collapsed .sidebar-logo-collapsed-dark {
     display: block !important;
     opacity: 1 !important;
+}
+
+/* ---------- Calendario Inicio: colores por tema oscuro ---------- */
+/* Profundo (deep): celdas sin caja, fondo solo en hover/hoy */
+html.theme-dark .home-shell-aside,
+html.theme-dark.theme-dark--deep .home-shell-aside {
+    --cal-cell-bg: transparent;
+    --cal-cell-hover-bg: rgba(255, 255, 255, 0.06);
+    --cal-cell-border: transparent;
+    --cal-cell-hover-border: rgba(255, 255, 255, 0.08);
+    --cal-cell-text: #c8cdd6;
+    --cal-today-bg: rgba(199, 155, 102, 0.2);
+    --cal-today-border: rgba(199, 155, 102, 0.45);
+    --cal-today-text: #f0e6d8;
+    --cal-month-text: #e8c99b;
+    --cal-weekday-text: #8e96a4;
+    --cal-nav-btn-bg: rgba(255, 255, 255, 0.05);
+    --cal-nav-btn-border: rgba(255, 255, 255, 0.1);
+    --cal-nav-btn-color: #e8e9ed;
+    --cal-dot-future: #d4a574;
+    --cal-dot-today: #3d9b8e;
+    --cal-dot-past: #a84d62;
+}
+
+/* Gris tenue (soft): celdas sin caja, hover sutil */
+html.theme-dark.theme-dark--soft .home-shell-aside {
+    --cal-cell-bg: transparent;
+    --cal-cell-hover-bg: rgba(255, 255, 255, 0.1);
+    --cal-cell-border: transparent;
+    --cal-cell-hover-border: rgba(255, 255, 255, 0.14);
+    --cal-cell-text: #e8eaef;
+    --cal-today-bg: rgba(199, 155, 102, 0.28);
+    --cal-today-border: rgba(199, 155, 102, 0.5);
+    --cal-today-text: #fffbf5;
+    --cal-month-text: #e8c99b;
+    --cal-weekday-text: #a8aeb8;
+    --cal-nav-btn-bg: rgba(255, 255, 255, 0.08);
+    --cal-nav-btn-border: rgba(255, 255, 255, 0.14);
+    --cal-nav-btn-color: #f0f1f4;
+    --cal-dot-future: #d4a574;
+    --cal-dot-today: #3d9b8e;
+    --cal-dot-past: #a84d62;
+}
+
+/* Pizarra (slate): celdas sin caja, hover azulado */
+html.theme-dark.theme-dark--slate .home-shell-aside {
+    --cal-cell-bg: transparent;
+    --cal-cell-hover-bg: rgba(130, 160, 200, 0.08);
+    --cal-cell-border: transparent;
+    --cal-cell-hover-border: rgba(130, 160, 200, 0.15);
+    --cal-cell-text: #d0d8e4;
+    --cal-today-bg: rgba(199, 155, 102, 0.22);
+    --cal-today-border: rgba(199, 155, 102, 0.48);
+    --cal-today-text: #f2ebdf;
+    --cal-month-text: #e8c99b;
+    --cal-weekday-text: #7d8ba3;
+    --cal-nav-btn-bg: rgba(255, 255, 255, 0.05);
+    --cal-nav-btn-border: rgba(130, 160, 200, 0.2);
+    --cal-nav-btn-color: #e6eaf0;
+    --cal-dot-future: #d4a574;
+    --cal-dot-today: #3d9b8e;
+    --cal-dot-past: #a84d62;
 }

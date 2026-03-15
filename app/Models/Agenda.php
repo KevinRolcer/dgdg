@@ -7,9 +7,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
 
 class Agenda extends Model
 {
+    public const ESTADO_ACTIVO = 'activo';
+
+    public const ESTADO_CONCLUIDO = 'concluido';
+
     use HasFactory;
 
     protected $fillable = [
@@ -31,6 +37,9 @@ class Agenda extends Model
         'recordatorio_minutos',
         'direcciones_adicionales',
         'creado_por',
+        'parent_id',
+        'estado_seguimiento',
+        'es_actualizacion',
     ];
 
     protected $casts = [
@@ -41,7 +50,30 @@ class Agenda extends Model
         'dias_repeticion' => 'array',
         'recordatorio_minutos' => 'integer',
         'direcciones_adicionales' => 'array',
+        'es_actualizacion' => 'boolean',
     ];
+
+    public function scopeActivas($query)
+    {
+        if (!Schema::hasColumn((new static)->getTable(), 'estado_seguimiento')) {
+            return $query;
+        }
+
+        return $query->where(function ($q) {
+            $q->where('estado_seguimiento', self::ESTADO_ACTIVO)
+                ->orWhereNull('estado_seguimiento');
+        });
+    }
+
+    public function padre(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function hijos(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
 
 
     /**

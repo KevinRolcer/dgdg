@@ -1,0 +1,211 @@
+/* Seguimiento de Agenda — lista compacta y filtros como Agenda Directiva */
+
+.agenda-seg-page { max-width: 100%; }
+
+.agenda-shell .agenda-seg-empty {
+    padding: 1rem 0;
+    color: var(--clr-text-light);
+    margin: 0;
+    font-size: var(--fs-body);
+}
+
+/* Tabla compacta */
+.agenda-seg-table-wrap {
+    overflow-x: auto;
+    margin-top: 0;
+}
+
+.agenda-seg-table th,
+.agenda-seg-table td {
+    padding: 0.5rem 0.6rem;
+    vertical-align: middle;
+    font-size: var(--fs-small, 0.8125rem);
+}
+
+.agenda-seg-table th {
+    font-weight: 600;
+    color: var(--clr-text-light);
+    border-bottom: 1px solid var(--clr-border);
+    white-space: nowrap;
+}
+
+.agenda-seg-table td strong {
+    display: block;
+    font-size: var(--fs-body, 0.875rem);
+    margin-bottom: 2px;
+}
+
+.agenda-seg-table td small {
+    display: block;
+    font-size: var(--fs-caption, 0.75rem);
+    color: var(--clr-text-light);
+    line-height: 1.3;
+}
+
+/* Badges en celda */
+.agenda-seg-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 999px;
+    margin-right: 4px;
+    text-transform: uppercase;
+}
+
+.agenda-seg-badge--act {
+    background: rgba(199, 155, 102, 0.25);
+    color: var(--clr-accent);
+    border: 1px solid rgba(199, 155, 102, 0.5);
+}
+
+.agenda-seg-badge--gira {
+    background: rgba(134, 30, 52, 0.12);
+    color: var(--clr-primary-dark);
+}
+
+.agenda-seg-badge--asunto {
+    background: rgba(36, 98, 87, 0.15);
+    color: var(--clr-secondary);
+}
+
+html.theme-dark .agenda-seg-badge--gira { color: var(--clr-accent); }
+
+/* Celda de acciones */
+.agenda-seg-actions-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.agenda-seg-actions-cell .agenda-btn-sm {
+    min-height: 28px;
+    padding: 4px 10px;
+    font-size: var(--fs-caption, 0.75rem);
+}
+
+.agenda-seg-text-muted {
+    font-size: var(--fs-caption);
+    color: var(--clr-text-light);
+}
+
+/* Fila de detalle (formulario expandido) */
+.agenda-seg-detail-row td {
+    padding: 0.75rem 0.6rem;
+    background: rgba(72, 71, 71, 0.03);
+    border-bottom: 1px solid var(--clr-border);
+    vertical-align: top;
+}
+
+html.theme-dark .agenda-seg-detail-row td {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* Formulario dentro del detalle — colapsado por defecto */
+.agenda-seg-actions { margin-top: 0; padding-top: 0; border-top: none; }
+.agenda-seg-actions h3 { font-size: 0.9rem; margin: 0 0 0.35rem; }
+.agenda-seg-hint { font-size: 0.78rem; color: var(--clr-text-light); margin: 0 0 0.5rem; }
+
+.agenda-seg-actions-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin: 0 0 0.5rem;
+    padding: 0.4rem 0;
+    border: 0;
+    background: transparent;
+    color: var(--clr-primary-dark);
+    font-family: inherit;
+    font-size: var(--fs-small, 0.8125rem);
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    gap: 0.5rem;
+}
+
+.agenda-seg-actions-toggle:hover { color: var(--clr-primary); }
+.agenda-seg-actions-chevron {
+    font-size: 0.7rem;
+    transition: transform 0.2s ease;
+    color: var(--clr-text-light);
+}
+.agenda-seg-actions-wrap.is-open .agenda-seg-actions-chevron { transform: rotate(180deg); }
+
+.agenda-seg-actions-body {
+    display: none;
+    padding-top: 0.5rem;
+}
+.agenda-seg-actions-wrap.is-open .agenda-seg-actions-body {
+    display: block;
+}
+
+.agenda-seg-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.agenda-seg-full { grid-column: 1 / -1; }
+.agenda-seg-form .form-control {
+    width: 100%;
+    min-height: 34px;
+    border-radius: var(--ui-radius, 6px);
+    border: 1px solid var(--clr-border);
+    padding: 5px 8px;
+    font-size: var(--fs-small);
+    font: inherit;
+}
+.agenda-seg-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: var(--fs-caption);
+    font-weight: 600;
+}
+
+html.theme-dark .agenda-seg-form .form-control {
+    background: var(--tm-input-bg, #1e242e);
+    color: var(--clr-text-main);
+    border-color: var(--clr-border);
+}
+
+/* Paginación */
+.agenda-seg-table-wrap + .agenda-pagination-wrap {
+    margin-top: 0.75rem;
+}
+
+/* Admin: vista por usuario */
+.agenda-seg-admin-user {
+    margin-bottom: 1.5rem;
+}
+.agenda-seg-admin-user:last-child {
+    margin-bottom: 0;
+}
+.agenda-seg-admin-user-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+    color: var(--clr-accent);
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+.agenda-seg-admin-user-name {
+    font-weight: 700;
+}
+.agenda-seg-admin-user-count {
+    font-size: var(--fs-caption, 0.75rem);
+    font-weight: 500;
+    color: var(--clr-text-light);
+}
+.agenda-seg-seguimiento-text {
+    font-size: var(--fs-caption, 0.75rem);
+    color: var(--clr-text-main);
+    line-height: 1.35;
+    white-space: pre-wrap;
+    max-width: 28rem;
+    display: block;
+}

@@ -4,16 +4,26 @@
 <link rel="stylesheet" href="{{ asset('assets/css/modules/temporary-modules.css') }}?v={{ @filemtime(public_path('assets/css/modules/temporary-modules.css')) ?: time() }}">
 @endpush
 
+@php
+    $hidePageHeader = true;
+@endphp
+
 @section('content')
-<section class="tm-page">
-    <article class="content-card tm-card">
+<section class="tm-page tm-shell app-density-compact">
+    <div class="tm-shell-main">
+        <header class="tm-shell-head">
+            <h1 class="tm-shell-title">Eventos temporales</h1>
+            <p class="tm-shell-desc">Administración de módulos: crear, editar, vigencia y exportación de registros.</p>
+        </header>
+
+        <article class="content-card tm-card tm-card-in-shell">
         @if (session('status'))
             <div class="inline-alert inline-alert-success" role="alert">{{ session('status') }}</div>
         @endif
 
         <div class="tm-head">
             <div>
-                <p>Gestiona módulos creados: editar, eliminar y ajustar vigencia/alcance.</p>
+                <p class="tm-head-desc-only">Gestiona módulos creados: editar, eliminar y ajustar vigencia/alcance.</p>
             </div>
             <div class="tm-inline-actions">
                 <a href="{{ route('temporary-modules.admin.records') }}" class="tm-btn">Ver registros</a>
@@ -76,7 +86,8 @@
                 </tbody>
             </table>
         </div>
-    </article>
+        </article>
+    </div>
 </section>
 @endsection
 

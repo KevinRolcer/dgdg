@@ -31,6 +31,13 @@
         if (isset($item['hidden_if_can']) && $user->can($item['hidden_if_can'])) {
             return false;
         }
+        if (isset($item['hidden_if_any_can']) && is_array($item['hidden_if_any_can'])) {
+            foreach ($item['hidden_if_any_can'] as $p) {
+                if ($user->can($p)) {
+                    return false;
+                }
+            }
+        }
 
         $userEmail = mb_strtolower(trim((string) ($user->email ?? '')));
         if (!empty($item['hidden_for_emails']) && is_array($item['hidden_for_emails'])) {

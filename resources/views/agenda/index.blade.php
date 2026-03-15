@@ -11,27 +11,37 @@
 @endphp
 
 @section('content')
-<section class="agenda-page">
-    <article class="agenda-card">
-        <div class="agenda-head">
-            <div>
-                <h2 class="agenda-head-title">Agenda Directiva</h2>
-                <p class="agenda-head-desc">Gestiona asuntos, giras y pre-giras; asigna usuarios y envía invitaciones a calendario.</p>
-            </div>
-            <div class="agenda-head-actions">
+<section class="agenda-page agenda-shell app-density-compact">
+    <div class="agenda-shell-main">
+        <header class="agenda-shell-head">
+            <h1 class="agenda-shell-title">Agenda Directiva</h1>
+            <p class="agenda-shell-desc">
+                @if(!empty($soloAsignaciones))
+                    Solo ves los eventos asignados a ti (actualizaciones incluidas). Para pasar pre-gira a gira o registrar actualizaciones usa Seguimiento de Agenda.
+                @else
+                    Gestiona asuntos, giras y pre-giras; asigna usuarios y envía invitaciones a calendario.
+                @endif
+            </p>
+        </header>
+
+        <article class="agenda-card agenda-card-in-shell">
+            <div class="agenda-head agenda-head-actions-only">
+                <div class="agenda-head-actions">
                 @if(!empty($puedeAsignarModuloAgenda))
                 <button type="button" class="agenda-btn agenda-btn-secondary" onclick="openAgendaModuloModal()" title="Dar acceso a Agenda Directiva a Enlaces">
                     <i class="fa-solid fa-user-check"></i> Asignar módulo
                 </button>
                 @endif
+                @if(!empty($puedeEditarAgenda))
                 <button type="button" class="agenda-btn agenda-btn-secondary" onclick="openAgendaModal(null, 'gira')" title="Agregar Gira o Pre-Gira">
                     <i class="fa-solid fa-map-location-dot"></i> Gira/Pre-Gira
                 </button>
                 <button type="button" class="agenda-btn agenda-btn-primary" onclick="openAgendaModal(null, 'asunto')" title="Agregar nuevo asunto">
                     <i class="fa-solid fa-plus"></i> Nuevo Asunto
                 </button>
+                @endif
+                </div>
             </div>
-        </div>
 
         @php
             $agendaFiltrosAvanzadosAbiertos = trim((string)($buscar ?? '')) !== ''
@@ -90,7 +100,8 @@
             <div class="agenda-ajax-loading" id="agendaAjaxLoading" hidden aria-hidden="true">Actualizando…</div>
             @include('agenda.partials.list-fragment')
         </div>
-    </article>
+        </article>
+    </div>
 </section>
 @endsection
 

@@ -71,6 +71,7 @@
                         <select id="role" name="role" required onchange="onRoleChange(this.value)">
                             <option value="Delegado" {{ $userRole === 'delegado' ? 'selected' : '' }}>Delegado</option>
                             <option value="Enlace"   {{ $userRole === 'enlace'   ? 'selected' : '' }}>Enlace</option>
+                            <option value="Auditor" {{ $userRole === 'auditor' ? 'selected' : '' }}>Auditor (solo lectura)</option>
                         </select>
                     </label>
 
@@ -94,6 +95,11 @@
                         @endforeach
                     </select>
                 </label>
+            </div>
+
+            <div id="section-auditor" class="um-conditional-section" style="display:none;">
+                <div class="um-section-title"><i class="fa-solid fa-eye"></i> Auditor</div>
+                <p class="um-text-muted" style="margin:0;font-size:0.85rem;">Solo lectura en todos los módulos visibles.</p>
             </div>
 
             {{-- ===== Enlace: varias microrregiones ===== --}}
@@ -127,22 +133,20 @@
 @push('scripts')
 <script>
 function onRoleChange(role) {
-    const sd   = document.getElementById('section-delegado');
-    const se   = document.getElementById('section-enlace');
-    const mrD  = document.getElementById('microrregion_id');
-    const mrE  = document.getElementById('microrregion_ids');
-
-    if (role === 'Delegado' || role === 'delegado') {
-        sd.style.display = 'block'; se.style.display = 'none';
-        if (mrD) mrD.required = true;
-        if (mrE) mrE.required = false;
-    } else if (role === 'Enlace' || role === 'enlace') {
-        sd.style.display = 'none'; se.style.display = 'block';
-        if (mrD) mrD.required = false;
-        if (mrE) mrE.required = true;
-    } else {
-        sd.style.display = 'none'; se.style.display = 'none';
-    }
+    const sd = document.getElementById('section-delegado');
+    const se = document.getElementById('section-enlace');
+    const sa = document.getElementById('section-auditor');
+    const mrD = document.getElementById('microrregion_id');
+    const mrE = document.getElementById('microrregion_ids');
+    const r = (role || '').toLowerCase();
+    if (sd) sd.style.display = 'none';
+    if (se) se.style.display = 'none';
+    if (sa) sa.style.display = 'none';
+    if (mrD) mrD.required = false;
+    if (mrE) mrE.required = false;
+    if (r === 'delegado') { if (sd) sd.style.display = 'block'; if (mrD) mrD.required = true; }
+    else if (r === 'enlace') { if (se) se.style.display = 'block'; if (mrE) mrE.required = true; }
+    else if (r === 'auditor') { if (sa) sa.style.display = 'block'; }
 }
 document.addEventListener('DOMContentLoaded', () => {
     onRoleChange(document.getElementById('role').value);

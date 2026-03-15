@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Pagination\Paginator;
+use Spatie\Permission\Models\Permission;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,6 +27,58 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        /* Evita "There is no permission named …" si aún no corrió la migración de consulta */
+        foreach ([
+            'Mesas-Paz-consulta',
+            'Modulos-Temporales-Admin-consulta',
+            'Modulos-Temporales-consulta',
+            'Agenda-consulta',
+        ] as $permName) {
+            Permission::findOrCreate($permName, 'web');
+        }
+
+        Gate::define('mesas-paz-ver', function ($user) {
+            if (!$user) {
+                return false;
+            }
+            if (Gate::forUser($user)->allows('Mesas-Paz')) {
+                return true;
+            }
+            try {
+                return $user->hasPermissionTo('Mesas-Paz-consulta');
+            } catch (\Throwable) {
+                return false;
+            }
+        });
+
+        Gate::define('modulos-temporales-admin-ver', function ($user) {
+            if (!$user) {
+                return false;
+            }
+            if ($user->can('Modulos-Temporales-Admin')) {
+                return true;
+            }
+            try {
+                return $user->hasPermissionTo('Modulos-Temporales-Admin-consulta');
+            } catch (\Throwable) {
+                return false;
+            }
+        });
+
+        Gate::define('modulos-temporales-ver', function ($user) {
+            if (!$user) {
+                return false;
+            }
+            if ($user->can('Modulos-Temporales')) {
+                return true;
+            }
+            try {
+                return $user->hasPermissionTo('Modulos-Temporales-consulta');
+            } catch (\Throwable) {
+                return false;
+            }
+        });
+
         Gate::define('Mesas-Paz', function ($user) {
             if (!$user) {
                 return false;

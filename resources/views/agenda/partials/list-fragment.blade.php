@@ -27,6 +27,9 @@
                             @if($semaforoClass)
                                 <span class="status-dot {{ $semaforoClass }}" title="Semáforo: {{ ucfirst($item->semaforo) }}"></span>
                             @endif
+                            @if (!empty($item->es_actualizacion))
+                                <span class="agenda-pill-actualizacion" title="Seguimiento">Actualización</span>
+                            @endif
                             <strong>{{ $item->asunto }}</strong>
                             @if($item->descripcion)
                                 <small>{{ Str::limit($item->descripcionConAforoPersonas(), 72) }}</small>
@@ -66,6 +69,8 @@
                             </span>
                         </td>
                         <td>
+                            <div class="agenda-actions-cell">
+                            @if (!empty($puedeEditarAgenda))
                             <button type="button" class="agenda-btn agenda-btn-table"
                                     onclick="openAgendaModal({{ $item->id }})"
                                     data-id="{{ $item->id }}"
@@ -95,9 +100,11 @@
                                     Eliminar
                                 </button>
                             </form>
+                            @endif
                             <a href="{{ $item->getGoogleCalendarUrl() }}" target="_blank" class="agenda-btn agenda-btn-table agenda-btn-icon" title="Google Calendar">
                                 <i class="fa-brands fa-google"></i>
                             </a>
+                            </div>
                         </td>
                     </tr>
                 @empty

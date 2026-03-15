@@ -289,10 +289,48 @@ html.theme-dark .swal2-styled:focus {
 }
 
 html.theme-dark #supervisionEvidenciasPage .supervision-table-row {
-    background: var(--clr-card);
+    background: var(--clr-bg);
     border-color: var(--clr-border);
 }
 
 html.theme-dark #supervisionEvidenciasPage .supervision-table-row:hover {
-    background: rgba(199, 155, 102, 0.1);
+    background: rgba(199, 155, 102, 0.08);
+}
+
+/* Botón Limpiar y btn-default: visibles en modo oscuro */
+html.theme-dark #supervisionEvidenciasPage .btn-default {
+    background: rgba(255, 255, 255, 0.06) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark #supervisionEvidenciasPage .btn-default:hover:not(:disabled) {
+    background: rgba(199, 155, 102, 0.12) !important;
+    border-color: rgba(199, 155, 102, 0.4) !important;
+    color: var(--clr-text-main) !important;
+}
+
+/* Encabezados lista evidencias */
+html.theme-dark #supervisionEvidenciasPage .evidencias-list-header {
+    color: var(--clr-text-main);
+}
+
+/* Parte/Sin evidencia: legible en oscuro */
+html.theme-dark #supervisionEvidenciasPage .badge-supervision-soft {
+    color: var(--clr-text-light) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: var(--clr-border) !important;
+}
+
+/* Badge municipios presentes en oscuro */
+html.theme-dark #supervisionEvidenciasPage .badge-evidencia-presente {
+    background-color: var(--clr-secondary) !important;
+    color: #fff !important;
+}
+
+/* No presentes: badge warning legible */
+html.theme-dark #supervisionEvidenciasPage .badge.bg-warning.text-dark {
+    color: #1a1a1a !important;
+    background: rgba(199, 155, 102, 0.35) !important;
+    border: 1px solid rgba(199, 155, 102, 0.5);
 }

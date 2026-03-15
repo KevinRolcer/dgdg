@@ -29,6 +29,7 @@
                     <button type="submit" name="role" value="" class="tm-section-tab {{ !$role ? 'is-active' : '' }}">Todos</button>
                     <button type="submit" name="role" value="Delegado" class="tm-section-tab {{ strtolower($role ?? '') === 'delegado' ? 'is-active' : '' }}">Delegados</button>
                     <button type="submit" name="role" value="Enlace"   class="tm-section-tab {{ strtolower($role ?? '') === 'enlace'   ? 'is-active' : '' }}">Enlaces</button>
+                    <button type="submit" name="role" value="Auditor" class="tm-section-tab {{ strtolower($role ?? '') === 'auditor' ? 'is-active' : '' }}">Auditores</button>
                 </div>
             </form>
 
@@ -54,7 +55,39 @@
             </div>
         </div>
 
-        <div class="tm-table-wrap">
+        <div class="um-cards" aria-hidden="false">
+            @foreach($users as $user)
+            @php $roleName = $user->roles->first()?->name ?? '—'; @endphp
+            <article class="um-card">
+                <div class="um-card-head">
+                    <span class="um-user-avatar">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
+                    <div>
+                        <strong class="um-card-name">{{ $user->name }}</strong>
+                        <span class="um-text-muted um-card-email">{{ $user->email }}</span>
+                    </div>
+                    <span class="um-role-pill um-role-{{ strtolower($roleName) }}">{{ ucfirst($roleName) }}</span>
+                </div>
+                <div class="um-card-body">
+                    <div><span class="um-card-label">Microrregiones</span>
+                        @php $nums = $user->microrregionesAsignadas->pluck('microrregion')->sort()->values(); @endphp
+                        <span>{{ $nums->isNotEmpty() ? $nums->implode(', ') : '—' }}</span>
+                    </div>
+                    <div><span class="um-card-label">Estado</span>
+                        @if($user->activo ?? true)<span class="tm-badge is-active">Activo</span>@else<span class="tm-badge is-inactive">Inactivo</span>@endif
+                    </div>
+                </div>
+                <div class="um-card-actions">
+                    <a href="{{ route('admin.usuarios.edit', $user->id) }}" class="tm-btn um-btn-edit"><i class="fa-solid fa-pen-to-square"></i> Editar</a>
+                    <form action="{{ route('admin.usuarios.destroy', $user->id) }}" method="POST" class="tm-inline-form" data-confirm-delete data-user-name="{{ $user->name }}">@csrf @method('DELETE')<button type="submit" class="tm-btn um-btn-delete"><i class="fa-solid fa-trash"></i></button></form>
+                    <form action="{{ route('admin.usuarios.toggle-status', $user->id) }}" method="POST" class="tm-inline-form">@csrf
+                        @if($user->activo ?? true)<button type="submit" class="tm-btn um-btn-status-off">Desactivar</button>@else<button type="submit" class="tm-btn um-btn-status-on">Activar</button>@endif
+                    </form>
+                </div>
+            </article>
+            @endforeach
+        </div>
+
+        <div class="tm-table-wrap um-table-desktop">
             <table class="tm-table um-table">
                 <thead>
                     <tr>
@@ -152,6 +185,7 @@
             </div>
         </div>
         @endif
+
     </article>
 </section>
 @endsection

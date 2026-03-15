@@ -9,7 +9,7 @@
     gap: 8px;
     font-size: 0.88rem;
     font-weight: 700;
-    color: var(--clr-primary-dark);
+    color: var(--clr-accent);
     padding-bottom: 6px;
     border-bottom: 1px solid var(--clr-border);
     margin-bottom: 4px;
@@ -59,6 +59,14 @@
 
 @media (max-width: 768px) {
     .um-grid-3 { grid-template-columns: 1fr; }
+    .um-grid-create .tm-actions {
+        flex-direction: column;
+    }
+    .um-grid-create .tm-actions .tm-btn {
+        width: 100%;
+        min-height: 48px;
+        justify-content: center;
+    }
 }
 
 /* ---- Fila inline: rol + checkbox activo ---- */
@@ -218,6 +226,105 @@
     color: #a07838;
 }
 
+.um-role-pill.um-role-auditor {
+    background: rgba(70, 100, 140, 0.12);
+    border-color: rgba(70, 100, 140, 0.35);
+    color: #3d5a80;
+}
+
+/* ——— Vista móvil: tarjetas ——— */
+.um-cards {
+    display: none;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.um-card {
+    border: 1px solid var(--clr-border);
+    border-radius: 12px;
+    padding: 14px;
+    background: #fff;
+}
+
+.um-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+.um-card-name {
+    display: block;
+    font-size: 0.9rem;
+    line-height: 1.25;
+}
+
+.um-card-email {
+    display: block;
+    font-size: 0.75rem;
+    margin-top: 2px;
+    word-break: break-all;
+}
+
+.um-card-body {
+    display: grid;
+    gap: 8px;
+    font-size: 0.8rem;
+    margin-bottom: 12px;
+}
+
+.um-card-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--clr-text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-bottom: 2px;
+}
+
+.um-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.um-card-actions .tm-btn {
+    min-height: 44px;
+    padding: 0 14px;
+    font-size: 0.82rem;
+}
+
+.um-card-actions .um-btn-delete {
+    min-width: 44px;
+}
+
+@media (max-width: 768px) {
+    .um-table-desktop {
+        display: none !important;
+    }
+    .um-cards {
+        display: grid;
+    }
+    .tm-table-wrap.um-table-desktop {
+        display: none !important;
+    }
+    .tm-page .tm-card {
+        padding-bottom: 16px;
+    }
+}
+
+@media (min-width: 769px) {
+    .um-cards {
+        display: none !important;
+    }
+}
+
 /* ---- Números de microrregiones ---- */
 .um-micros-text {
     font-size: var(--fs-small);
@@ -329,6 +436,40 @@
     flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 12px;
+}
+
+@media (max-width: 640px) {
+    .um-filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .um-filter-bar .um-filter-form {
+        width: 100%;
+    }
+    .um-filter-bar .tm-section-switch {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: flex-start;
+    }
+    .um-filter-bar .tm-section-tab {
+        flex: 1 1 auto;
+        min-height: 44px;
+        padding: 10px 12px;
+        font-size: 0.8rem;
+    }
+    .um-filter-divider {
+        display: none;
+    }
+    .um-filter-actions {
+        margin-left: 0;
+        width: 100%;
+    }
+    .um-filter-actions .tm-btn {
+        width: 100%;
+        min-height: 44px;
+        justify-content: center;
+    }
 }
 
 .um-filter-actions {

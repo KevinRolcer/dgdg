@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(SecurityHeaders::class);
         $middleware->alias([
             'agenda.access' => \App\Http\Middleware\AgendaAccess::class,
+            'agenda.access.escritura' => \App\Http\Middleware\AgendaAccessEscritura::class,
         ]);
     })
     ->withSchedule(function (\Illuminate\Console\Scheduling\Schedule $schedule) {

@@ -4,6 +4,7 @@
 
 @push('css')
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+<link href="{{ asset('assets/css/mesas_paz/mesas-paz-shell.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesas-paz-shell.css')) ?: time() }}" rel="stylesheet" />
 <link href="{{ asset('assets/css/mesas_paz/mesaPazSupervision.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesaPazSupervision.css')) ?: time() }}" rel="stylesheet" />
 <link href="{{ asset('assets/css/mesas_paz/mesaPaz.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesaPaz.css')) ?: time() }}" rel="stylesheet" />
 <link href="{{ asset('assets/css/theme-dark-mesas-paz.css') }}?v={{ @filemtime(public_path('assets/css/theme-dark-mesas-paz.css')) ?: time() }}" rel="stylesheet" />
@@ -14,12 +15,22 @@
 @endpush
 
 @section('content')
+@php
+    $hidePageHeader = true;
+@endphp
+<div class="mesas-paz-shell app-density-compact">
+    <div class="mesas-paz-shell-main">
+        <header class="mesas-paz-shell-head">
+            <h1 class="mesas-paz-shell-title">Evidencias Mesas de Paz</h1>
+            <p class="mesas-paz-shell-desc">Consulta de evidencias y asistencias por delegado. Filtros por fecha y análisis por microrregión.</p>
+        </header>
+
 <div id="supervisionEvidenciasPage">
-<div class="panel panel-inverse">
-    <div class="panel-heading">
+<div class="mesas-paz-panel panel panel-inverse">
+    <div class="mesas-paz-panel-head panel-heading">
         <h4 class="panel-title">Filtros de búsqueda</h4>
     </div>
-    <div class="panel-body">
+    <div class="mesas-paz-panel-body panel-body">
         <form id="supervisionFiltersForm" method="GET" action="{{ route('mesas-paz.evidencias') }}" class="row g-3 align-items-end">
             <div class="col-md-4 col-lg-3">
                 <label for="fecha_lista" class="form-label">Fecha (lista de evidencias)</label>
@@ -335,13 +346,13 @@
     </div>
 </div>
 
-<div class="panel panel-inverse">
-    <div class="panel-heading">
+<div class="mesas-paz-panel panel panel-inverse">
+    <div class="mesas-paz-panel-head panel-heading">
         <h4 class="panel-title">Evidencias de asistencias (todos los delegados)</h4>
     </div>
-    <div id="evidenciasPanelBody" class="panel-body">
+    <div id="evidenciasPanelBody" class="mesas-paz-panel-body panel-body">
         @if(isset($evidencias) && collect($evidencias)->isNotEmpty())
-            <div class="d-none d-md-flex px-3 pb-2 small text-muted border-bottom mb-2">
+            <div class="evidencias-list-header d-none d-md-flex px-3 pb-2 small border-bottom mb-2">
                 <div class="col-md-2">Delegado</div>
                 <div class="col-md-2">Microrregión</div>
                 <div class="col-md-4">Municipios con asistencia</div>
@@ -374,7 +385,7 @@
                             @if(collect($item['municipios_con_asistencia'] ?? [])->isNotEmpty())
                                 <div class="d-flex flex-wrap gap-1">
                                     @foreach($item['municipios_con_asistencia'] as $municipio)
-                                        <span class="badge" style="background-color: #1b5e40; font-size: 0.75rem;">{{ $municipio }}</span>
+                                        <span class="badge badge-evidencia-presente">{{ $municipio }}</span>
                                     @endforeach
                                 </div>
                             @else
@@ -575,6 +586,8 @@
                 <img id="evidenciaPreviewModalImg" src="" alt="Vista previa" class="img-fluid rounded border">
             </div>
         </div>
+    </div>
+</div>
     </div>
 </div>
 </div>

@@ -17,7 +17,7 @@ class UserManagementController extends Controller
     {
         $role   = $request->get('role');
         $status = $request->get('status'); // 'activo', 'inactivo', or null = todos
-        $rolesPermitidos = ['Delegado', 'Enlace', 'delegado', 'enlace'];
+        $rolesPermitidos = ['Delegado', 'Enlace', 'Auditor', 'delegado', 'enlace', 'auditor'];
 
         $query = User::query()->whereHas('roles', function ($q) use ($rolesPermitidos) {
             $q->whereIn('name', $rolesPermitidos);
@@ -59,7 +59,7 @@ class UserManagementController extends Controller
             'telefono'         => 'nullable|string|max:20',
             'activo'           => 'nullable|boolean',
             // role
-            'role'             => 'required|in:delegado,enlace',
+            'role'             => 'required|in:delegado,enlace,auditor',
             // microrregiones
             'microrregion_id'  => 'required_if:role,delegado|nullable|exists:microrregiones,id',
             'microrregion_ids' => 'required_if:role,enlace|array|nullable',
@@ -83,7 +83,9 @@ class UserManagementController extends Controller
         $user = User::create($userPayload);
         $user->assignRole(ucfirst($validated['role']));
 
-        if ($validated['role'] === 'delegado') {
+        if ($validated['role'] === 'auditor') {
+            // Sin microrregiones; permisos vienen del rol Auditor (migración/seeder).
+        } elseif ($validated['role'] === 'delegado') {
             $user->microrregionesAsignadas()->sync(
                 isset($validated['microrregion_id']) ? [$validated['microrregion_id']] : []
             );
@@ -129,7 +131,7 @@ class UserManagementController extends Controller
             'password'         => 'nullable|string|min:8|confirmed',
             'telefono'         => 'nullable|string|max:20',
             'activo'           => 'nullable|boolean',
-            'role'             => 'required|in:delegado,enlace',
+            'role'             => 'required|in:delegado,enlace,auditor',
             'microrregion_id'  => 'required_if:role,delegado|nullable|exists:microrregiones,id',
             'microrregion_ids' => 'required_if:role,enlace|array|nullable',
             'microrregion_ids.*' => 'exists:microrregiones,id',
@@ -155,7 +157,9 @@ class UserManagementController extends Controller
         }
         $user->syncRoles([ucfirst($validated['role'])]);
 
-        if ($validated['role'] === 'delegado') {
+        if ($validated['role'] === 'auditor') {
+            $user->microrregionesAsignadas()->sync([]);
+        } elseif ($validated['role'] === 'delegado') {
             $user->microrregionesAsignadas()->sync(
                 isset($validated['microrregion_id']) ? [$validated['microrregion_id']] : []
             );

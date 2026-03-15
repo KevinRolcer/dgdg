@@ -12,6 +12,7 @@ class Municipio extends Model
         'cve_inegi',
         'cve_edo',
         'municipio',
+        'microrregion_id',
         'df',
         'dl',
         'region',
@@ -45,5 +46,11 @@ class Municipio extends Model
     public function microrregion()
     {
         return $this->belongsTo(Microrregione::class, 'microrregion_id', 'id');
+    }
+
+    /** Asistencias de Mesas de Paz en este municipio. */
+    public function mesasPazAsistencias()
+    {
+        return $this->hasMany(MesaPazAsistencia::class, 'municipio_id', 'id');
     }
 }

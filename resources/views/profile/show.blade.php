@@ -63,6 +63,12 @@
                                 <span class="profile-role-badge">{{ $roleName }}</span>
                                 <span class="profile-phone-pill">{{ $phoneNumber }}</span>
                             </div>
+                            <p class="profile-ajustes-link-wrap">
+                                <a href="{{ route('settings.apariencia') }}" class="profile-ajustes-link">
+                                    <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                                    Ajustes (apariencia / tema)
+                                </a>
+                            </p>
                         </div>
                     </div>
 

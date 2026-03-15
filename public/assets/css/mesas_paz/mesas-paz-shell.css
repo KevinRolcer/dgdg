@@ -1,0 +1,167 @@
+/* =========================================================
+   Mesas de Paz — UI limpia (mismo plano que Ajustes/Inicio):
+   sin caja exterior; solo división por bloques con borde suave
+   ========================================================= */
+
+.mesas-paz-shell {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: var(--clr-bg);
+    box-shadow: none;
+    overflow: visible;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    padding: 0;
+}
+
+.mesas-paz-shell-main {
+    padding: 0.85rem 1.25rem 1.25rem;
+    min-width: 0;
+    background: var(--clr-bg);
+    border: none;
+}
+
+@media (min-width: 900px) {
+    .mesas-paz-shell-main {
+        padding: 1rem 1.5rem 1.5rem;
+    }
+}
+
+.mesas-paz-shell-head {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+.mesas-paz-shell-title {
+    margin: 0 0 0.1rem;
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--clr-accent);
+}
+
+html.theme-dark .mesas-paz-shell-title {
+    color: var(--clr-text-main);
+}
+
+.mesas-paz-shell-desc {
+    margin: 0;
+    font-size: 0.76rem;
+    color: var(--clr-text-light);
+    line-height: 1.45;
+}
+
+/* Bloque = sección sin caja; solo título opcional y borde inferior */
+.mesas-paz-block {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+.mesas-paz-block:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.mesas-paz-block-head {
+    margin: 0 0 0.5rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+.mesas-paz-block-title {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: var(--clr-accent);
+}
+
+html.theme-dark .mesas-paz-block-title {
+    color: var(--clr-text-main);
+}
+
+.mesas-paz-block-body {
+    min-width: 0;
+}
+
+/* Dentro del shell, los .panel se muestran sin caja (solo contenido) */
+.mesas-paz-shell .mesas-paz-panel,
+.mesas-paz-shell #mesasPazApp .mesas-paz-panel,
+.mesas-paz-shell #supervisionEvidenciasPage .mesas-paz-panel {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+.mesas-paz-shell .mesas-paz-panel:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.mesas-paz-shell .mesas-paz-panel-head,
+.mesas-paz-shell #mesasPazApp .mesas-paz-panel-head,
+.mesas-paz-shell #supervisionEvidenciasPage .mesas-paz-panel-head {
+    padding: 0 0 0.4rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--clr-border);
+    background: transparent !important;
+}
+
+.mesas-paz-shell .mesas-paz-panel-body,
+.mesas-paz-shell #mesasPazApp .mesas-paz-panel-body,
+.mesas-paz-shell #supervisionEvidenciasPage .mesas-paz-panel-body {
+    padding: 0;
+    background: transparent !important;
+}
+
+/* Barra de microrregiones (compacta) */
+.mesas-paz-shell .mesa-micro-pagination-wrap {
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+    background: var(--clr-bg);
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+/* Alertas discretas */
+.mesas-paz-shell .alert {
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.78rem;
+}
+
+.mesas-paz-shell .border.rounded {
+    border-radius: 6px !important;
+    border-color: var(--clr-border) !important;
+}
+
+/* Cards de municipio: menos sombra, borde ligero */
+.mesas-paz-shell .municipio-card,
+.mesas-paz-shell .card {
+    background: var(--clr-bg);
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+.mesas-paz-shell .card-header {
+    background: rgba(72, 71, 71, 0.04);
+}
+
+html.theme-dark .mesas-paz-shell .card-header {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.mesas-paz-shell .list-group-item {
+    background: var(--clr-bg);
+    border-color: var(--clr-border);
+}

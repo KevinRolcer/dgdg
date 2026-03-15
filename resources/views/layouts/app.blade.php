@@ -143,7 +143,7 @@
                                 <i class="fa-regular fa-user" aria-hidden="true"></i>
                                 <span>Mi perfil</span>
                             </a>
-                            <a href="{{ route('settings.index') }}" class="topbar-menu-link {{ request()->routeIs('settings.index') ? 'is-active' : '' }}">
+                            <a href="{{ route('settings.apariencia') }}" class="topbar-menu-link {{ request()->routeIs('settings.*') ? 'is-active' : '' }}">
                                 <i class="fa-solid fa-sliders" aria-hidden="true"></i>
                                 <span>Ajustes</span>
                             </a>

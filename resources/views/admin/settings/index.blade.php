@@ -42,7 +42,7 @@
         <h2>Configuracion de imagenes</h2>
         <p>Esta herramienta migra imagenes de Localstorage hacia una ruta privada compartida.</p>
 
-        <form method="POST" action="{{ route('admin.settings.images.migrate') }}" style="margin-top: 16px;">
+        <form method="POST" action="{{ route('settings.images.migrate') }}" style="margin-top: 16px;">
             @csrf
 
             <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">

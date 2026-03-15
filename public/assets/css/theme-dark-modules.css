@@ -49,6 +49,34 @@ html.theme-dark .app-content table {
     color: var(--clr-text-main);
 }
 
+/* ---------- Shell Eventos temporales (todos los temas oscuros) ---------- */
+html.theme-dark .tm-shell .tm-shell-title {
+    color: var(--clr-text-main);
+}
+html.theme-dark .tm-shell .tm-shell-desc {
+    color: var(--clr-text-light);
+}
+html.theme-dark .tm-shell .tm-card-in-shell,
+html.theme-dark .tm-shell .tm-module-grid .tm-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-bottom: 1px solid var(--clr-border);
+}
+/* Evitar caja en el contenedor de la tabla de registros */
+html.theme-dark .tm-shell .tm-table-wrap,
+html.theme-dark .tm-shell .tm-table-wrap-scroll {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+/* Pie de paginación dentro del shell: sin caja */
+html.theme-dark .tm-shell .tm-pagination-wrap.tm-pagination--footer {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
 /* ---------- Módulos temporales (.tm-*) ---------- */
 html.theme-dark .tm-section-switch,
 html.theme-dark .tm-upload-meta-pill,
@@ -417,8 +445,54 @@ html.theme-dark .calendar-grid {
     border-color: var(--clr-border);
 }
 
+/* Inicio: calendario sin caja en celdas (fondo solo en hover/hoy) */
+html.theme-dark .home-shell-aside .calendar-day:not(.is-today),
+html.theme-dark .home-shell-aside .calendar-grid {
+    background: transparent !important;
+}
+
+html.theme-dark .calendar-toolbar strong,
+html.theme-dark #calendarMonthLabel {
+    color: var(--clr-accent) !important;
+}
+
 html.theme-dark .calendar-day.is-today {
-    background: rgba(232, 136, 156, 0.15) !important;
+    background: rgba(199, 155, 102, 0.2) !important;
+    border-color: rgba(199, 155, 102, 0.55) !important;
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .calendar-day.has-agenda .calendar-day-num {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .calendar-agenda-tooltip {
+    background: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+
+html.theme-dark .calendar-agenda-tooltip-title {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .calendar-agenda-tooltip-time {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .calendar-agenda-dot--future {
+    background: var(--clr-accent) !important;
+    border-color: rgba(232, 201, 160, 0.5) !important;
+}
+
+html.theme-dark .calendar-agenda-dot--today {
+    background: var(--clr-secondary) !important;
+    border-color: rgba(120, 200, 180, 0.45) !important;
+}
+
+html.theme-dark .calendar-agenda-dot--past {
+    background: var(--clr-primary) !important;
+    border-color: rgba(232, 160, 176, 0.4) !important;
 }
 
 html.theme-dark .calendar-event-form input,

@@ -181,18 +181,53 @@
     }
 }
 
+/* Botón Limpiar y secundarios: visibles en todos los temas */
+#supervisionEvidenciasPage .btn-default {
+    color: var(--clr-text-main);
+    background: transparent;
+    border: 1px solid var(--clr-border);
+    border-radius: var(--mesa-radius-sm);
+    font-weight: 600;
+}
+
+#supervisionEvidenciasPage .btn-default:hover:not(:disabled) {
+    background: rgba(72, 71, 71, 0.06);
+    border-color: var(--clr-text-light);
+}
+
+/* Encabezados de la lista de evidencias: buen contraste */
+#supervisionEvidenciasPage .evidencias-list-header {
+    color: var(--clr-text-main);
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+}
+
+/* Badge municipios presentes: usa variable de tema */
+#supervisionEvidenciasPage .badge-evidencia-presente {
+    background-color: var(--clr-secondary) !important;
+    color: #fff !important;
+    font-size: 0.75rem;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+
+/* Parte/Acuerdos “aún no registrada” y “Sin evidencia”: legibles en todos los temas */
 #supervisionEvidenciasPage .badge-supervision-soft {
-    color: var(--clr-primary-dark, #861e34);
-    border: 1px solid rgba(199, 155, 102, 0.4);
-    background: rgba(199, 155, 102, 0.05);
-    padding: 2px 8px;
+    color: var(--clr-text-light);
+    border: 1px solid var(--clr-border);
+    background: rgba(72, 71, 71, 0.06);
+    padding: 0.2rem 0.5rem;
     border-radius: 4px;
     display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 500;
 }
 
 #supervisionEvidenciasPage .supervision-table-row {
-    background-color: var(--clr-card, #ffffff);
-    border-bottom: 1px solid var(--clr-border, #dee2e6);
+    background-color: var(--clr-bg);
+    border-bottom: 1px solid var(--clr-border);
     transition: background-color 0.2s;
     margin-left: 0 !important;
     margin-right: 0 !important;
@@ -200,4 +235,19 @@
 
 #supervisionEvidenciasPage .supervision-table-row:hover {
     background-color: rgba(72, 71, 71, 0.05);
+}
+
+/* Labels móviles (Delegado, Microrregión, etc.): contraste suficiente */
+#supervisionEvidenciasPage .supervision-table-row .text-muted.d-md-none {
+    color: var(--clr-text-light) !important;
+    font-weight: 600;
+    font-size: 0.7rem;
+}
+
+#supervisionEvidenciasPage .supervision-table-row .delegado-nombre {
+    color: var(--clr-text-main);
+}
+
+#supervisionEvidenciasPage .supervision-table-row .text-muted {
+    color: var(--clr-text-light);
 }

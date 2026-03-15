@@ -475,12 +475,67 @@ document.addEventListener('DOMContentLoaded', function () {
     var today = new Date();
     var currentMonthDate = new Date(today.getFullYear(), today.getMonth(), 1);
 
+    var agendaDaysMap = {};
+    try {
+        var jsonEl = document.getElementById('homeCalendarAgendaDays');
+        var raw = (jsonEl && jsonEl.textContent) ? jsonEl.textContent.trim() : (calendarCard.getAttribute('data-agenda-days') || '{}');
+        agendaDaysMap = JSON.parse(raw);
+        if (!agendaDaysMap || typeof agendaDaysMap !== 'object') {
+            agendaDaysMap = {};
+        }
+    } catch (e) {
+        agendaDaysMap = {};
+    }
+
+    var agendaTooltipEl = null;
+    function hideAgendaTooltip() {
+        if (agendaTooltipEl && agendaTooltipEl.parentNode) {
+            agendaTooltipEl.parentNode.removeChild(agendaTooltipEl);
+        }
+        agendaTooltipEl = null;
+    }
+    function showAgendaTooltip(dayCell, items) {
+        hideAgendaTooltip();
+        if (!items || !items.length) return;
+        var el = document.createElement('div');
+        el.className = 'calendar-agenda-tooltip';
+        el.setAttribute('role', 'tooltip');
+        items.forEach(function (it) {
+            var row = document.createElement('div');
+            row.className = 'calendar-agenda-tooltip-row';
+            var t = document.createElement('div');
+            t.className = 'calendar-agenda-tooltip-title';
+            t.textContent = it.title || '';
+            var time = document.createElement('div');
+            time.className = 'calendar-agenda-tooltip-time';
+            time.textContent = it.time || '';
+            row.appendChild(t);
+            row.appendChild(time);
+            el.appendChild(row);
+        });
+        document.body.appendChild(el);
+        el.style.position = 'fixed';
+        el.style.zIndex = '10000';
+        var rect = dayCell.getBoundingClientRect();
+        var tw = el.offsetWidth;
+        var th = el.offsetHeight;
+        var left = rect.left + rect.width / 2 - tw / 2;
+        var top = rect.top - th - 8;
+        if (left < 8) left = 8;
+        if (left + tw > window.innerWidth - 8) left = window.innerWidth - tw - 8;
+        if (top < 8) top = rect.bottom + 8;
+        el.style.left = left + 'px';
+        el.style.top = top + 'px';
+        agendaTooltipEl = el;
+    }
+
     function openCalendarDrawer() {
-        if (!calendarCard || !calendarMobileBackdrop || !isMobileViewport()) {
+        if (!calendarCard || !calendarMobileBackdrop) {
             return;
         }
-
-        closeSidebar();
+        if (isMobileViewport()) {
+            closeSidebar();
+        }
         calendarCard.classList.add('is-open');
         calendarMobileBackdrop.classList.add('is-visible');
         if (calendarDrawerToggle) {
@@ -493,7 +548,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!calendarCard || !calendarMobileBackdrop) {
             return;
         }
-
         calendarCard.classList.remove('is-open');
         calendarMobileBackdrop.classList.remove('is-visible');
         if (calendarDrawerToggle) {
@@ -538,10 +592,46 @@ document.addEventListener('DOMContentLoaded', function () {
             calendarGrid.appendChild(emptyCell);
         }
 
+        function pad(n) {
+            return n < 10 ? '0' + n : String(n);
+        }
+
         for (var day = 1; day <= daysInMonth; day++) {
             var dayCell = document.createElement('span');
             dayCell.className = 'calendar-day';
-            dayCell.textContent = String(day);
+            var dayKey = year + '-' + pad(month + 1) + '-' + pad(day);
+            var dayEvents = agendaDaysMap[dayKey];
+            var num = document.createElement('span');
+            num.className = 'calendar-day-num';
+            num.textContent = String(day);
+            dayCell.appendChild(num);
+
+            if (dayEvents && dayEvents.length) {
+                (function (cell, list, y, m, d) {
+                    cell.classList.add('has-agenda');
+                    var dot = document.createElement('span');
+                    var cellMidnight = new Date(y, m, d).setHours(0, 0, 0, 0);
+                    var todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).setHours(0, 0, 0, 0);
+                    var dotKind = 'future';
+                    if (cellMidnight < todayMidnight) {
+                        dotKind = 'past';
+                    } else if (cellMidnight === todayMidnight) {
+                        dotKind = 'today';
+                    }
+                    dot.className = 'calendar-agenda-dot calendar-agenda-dot--' + dotKind;
+                    dot.setAttribute('aria-hidden', 'true');
+                    cell.appendChild(dot);
+                    cell.addEventListener('mouseenter', function () {
+                        showAgendaTooltip(cell, list);
+                    });
+                    cell.addEventListener('mouseleave', hideAgendaTooltip);
+                    cell.addEventListener('focus', function () {
+                        showAgendaTooltip(cell, list);
+                    });
+                    cell.addEventListener('blur', hideAgendaTooltip);
+                    cell.setAttribute('tabindex', '0');
+                })(dayCell, dayEvents, year, month, day);
+            }
 
             if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
                 dayCell.classList.add('is-today');
@@ -596,6 +686,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    setCalendarView('month');
+    setCalendarView('upcoming');
     renderMonthGrid();
 });

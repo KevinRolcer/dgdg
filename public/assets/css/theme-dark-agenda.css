@@ -1,6 +1,27 @@
 /**
  * Agenda Directiva — modo oscuro (html.theme-dark)
  */
+
+/* Shell: sin caja, mismo plano que contenido */
+html.theme-dark .agenda-shell .agenda-card-in-shell {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+html.theme-dark .agenda-shell .agenda-filters-form.agenda-filters-compact {
+    background: transparent !important;
+    border: none !important;
+}
+
+html.theme-dark .agenda-shell .agenda-shell-title {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .agenda-shell .agenda-shell-desc {
+    color: var(--clr-text-light) !important;
+}
+
 html.theme-dark .agenda-filters-form.agenda-filters-compact {
     background: var(--tm-muted-bg) !important;
     border-color: var(--clr-border) !important;
@@ -34,13 +55,42 @@ html.theme-dark .agenda-head-title {
 }
 
 html.theme-dark .agenda-btn:not(.agenda-btn-primary):not(.agenda-btn-danger) {
-    background: var(--tm-surface) !important;
+    background: transparent !important;
     color: var(--clr-text-main) !important;
     border-color: var(--clr-border) !important;
 }
 
 html.theme-dark .agenda-btn-secondary:hover {
-    background: rgba(199, 155, 102, 0.12) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .agenda-shell .agenda-btn-secondary:hover {
+    background: rgba(199, 155, 102, 0.08) !important;
+    border-color: rgba(199, 155, 102, 0.35) !important;
+}
+
+/* Chips: inactivo transparente, activo sutil */
+html.theme-dark .agenda-shell .agenda-filters-compact .tm-module-chip:not(.is-active):not(.tm-btn-clear) {
+    background: transparent !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .agenda-shell .agenda-filters-compact .tm-module-chip.is-active {
+    background: rgba(199, 155, 102, 0.15) !important;
+    border-color: var(--clr-accent) !important;
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .agenda-shell .agenda-filters-compact .tm-module-chip.tm-btn-clear {
+    background: transparent !important;
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .agenda-shell .agenda-filters-compact .tm-module-chip.tm-btn-clear:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    color: var(--clr-text-main) !important;
 }
 
 html.theme-dark .agenda-modulo-list li {
@@ -129,7 +179,8 @@ html.theme-dark .unfold-container {
 }
 
 html.theme-dark .agenda-table th {
-    color: var(--clr-accent) !important;
+    color: var(--clr-text-light) !important;
+    background: transparent !important;
 }
 
 html.theme-dark .agenda-table td strong {
@@ -137,7 +188,29 @@ html.theme-dark .agenda-table td strong {
 }
 
 html.theme-dark .agenda-table tbody tr:hover {
-    background: rgba(255, 255, 255, 0.04) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Botones de tabla y Eliminar: legibles en oscuro */
+html.theme-dark .agenda-btn-table {
+    background: transparent !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .agenda-btn-table:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+
+html.theme-dark .agenda-btn-danger {
+    color: #f5c2c7 !important;
+    border-color: rgba(220, 53, 69, 0.4) !important;
+    background: rgba(220, 53, 69, 0.12) !important;
+}
+
+html.theme-dark .agenda-btn-danger:hover {
+    background: rgba(220, 53, 69, 0.2) !important;
+    color: #f8b4bc !important;
 }
 
 html.theme-dark .agenda-badge.is-pasado {
@@ -195,9 +268,9 @@ html.theme-dark .agenda-page {
     background: transparent;
 }
 
-/* Chips borrar filtro heredan tm-module-chip — refuerzo */
+/* Chips borrar filtro (sin shell): refuerzo */
 html.theme-dark .agenda-filters-compact .tm-module-chip.tm-btn-clear {
-    background: rgba(232, 136, 156, 0.1) !important;
-    color: var(--clr-accent) !important;
+    background: transparent !important;
+    color: var(--clr-text-light) !important;
     border-color: var(--clr-border) !important;
 }
