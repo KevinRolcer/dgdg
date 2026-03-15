@@ -41,25 +41,25 @@
         </header>
 
         <div class="home-calendar-view-switch" role="tablist" aria-label="Lista y filtros de eventos">
-            <button type="button" class="home-calendar-view-btn is-active" data-calendar-view="upcoming">Próximos</button>
-            <button type="button" class="home-calendar-view-btn" data-calendar-view="month">Mes</button>
             <button type="button" class="home-calendar-view-btn" data-calendar-view="past">Anteriores</button>
+            <button type="button" class="home-calendar-view-btn is-active" data-calendar-view="month">Mes</button>
+            <button type="button" class="home-calendar-view-btn" data-calendar-view="upcoming">Próximos</button>
         </div>
 
-        <section class="home-calendar-panel is-active" data-calendar-panel="upcoming">
+        <section class="home-calendar-panel" data-calendar-panel="past">
             <ul class="home-calendar-event-list">
-                @forelse ($upcomingEvents as $event)
+                @forelse ($pastEvents as $event)
                     <li>
                         <strong>{{ $event['summary'] }}</strong>
                         <small>{{ $event['starts_at']->format('d/m/Y H:i') }} - {{ $event['ends_at']->format('H:i') }}</small>
                     </li>
                 @empty
-                    <li><strong>Sin eventos próximos asignados.</strong></li>
+                    <li><strong>Sin eventos anteriores asignados.</strong></li>
                 @endforelse
             </ul>
         </section>
 
-        <section class="home-calendar-panel" data-calendar-panel="month">
+        <section class="home-calendar-panel is-active" data-calendar-panel="month">
             <div class="home-calendar-toolbar">
                 <button type="button" class="home-calendar-nav-btn" id="calendarPrev" aria-label="Mes anterior">
                     <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
@@ -75,15 +75,15 @@
             <div class="calendar-grid" id="calendarGrid"></div>
         </section>
 
-        <section class="home-calendar-panel" data-calendar-panel="past">
+        <section class="home-calendar-panel" data-calendar-panel="upcoming">
             <ul class="home-calendar-event-list">
-                @forelse ($pastEvents as $event)
+                @forelse ($upcomingEvents as $event)
                     <li>
                         <strong>{{ $event['summary'] }}</strong>
                         <small>{{ $event['starts_at']->format('d/m/Y H:i') }} - {{ $event['ends_at']->format('H:i') }}</small>
                     </li>
                 @empty
-                    <li><strong>Sin eventos anteriores asignados.</strong></li>
+                    <li><strong>Sin eventos próximos asignados.</strong></li>
                 @endforelse
             </ul>
         </section>
