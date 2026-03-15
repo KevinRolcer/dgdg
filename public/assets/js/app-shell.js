@@ -686,6 +686,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    setCalendarView('upcoming');
+    setCalendarView('month');
     renderMonthGrid();
 });
