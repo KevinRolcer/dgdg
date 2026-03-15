@@ -61,7 +61,8 @@ class Agenda extends Model
 
         return $query->where(function ($q) {
             $q->where('estado_seguimiento', self::ESTADO_ACTIVO)
-                ->orWhereNull('estado_seguimiento');
+                ->orWhereNull('estado_seguimiento')
+                ->orWhere('estado_seguimiento', '');
         });
     }
 

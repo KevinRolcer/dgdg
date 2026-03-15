@@ -50,7 +50,12 @@ class HomeAgendaCalendarService
             if (!$agenda->fecha_inicio) {
                 continue;
             }
-            foreach ($this->expandOccurrences($agenda, $tz) as $occ) {
+            try {
+                $occurrencesForAgenda = $this->expandOccurrences($agenda, $tz);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            foreach ($occurrencesForAgenda as $occ) {
                 $dayKey = $occ['date']->format('Y-m-d');
                 $title = $this->displayTitle($agenda);
                 $time = $occ['time_label'];
@@ -135,7 +140,11 @@ class HomeAgendaCalendarService
      */
     private function expandOccurrences(Agenda $agenda, string $tz): array
     {
-        $start = $agenda->fecha_inicio->copy()->timezone($tz)->startOfDay();
+        $fechaInicio = $agenda->fecha_inicio;
+        if (!$fechaInicio instanceof Carbon) {
+            $fechaInicio = Carbon::parse($fechaInicio, $tz);
+        }
+        $start = $fechaInicio->copy()->timezone($tz)->startOfDay();
         $fin = $agenda->fecha_fin ?? $agenda->fecha_inicio;
         $end = $fin instanceof Carbon ? $fin->copy()->timezone($tz)->startOfDay() : Carbon::parse($fin, $tz)->startOfDay();
         if ($end->lt($start)) {
