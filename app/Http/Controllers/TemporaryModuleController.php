@@ -1282,7 +1282,6 @@ class TemporaryModuleController extends Controller
         $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$module;
 
         if (in_array($format, ['word', 'pdf'], true)) {
-        if (in_array($format, ['word', 'pdf'], true)) {
             try {
                 // Exportación directa a Word o PDF (solo tabla de registros, sin análisis).
                 $columnsCfg = is_array($exportConfig) && isset($exportConfig['columns']) && is_array($exportConfig['columns'])
