@@ -772,6 +772,8 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     transition: all 0.2s;
     color: #1e293b;
     height: 34px;
+    user-select: auto !important;
+    pointer-events: auto !important;
 }
 
 
