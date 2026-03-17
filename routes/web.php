@@ -153,6 +153,11 @@ Route::middleware('auth')->group(function () {
             ->middleware('can:Modulos-Temporales')
             ->whereNumber('module')
             ->name('temporary-modules.submit');
+        Route::delete('/{module}/registros/{entry}', [TemporaryModuleController::class, 'destroyEntry'])
+            ->middleware('can:Modulos-Temporales')
+            ->whereNumber('module')
+            ->whereNumber('entry')
+            ->name('temporary-modules.entry.destroy');
         Route::get('/{module}/registros/{entry}/archivo/{fieldKey}', [TemporaryModuleController::class, 'previewEntryFile'])
             ->middleware('can:modulos-temporales-ver')
             ->whereNumber('entry')

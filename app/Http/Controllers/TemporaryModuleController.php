@@ -1025,6 +1025,33 @@ class TemporaryModuleController extends Controller
             ->with('status', 'Registro guardado correctamente.');
     }
 
+    /** El delegado elimina uno de sus registros (solo si tiene acceso por microrregión). */
+    public function destroyEntry(Request $request, int $module, int $entry): RedirectResponse
+    {
+        $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
+        abort_unless($temporaryModule->isAvailable(), 404);
+        abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
+
+        $entryModel = TemporaryModuleEntry::query()
+            ->where('id', $entry)
+            ->where('temporary_module_id', $temporaryModule->id)
+            ->firstOrFail();
+
+        abort_unless(
+            $this->accessService->userCanAccessEntryByMicrorregion(
+                (int) $request->user()->id,
+                (int) $entryModel->microrregion_id
+            ),
+            403
+        );
+
+        $this->entryDataService->deleteEntryAndFiles($entryModel, $temporaryModule);
+
+        return redirect()
+            ->route('temporary-modules.records', ['module' => $temporaryModule->id])
+            ->with('status', 'Registro eliminado correctamente.');
+    }
+
     /**
      * Paso 1: sube Excel y devuelve columnas detectadas + sugerencia de mapeo a campos del módulo.
      */

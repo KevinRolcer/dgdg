@@ -48,6 +48,11 @@
                     @endforeach
                     <div class="tm-record-card-actions">
                         <button type="button" class="tm-btn" data-open-module-preview="delegate-edit-{{ $entry->id }}">Editar</button>
+                        <form action="{{ route('temporary-modules.entry.destroy', ['module' => $module->id, 'entry' => $entry->id]) }}" method="POST" class="tm-inline-form" data-confirm-delete data-record-title="{{ $cardTitle }}">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="tm-btn tm-btn-danger"><i class="fa-solid fa-trash" aria-hidden="true"></i> Eliminar</button>
+                        </form>
                     </div>
                 </div>
             </details>
@@ -96,7 +101,18 @@
                                 @endif
                             </td>
                         @endforeach
-                        <td><button type="button" class="tm-btn" data-open-module-preview="delegate-edit-{{ $entry->id }}">Editar</button></td>
+                        <td class="tm-actions-cell">
+                            @php
+                                $rowMrValue = $municipioField ? ($entry->data[$municipioField->key] ?? null) : null;
+                                $rowTitle = (is_string($rowMrValue) && trim($rowMrValue) !== '') ? $rowMrValue : 'Registro '.($loop->iteration + ($entries->firstItem() ?? 1) - 1);
+                            @endphp
+                            <button type="button" class="tm-btn" data-open-module-preview="delegate-edit-{{ $entry->id }}">Editar</button>
+                            <form action="{{ route('temporary-modules.entry.destroy', ['module' => $module->id, 'entry' => $entry->id]) }}" method="POST" class="tm-inline-form" data-confirm-delete data-record-title="{{ $rowTitle }}">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="tm-btn tm-btn-danger" title="Eliminar"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+                            </form>
+                        </td>
                     </tr>
                 @empty
                     <tr><td colspan="{{ $module->fields->count() + 2 }}">Sin registros capturados.</td></tr>

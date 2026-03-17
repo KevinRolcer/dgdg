@@ -53,6 +53,24 @@ class TemporaryModuleEntryDataService
         return null;
     }
 
+    /** Elimina una entrada y sus archivos asociados (imagen/file). */
+    public function deleteEntryAndFiles(TemporaryModuleEntry $entry, TemporaryModule $module): void
+    {
+        $fileFieldKeys = $module->fields
+            ->whereIn('type', ['image', 'file'])
+            ->pluck('key')
+            ->all();
+
+        foreach ($fileFieldKeys as $fieldKey) {
+            $path = $entry->data[$fieldKey] ?? null;
+            if (is_string($path) && trim($path) !== '' && !filter_var($path, FILTER_VALIDATE_URL)) {
+                $this->deleteStoredPath($path);
+            }
+        }
+
+        $entry->delete();
+    }
+
     public function clearModuleEntriesData(TemporaryModule $temporaryModule): void
     {
         $fileFieldKeys = $temporaryModule->fields

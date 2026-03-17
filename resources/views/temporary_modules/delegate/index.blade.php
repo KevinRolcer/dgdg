@@ -477,8 +477,42 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('submit', function (e) {
+            const form = e.target;
+            if (!form || !form.matches || !form.matches('form[data-confirm-delete]')) {
+                return;
+            }
+            e.preventDefault();
+            const title = form.getAttribute('data-record-title') || 'este registro';
+            if (typeof Swal === 'undefined') {
+                if (confirm('¿Eliminar el registro "' + title + '" de manera permanente?')) {
+                    form.submit();
+                }
+                return;
+            }
+            Swal.fire({
+                title: '¿Eliminar registro?',
+                text: 'Se eliminará "' + title + '" de manera permanente.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
+                reverseButtons: true,
+                buttonsStyling: false,
+                customClass: {
+                    popup: 'tm-swal-popup',
+                    title: 'tm-swal-title',
+                    htmlContainer: 'tm-swal-text',
+                    confirmButton: 'tm-swal-confirm',
+                    cancelButton: 'tm-swal-cancel'
+                }
+            }).then(function (result) {
+                if (result.isConfirmed) form.submit();
+            });
+        }, true);
         const microrregionesMunicipios = @json(($microrregionesAsignadas ?? collect())->mapWithKeys(function ($micro) {
             return [(string) $micro->id => array_values($micro->municipios ?? [])];
         })->all());

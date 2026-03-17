@@ -1298,6 +1298,15 @@ html.theme-dark .tm-target-box h3 {
 .tm-record-card-actions {
     display: flex;
     justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tm-actions-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 
 .tm-record-empty {
