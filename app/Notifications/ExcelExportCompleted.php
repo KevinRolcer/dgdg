@@ -13,7 +13,7 @@ class ExcelExportCompleted extends Notification implements ShouldQueue
 
     public function __construct(
         public string $fileName,
-        public string $downloadUrl
+        public ?string $downloadUrl = null
     ) {
     }
 
