@@ -971,19 +971,20 @@ body.sidebar-collapsed .sidebar-logout-btn {
     width: 100%;
     max-width: var(--content-max-width);
     margin: 0 auto;
-    padding: var(--ui-gap-lg) var(--ui-pad-lg);
     background: var(--clr-bg);
     flex: 1;
 }
 
-/* Ajustes / Inicio / Mesas de Paz / Agenda / Eventos temporales / UM: mismo plano, padding moderado */
 .app-content:has(> .settings-shell),
 .app-content:has(> .home-shell),
 .app-content:has(> .mesas-paz-shell),
-.app-content:has(> .agenda-shell),
 .app-content:has(> .tm-shell),
 .app-content:has(> .um-page) {
+    padding: .25rem .5rem;
+}
+.app-content:has(> .agenda-shell){
     padding: 1.25rem 1.5rem;
+
 }
 
 .app-content > .content-card:first-child {

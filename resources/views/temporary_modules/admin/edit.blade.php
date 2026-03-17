@@ -710,10 +710,13 @@
                     return value === 'file' ? 'image' : value;
                 };
 
-                const hasConflict = existingRows.some(function (row) {
+                let hasConflict = false;
+                let hasMunicipioConflict = false;
+
+                existingRows.forEach(function (row) {
                     const hasData = row.getAttribute('data-has-data') === '1';
                     if (!hasData) {
-                        return false;
+                        return;
                     }
 
                     const oldKey = row.getAttribute('data-old-key') || '';
@@ -724,7 +727,13 @@
                     const newKey = keyInput ? keyInput.value.trim() : oldKey;
                     const newType = normalizeFieldType(typeSelect ? typeSelect.value : oldType);
 
-                    return isDeleted || newKey !== oldKey || newType !== oldType;
+                    const rowHasConflict = isDeleted || newKey !== oldKey || newType !== oldType;
+                    if (rowHasConflict) {
+                        hasConflict = true;
+                        if (oldKey === 'municipio' && normalizeFieldType(oldType) !== 'municipio' && newType === 'municipio') {
+                            hasMunicipioConflict = true;
+                        }
+                    }
                 });
 
                 if (!hasConflict) {
@@ -740,30 +749,53 @@
                 };
 
                 if (!templateSwal) {
-                    submitWithAction('clear_module');
+                    submitWithAction(hasMunicipioConflict ? 'normalize_municipio' : 'clear_module');
                     return;
                 }
 
-                templateSwal.fire({
-                    title: 'Conflicto con datos existentes',
-                    text: 'Detectamos registros en campos que quieres modificar o eliminar. Elige cómo continuar.',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    showDenyButton: true,
-                    confirmButtonText: 'Vaciar toda la tabla',
-                    denyButtonText: 'Borrar datos de esos campos',
-                    cancelButtonText: 'Cancelar',
-                    reverseButtons: true
-                }).then(function (result) {
-                    if (result.isConfirmed) {
-                        submitWithAction('clear_module');
-                        return;
-                    }
+                if (hasMunicipioConflict) {
+                    templateSwal.fire({
+                        title: 'Conflicto con datos existentes',
+                        text: 'Detectamos registros en el campo municipio. ¿Quieres normalizar esos valores contra el catálogo oficial o borrar los datos?',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        showDenyButton: true,
+                        confirmButtonText: 'Normalizar municipios',
+                        denyButtonText: 'Borrar datos de esos campos',
+                        cancelButtonText: 'Cancelar',
+                        reverseButtons: true
+                    }).then(function (result) {
+                        if (result.isConfirmed) {
+                            submitWithAction('normalize_municipio');
+                            return;
+                        }
 
-                    if (result.isDenied) {
-                        submitWithAction('clear_field_data');
-                    }
-                });
+                        if (result.isDenied) {
+                            submitWithAction('clear_field_data');
+                        }
+                    });
+                } else {
+                    templateSwal.fire({
+                        title: 'Conflicto con datos existentes',
+                        text: 'Detectamos registros en campos que quieres modificar o eliminar. Elige cómo continuar.',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        showDenyButton: true,
+                        confirmButtonText: 'Vaciar toda la tabla',
+                        denyButtonText: 'Borrar datos de esos campos',
+                        cancelButtonText: 'Cancelar',
+                        reverseButtons: true
+                    }).then(function (result) {
+                        if (result.isConfirmed) {
+                            submitWithAction('clear_module');
+                            return;
+                        }
+
+                        if (result.isDenied) {
+                            submitWithAction('clear_field_data');
+                        }
+                    });
+                }
             });
         }
 

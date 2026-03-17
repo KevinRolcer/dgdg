@@ -80,7 +80,7 @@ Route::middleware('auth')->group(function () {
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.export-status');
             Route::get('/exportaciones/{file}', [TemporaryModuleController::class, 'downloadExport'])
-                ->where('file', '[A-Za-z0-9_\-]+\.(xlsx|docx)')
+                ->where('file', '[A-Za-z0-9_\-]+\.(xlsx|docx|pdf)')
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.exports.download');
             Route::get('/{module}/campos', [TemporaryModuleController::class, 'fieldsJson'])
@@ -104,6 +104,10 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.export');
+            Route::post('/{module}/normalizar-municipio', [TemporaryModuleController::class, 'normalizeMunicipioField'])
+                ->whereNumber('module')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.normalize-municipio');
             Route::get('/{module}/analisis-preview', [TemporaryModuleController::class, 'analysisPreviewJson'])
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')

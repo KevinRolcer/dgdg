@@ -1,9 +1,4 @@
-/* Agenda Module — diseño alineado a Módulos temporales */
 
-/* =========================================================
-   Shell UI limpia (como Ajustes/Inicio): sin caja exterior,
-   mismo fondo que .app-content, cabecera + bloques con borde
-   ========================================================= */
 .agenda-shell {
     width: 100%;
     max-width: 100%;
@@ -17,15 +12,8 @@
 }
 
 .agenda-shell-main {
-    padding: 0.85rem 1.25rem 1.25rem;
     min-width: 0;
     background: var(--clr-bg);
-}
-
-@media (min-width: 900px) {
-    .agenda-shell-main {
-        padding: 1rem 1.5rem 1.5rem;
-    }
 }
 
 .agenda-shell-head {
@@ -52,7 +40,6 @@ html.theme-dark .agenda-shell-title {
     line-height: 1.45;
 }
 
-/* Dentro del shell: la “card” es solo contenido, sin caja */
 .agenda-shell .agenda-card-in-shell {
     background: transparent;
     border: none;
@@ -80,7 +67,6 @@ html.theme-dark .agenda-shell-title {
     border-bottom: 1px solid var(--clr-border);
 }
 
-/* Botones secundarios en shell: más discretos, solo borde */
 .agenda-shell .agenda-btn-secondary {
     background: transparent;
     border-color: var(--clr-border);
@@ -93,7 +79,6 @@ html.theme-dark .agenda-shell-title {
     border-color: var(--clr-text-light);
 }
 
-/* Chips de clasificación: inactivo = borde, activo = relleno sutil */
 .agenda-shell .agenda-filters-compact .tm-module-chip:not(.is-active) {
     background: transparent !important;
     border: 1px solid var(--clr-border);
@@ -123,7 +108,6 @@ html.theme-dark .agenda-shell-title {
     margin-bottom: 6px;
 }
 
-/* Agenda: todo cabe en el body sin scroll; solo la tabla hace scroll */
 .app-content:has(> .agenda-shell) {
     display: flex;
     flex-direction: column;
@@ -434,7 +418,7 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     background: #fff;
     color: var(--clr-text-main);
     font-family: inherit;
-    font-size: 0.82rem;
+    font-size: 0.72rem;
     font-weight: 700;
     padding: 7px 12px;
     cursor: pointer;

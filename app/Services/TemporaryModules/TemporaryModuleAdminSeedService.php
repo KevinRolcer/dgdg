@@ -670,7 +670,7 @@ class TemporaryModuleAdminSeedService
     /**
      * Coincide municipio solo dentro de la microrregión ya resuelta (evita homónimos en otra MR).
      */
-    private function resolveMunicipioInMicrorregion(string $cellMun, int $microId, array $municipiosByMicro): ?object
+    public function resolveMunicipioInMicrorregion(string $cellMun, int $microId, array $municipiosByMicro): ?object
     {
         $candidates = $municipiosByMicro[$microId] ?? [];
         if ($candidates === []) {
@@ -791,7 +791,7 @@ class TemporaryModuleAdminSeedService
     /**
      * @param  array<string, list<object>>  $municipiosGlobalNorm
      */
-    private function resolveMunicipioGlobal(
+    public function resolveMunicipioGlobal(
         string $cellMun,
         ?int $preferredMicroId,
         array $municipiosGlobalNorm,
@@ -954,5 +954,83 @@ class TemporaryModuleAdminSeedService
             ->value('user_id');
 
         return $uid ? (int) $uid : null;
+    }
+
+    /**
+     * Normaliza los valores de un campo municipio ya existente (guardado como texto)
+     * contra el catálogo oficial de municipios.
+     *
+     * @return array{updated:int,skipped:int,unmatched:list<string>}
+     */
+    public function normalizeMunicipioField(TemporaryModule $module, string $fieldKey = 'municipio'): array
+    {
+        $entries = TemporaryModuleEntry::query()
+            ->where('temporary_module_id', $module->id)
+            ->select(['id', 'microrregion_id', 'data'])
+            ->get();
+
+        if ($entries->isEmpty()) {
+            return ['updated' => 0, 'skipped' => 0, 'unmatched' => []];
+        }
+
+        $municipiosRows = DB::table('municipios as mu')
+            ->join('microrregiones as mr', 'mr.id', '=', 'mu.microrregion_id')
+            ->select(['mu.id', 'mu.municipio', 'mu.microrregion_id', 'mr.microrregion as mr_num'])
+            ->get();
+
+        $municipiosByMicro = [];
+        foreach ($municipiosRows as $m) {
+            $mid = (int) $m->microrregion_id;
+            $municipiosByMicro[$mid][] = $m;
+        }
+
+        $municipiosGlobalNorm = [];
+        foreach ($municipiosRows as $m) {
+            $k = $this->normalizeMunicipioName($m->municipio);
+            $municipiosGlobalNorm[$k][] = $m;
+        }
+
+        $updated = 0;
+        $skipped = 0;
+        $unmatched = [];
+
+        foreach ($entries as $entry) {
+            $data = $entry->data ?? [];
+            $raw = $data[$fieldKey] ?? null;
+            if (!is_string($raw) || trim($raw) === '') {
+                $skipped++;
+                continue;
+            }
+
+            $municipioSearch = trim($raw);
+            $municipioDB = $this->resolveMunicipioGlobal($municipioSearch, null, $municipiosGlobalNorm, $municipiosByMicro);
+
+            $microId = (int) ($entry->microrregion_id ?? 0);
+            if (!$municipioDB && $microId > 0) {
+                $municipioDB = $this->resolveMunicipioInMicrorregion($municipioSearch, $microId, $municipiosByMicro)
+                    ?: $this->resolveMunicipioGlobal($municipioSearch, $microId, $municipiosGlobalNorm, $municipiosByMicro);
+            }
+
+            if (!$municipioDB) {
+                $skipped++;
+                if (count($unmatched) < 100) {
+                    $unmatched[] = $municipioSearch;
+                }
+                continue;
+            }
+
+            $nombre = (string) $municipioDB->municipio;
+            if (($data[$fieldKey] ?? null) === $nombre) {
+                continue;
+            }
+
+            $data[$fieldKey] = $nombre;
+            TemporaryModuleEntry::query()->whereKey($entry->id)->update(['data' => $data]);
+            $updated++;
+        }
+
+        $unmatched = array_values(array_unique($unmatched));
+
+        return ['updated' => $updated, 'skipped' => $skipped, 'unmatched' => $unmatched];
     }
 }

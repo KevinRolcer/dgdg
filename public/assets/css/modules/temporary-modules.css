@@ -2453,6 +2453,32 @@ a.tm-paginator-btn:hover {
     min-width: 0;
 }
 
+.tm-export-modal-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tm-export-foot-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.tm-btn-word {
+    background-color: #185abd;
+    border-color: #185abd;
+    color: #ffffff;
+}
+
+.tm-btn-word:hover {
+    background-color: #144a9a;
+    border-color: #144a9a;
+    color: #ffffff;
+}
+
 .tm-export-personalize-form {
     flex: 0 0 40%;
     max-width: 44%;
@@ -2629,11 +2655,19 @@ a.tm-paginator-btn:hover {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 8px;
+    padding: 2px 6px;
     border-radius: 6px;
     background: var(--clr-bg);
     font-size: 0.78rem;
     color: var(--clr-text-light);
+}
+
+.tm-export-col-width-preview input.tm-export-col-width-input {
+    width: 56px;
+    padding: 2px 4px;
+    border: 1px solid var(--clr-border);
+    border-radius: 4px;
+    font-size: 0.8rem;
 }
 
 .tm-export-col-image-opts {

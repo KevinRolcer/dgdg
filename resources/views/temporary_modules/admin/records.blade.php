@@ -312,7 +312,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="tm-export-preview-a4">
+                        <div class="tm-export-preview-a4" id="tmExportPreviewA4Area">
                             <div class="tm-export-preview-page" id="tmExportPreviewPage">
                                 <div class="tm-export-preview-zoom-wrap" id="tmExportPreviewZoomWrap">
                                     <div class="tm-export-personalize-preview" id="tmExportPersonalizePreview"></div>
@@ -322,9 +322,13 @@
                     </div>
                 </div>
             </div>
-            <div class="tm-modal-foot">
+            <div class="tm-modal-foot tm-export-modal-foot">
                 <button type="button" class="tm-btn tm-btn-outline" data-close-export-personalize>Cancelar</button>
-                <button type="button" class="tm-btn tm-btn-success" id="tmExportPersonalizeApply">Exportar con esta configuración</button>
+                <div class="tm-export-foot-actions">
+                    <button type="button" class="tm-btn tm-btn-success" id="tmExportApplyExcel">Excel</button>
+                    <button type="button" class="tm-btn tm-btn-danger" id="tmExportApplyPdf">PDF</button>
+                    <button type="button" class="tm-btn tm-btn-word" id="tmExportApplyWord">Word</button>
+                </div>
             </div>
         </div>
     </div>
@@ -445,7 +449,7 @@
                     </div>
                     <div class="tm-export-personalize-preview-wrap tm-analysis-word-preview-wrap">
                         <div class="tm-export-preview-toolbar">
-                            <span class="tm-export-preview-label">Vista previa A4 <span class="tm-word-preview-zoom-hint" title="Pellizco en trackpad o Ctrl + rueda">· zoom con trackpad</span></span>
+                            <span class="tm-export-preview-label">Vista previa A4</span>
                             <div class="tm-export-toolbar-controls" aria-label="Zoom y orientación">
                                 <div class="tm-export-zoom-btns">
                                     <button type="button" class="tm-export-zoom-btn" data-word-zoom-out title="Alejar" aria-label="Alejar">−</button>
@@ -1367,10 +1371,13 @@
                         '<label>Ancho <input type="number" min="40" max="400" value="120" class="tm-export-image-width" data-key="' + escapeHtml(col.key) + '"></label>' +
                         '<label>Alto <input type="number" min="30" max="300" value="' + String(col.image_height || 80) + '" class="tm-export-image-height" data-key="' + escapeHtml(col.key) + '"></label></div>';
                 } else {
-                    var mw = Math.min(col.max_width_chars || 10, 40);
-                    var approx = String(col.max_width_chars || 10);
-                    mid = '<div class="tm-export-col-width-preview" style="min-width:' + mw + 'ch" data-width-hint="' + escapeHtml(approx) + '">' +
-                        '<span class="tm-export-col-width-num">' + approx + '</span> ch</div>';
+                    var approx = col.max_width_chars || 24;
+                    if (!Number.isFinite(approx)) { approx = 24; }
+                    approx = Math.max(8, Math.min(approx, 60));
+                    mid = '<label class="tm-export-col-width-preview" data-width-hint="' + escapeHtml(String(approx)) + '">' +
+                        '<span>Ancho (ch)</span>' +
+                        '<input type="number" class="tm-export-col-width-input" min="8" max="60" value="' + String(approx) + '" data-key="' + escapeHtml(col.key) + '">' +
+                        '</label>';
                 }
                 item.innerHTML =
                     '<span class="tm-export-drag-handle" aria-hidden="true">&#9776;</span>' +
@@ -1438,8 +1445,8 @@
                     const h = (c.imageHeight || 80) + 'px';
                     html += '<div class="tm-export-preview-cell tm-export-preview-header-cell tm-export-preview-image-cell" style="background-color:' + escapeHtml(color) + ';width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + '"><span class="tm-export-preview-image-placeholder">Imagen</span></div>';
                 } else {
-                    const ch = Math.min(col.max_width_chars || 10, 40);
-                    html += '<div class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(color) + ';min-width:' + ch + 'ch">' + escapeHtml(col.label) + '</div>';
+                    const ch = Math.min(col.max_width_chars || 24, 60);
+                    html += '<div class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(color) + ';min-width:' + ch + 'ch;max-width:' + ch + 'ch">' + escapeHtml(col.label) + '</div>';
                 }
             });
             html += '</div><div class="tm-export-preview-row tm-export-preview-data">';
@@ -1452,9 +1459,9 @@
                     const h = (c.imageHeight || 80) + 'px';
                     html += '<div class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" data-key="' + escapeHtml(col.key) + '" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">—</span></div>';
                 } else {
-                    const ch = Math.min(col.max_width_chars || 10, 40);
+                    const ch = Math.min(col.max_width_chars || 24, 60);
                     const val = savedRow[col.key] !== undefined ? escapeHtml(savedRow[col.key]) : '';
-                    html += '<div class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="min-width:' + ch + 'ch;background:' + escapeHtml(cellColor) + '" data-placeholder="Ejemplo">' + val + '</div>';
+                    html += '<div class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="min-width:' + ch + 'ch;max-width:' + ch + 'ch;background:' + escapeHtml(cellColor) + '" data-placeholder="Ejemplo">' + val + '</div>';
                 }
             });
             html += '</div></div>';
@@ -1462,10 +1469,26 @@
         }
 
         function reorderColumnsList(container, columns) {
-            const order = Array.from(container.querySelectorAll('.tm-export-personalize-col')).map(function (item) {
-                return columns.find(function (c) { return c.key === item.dataset.key; });
-            }).filter(Boolean);
-            return order.length ? order : columns.slice();
+            const map = {};
+            columns.forEach(function (c) { if (c && c.key) { map[c.key] = c; } });
+            const ordered = [];
+            Array.from(container.querySelectorAll('.tm-export-personalize-col')).forEach(function (item) {
+                const key = item.dataset.key || '';
+                const base = map[key];
+                if (!base) { return; }
+                const col = Object.assign({}, base);
+                if (!col.is_image) {
+                    const widthInput = item.querySelector('.tm-export-col-width-input');
+                    if (widthInput) {
+                        var raw = parseInt(widthInput.value, 10);
+                        if (!Number.isNaN(raw)) {
+                            col.max_width_chars = Math.max(8, Math.min(raw, 60));
+                        }
+                    }
+                }
+                ordered.push(col);
+            });
+            return ordered.length ? ordered : columns.slice();
         }
 
         function updateRestoreVisibility(columnsEl, originalColumns, restoreWrap) {
@@ -1509,6 +1532,30 @@
             }
             if (resetBtn) {
                 resetBtn.onclick = function () { applyPreviewZoom(100); };
+            }
+            var a4Area = document.getElementById('tmExportPreviewA4Area');
+            if (a4Area && !a4Area._tmExcelWheelZoomBound) {
+                a4Area._tmExcelWheelZoomBound = true;
+                a4Area.addEventListener('wheel', function (event) {
+                    var pinch = event.ctrlKey || event.metaKey;
+                    if (!pinch) { return; }
+                    event.preventDefault();
+                    event.stopPropagation();
+                    var steps = PREVIEW_ZOOM_STEPS;
+                    var currentZoom = (personalizeModal && personalizeModal._previewZoom) || 100;
+                    var idx = steps.indexOf(currentZoom);
+                    if (idx < 0) { idx = steps.indexOf(100); }
+                    if (event.deltaY > 0) {
+                        // alejar
+                        idx = Math.max(0, idx - 1);
+                    } else if (event.deltaY < 0) {
+                        // acercar
+                        idx = Math.min(steps.length - 1, idx + 1);
+                    } else {
+                        return;
+                    }
+                    applyPreviewZoom(steps[idx]);
+                }, { passive: false });
             }
         }
 
@@ -1589,7 +1636,9 @@
             const columnsEl = document.getElementById('tmExportPersonalizeColumns');
             const previewEl = document.getElementById('tmExportPersonalizePreview');
             const titleEl = document.getElementById('tmExportPersonalizeTitle');
-            const applyBtn = document.getElementById('tmExportPersonalizeApply');
+            const applyExcelBtn = document.getElementById('tmExportApplyExcel');
+            const applyPdfBtn = document.getElementById('tmExportApplyPdf');
+            const applyWordBtn = document.getElementById('tmExportApplyWord');
             const restoreWrap = document.getElementById('tmExportRestoreWrap');
             const restoreBtn = document.getElementById('tmExportRestoreBtn');
 
@@ -1606,7 +1655,7 @@
                     if (personalizeModal) { personalizeModal._personalizeColumns = columns; }
                     if (titleEl) { titleEl.value = data.title || ''; }
                     buildPersonalizeColumnsList(columns, columnsEl);
-                    buildPersonalizePreview(columns, previewEl);
+                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
                     if (restoreWrap) { restoreWrap.hidden = true; }
                     if (personalizeModal) { personalizeModal._previewZoom = 100; }
                     setupPreviewZoom();
@@ -1639,8 +1688,7 @@
                         };
                     }
 
-                    if (applyBtn && exportUrl) {
-                        applyBtn.onclick = function () {
+                    function applyExport(format) {
                             const orderedCols = reorderColumnsList(columnsEl, columns);
                             const state = getPersonalizeState();
                             const orientBtn = personalizeModal.querySelector('.tm-export-orient-btn.is-active');
@@ -1657,7 +1705,6 @@
                                         color: colState.color || 'var(--clr-primary)',
                                         image_width: colState.imageWidth || null,
                                         image_height: colState.imageHeight || null,
-                                        // width in caracteres aproximados, si viene del API
                                         max_width_chars: col.max_width_chars || null
                                     };
                                 })
@@ -1665,9 +1712,19 @@
 
                             const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
                             const cfgParam = encodeURIComponent(JSON.stringify(cfg));
+                            const fmt = format || 'excel';
                             closePersonalizeModal();
-                            window.location.href = exportUrl + separator + 'mode=single&analysis=0&cfg=' + cfgParam;
-                        };
+                            window.location.href = exportUrl + separator + 'mode=single&analysis=0&format=' + encodeURIComponent(fmt) + '&cfg=' + cfgParam;
+                    }
+
+                    if (applyExcelBtn && exportUrl) {
+                        applyExcelBtn.onclick = function () { applyExport('excel'); };
+                    }
+                    if (applyWordBtn && exportUrl) {
+                        applyWordBtn.onclick = function () { applyExport('word'); };
+                    }
+                    if (applyPdfBtn && exportUrl) {
+                        applyPdfBtn.onclick = function () { applyExport('pdf'); };
                     }
                 })
                 .catch(function () {

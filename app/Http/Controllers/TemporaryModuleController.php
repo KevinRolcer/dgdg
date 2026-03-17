@@ -26,6 +26,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Dompdf\Dompdf;
 
 class TemporaryModuleController extends Controller
 {
@@ -397,7 +398,7 @@ class TemporaryModuleController extends Controller
             'applies_to' => ['required', Rule::in(['all', 'selected'])],
             'delegate_ids' => ['nullable', 'array'],
             'delegate_ids.*' => ['integer', Rule::exists('users', 'id')],
-            'conflict_action' => ['nullable', Rule::in(['none', 'clear_module', 'clear_field_data'])],
+            'conflict_action' => ['nullable', Rule::in(['none', 'clear_module', 'clear_field_data', 'normalize_municipio'])],
             'existing_fields' => ['nullable', 'array'],
             'existing_fields.*.id' => ['required_with:existing_fields', 'integer'],
             'existing_fields.*.label' => ['required_with:existing_fields', 'string', 'max:120'],
@@ -543,6 +544,14 @@ class TemporaryModuleController extends Controller
         $destructiveKeys = array_values(array_unique($destructiveKeys));
         $invalidMainImageKeys = array_values(array_unique($invalidMainImageKeys));
         $conflictAction = (string) ($validated['conflict_action'] ?? 'none');
+
+        if ($conflictAction === 'normalize_municipio') {
+            $adminSeed = app(\App\Services\TemporaryModules\TemporaryModuleAdminSeedService::class);
+            $adminSeed->normalizeMunicipioField($temporaryModule, 'municipio');
+            // Después de normalizar, ese campo ya no debe contarse como “destructivo”
+            $destructiveKeys = array_values(array_diff($destructiveKeys, ['municipio']));
+            $conflictAction = 'none';
+        }
 
         if (!empty($destructiveKeys)) {
             if (!in_array($conflictAction, ['clear_module', 'clear_field_data'], true)) {
@@ -1215,8 +1224,41 @@ class TemporaryModuleController extends Controller
             ->with('status', 'Se vaciaron los registros del módulo correctamente.');
     }
 
+    public function normalizeMunicipioField(int $module): RedirectResponse
+    {
+        $temporaryModule = TemporaryModule::query()
+            ->with('fields:id,temporary_module_id,key,type')
+            ->findOrFail($module);
+        abort_unless(auth()->user()?->can('Modulos-Temporales-Admin'), 403);
+
+        $field = $temporaryModule->fields->firstWhere('key', 'municipio');
+        if (!$field) {
+            return redirect()
+                ->back()
+                ->with('status', 'El módulo no tiene un campo con clave "municipio".');
+        }
+
+        $adminSeed = app(\App\Services\TemporaryModules\TemporaryModuleAdminSeedService::class);
+        $result = $adminSeed->normalizeMunicipioField($temporaryModule, 'municipio');
+
+        $msg = 'Normalización de municipio completada. '.$result['updated'].' registro(s) actualizados.';
+        if (!empty($result['unmatched'])) {
+            $ejemplos = implode(', ', array_slice($result['unmatched'], 0, 5));
+            $msg .= ' No se pudo mapear '.count($result['unmatched']).' valor(es), por ejemplo: '.$ejemplos.'.';
+        }
+
+        return redirect()
+            ->back()
+            ->with('status', $msg);
+    }
+
     public function exportExcel(Request $request, int $module)
     {
+        $format = (string) $request->query('format', 'excel');
+        if (!in_array($format, ['excel', 'word', 'pdf'], true)) {
+            $format = 'excel';
+        }
+
         $mode = (string) $request->query('mode', 'single');
         if (!in_array($mode, ['single', 'mr'], true)) {
             $mode = 'single';
@@ -1238,6 +1280,179 @@ class TemporaryModuleController extends Controller
 
         $temporaryModule = TemporaryModule::query()->findOrFail($module);
         $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$module;
+
+        if (in_array($format, ['word', 'pdf'], true)) {
+            // Exportación directa a Word o PDF (solo tabla de registros, sin análisis).
+            $columnsCfg = is_array($exportConfig) && isset($exportConfig['columns']) && is_array($exportConfig['columns'])
+                ? $exportConfig['columns']
+                : [];
+            if ($columnsCfg === []) {
+                $cols = $this->getExportColumnsForPreview($temporaryModule);
+                $columnsCfg = array_map(static fn (array $col): array => ['key' => $col['key'], 'label' => $col['label'] ?? $col['key']], $cols);
+            }
+
+            $columnMap = [];
+            foreach ($columnsCfg as $col) {
+                if (!is_array($col)) {
+                    continue;
+                }
+                $key = (string) ($col['key'] ?? '');
+                if ($key === '') {
+                    continue;
+                }
+                $columnMap[$key] = [
+                    'key' => $key,
+                    'label' => (string) ($col['label'] ?? $key),
+                ];
+            }
+            $columns = array_values($columnMap);
+            if ($columns === []) {
+                abort(422, 'No hay columnas seleccionadas para el reporte.');
+            }
+
+            $microrregionIds = $temporaryModule->entries()
+                ->withoutGlobalScopes()
+                ->reorder()
+                ->select('microrregion_id')
+                ->distinct()
+                ->pluck('microrregion_id')
+                ->filter()
+                ->values()
+                ->all();
+
+            $microrregionMeta = DB::table('microrregiones')
+                ->select(['id', 'cabecera', 'microrregion'])
+                ->whereIn('id', $microrregionIds)
+                ->get()
+                ->mapWithKeys(function ($row) {
+                    $number = trim((string) ($row->microrregion ?? ''));
+                    $name = trim((string) ($row->cabecera ?? ''));
+
+                    $label = $number !== ''
+                        ? ('MR '.str_pad($number, 2, '0', STR_PAD_LEFT).($name !== '' ? ' — '.$name : ''))
+                        : ($name !== '' ? $name : 'Sin microrregión');
+
+                    return [(int) $row->id => [
+                        'number' => $number,
+                        'name' => $name,
+                        'label' => $label,
+                    ]];
+                });
+
+            $entries = $temporaryModule->entries()
+                ->withoutGlobalScopes()
+                ->orderBy('submitted_at')
+                ->get(['microrregion_id', 'data', 'submitted_at']);
+
+            $baseSlug = Str::slug($fileName, '_') ?: 'modulo_temporal_'.$temporaryModule->id;
+            $exportDir = storage_path('app/public/temporary-exports');
+            if (!is_dir($exportDir)) {
+                mkdir($exportDir, 0755, true);
+            }
+
+            $title = (string) ($exportConfig['title'] ?? $fileName);
+            $orientationConfig = ($exportConfig['orientation'] ?? 'portrait') === 'landscape' ? 'landscape' : 'portrait';
+
+            if ($format === 'word') {
+                $wordFileName = $baseSlug.'_'.now()->format('Ymd_His').'.docx';
+                $fullPath = $exportDir.'/'.$wordFileName;
+
+                $phpWord = new \PhpOffice\PhpWord\PhpWord();
+                $phpWord->setDefaultFontName('Calibri');
+                $phpWord->setDefaultFontSize(10);
+                $orientation = $orientationConfig === 'landscape'
+                    ? \PhpOffice\PhpWord\Style\Section::ORIENTATION_LANDSCAPE
+                    : \PhpOffice\PhpWord\Style\Section::ORIENTATION_PORTRAIT;
+                $section = $phpWord->addSection([
+                    'orientation' => $orientation,
+                    'marginTop' => 1134,
+                    'marginBottom' => 1134,
+                    'marginLeft' => 1134,
+                    'marginRight' => 1134,
+                ]);
+
+                $align = (string) ($exportConfig['title_align'] ?? 'center');
+                $jc = match ($align) {
+                    'left' => \PhpOffice\PhpWord\SimpleType\Jc::START,
+                    'right' => \PhpOffice\PhpWord\SimpleType\Jc::END,
+                    default => \PhpOffice\PhpWord\SimpleType\Jc::CENTER,
+                };
+                $section->addText($title, ['bold' => true, 'size' => 14, 'color' => '861E34'], ['alignment' => $jc, 'spaceAfter' => 200]);
+                $section->addTextBreak(1);
+
+                $table = $section->addTable([
+                    'borderSize' => 6,
+                    'borderColor' => '444444',
+                    'cellMargin' => 80,
+                ]);
+
+                // Encabezados
+                $table->addRow();
+                foreach ($columns as $col) {
+                    $table->addCell(null)->addText((string) $col['label'], ['bold' => true]);
+                }
+
+                // Filas
+                $itemNumber = 1;
+                foreach ($entries as $entry) {
+                    $table->addRow();
+                    foreach ($columns as $col) {
+                        $key = $col['key'];
+                        if ($key === 'item') {
+                            $text = (string) $itemNumber;
+                            $itemNumber++;
+                        } elseif ($key === 'microrregion') {
+                            $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+                            $text = (string) ($meta['label'] ?? $meta->label ?? '');
+                        } else {
+                            $val = $entry->data[$key] ?? null;
+                            if (is_bool($val)) {
+                                $text = $val ? 'Sí' : 'No';
+                            } elseif (is_array($val)) {
+                                $text = implode(', ', array_map(static fn ($v) => is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE), $val));
+                            } elseif (is_scalar($val)) {
+                                $text = (string) $val;
+                            } else {
+                                $text = '';
+                            }
+                        }
+                        $table->addCell(null)->addText($text);
+                    }
+                }
+
+                \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007')->save($fullPath);
+
+                $downloadUrl = route('temporary-modules.admin.exports.download', ['file' => $wordFileName]);
+                $request->user()->notify(new \App\Notifications\ExcelExportCompleted($wordFileName, $downloadUrl));
+
+                return redirect()->back()->with('toast', 'El documento Word se generó correctamente. Puedes descargarlo desde tus notificaciones.');
+            }
+
+            // PDF
+            $pdfFileName = $baseSlug.'_'.now()->format('Ymd_His').'.pdf';
+            $fullPdfPath = $exportDir.'/'.$pdfFileName;
+
+            $html = view('temporary_modules.admin.partials.export_pdf_table', [
+                'title' => $title,
+                'orientation' => $orientationConfig,
+                'columns' => $columns,
+                'entries' => $entries,
+                'microrregionMeta' => $microrregionMeta,
+            ])->render();
+
+            $dompdf = new Dompdf([
+                'defaultPaperSize' => 'a4',
+            ]);
+            $dompdf->loadHtml($html, 'UTF-8');
+            $dompdf->setPaper('A4', $orientationConfig === 'landscape' ? 'landscape' : 'portrait');
+            $dompdf->render();
+            file_put_contents($fullPdfPath, $dompdf->output());
+
+            $downloadUrl = route('temporary-modules.admin.exports.download', ['file' => $pdfFileName]);
+            $request->user()->notify(new \App\Notifications\ExcelExportCompleted($pdfFileName, $downloadUrl));
+
+            return redirect()->back()->with('toast', 'El PDF se generó correctamente. Puedes descargarlo desde tus notificaciones.');
+        }
 
         $exportRequestId = Str::uuid()->toString();
         $request->user()->notify(new \App\Notifications\ExcelExportPending($exportRequestId, $fileName, 'excel'));
@@ -1431,7 +1646,7 @@ class TemporaryModuleController extends Controller
         abort_unless($request->user()->can('Modulos-Temporales-Admin'), 403);
 
         $file = trim($file);
-        abort_unless($file !== '' && preg_match('/\A[A-Za-z0-9_\-]+\.(xlsx|docx)\z/', $file) === 1, 404);
+        abort_unless($file !== '' && preg_match('/\A[A-Za-z0-9_\-]+\.(xlsx|docx|pdf)\z/', $file) === 1, 404);
 
         $path = storage_path('app/public/temporary-exports/'.$file);
         abort_unless(is_file($path), 404);
