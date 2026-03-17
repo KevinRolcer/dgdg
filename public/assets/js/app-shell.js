@@ -390,6 +390,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             closeAllSubmenus(targetId);
             submenu.classList.add('is-open');
+            button.setAttribute('aria-expanded', 'true');
         });
     });
 
