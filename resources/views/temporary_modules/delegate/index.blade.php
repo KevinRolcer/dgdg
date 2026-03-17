@@ -213,6 +213,10 @@
         </div>
 
         @foreach ($module->getRelation('myEntries') as $entry)
+            @php
+                $entryMicrorregion = ($microrregionesAsignadas ?? collect())->firstWhere('id', $entry->microrregion_id);
+                $entryMunicipios = $entryMicrorregion && isset($entryMicrorregion->municipios) ? array_values($entryMicrorregion->municipios) : ($municipios ?? []);
+            @endphp
             <div class="tm-modal" id="delegate-edit-{{ $entry->id }}" aria-hidden="true" role="dialog" aria-modal="true">
                 <div class="tm-modal-backdrop" data-close-module-preview></div>
                 <div class="tm-modal-dialog tm-modal-dialog-entry">
@@ -333,7 +337,7 @@
                                         @elseif ($field->type === 'municipio')
                                             <select id="{{ $id }}" name="{{ $name }}" class="tm-municipio-select" {{ $field->is_required ? 'required' : '' }}>
                                                 <option value="">Selecciona un municipio</option>
-                                                @foreach ($municipios as $municipio)
+                                                @foreach ($entryMunicipios as $municipio)
                                                     <option value="{{ $municipio }}" @selected($value === $municipio)>{{ $municipio }}</option>
                                                 @endforeach
                                             </select>
