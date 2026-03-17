@@ -683,6 +683,36 @@ html.theme-dark .tm-word-acc-row {
     border-color: var(--clr-border);
 }
 
+/* Paleta de campos arrastrables y slots: adaptados a tema oscuro */
+html.theme-dark .tm-word-field-palette {
+    background: var(--tm-surface) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .tm-word-field-chip {
+    background: var(--tm-muted-bg) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-accent) !important;
+}
+
+html.theme-dark .tm-word-slot {
+    background: var(--tm-surface) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .tm-word-slot.is-filled {
+    border-color: rgba(199, 155, 102, 0.6) !important;
+}
+
+html.theme-dark .tm-word-acc-label {
+    color: var(--clr-text-main) !important;
+}
+
+/* Solo el título del modal Word usa acento (--clr-accent) */
+html.theme-dark .tm-analysis-word-personalize-modal .tm-modal-head h3 {
+    color: var(--clr-accent) !important;
+}
+
 html.theme-dark .tm-word-accounting-summary td.tm-word-accounting-val {
     background: var(--tm-input-bg) !important;
     color: #f87171 !important;
@@ -868,4 +898,10 @@ html.theme-dark.theme-dark--slate {
     --tm-preview-cell-alt: #455060;
     --tm-preview-border: rgba(140, 170, 210, 0.12);
     --tm-preview-sheet-edge: rgba(130, 170, 220, 0.35);
+}
+
+/* Tema pizarra: textos rojos → acento en módulos (TM, UM, supervisión, etc.) */
+html.theme-dark.theme-dark--slate .tm-shell .tm-table th,
+html.theme-dark.theme-dark--slate .supervision-layout table thead th {
+    color: var(--clr-accent) !important;
 }

@@ -89,11 +89,24 @@ function openAgendaModal(id = null, tipo = 'asunto') {
             
             document.getElementById('modalAsunto').value = btn.dataset.asunto || '';
             var rawDesc = btn.dataset.descripcion || '';
+            
+            const btnOpenDescRef = document.getElementById('btnOpenDescModal');
+            
             if (itemTipo === 'gira') {
                 var parsed = agendaExtractAforoFromDescription(rawDesc);
                 document.getElementById('modalDescripcion').value = parsed.base;
                 var aforoEl = document.getElementById('modalAforo');
                 if (aforoEl) aforoEl.value = parsed.aforo || '';
+                
+                if (btnOpenDescRef) {
+                    if (parsed.base.trim().length > 0) {
+                        btnOpenDescRef.innerHTML = '<i class="fa-solid fa-align-left" style="color: var(--clr-accent, #c79b66);"></i> Ver o Editar Descripción';
+                        btnOpenDescRef.classList.add('is-active');
+                    } else {
+                        btnOpenDescRef.innerHTML = '<i class="fa-solid fa-align-left" style="color: var(--clr-accent, #c79b66);"></i> Añadir Descripción';
+                        btnOpenDescRef.classList.remove('is-active');
+                    }
+                }
             } else {
                 document.getElementById('modalDescripcion').value = rawDesc;
                 var aforoEl2 = document.getElementById('modalAforo');
@@ -152,7 +165,7 @@ function openAgendaModal(id = null, tipo = 'asunto') {
     }
     const tipoSelector = document.getElementById('agendaTipoSelector');
     if (tipoSelector) {
-        tipoSelector.style.display = isGira ? 'block' : 'none';
+        tipoSelector.style.display = isGira ? 'flex' : 'none';
     }
     const delegadoWrap = document.getElementById('agendaDelegadoLabelWrap');
     if (delegadoWrap) {
@@ -166,6 +179,13 @@ function openAgendaModal(id = null, tipo = 'asunto') {
     if (!id && isGira) {
         var aforoNew = document.getElementById('modalAforo');
         if (aforoNew) aforoNew.value = '';
+        
+        // Reset description button on physical new form
+        const btnOpenDescRef = document.getElementById('btnOpenDescModal');
+        if (btnOpenDescRef) {
+            btnOpenDescRef.innerHTML = '<i class="fa-solid fa-align-left" style="color: var(--clr-accent, #c79b66);"></i> Añadir Descripción';
+            btnOpenDescRef.classList.remove('is-active');
+        }
     }
     if (isGira) {
         const microSel = document.getElementById('modalMicrorregion');
@@ -201,6 +221,30 @@ function toggleUnfold(id) {
     const isShowing = container.style.display !== 'none';
     setUnfoldState(id, !isShowing);
 }
+
+// Funciones para el Mini Modal de Descripción
+function openDescModal() {
+    const modal = document.getElementById('agendaDescModal');
+    const miniDesc = document.getElementById('modalMiniDescripcion');
+    const mainDesc = document.getElementById('modalDescripcion');
+    
+    if (modal && miniDesc && mainDesc) {
+        // Cargar lo que ya tenga el mainDesc (quitando aforos por si acaso)
+        miniDesc.value = agendaStripAforoLines(mainDesc.value);
+        modal.style.display = 'flex';
+        setTimeout(() => miniDesc.focus(), 100);
+    }
+}
+
+function closeDescModal() {
+    const modal = document.getElementById('agendaDescModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Exponer estas dos globalmente por los onClick del Blade
+window.closeDescModal = closeDescModal;
 
 function addAddressRow(value = '') {
     const container = document.getElementById('extraAddressesContainer');
@@ -275,6 +319,38 @@ document.addEventListener('DOMContentLoaded', function () {
                 const email = item.dataset.email || '';
                 item.style.display = (name.includes(query) || email.includes(query)) ? 'flex' : 'none';
             });
+        });
+    }
+
+    // Mini Modal de Descripción (Eventos de botones)
+    const btnOpenDesc = document.getElementById('btnOpenDescModal');
+    if (btnOpenDesc) {
+        btnOpenDesc.addEventListener('click', openDescModal);
+    }
+
+    const btnSaveDesc = document.getElementById('btnSaveDescModal');
+    if (btnSaveDesc) {
+        btnSaveDesc.addEventListener('click', function() {
+            const miniDesc = document.getElementById('modalMiniDescripcion');
+            const mainDesc = document.getElementById('modalDescripcion');
+            const btnOpenDescRef = document.getElementById('btnOpenDescModal');
+            
+            if (miniDesc && mainDesc) {
+                // Al presionar guardar, transferimos la info al input original oculto
+                mainDesc.value = miniDesc.value;
+                
+                // Actualizar el texto del botón si hay contenido
+                if (btnOpenDescRef) {
+                    if (miniDesc.value.trim().length > 0) {
+                        btnOpenDescRef.innerHTML = '<i class="fa-solid fa-align-left" style="color: var(--clr-accent, #c79b66);"></i> Ver o Editar Descripción';
+                        btnOpenDescRef.classList.add('is-active');
+                    } else {
+                        btnOpenDescRef.innerHTML = '<i class="fa-solid fa-align-left" style="color: var(--clr-accent, #c79b66);"></i> Añadir Descripción';
+                        btnOpenDescRef.classList.remove('is-active');
+                    }
+                }
+                closeDescModal();
+            }
         });
     }
 
@@ -397,6 +473,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (e.target === moduloModal) closeAgendaModuloModal();
         });
     }
+
+    var verDescModal = document.getElementById('agendaVerDescripcionModal');
+    if (verDescModal) {
+        verDescModal.addEventListener('click', function (e) {
+            if (e.target === verDescModal) window.agendaCerrarVerDescripcion();
+        });
+    }
 });
 
 function agendaCsrfToken() {
@@ -510,3 +593,24 @@ function closeAgendaModuloModal() {
 
 window.openAgendaModuloModal = openAgendaModuloModal;
 window.closeAgendaModuloModal = closeAgendaModuloModal;
+
+/** Abre el modal de solo lectura con la descripción (botón "Ver" en la tabla). */
+window.agendaVerDescripcion = function(btn) {
+    var text = btn && btn.getAttribute ? btn.getAttribute('data-descripcion') : '';
+    var body = document.getElementById('agendaVerDescripcionBody');
+    var modal = document.getElementById('agendaVerDescripcionModal');
+    if (body) body.textContent = text || '';
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+    }
+};
+
+/** Cierra el modal de ver descripción. */
+window.agendaCerrarVerDescripcion = function() {
+    var modal = document.getElementById('agendaVerDescripcionModal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    }
+};

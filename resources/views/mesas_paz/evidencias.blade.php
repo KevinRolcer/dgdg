@@ -4,10 +4,184 @@
 
 @push('css')
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <link href="{{ asset('assets/css/mesas_paz/mesas-paz-shell.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesas-paz-shell.css')) ?: time() }}" rel="stylesheet" />
 <link href="{{ asset('assets/css/mesas_paz/mesaPazSupervision.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesaPazSupervision.css')) ?: time() }}" rel="stylesheet" />
 <link href="{{ asset('assets/css/mesas_paz/mesaPaz.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesaPaz.css')) ?: time() }}" rel="stylesheet" />
 <link href="{{ asset('assets/css/theme-dark-mesas-paz.css') }}?v={{ @filemtime(public_path('assets/css/theme-dark-mesas-paz.css')) ?: time() }}" rel="stylesheet" />
+<style>
+/* Calendario presentación: mismo diseño que calendario de inicio (variables --cal-*) */
+.flatpickr-calendar {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: 340px !important;
+    margin: 0 auto;
+    font-family: inherit;
+    padding: 0 !important;
+}
+
+/* Cabecera del mes y botones de navegación */
+.flatpickr-months {
+    margin-bottom: 12px;
+}
+.flatpickr-months .flatpickr-month {
+    background: transparent !important;
+    color: var(--cal-month-text, var(--clr-accent)) !important;
+    height: 38px !important;
+}
+.flatpickr-current-month {
+    font-size: 1.15rem !important;
+    padding-top: 4px !important;
+}
+.flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-current-month span.cur-month,
+.flatpickr-current-month input.cur-year {
+    color: var(--cal-month-text, var(--clr-accent)) !important;
+    font-weight: 800 !important;
+    appearance: none;
+    background: transparent;
+    border: none;
+}
+.flatpickr-current-month .flatpickr-monthDropdown-months:hover {
+    background: var(--cal-cell-hover-bg, rgba(255,255,255,0.05));
+    border-radius: 4px;
+}
+
+/* Flechas de navegación (como home: .home-calendar-nav-btn) */
+.flatpickr-months .flatpickr-prev-month,
+.flatpickr-months .flatpickr-next-month {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 6px !important;
+    border: 1px solid var(--cal-nav-btn-border, var(--clr-border)) !important;
+    background: var(--cal-nav-btn-bg, transparent) !important;
+    padding: 0 !important;
+    top: 0 !important;
+    margin-top: 2px !important;
+    transition: all 0.2s ease;
+}
+.flatpickr-months .flatpickr-prev-month:hover,
+.flatpickr-months .flatpickr-next-month:hover {
+    background: var(--cal-cell-hover-bg, rgba(255,255,255,0.05)) !important;
+    border-color: var(--cal-cell-hover-border, var(--clr-border)) !important;
+}
+.flatpickr-months .flatpickr-prev-month svg, 
+.flatpickr-months .flatpickr-next-month svg {
+    fill: var(--cal-nav-btn-color, var(--clr-text-main)) !important;
+    width: 12px !important;
+    height: 12px !important;
+}
+
+/* Días de la semana */
+.flatpickr-weekdays {
+    background: transparent !important;
+    height: 28px !important;
+}
+span.flatpickr-weekday {
+    color: var(--cal-weekday-text, var(--clr-text-light)) !important;
+    font-weight: 800 !important;
+    font-size: 0.85rem !important;
+    text-transform: capitalize;
+}
+
+/* Contenedores para centrar la grilla */
+.flatpickr-innerContainer {
+    display: flex !important;
+    justify-content: center !important;
+}
+.flatpickr-rContainer {
+    width: 100% !important;
+    max-width: 340px !important;
+}
+.flatpickr-days {
+    width: 100% !important;
+    border: none !important;
+}
+.dayContainer {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    justify-content: space-between !important;
+}
+
+/* Cada día individual (mismo criterio que calendario de inicio: celdas sin caja, borde transparente) */
+.flatpickr-day {
+    max-width: 42px !important;
+    height: 42px !important;
+    line-height: 40px !important;
+    background: var(--cal-cell-bg, transparent) !important;
+    border: 1px solid var(--cal-cell-border, transparent) !important;
+    color: var(--cal-cell-text, var(--clr-text-main)) !important;
+    border-radius: 6px !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+    margin: 2px 0 !important;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* Quitar fondo blanco asqueroso de predeterminados de flatpickr */
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay,
+.flatpickr-day.flatpickr-disabled {
+    color: var(--cal-cell-border, #4b5563) !important;
+    background: transparent !important;
+    border-color: transparent !important;
+    opacity: 0.5;
+}
+
+.flatpickr-day:hover:not(.flatpickr-disabled) {
+    background: var(--cal-cell-hover-bg, rgba(255, 255, 255, 0.05)) !important;
+    border-color: var(--cal-cell-hover-border, var(--clr-border)) !important;
+}
+
+/* Día de hoy (igual que calendario de inicio) */
+.flatpickr-day.today {
+    background: var(--cal-today-bg) !important;
+    border-color: var(--cal-today-border) !important;
+    color: var(--cal-today-text) !important;
+    font-weight: 700 !important;
+}
+
+/* Día seleccionado / inicio o fin de rango (mismo estilo que “hoy”) */
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+    background: var(--cal-today-bg) !important;
+    border-color: var(--cal-today-border) !important;
+    color: var(--cal-today-text) !important;
+    font-weight: 700 !important;
+    position: relative;
+}
+
+/* Rango intermedio */
+.flatpickr-day.inRange,
+.flatpickr-day.inRange:hover {
+    background: var(--cal-today-bg) !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+/* Días deshabilitados (Fines de semana visualmente inactivos) */
+.flatpickr-day.is-weekend-disabled {
+    opacity: 0.3 !important;
+    background: transparent !important;
+    border-color: transparent !important;
+}
+
+/* Envoltura del modal */
+.calendar-wrapper { margin-top: 15px; width: 100%; display: flex; justify-content: center; }
+
+/* Título del calendario: mismo color que mes/año del calendario de inicio */
+.presentation-calendar-label {
+    font-size: 1.1rem;
+    color: var(--cal-month-text, var(--clr-primary-dark));
+}
+</style>
 @endpush
 
 @push('scripts')
@@ -601,14 +775,12 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
-                <form id="formRangoFechasPresentacion" class="d-flex flex-column gap-3">
-                    <div>
-                        <label for="fechaInicioPresentacion" class="form-label">Fecha inicio</label>
-                        <input type="date" id="fechaInicioPresentacion" name="fecha_inicio" class="form-control" required>
-                    </div>
-                    <div>
-                        <label for="fechaFinPresentacion" class="form-label">Fecha fin</label>
-                        <input type="date" id="fechaFinPresentacion" name="fecha_fin" class="form-control" required>
+                <form id="formRangoFechasPresentacion" class="d-flex flex-column align-items-center">
+                    <label for="fechaRangoPresentacion" class="form-label fw-bold mb-3 text-center presentation-calendar-label">
+                        Selecciona la semana a evaluar
+                    </label>
+                    <div class="calendar-wrapper presentation-calendar-wrap w-100 d-flex justify-content-center">
+                        <input type="text" id="fechaRangoPresentacion" name="fecha_rango" class="d-none" required>
                     </div>
                 </form>
             </div>
@@ -638,5 +810,7 @@
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
 <script src="{{ asset('assets/js/mesas_paz/mesaPazSupervicion.js') }}?v={{ @filemtime(public_path('assets/js/mesas_paz/mesaPazSupervicion.js')) ?: time() }}"></script>
 @endpush

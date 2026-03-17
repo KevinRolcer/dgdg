@@ -259,29 +259,91 @@ document.addEventListener('DOMContentLoaded', function () {
         const btnConfirmarRango = document.getElementById('btnConfirmarRangoFechasPresentacion');
         const btnGenerarCanva = document.getElementById('btnGenerarPresentacion');
 
+        let fpRango = null;
+        if (typeof flatpickr !== 'undefined') {
+            fpRango = flatpickr("#fechaRangoPresentacion", {
+                mode: "range",
+                inline: true,
+                locale: "es",
+                dateFormat: "Y-m-d",
+                onDayCreate: function(dObj, dStr, fp, dayElem) {
+                    const day = dayElem.dateObj.getDay();
+                    if (day === 0 || day === 6) {
+                        dayElem.classList.add("is-weekend-disabled");
+                    }
+                },
+                onChange: function(selectedDates, dateStr, instance) {
+                    if (selectedDates.length > 0) {
+                        // Evitar iniciar en fin de semana
+                        const startDay = selectedDates[0].getDay();
+                        if (startDay === 0 || startDay === 6) {
+                            instance.clear();
+                            return;
+                        }
+                    }
+
+                    if (selectedDates.length === 2) {
+                        const start = selectedDates[0];
+                        let end = selectedDates[1];
+
+                        let current = new Date(start.getTime());
+                        let validDaysCount = 0;
+                        let lastValidDate = start;
+
+                        while (current <= end) {
+                            const d = current.getDay();
+                            if (d !== 0 && d !== 6) {
+                                validDaysCount++;
+                                lastValidDate = new Date(current.getTime());
+                            }
+                            if (validDaysCount >= 5) {
+                                break;
+                            }
+                            current.setDate(current.getDate() + 1);
+                        }
+
+                        // Setear hasta el maximo de 5 dias o regresarlo si termino en fin de semana
+                        if (end > current || end.getDay() === 0 || end.getDay() === 6) {
+                            instance.setDate([start, lastValidDate], true);
+                        }
+                    }
+                }
+            });
+        }
+
         if (btnAbrirRango) {
             btnAbrirRango.addEventListener('click', function() {
                 const modalEl = document.getElementById('rangoFechasPresentacionModal');
                 if (modalEl) {
                     const modal = new bootstrap.Modal(modalEl);
                     modal.show();
+                    // Opcional: limpiar fecha al abrir
+                    if (fpRango) fpRango.clear();
                 }
             });
         }
 
         if (btnConfirmarRango) {
             btnConfirmarRango.addEventListener('click', function() {
-                const fechaInicio = document.getElementById('fechaInicioPresentacion')?.value;
-                const fechaFin = document.getElementById('fechaFinPresentacion')?.value;
-                
-                if (!fechaInicio || !fechaFin) {
+                if (!fpRango || !fpRango.selectedDates || fpRango.selectedDates.length < 2) {
                     if (typeof swal === 'function') {
-                        swal('Atención', 'Selecciona ambas fechas para continuar.', 'warning');
+                        swal('Atención', 'Selecciona un rango válido (Inicio y Fin) para continuar.', 'warning');
                     } else {
-                        alert('Selecciona ambas fechas para continuar.');
+                        alert('Selecciona un rango válido (Inicio y Fin) para continuar.');
                     }
                     return;
                 }
+
+                const fechaInicioVal = fpRango.selectedDates[0];
+                const fechaFinVal = fpRango.selectedDates[1];
+
+                const offsetInicio = fechaInicioVal.getTimezoneOffset() * 60000;
+                const offsetFin = fechaFinVal.getTimezoneOffset() * 60000;
+                const fechaInicioArr = new Date(fechaInicioVal.getTime() - offsetInicio).toISOString().split('T')[0];
+                const fechaFinArr = new Date(fechaFinVal.getTime() - offsetFin).toISOString().split('T')[0];
+
+                const fechaInicio = fechaInicioArr;
+                const fechaFin = fechaFinArr;
 
                 const rangoModal = bootstrap.Modal.getInstance(document.getElementById('rangoFechasPresentacionModal'));
                 if (rangoModal) rangoModal.hide();

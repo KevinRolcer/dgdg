@@ -5,6 +5,7 @@
             <thead>
                 <tr>
                     <th>Asunto</th>
+                    <th>Descripción</th>
                     <th>Fecha y Hora</th>
                     <th>Asignados</th>
                     <th>Recordatorio</th>
@@ -31,11 +32,17 @@
                                 <span class="agenda-pill-actualizacion" title="Seguimiento">Actualización</span>
                             @endif
                             <strong>{{ $item->asunto }}</strong>
-                            @if($item->descripcion)
-                                <small>{{ Str::limit($item->descripcionConAforoPersonas(), 72) }}</small>
-                            @endif
                             @if($item->repite)
                                 <span class="agenda-pill-recurrente"><i class="fa-solid fa-repeat"></i> Recurrente</span>
+                            @endif
+                        </td>
+                        <td class="agenda-cell-descripcion">
+                            @if($item->descripcion)
+                                <button type="button" class="agenda-btn agenda-btn-ver-desc" data-descripcion="{{ e($item->descripcionConAforoPersonas()) }}" onclick="window.agendaVerDescripcion(this)" title="Ver descripción">
+                                    Ver
+                                </button>
+                            @else
+                                <span class="agenda-text-muted">—</span>
                             @endif
                         </td>
                         <td>
@@ -71,7 +78,7 @@
                         <td>
                             <div class="agenda-actions-cell">
                             @if (!empty($puedeEditarAgenda))
-                            <button type="button" class="agenda-btn agenda-btn-table"
+                            <button type="button" class="agenda-btn agenda-btn-table agenda-btn-icon"
                                     onclick="openAgendaModal({{ $item->id }})"
                                     data-id="{{ $item->id }}"
                                     data-tipo="{{ $item->tipo }}"
@@ -91,13 +98,13 @@
                                     data-users='@json($item->usuariosAsignados->pluck('id'))'
                                     data-addresses='@json($item->direcciones_adicionales ?? [])'
                                     title="Editar">
-                                Editar
+                                <i class="fa-solid fa-pen" aria-hidden="true"></i>
                             </button>
                             <form action="{{ route('agenda.destroy', $item->id) }}" method="POST" id="delete-form-{{ $item->id }}" class="agenda-inline-form">
                                 @csrf
                                 @method('DELETE')
-                                <button type="button" class="agenda-btn agenda-btn-danger" onclick="confirmDelete({{ $item->id }})" title="Eliminar">
-                                    Eliminar
+                                <button type="button" class="agenda-btn agenda-btn-danger agenda-btn-icon" onclick="confirmDelete({{ $item->id }})" title="Eliminar">
+                                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
                                 </button>
                             </form>
                             @endif
@@ -109,7 +116,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="agenda-table-empty">
+                        <td colspan="7" class="agenda-table-empty">
                             No hay asuntos registrados en la agenda para mostrar.
                         </td>
                     </tr>

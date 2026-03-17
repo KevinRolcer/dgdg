@@ -30,7 +30,7 @@
 }
 
 html.theme-dark .agenda-shell-title {
-    color: var(--clr-text-main);
+    color: var(--clr-text-main)
 }
 
 .agenda-shell-desc {
@@ -609,7 +609,6 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     background: white;
     width: 100%;
     max-width: 650px;
-    height: auto;
     max-height: calc(100vh - 2rem);
     min-height: 0;
     border-radius: 12px;
@@ -656,6 +655,70 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     overflow-x: hidden !important;
     flex: 1 1 auto;
     min-height: 0; /* scroll dentro de max-height del modal */
+}
+
+/* Modal agregar/editar: altura adaptable; form en flex para que el pie quede siempre hasta abajo */
+#agendaModal .modal-agenda-content {
+    height: auto;
+    max-height: calc(100vh - 2rem);
+}
+
+#agendaModal #agendaForm {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    margin: 0;
+    height: 100%;
+}
+
+#agendaModal .modal-body-scroll {
+    padding: 0.6rem 1rem 0.75rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto !important;
+}
+
+#agendaModal .modal-agenda-header {
+    padding: 0.6rem 1rem;
+}
+
+#agendaModal .modal-agenda-footer {
+    flex-shrink: 0;
+    padding: 0.6rem 1rem 0.75rem;
+    margin-top: auto;
+    margin-bottom: 0;
+}
+
+#agendaModal .form-group-agenda {
+    margin-bottom: 0.5rem;
+}
+
+#agendaModal .form-label-agenda {
+    font-size: 0.7rem;
+    margin-top: 0.15rem;
+    margin-bottom: 0.15rem;
+}
+
+#agendaModal .form-control-agenda {
+    font-size: 0.7rem;
+    height: 32px;
+    padding: 0.3rem 0.5rem;
+}
+
+#agendaModal .agenda-type-switch {
+    margin-bottom: 0.75rem !important;
+}
+
+#agendaModal .agenda-row-two-cols.mb-3,
+#agendaModal .agenda-gira-delegado-aforo-row {
+    margin-top: 0.5rem !important;
+}
+
+#agendaModal .agenda-aforo-field .form-label-agenda,
+#agendaModal .agenda-aforo-input-row {
+    margin-bottom: 0.2rem;
 }
 
 .modal-body-scroll::-webkit-scrollbar {
@@ -965,6 +1028,25 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
 .agenda-table td > .agenda-inline-form {
     margin-right: 6px;
     margin-bottom: 6px;
+}
+
+.agenda-cell-descripcion {
+    width: 1%;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.agenda-btn-ver-desc {
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    min-height: 26px;
+}
+
+.modal-agenda-ver-desc .modal-agenda-ver-desc-body,
+#agendaVerDescripcionBody {
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--clr-text-main, #1e293b);
 }
 
 .agenda-table td > *:last-child {

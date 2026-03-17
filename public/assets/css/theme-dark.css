@@ -200,6 +200,28 @@ html.theme-dark .menu-group.is-active > .menu-link-toggle {
     color: var(--clr-accent);
 }
 
+/* Tema pizarra: textos y bordes rojos → acento (#c79b66) en todos los módulos */
+html.theme-dark.theme-dark--slate .topbar-menu-link-danger {
+    color: var(--clr-accent);
+}
+
+html.theme-dark.theme-dark--slate .btn-outline-primary {
+    color: var(--clr-accent) !important;
+    border-color: var(--clr-accent) !important;
+    background: transparent !important;
+}
+
+html.theme-dark.theme-dark--slate .btn-outline-primary:hover,
+html.theme-dark.theme-dark--slate .btn-outline-primary:focus {
+    background: rgba(199, 155, 102, 0.2) !important;
+    border-color: var(--clr-accent) !important;
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark.theme-dark--slate .text-primary {
+    color: var(--clr-accent) !important;
+}
+
 /* Login (misma clase en html) */
 html.theme-dark.auth-page body {
     background: var(--clr-bg);

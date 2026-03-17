@@ -14,11 +14,18 @@
             <input type="hidden" name="subtipo" id="modalSubtipo" value="gira">
             
             <div class="modal-body-scroll">
-                <div class="form-group-agenda agenda-type-switch" id="agendaTipoSelector" style="display: none;">
-                    <label class="form-label-agenda">Tipo de evento</label>
-                    <div class="agenda-type-pills">
-                    <button type="button" class="agenda-type-pill" data-subtipo="pre-gira">Pre-Gira</button>
-                        <button type="button" class="agenda-type-pill is-active" data-subtipo="gira">Gira</button>
+                <div class="agenda-type-switch" id="agendaTipoSelector" style="display: flex !important; flex-direction: row !important; justify-content: space-between !important; align-items: flex-end !important; width: 100%; margin-bottom: 12px;">
+                    <div style="flex: 0 0 auto;">
+                        <label class="form-label-agenda" style="display: block; margin-bottom: 8px;">Tipo de evento</label>
+                        <div class="agenda-type-pills">
+                            <button type="button" class="agenda-type-pill" data-subtipo="pre-gira">Pre-Gira</button>
+                            <button type="button" class="agenda-type-pill is-active" data-subtipo="gira">Gira</button>
+                        </div>
+                    </div>
+                    <div style="flex: 1 1 auto; display: flex; align-items: flex-end; justify-content: flex-end;">
+                        <button type="button" id="btnOpenDescModal" style="background: var(--cal-cell-hover-bg, rgba(255,255,255,0.05)); border: 1px solid var(--cal-cell-hover-border, var(--clr-border, #4b5563)); color: var(--clr-text-main, #e2e8f0); border-radius: 6px; padding: 0 12px; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; height: 32px; transition: all 0.2s;">
+                            <i class="fa-solid fa-align-left" style="color: var(--clr-accent, #c79b66);"></i> Añadir Descripción
+                        </button>
                     </div>
                 </div>
 
@@ -74,7 +81,7 @@
                 </div>
 
                 <!-- Common temporal row -->
-                <div style="display: flex !important; flex-direction: row !important; gap: 12px; align-items: flex-end; width: 100%; margin-bottom: 1rem;">
+                <div class="agenda-fecha-hora-row" style="display: flex !important; flex-direction: row !important; gap: 12px; align-items: flex-end; width: 100%; margin-bottom: 0.5rem;">
                     <div style="flex: 1; min-width: 120px;">
                         <label class="form-label-agenda">Fecha <span class="text-red-500">*</span></label>
                         <input type="date" name="fecha_inicio" id="modalFecha" class="form-control-agenda" required>
@@ -115,7 +122,7 @@
                     </div>
                 </div>
 
-                <div class="mt-4 agenda-gira-delegado-aforo-row">
+                <div class="agenda-gira-delegado-aforo-row" style="margin-top: 0.75rem;">
                     {{-- Solo Gira/Pre-Gira: delegado de la MR --}}
                     <div class="agenda-col-40" id="agendaDelegadoLabelWrap" style="display: none;">
                         <p id="agendaDelegadoLabel" class="agenda-delegado-label">
@@ -179,6 +186,29 @@
         </div>
         <div class="modal-agenda-footer">
             <button type="button" class="btn-agenda btn-secondary-agenda" onclick="closeAssignModal()">Cerrar</button>
+        </div>
+    </div>
+    </div>
+</div>
+
+<!-- Modal Pequeño para Descripción -->
+<div id="agendaDescModal" class="modal-agenda-overlay" style="display:none; z-index: 10000;">
+    <div class="modal-agenda-content" style="max-width: 500px; padding: 20px;">
+        <div class="modal-agenda-header">
+            <h3>Añadir Descripción</h3>
+            <button type="button" class="modal-close-btn" onclick="closeDescModal()">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="modal-body-scroll" style="max-height: 400px; overflow-y: auto;">
+            <div class="form-group-agenda">
+                <label class="form-label-agenda">Escribe los detalles adicionales de este evento:</label>
+                <textarea id="modalMiniDescripcion" rows="6" class="form-control-agenda" placeholder="Agrega aquí la descripción..." style="resize: vertical; min-height: 120px;"></textarea>
+            </div>
+        </div>
+        <div class="modal-agenda-footer" style="margin-top: 15px;">
+            <button type="button" class="btn-agenda btn-secondary-agenda" onclick="closeDescModal()">Cerrar</button>
+            <button type="button" class="btn-agenda btn-primary-agenda" id="btnSaveDescModal">Aceptar</button>
         </div>
     </div>
 </div>

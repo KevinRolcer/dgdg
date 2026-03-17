@@ -108,6 +108,22 @@
 @include('agenda.partials.modal')
 @include('agenda.partials.modulo-modal')
 
+{{-- Modal solo lectura para ver descripción desde la tabla --}}
+<div id="agendaVerDescripcionModal" class="modal-agenda-overlay" style="display: none;" aria-hidden="true">
+    <div class="modal-agenda-content modal-agenda-ver-desc" style="max-width: 420px;">
+        <div class="modal-agenda-header">
+            <h3>Descripción</h3>
+            <button type="button" class="modal-close-btn" onclick="window.agendaCerrarVerDescripcion()" aria-label="Cerrar">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="modal-body-scroll modal-agenda-ver-desc-body" id="agendaVerDescripcionBody" style="max-height: 50vh; white-space: pre-wrap; word-break: break-word;"></div>
+        <div class="modal-agenda-footer">
+            <button type="button" class="btn-agenda btn-secondary-agenda" onclick="window.agendaCerrarVerDescripcion()">Cerrar</button>
+        </div>
+    </div>
+</div>
+
 @push('scripts')
 {{-- POST/PUT: misma base que APP_URL (evita 404 en subcarpeta) --}}
 <meta name="agenda-url-store" content="{{ route('agenda.store') }}">

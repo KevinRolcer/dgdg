@@ -221,6 +221,12 @@ html.theme-dark #supervisionEvidenciasPage .bg-white {
     background-color: var(--clr-card) !important;
 }
 
+html.theme-dark #mesasPazApp .modal-content,
+html.theme-dark #supervisionEvidenciasPage .modal-content {
+    background: var(--clr-card);
+    border-color: var(--clr-border);
+}
+
 html.theme-dark #mesasPazApp .modal-header,
 html.theme-dark #mesasPazApp .modal-footer,
 html.theme-dark #supervisionEvidenciasPage .modal-header,
@@ -234,6 +240,15 @@ html.theme-dark #mesasPazApp .modal-body,
 html.theme-dark #supervisionEvidenciasPage .modal-body {
     background: var(--clr-card);
     color: var(--clr-text-main);
+}
+
+/* Calendario “Selecciona la semana a evaluar”: título usa --cal-* del tema */
+html.theme-dark .presentation-calendar-label {
+    color: var(--cal-month-text) !important;
+}
+
+html.theme-dark #rangoFechasPresentacionModal .modal-title {
+    color: var(--clr-text-main) !important;
 }
 
 html.theme-dark #mesasPazApp .btn-close,
@@ -333,4 +348,11 @@ html.theme-dark #supervisionEvidenciasPage .badge.bg-warning.text-dark {
     color: #1a1a1a !important;
     background: rgba(199, 155, 102, 0.35) !important;
     border: 1px solid rgba(199, 155, 102, 0.5);
+}
+
+/* Tema pizarra: encabezados de tabla y texto primario → acento (no rojo) */
+html.theme-dark.theme-dark--slate #mesasPazApp .table thead th,
+html.theme-dark.theme-dark--slate #supervisionEvidenciasPage .table thead th,
+html.theme-dark.theme-dark--slate #supervisionEvidenciasPage .text-primary {
+    color: var(--clr-accent) !important;
 }
