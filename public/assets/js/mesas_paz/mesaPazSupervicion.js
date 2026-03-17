@@ -290,11 +290,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 const contentEl = document.getElementById('canvaPresentacionModalContent');
                 
                 if (canvaModalEl && contentEl) {
+                    const pptUrl = pageContainer?.dataset?.urlPpt || "/ppt/generar-presentacion";
                     const modalPresentacion = new bootstrap.Modal(canvaModalEl);
                     contentEl.innerHTML = '<span class="text-muted">Generando...</span>';
                     modalPresentacion.show();
 
-                    fetch("/ppt/generar-presentacion", {
+                    fetch(pptUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -361,11 +362,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 const contentEl = document.getElementById('canvaPresentacionModalContent');
 
                 if (canvaModalEl && contentEl) {
+                    const canvaUrl = pageContainer?.dataset?.urlCanva || "/canva/generar-documento";
                     const modal = new bootstrap.Modal(canvaModalEl);
                     contentEl.innerHTML = '<span class="text-muted">Generando...</span>';
                     modal.show();
 
-                    fetch("/canva/generar-documento", {
+                    fetch(canvaUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

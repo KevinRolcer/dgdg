@@ -25,7 +25,7 @@
             <p class="mesas-paz-shell-desc">Consulta de evidencias y asistencias por delegado. Filtros por fecha y análisis por microregión.</p>
         </header>
 
-<div id="supervisionEvidenciasPage">
+<div id="supervisionEvidenciasPage" data-url-ppt="{{ route('ppt.generar-presentacion') }}" data-url-canva="{{ route('canva.generar-documento') }}">
 <div class="mesas-paz-panel panel panel-inverse">
     <div class="mesas-paz-panel-head panel-heading">
         <h4 class="panel-title">Filtros de búsqueda</h4>
@@ -624,7 +624,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Enlace a presentación Canva</h5>
+                <h5 class="modal-title" id="canvaPresentacionModalTitle">Generando presentación</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
