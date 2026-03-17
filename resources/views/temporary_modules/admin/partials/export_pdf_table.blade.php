@@ -22,11 +22,16 @@
         table {
             width: 100%;
             border-collapse: collapse;
+            @if(isset($stretch) && $stretch)
+            table-layout: fixed;
+            @endif
         }
         th, td {
             border: 1px solid #999;
             padding: 4px 6px;
             vertical-align: top;
+            word-wrap: break-word;
+            word-break: break-all;
         }
         th {
             background: #861E34;

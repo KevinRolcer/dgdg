@@ -27,15 +27,13 @@ class TemporaryModuleWordPdfService
             : [];
             
         // Si no hay configuracion de columnas, tomar todas como es el caso por defecto.
-        // Simulando TemporaryModuleController->getExportColumnsForPreview
         if ($columnsCfg === []) {
              $cols = [];
              foreach ($temporaryModule->fields as $field) {
-                 $cols[] = ['key' => $field->key, 'label' => $field->label];
+                 $cols[] = ['key' => $field->key, 'label' => (string) ($field->label ?? $field->key)];
              }
-             // Añadir columnas por defecto al principio si el front las pidiese, pero el request actual se las manda.
              if(count($cols) > 0) {
-                 $columnsCfg = array_map(static fn (array $col): array => ['key' => $col['key'], 'label' => $col['label'] ?? $col['key']], $cols);
+                 $columnsCfg = $cols;
              }
         }
 
@@ -57,6 +55,9 @@ class TemporaryModuleWordPdfService
         if ($columns === []) {
             throw new \Exception('No hay columnas seleccionadas para el reporte.');
         }
+
+        $totalCols = count($columns);
+        $stretch = ($exportConfig['table_align'] ?? 'left') === 'stretch';
 
         $microrregionIds = $temporaryModule->entries()
             ->withoutGlobalScopes()
@@ -128,16 +129,29 @@ class TemporaryModuleWordPdfService
             $section->addText($title, ['bold' => true, 'size' => 14, 'color' => '861E34'], ['alignment' => $jc, 'spaceAfter' => 200]);
             $section->addTextBreak(1);
 
-            $table = $section->addTable([
+            $tblStyle = [
                 'borderSize' => 6,
                 'borderColor' => '444444',
                 'cellMargin' => 80,
-            ]);
+            ];
+            
+            if ($stretch) {
+                $tblStyle['width'] = 100;
+                $tblStyle['unit'] = 'pct';
+            }
+            
+            $table = $section->addTable($tblStyle);
+
+            $dynTwips = null;
+            if ($stretch && $totalCols > 0) {
+                // Aprox ancho total disponible en horizontal A4 son 9000 twips (depende de márgenes)
+                $dynTwips = (int) round(9000 / $totalCols);
+            }
 
             // Encabezados
             $table->addRow();
             foreach ($columns as $col) {
-                $table->addCell(null)->addText((string) $col['label'], ['bold' => true]);
+                $table->addCell($dynTwips)->addText((string) $col['label'], ['bold' => true]);
             }
 
             // Filas
@@ -164,7 +178,7 @@ class TemporaryModuleWordPdfService
                             $text = '';
                         }
                     }
-                    $table->addCell(null)->addText($text);
+                    $table->addCell($dynTwips)->addText($text);
                 }
             }
 
@@ -186,6 +200,7 @@ class TemporaryModuleWordPdfService
             'columns' => $columns,
             'entries' => $entries,
             'microrregionMeta' => $microrregionMeta,
+            'stretch' => $stretch,
         ])->render();
 
         $dompdf = new Dompdf([
