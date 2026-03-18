@@ -45,11 +45,11 @@ function openAgendaModal(id = null, tipo = 'asunto') {
     const tipoInput = document.getElementById('modalTipo');
     const subTipoInput = document.getElementById('modalSubtipo');
     const assignModal = document.getElementById('agendaAssignModal');
-    
+
     // Elements to toggle
     const fieldsGira = document.getElementById('fieldsGira');
     const rowDescripcion = document.getElementById('rowDescripcion');
-    
+
     // Reset form
     form.reset();
     document.querySelectorAll('.user-item-mini input').forEach(cb => cb.checked = false);
@@ -63,11 +63,11 @@ function openAgendaModal(id = null, tipo = 'asunto') {
             container.prepend(hint);
         }
     }
-    
+
     // Ensure containers are closed by default for new
     setUnfoldState('unfoldAsignar', false);
     document.getElementById('modalHora').style.display = 'none';
-    
+
     tipoInput.value = tipo;
     if (subTipoInput) {
         subTipoInput.value = 'gira';
@@ -87,18 +87,18 @@ function openAgendaModal(id = null, tipo = 'asunto') {
             title.innerText = itemTipo === 'gira' ? 'Editar Gira/Pre-Gira' : 'Editar Asunto';
             form.action = agendaUrlBase() + '/' + id;
             document.getElementById('formMethod').value = 'PUT';
-            
+
             document.getElementById('modalAsunto').value = btn.dataset.asunto || '';
             var rawDesc = btn.dataset.descripcion || '';
-            
+
             const btnOpenDescRef = document.getElementById('btnOpenDescModal');
-            
+
             if (itemTipo === 'gira') {
                 var parsed = agendaExtractAforoFromDescription(rawDesc);
                 document.getElementById('modalDescripcion').value = parsed.base;
                 var aforoEl = document.getElementById('modalAforo');
                 if (aforoEl) aforoEl.value = parsed.aforo || '';
-                
+
                 if (btnOpenDescRef) {
                     if (parsed.base.trim().length > 0) {
                         btnOpenDescRef.innerHTML = '<i class="fa-solid fa-align-left" style="color: var(--clr-accent, #c79b66);"></i> Ver o Editar Descripción';
@@ -115,7 +115,7 @@ function openAgendaModal(id = null, tipo = 'asunto') {
             }
             document.getElementById('modalFecha').value = btn.dataset.fecha || '';
             document.getElementById('modalRecordatorio').value = btn.dataset.recordatorio || '30';
-            
+
             // Gira specific
             if (itemTipo === 'gira') {
                 const microSelect = document.getElementById('modalMicrorregion');
@@ -128,7 +128,7 @@ function openAgendaModal(id = null, tipo = 'asunto') {
             }
             const semaforoEl = document.getElementById('modalSemaforo');
             if (semaforoEl) semaforoEl.value = btn.dataset.semaforo || '';
-            
+
             if (btn.dataset.hora && btn.dataset.hora !== 'null' && btn.dataset.hora !== '') {
                 document.getElementById('modalHabilitarHora').checked = true;
                 const timeValue = btn.dataset.hora.includes(':') ? btn.dataset.hora.substring(0, 5) : '';
@@ -156,7 +156,7 @@ function openAgendaModal(id = null, tipo = 'asunto') {
         form.action = agendaUrlStore();
         document.getElementById('formMethod').value = 'POST';
     }
-    
+
     // Toggle fields based on type
     const isGira = tipoInput.value === 'gira';
     if(fieldsGira) fieldsGira.style.display = isGira ? 'block' : 'none';
@@ -182,7 +182,7 @@ function openAgendaModal(id = null, tipo = 'asunto') {
     if (!id && isGira) {
         var aforoNew = document.getElementById('modalAforo');
         if (aforoNew) aforoNew.value = '';
-        
+
         // Reset description button on physical new form
         const btnOpenDescRef = document.getElementById('btnOpenDescModal');
         if (btnOpenDescRef) {
@@ -232,7 +232,7 @@ function openDescModal() {
     const modal = document.getElementById('agendaDescModal');
     const miniDesc = document.getElementById('modalMiniDescripcion');
     const mainDesc = document.getElementById('modalDescripcion');
-    
+
     if (modal && miniDesc && mainDesc) {
         // Cargar lo que ya tenga el mainDesc (quitando aforos por si acaso)
         miniDesc.value = agendaStripAforoLines(mainDesc.value);
@@ -279,10 +279,20 @@ document.addEventListener('DOMContentLoaded', function () {
         agendaForm.addEventListener('submit', function () {
             var tipo = document.getElementById('modalTipo');
             var desc = document.getElementById('modalDescripcion');
+            var delegadoLabel = document.getElementById('agendaDelegadoLabel');
+            var delegadoInput = document.getElementById('modalDelegadoEncargado');
             if (!desc) return;
             if (tipo && tipo.value === 'gira') {
                 var aforo = document.getElementById('modalAforo');
                 desc.value = agendaMergeAforoIntoDescripcion(desc.value, aforo ? aforo.value : '');
+                // Extraer el nombre del delegado del label y ponerlo en el input hidden
+                if (delegadoLabel && delegadoInput) {
+                    var txt = delegadoLabel.textContent || '';
+                    var match = txt.match(/Delegad@ encargado: (.+)/);
+                    delegadoInput.value = match ? match[1].trim() : '';
+                }
+            } else if (delegadoInput) {
+                delegadoInput.value = '';
             }
         });
     }
@@ -339,11 +349,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const miniDesc = document.getElementById('modalMiniDescripcion');
             const mainDesc = document.getElementById('modalDescripcion');
             const btnOpenDescRef = document.getElementById('btnOpenDescModal');
-            
+
             if (miniDesc && mainDesc) {
                 // Al presionar guardar, transferimos la info al input original oculto
                 mainDesc.value = miniDesc.value;
-                
+
                 // Actualizar el texto del botón si hay contenido
                 if (btnOpenDescRef) {
                     if (miniDesc.value.trim().length > 0) {

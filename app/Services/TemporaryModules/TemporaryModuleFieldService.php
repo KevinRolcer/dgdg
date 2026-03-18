@@ -202,7 +202,16 @@ class TemporaryModuleFieldService
             'date' => [...$rules, 'date'],
             'datetime' => [...$rules, 'date'],
             'select' => [...$rules, Rule::in($options)],
-            'categoria' => [...$rules, 'string', 'max:255', Rule::in($this->categoriaAllowedValues($options))],
+            'categoria' => (function () use ($required, $options, $rules) {
+                $allowed = $this->categoriaAllowedValues($options);
+                // Si el campo NO es obligatorio, permitimos que llegue '' (select vacío)
+                // para que los registros aplicables solo a una parte queden en blanco en Excel.
+                if (! $required) {
+                    $allowed = array_values(array_unique(array_merge([''], $allowed)));
+                }
+
+                return [...$rules, 'string', 'max:255', Rule::in($allowed)];
+            })(),
             'municipio' => [...$rules, Rule::in($municipios)],
             'boolean' => [...$rules, 'boolean'],
             'seccion' => ['nullable', 'string'], // no se guarda valor; solo layout

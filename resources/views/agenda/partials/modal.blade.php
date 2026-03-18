@@ -6,13 +6,14 @@
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
-        
+
         <form id="agendaForm" method="POST" action="{{ route('agenda.store') }}">
+                        <input type="hidden" name="delegado_encargado" id="modalDelegadoEncargado" value="">
             @csrf
             <input type="hidden" name="_method" id="formMethod" value="POST">
             <input type="hidden" name="tipo" id="modalTipo" value="asunto">
             <input type="hidden" name="subtipo" id="modalSubtipo" value="gira">
-            
+
             <div class="modal-body-scroll">
                 <div class="agenda-type-switch" id="agendaTipoSelector" style="display: flex !important; flex-direction: row !important; justify-content: space-between !important; align-items: flex-end !important; width: 100%; margin-bottom: 12px;">
                     <div style="flex: 0 0 auto;">

@@ -162,7 +162,7 @@ class AgendaService
     public function crear(array $validated, \Illuminate\Http\Request $request): Agenda
     {
         return DB::transaction(function () use ($validated, $request) {
-            $agenda = Agenda::create(array_merge($validated, [
+            $datos = array_merge($validated, [
                 'creado_por' => $request->user()->id,
                 'estado_seguimiento' => Agenda::ESTADO_ACTIVO,
                 'es_actualizacion' => false,
@@ -171,14 +171,22 @@ class AgendaService
                 'tipo' => $request->input('tipo', 'asunto'),
                 'subtipo' => $request->input('tipo') === 'gira' ? $request->input('subtipo', 'gira') : null,
                 'direcciones_adicionales' => array_values(array_filter(array_map('trim', $request->input('direcciones_adicionales', [])))),
-            ]));
-
+            ]);
+            // Si es gira/pre-gira, agregar delegado encargado a la descripción
+            if (($datos['tipo'] ?? null) === 'gira' && $request->filled('delegado_encargado')) {
+                $desc = trim((string)($datos['descripcion'] ?? ''));
+                $delegadoTexto = 'Delegad@ encargado: ' . $request->input('delegado_encargado');
+                if (stripos($desc, $delegadoTexto) === false) {
+                    $desc = ($desc ? $desc . "\n" : '') . $delegadoTexto;
+                }
+                $datos['descripcion'] = $desc;
+            }
+            $agenda = Agenda::create($datos);
             if (!empty($validated['usuarios_asignados'])) {
                 $agenda->usuariosAsignados()->sync($validated['usuarios_asignados']);
             }
             $agenda->load('usuariosAsignados');
             $this->sincronizarPermisoSeguimientoAsignados($agenda);
-
             return $agenda;
         });
     }
@@ -189,13 +197,23 @@ class AgendaService
     public function actualizar(Agenda $agenda, array $validated, \Illuminate\Http\Request $request): void
     {
         DB::transaction(function () use ($agenda, $validated, $request) {
-            $agenda->update(array_merge($validated, [
+            $datos = array_merge($validated, [
                 'habilitar_hora' => $request->has('habilitar_hora'),
                 'repite' => $request->has('repite'),
                 'subtipo' => $request->input('tipo') === 'gira' ? $request->input('subtipo', 'gira') : null,
                 'dias_repeticion' => $request->input('dias_repeticion', []),
                 'direcciones_adicionales' => array_values(array_filter(array_map('trim', $request->input('direcciones_adicionales', [])))),
-            ]));
+            ]);
+            // Si es gira/pre-gira, agregar delegado encargado a la descripción
+            if (($datos['tipo'] ?? null) === 'gira' && $request->filled('delegado_encargado')) {
+                $desc = trim((string)($datos['descripcion'] ?? ''));
+                $delegadoTexto = 'Delegad@ encargado: ' . $request->input('delegado_encargado');
+                if (stripos($desc, $delegadoTexto) === false) {
+                    $desc = ($desc ? $desc . "\n" : '') . $delegadoTexto;
+                }
+                $datos['descripcion'] = $desc;
+            }
+            $agenda->update($datos);
             $agenda->usuariosAsignados()->sync($request->input('usuarios_asignados', []));
             $this->sincronizarPermisoSeguimientoAsignados($agenda->fresh());
         });

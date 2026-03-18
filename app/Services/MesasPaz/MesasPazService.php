@@ -506,14 +506,15 @@ class MesasPazService
 
         $override = $this->resolverReglaEspecialPorModalidad((string) ($data['modalidad'] ?? ''));
         $modalidad = trim((string) ($data['modalidad'] ?? ''));
-        $esSuspension = in_array($modalidad, ['Suspención de mesa de Seguridad', 'Suspención de la Mesa de Seguridad'], true);
+        $modalidadRaw = (string) ($data['modalidad'] ?? '');
+        $esSuspension = str_contains($this->quitarAcentos(mb_strtoupper($modalidadRaw, 'UTF-8')), 'SUSPENCION');
 
         if ($usarParte && $esSuspension) {
             $parteItems = ['S/R'];
         }
 
         if ($esSuspension && empty($acuerdoItems)) {
-            $acuerdoItems = ['Motivo no registrado'];
+            $acuerdoItems = ['Suspención de mesa de paz'];
         }
 
         if (!$esSuspension && empty($parteItems) && empty($acuerdoItems)) {
@@ -1056,7 +1057,9 @@ class MesasPazService
                 
                 $acuerdoItems = $rp['acuerdosList'];
                 if (empty($acuerdoItems)) {
-                    $acuerdoItems = strpos((string)$rp['modalidad'], 'Suspención') !== false ? ['Motivo no registrado'] : ['No se ha anotado nada'];
+                    $acuerdoItems = (str_contains((string)$rp['modalidad'], 'Suspención') || str_contains((string)$rp['modalidad'], 'Suspension')) 
+                        ? ['Suspención de mesa de paz'] 
+                        : ['No se ha anotado nada'];
                 }
 
                 $parteObservacion = $usarParte ? MesaPazAsistencia::encodeAcuerdoItems($parteItems) : null;
@@ -1295,18 +1298,18 @@ class MesasPazService
         $valor = mb_strtolower(trim($modalidad));
         $mod = $this->quitarAcentos(mb_strtoupper($modalidad, 'UTF-8'));
 
-        if (strpos((string)$mod, 'SUSPENCION') !== false) {
+        if (str_contains($mod, 'SUSPENCION')) {
             return [
-                'asiste' => 'Ninguno',
-                'presidente' => 'S/R',
-                'delegado_asistio' => 'S/R',
+                'asiste' => 'Suspención',
+                'presidente' => 'No',
+                'delegado_asistio' => 'No',
             ];
         }
 
         if ($valor === mb_strtolower('Sin reporte de Delegado')) {
             return [
                 'asiste' => 'SRD',
-                'presidente' => 'S/R',
+                'presidente' => 'No',
                 'delegado_asistio' => 'No',
             ];
         }
@@ -1314,17 +1317,18 @@ class MesasPazService
         if ($valor === mb_strtolower('Sin información de enlace')) {
             return [
                 'asiste' => 'SIE',
-                'presidente' => 'S/R',
+                'presidente' => 'No',
                 'delegado_asistio' => 'No',
             ];
         }
 
         if (
-            $valor === mb_strtolower('Suspención de mesa de Seguridad')
-            || $valor === mb_strtolower('Suspención de la Mesa de Seguridad')
+            $valor === mb_strtolower('Fallecimiento')
+            || $valor === mb_strtolower('Asueto')
+            || $valor === mb_strtolower('Día Festivo')
         ) {
             return [
-                'asiste' => 'Suspención',
+                'asiste' => 'Ninguno',
                 'presidente' => 'No',
                 'delegado_asistio' => 'No',
             ];

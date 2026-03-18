@@ -188,10 +188,19 @@ class Agenda extends Model
 
         $detailsText = $this->descripcionConAforoPersonas();
         if ($this->tipo === 'gira') {
-            $delegado = Delegado::whereHas('microrregion', function ($q) {
-                $q->where('microrregion', $this->microrregion);
-            })->first();
-            $delegadoNombre = $delegado ? $delegado->nombre_completo : 'Sin asignar';
+            // Buscar el ID de la microrregión por nombre exacto
+            $microrregionModel = \App\Models\Microrregione::where('microrregion', $this->microrregion)->first();
+            $delegado = null;
+            if ($microrregionModel) {
+                $delegado = \App\Models\Delegado::where('microrregion_id', $microrregionModel->id)->first();
+            }
+            $delegadoNombre = 'Sin asignar';
+            if ($delegado && $delegado->user_id) {
+                $usuario = \App\Models\User::where('id', $delegado->user_id)->where('activo', 1)->first();
+                if ($usuario) {
+                    $delegadoNombre = $delegado->nombre_completo;
+                }
+            }
             $block = '';
             if ($semaforoVis !== null) {
                 $block .= $semaforoVis['banner_html'] . "\n";

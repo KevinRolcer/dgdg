@@ -120,7 +120,6 @@
                             <option value="">Seleccionar</option>
                             <option value="Si" @if(($delegadoAsistioActual ?? '') === 'Si') selected @endif>Sí</option>
                             <option value="No" @if(($delegadoAsistioActual ?? '') === 'No') selected @endif>No</option>
-                            <option value="S/R" hidden @if(($delegadoAsistioActual ?? '') === 'S/R') selected @endif>S/R</option>
                         </select>
                     </div>
 
@@ -215,7 +214,6 @@
                                                 {{-- Municipio no presente" == "No" --}}
                                                 <option value="Ninguno" @if(in_array(optional($registroMunicipio)->presidente, ['No', 'Ninguno'])) selected @endif>Municipio no presente</option>
                                                 <option value="No" hidden @if(optional($registroMunicipio)->presidente === 'No') selected @endif>No</option>
-                                                <option value="S/R" hidden @if(optional($registroMunicipio)->presidente === 'S/R') selected @endif>S/R</option>
                                             </select>
                                         </div>
 

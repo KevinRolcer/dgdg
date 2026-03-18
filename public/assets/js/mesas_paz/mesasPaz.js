@@ -265,15 +265,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const modalidad = String(modalidadGlobalSelect.value || '').trim();
         if (modalidad === 'Sin reporte de Delegado') {
             return {
-                delegadoAsistio: 'S/R',
-                presidente: 'S/R',
+                delegadoAsistio: 'No',
+                presidente: 'No',
             };
         }
 
         if (modalidad === 'Sin información de enlace') {
             return {
-                delegadoAsistio: 'S/R',
-                presidente: 'S/R',
+                delegadoAsistio: 'No',
+                presidente: 'No',
             };
         }
 
