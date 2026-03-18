@@ -10,9 +10,9 @@
                 <span class="tm-upload-meta-pill"><strong>Mis registros:</strong> {{ $module->my_entries_count }}</span>
             </div>
             <div class="tm-upload-card-foot">
-                <button type="button" class="tm-btn tm-btn-primary" data-open-module-preview="delegate-preview-{{ $module->id }}">Registrar informacion</button>
-                <a href="{{ route('temporary-modules.records') }}?module={{ $module->id }}" class="tm-btn tm-btn-outline" title="Ver historial de registros">
-                    Historial de registros
+                <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-open-module-preview="delegate-preview-{{ $module->id }}">Registrar</button>
+                <a href="{{ route('temporary-modules.records') }}?module={{ $module->id }}" class="tm-btn tm-btn-outline tm-btn-sm" title="Historial de registros">
+                    <i class="fa-solid fa-clock" aria-hidden="true"></i>
                 </a>
             </div>
         </article>

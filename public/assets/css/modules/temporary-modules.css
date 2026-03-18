@@ -264,6 +264,8 @@
 .tm-upload-card-foot {
     display: flex;
     justify-content: flex-start;
+    align-items: center;
+    gap: 10px;
 }
 
 .tm-module-card .tm-btn {
@@ -271,6 +273,12 @@
     min-width: 190px;
     max-width: 100%;
     justify-self: start;
+}
+
+.tm-module-card .tm-btn.tm-btn-sm {
+    /* Evita que el botón compacto herede el min-width grande del card */
+    min-width: 0;
+    max-width: none;
 }
 
 .tm-card h2,
@@ -324,6 +332,15 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
+}
+
+.tm-btn-sm {
+    /* Botón compacto para tarjetas de eventos temporales */
+    min-height: 30px;
+    padding: 5px 10px;
+    font-size: 0.76rem;
+    border-radius: 10px;
+    gap: 8px;
 }
 
 .tm-btn-primary {

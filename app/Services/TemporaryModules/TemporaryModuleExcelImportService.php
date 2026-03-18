@@ -362,8 +362,9 @@ class TemporaryModuleExcelImportService
                     return $name;
                 }
             }
-
-            return $str;
+            // Si el municipio no pertenece a la microregión seleccionada, lo dejamos vacío
+            // para que el registro no se asigne incorrectamente.
+            return null;
         }
 
         return $str === '' ? null : $str;
