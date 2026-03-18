@@ -58,7 +58,13 @@
                             @if($item->usuariosAsignados->isEmpty())
                                 <span class="agenda-text-muted">Sin asignar</span>
                             @else
-                                {{ $item->usuariosAsignados->count() }} usuario(s)
+                                <button type="button"
+                                        class="agenda-btn agenda-btn-secondary agenda-btn-icon agenda-btn-ver-usuarios"
+                                        title="Ver usuarios asignados"
+                                        onclick="window.agendaVerUsuariosAsignados(this)"
+                                        data-users='@json($item->usuariosAsignados->map(fn($u) => ["id" => $u->id, "name" => $u->name, "email" => $u->email])->values())'>
+                                    <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                                </button>
                             @endif
                         </td>
                         <td>

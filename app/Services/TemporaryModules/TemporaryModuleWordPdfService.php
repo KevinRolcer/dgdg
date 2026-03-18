@@ -3,6 +3,7 @@
 namespace App\Services\TemporaryModules;
 
 use App\Models\TemporaryModule;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PhpOffice\PhpWord\SimpleType\Jc;
@@ -102,6 +103,19 @@ class TemporaryModuleWordPdfService
         $title = (string) ($exportConfig['title'] ?? $fileName);
         $orientationConfig = ($exportConfig['orientation'] ?? 'portrait') === 'landscape' ? 'landscape' : 'portrait';
 
+        $includeCountTable = !empty($exportConfig['include_count_table']);
+        $countByFields = $includeCountTable && is_array($exportConfig['count_by_fields'] ?? null)
+            ? array_values(array_filter(array_map('strval', $exportConfig['count_by_fields'])))
+            : [];
+        $countTable = null;
+        if ($includeCountTable) {
+            $fieldLabels = [];
+            foreach ($columnMap as $k => $c) {
+                $fieldLabels[$k] = $c['label'];
+            }
+            $countTable = $this->buildCountTableData($entries, $countByFields, $fieldLabels);
+        }
+
         if ($format === 'word') {
             $wordFileName = $baseSlug.'_'.now()->format('Ymd_His').'.docx';
             $fullPath = $exportDir.'/'.$wordFileName;
@@ -128,6 +142,56 @@ class TemporaryModuleWordPdfService
             };
             $section->addText($title, ['bold' => true, 'size' => 14, 'color' => '861E34'], ['alignment' => $jc, 'spaceAfter' => 200]);
             $section->addTextBreak(1);
+
+            if ($countTable !== null && isset($countTable['groups'])) {
+                $countTblStyle = ['borderSize' => 6, 'borderColor' => '444444', 'cellMargin' => 80];
+                $countTbl = $section->addTable($countTblStyle);
+                $countTableColors = is_array($exportConfig['count_table_colors'] ?? null) ? $exportConfig['count_table_colors'] : [];
+                $resolveCountColor = function ($key, int $rowNum, ?string $valueLabel = null) use ($countTableColors): string {
+                    $c = $countTableColors[$key] ?? null;
+                    if (is_string($c) && $c !== '') {
+                        return $this->cssColorToHex($c);
+                    }
+                    if (is_array($c)) {
+                        if ($rowNum === 1) {
+                            return $this->cssColorToHex($c['row1'] ?? '#861e34');
+                        }
+                        if ($valueLabel !== null && isset($c['row2Values']) && is_array($c['row2Values'])) {
+                            $css = $c['row2Values'][$valueLabel] ?? $c['row2Values'][mb_strtolower($valueLabel)] ?? null;
+                            if ($css !== null && $css !== '') {
+                                return $this->cssColorToHex($css);
+                            }
+                        }
+                        return $this->cssColorToHex($c['row2'] ?? '#2d5a27');
+                    }
+                    return $rowNum === 1 ? '861E34' : '2d5a27';
+                };
+                $countTbl->addRow();
+                foreach ($countTable['groups'] as $gi => $group) {
+                    $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
+                    $bgHex = $resolveCountColor($key, 1);
+                    $span = count($group['values']);
+                    $cell = $countTbl->addCell(null, ['gridSpan' => $span, 'bgColor' => $bgHex]);
+                    $cell->addText((string) $group['label'], ['bold' => true]);
+                }
+                $countTbl->addRow();
+                foreach ($countTable['groups'] as $gi => $group) {
+                    $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
+                    foreach ($group['values'] as $v) {
+                        $subLabel = $v['label'] !== '' ? $v['label'] : $group['label'];
+                        $bgHex = $resolveCountColor($key, 2, $subLabel);
+                        $countTbl->addCell(['bgColor' => $bgHex])->addText((string) $subLabel, ['bold' => true]);
+                    }
+                }
+                $countTbl->addRow();
+                foreach ($countTable['groups'] as $group) {
+                    foreach ($group['values'] as $v) {
+                        $countTbl->addCell()->addText((string) $v['count'], ['color' => 'c00000']);
+                    }
+                }
+                $section->addTextBreak(1);
+                $section->addText('Desglose', ['bold' => true, 'size' => 11], ['spaceAfter' => 120]);
+            }
 
             $tblStyle = [
                 'borderSize' => 6,
@@ -194,6 +258,10 @@ class TemporaryModuleWordPdfService
         $pdfFileName = $baseSlug.'_'.now()->format('Ymd_His').'.pdf';
         $fullPdfPath = $exportDir.'/'.$pdfFileName;
 
+        $countTableColorKeys = $countTable !== null && isset($countTable['groups'])
+            ? array_merge(['_total'], $countByFields)
+            : [];
+        $countTableColors = is_array($exportConfig['count_table_colors'] ?? null) ? $exportConfig['count_table_colors'] : [];
         $html = view('temporary_modules.admin.partials.export_pdf_table', [
             'title' => $title,
             'orientation' => $orientationConfig,
@@ -201,6 +269,9 @@ class TemporaryModuleWordPdfService
             'entries' => $entries,
             'microrregionMeta' => $microrregionMeta,
             'stretch' => $stretch,
+            'countTable' => $countTable,
+            'countTableColorKeys' => $countTableColorKeys,
+            'countTableColors' => $countTableColors,
         ])->render();
 
         $dompdf = new Dompdf([
@@ -215,5 +286,74 @@ class TemporaryModuleWordPdfService
             'name' => $pdfFileName,
             'url' => route('temporary-modules.admin.exports.download', ['file' => $pdfFileName])
         ];
+    }
+
+    /**
+     * @param Collection $entries entries with 'data'
+     * @param array<string> $countByFields
+     * @param array<string, string> $fieldLabels key => label
+     * @return array{groups: list<array{label: string, values: list<array{label: string, count: int}>}>}
+     */
+    private function buildCountTableData(Collection $entries, array $countByFields, array $fieldLabels = []): array
+    {
+        $total = $entries->count();
+        $groups = [
+            ['label' => 'Total de registros', 'values' => [['label' => '', 'count' => $total]]],
+        ];
+
+        foreach ($countByFields as $fieldKey) {
+            $valueCounts = [];
+            $labelByLower = [];
+            foreach ($entries as $entry) {
+                $val = $entry->data[$fieldKey] ?? null;
+                if (is_bool($val)) {
+                    $key = $val ? 'Sí' : 'No';
+                } elseif (is_scalar($val)) {
+                    $key = trim((string) $val);
+                } else {
+                    $key = '';
+                }
+                if ($key !== '') {
+                    $lower = mb_strtolower($key);
+                    $valueCounts[$lower] = ($valueCounts[$lower] ?? 0) + 1;
+                    if (!isset($labelByLower[$lower])) {
+                        $labelByLower[$lower] = $key;
+                    }
+                }
+            }
+            ksort($valueCounts, SORT_NATURAL);
+            $values = [];
+            foreach ($valueCounts as $lower => $count) {
+                $values[] = ['label' => $labelByLower[$lower] ?? $lower, 'count' => $count];
+            }
+            if ($values !== []) {
+                $groups[] = [
+                    'label' => $fieldLabels[$fieldKey] ?? $fieldKey,
+                    'values' => $values,
+                ];
+            }
+        }
+
+        return ['groups' => $groups];
+    }
+
+    private function cssColorToHex(string $color): string
+    {
+        $color = trim($color);
+        if (preg_match('/^#([0-9A-Fa-f]{6})$/', $color, $m)) {
+            return strtoupper($m[1]);
+        }
+        if (preg_match('/^#([0-9A-Fa-f]{3})$/', $color, $m)) {
+            $r = str_repeat($m[1][0], 2);
+            $g = str_repeat($m[1][1], 2);
+            $b = str_repeat($m[1][2], 2);
+            return strtoupper($r.$g.$b);
+        }
+        $map = [
+            'var(--clr-primary)' => '861E34',
+            'var(--clr-secondary)' => '2d5a27',
+            'var(--clr-accent)' => 'c9a227',
+        ];
+        return $map[$color] ?? '861E34';
     }
 }

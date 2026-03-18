@@ -401,9 +401,9 @@ class TemporaryModuleController extends Controller
             'conflict_action' => ['nullable', Rule::in(['none', 'clear_module', 'clear_field_data', 'normalize_municipio'])],
             'existing_fields' => ['nullable', 'array'],
             'existing_fields.*.id' => ['required_with:existing_fields', 'integer'],
-            'existing_fields.*.label' => ['required_with:existing_fields', 'string', 'max:120'],
+            'existing_fields.*.label' => ['nullable', 'required_unless:existing_fields.*.delete,1', 'string', 'max:120'],
             'existing_fields.*.key' => ['nullable', 'string', 'max:120'],
-            'existing_fields.*.type' => ['required_with:existing_fields', Rule::in(array_keys(self::FIELD_TYPES))],
+            'existing_fields.*.type' => ['nullable', 'required_unless:existing_fields.*.delete,1', Rule::in(array_keys(self::FIELD_TYPES))],
             'existing_fields.*.required' => ['nullable', 'boolean'],
             'existing_fields.*.delete' => ['nullable', 'boolean'],
             'existing_fields.*.options' => ['nullable', 'string', 'max:2000'],
@@ -1342,7 +1342,12 @@ class TemporaryModuleController extends Controller
         $exportColumns = $this->getExportColumnsForPreview($temporaryModule);
 
         $maxWidths = [];
-        $entries = $temporaryModule->entries()->withoutGlobalScopes()->select('data')->limit(500)->get();
+        $entries = $temporaryModule->entries()
+            ->withoutGlobalScopes()
+            ->orderBy('submitted_at')
+            ->select(['data', 'microrregion_id'])
+            ->limit(500)
+            ->get();
         foreach ($exportColumns as $col) {
             if (($col['is_image'] ?? false)) {
                 $maxWidths[$col['key']] = ['chars' => 12, 'image_height' => 80];
@@ -1376,9 +1381,28 @@ class TemporaryModuleController extends Controller
             ];
         }
 
+        $microrregionIds = $entries->pluck('microrregion_id')->filter()->unique()->values()->all();
+        $microrregionMeta = [];
+        if ($microrregionIds !== []) {
+            $rows = \Illuminate\Support\Facades\DB::table('microrregiones')
+                ->select(['id', 'cabecera', 'microrregion'])
+                ->whereIn('id', $microrregionIds)
+                ->get();
+            foreach ($rows as $row) {
+                $number = trim((string) ($row->microrregion ?? ''));
+                $name = trim((string) ($row->cabecera ?? ''));
+                $label = $number !== ''
+                    ? ('MR '.str_pad($number, 2, '0', STR_PAD_LEFT).($name !== '' ? ' — '.$name : ''))
+                    : ($name !== '' ? $name : 'Sin microrregión');
+                $microrregionMeta[(int) $row->id] = ['label' => $label];
+            }
+        }
+
         return response()->json([
             'title' => $temporaryModule->name,
             'columns' => $columns,
+            'entries' => $entries->map(fn ($e) => ['data' => $e->data, 'microrregion_id' => $e->microrregion_id])->values()->all(),
+            'microrregion_meta' => $microrregionMeta,
         ]);
     }
 

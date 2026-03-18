@@ -291,6 +291,33 @@
                             <button type="button" class="tm-export-align-btn" data-title-align="right">Der</button>
                         </div>
                     </div>
+                    <div class="tm-export-personalize-field tm-export-count-table-section">
+                        <label class="tm-export-count-table-toggle">
+                            <input type="checkbox" id="tmExportIncludeCountTable" value="1">
+                            Incluir tabla de conteo general arriba de la tabla de registros
+                        </label>
+                        <div class="tm-export-count-by-wrap" id="tmExportCountByWrap" hidden>
+                            <div class="tm-export-count-table-sizes">
+                                <span class="tm-export-label-inline">Tamaños de las celdas:</span>
+                                <label class="tm-export-count-cell-width-label">
+                                    Ancho columnas (ch):
+                                    <input type="number" id="tmExportCountTableCellWidth" class="tm-export-count-cell-width-input" min="6" max="40" value="12" aria-label="Ancho de columnas de la tabla de conteo en caracteres">
+                                </label>
+                            </div>
+                            <span class="tm-export-label-inline">Conteo por valor de:</span>
+                            <div class="tm-export-count-by-fields" id="tmExportCountByFields" role="group"></div>
+                            <div class="tm-export-count-table-colors-collapsible" id="tmExportCountColorsCollapsible">
+                                <button type="button" class="tm-export-count-colors-header" id="tmExportCountColorsToggle" aria-expanded="false" aria-controls="tmExportCountTableColorListWrap">
+                                    <span class="tm-export-count-colors-arrow" aria-hidden="true">▶</span>
+                                    <span class="tm-export-count-colors-label">Colores</span>
+                                </button>
+                                <div class="tm-export-count-table-colors-wrap" id="tmExportCountTableColorListWrap">
+                                    <span class="tm-export-label-inline">Colores de la tabla de conteo:</span>
+                                    <div class="tm-export-count-table-color-list" id="tmExportCountTableColorList" role="list"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                         <p class="tm-export-personalize-hint">Arrastra las columnas para cambiar el orden. Usa &times; para omitir una columna del reporte.</p>
                         <div class="tm-export-personalize-columns" id="tmExportPersonalizeColumns" role="list"></div>
                         <p class="tm-export-restore-wrap" id="tmExportRestoreWrap" hidden>
@@ -1392,6 +1419,101 @@
             });
         }
 
+        function buildCountTableColorList(container, countByFieldsEl, previewEntries) {
+            if (!container) { return; }
+            var savedColors = {};
+            container.querySelectorAll('.tm-export-count-table-color-item').forEach(function (row) {
+                var k = row.getAttribute('data-key');
+                if (!k) { return; }
+                var t1 = row.querySelector('.tm-export-color-trigger[data-row="1"]');
+                var t2 = row.querySelector('.tm-export-color-trigger[data-row="2"]');
+                savedColors[k] = {
+                    row1: (t1 && t1.getAttribute('data-color')) ? t1.getAttribute('data-color') : 'var(--clr-primary)',
+                    row2: (t2 && t2.getAttribute('data-color')) ? t2.getAttribute('data-color') : 'var(--clr-secondary)',
+                    row2Values: {}
+                };
+                row.querySelectorAll('.tm-export-count-table-value-color').forEach(function (vrow) {
+                    var v = vrow.getAttribute('data-value');
+                    var vt = vrow.querySelector('.tm-export-color-trigger');
+                    if (v && vt) { savedColors[k].row2Values[v] = vt.getAttribute('data-color') || 'var(--clr-secondary)'; }
+                });
+            });
+            var colorMenuHtml = TEMPLATE_COLORS.map(function (c, i) {
+                return '<button type="button" class="tm-export-color-option' + (i === 0 ? ' is-active' : '') + '" data-color="' + escapeHtml(c.value) + '">' +
+                    '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c.value) + '"></span>' +
+                    '<span class="tm-export-color-name">' + escapeHtml(c.name) + '</span></button>';
+            }).join('');
+            var defaultRow1 = TEMPLATE_COLORS[0].value;
+            var defaultRow2 = TEMPLATE_COLORS[1].value;
+            var oneColorBlock = function (key, label, colors, valueLabels) {
+                var c1 = (colors && colors.row1) ? colors.row1 : defaultRow1;
+                var c2 = (colors && colors.row2) ? colors.row2 : defaultRow2;
+                var row2Values = (colors && colors.row2Values) ? colors.row2Values : {};
+                var block = '<span class="tm-export-col-label">' + escapeHtml(label) + '</span>' +
+                    '<div class="tm-export-count-table-two-colors">' +
+                    '<div class="tm-export-col-color" title="Fila 1: títulos de grupo">' +
+                    '<span class="tm-export-color-row-label">Fila 1</span>' +
+                    '<button type="button" class="tm-export-color-trigger" data-row="1" data-color="' + escapeHtml(c1) + '" aria-haspopup="listbox" aria-expanded="false">' +
+                    '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c1) + '"></span></button>' +
+                    '<div class="tm-export-color-menu" role="listbox" hidden>' + colorMenuHtml + '</div></div>' +
+                    '<div class="tm-export-col-color" title="Fila 2: subtítulos (valor por defecto)">' +
+                    '<span class="tm-export-color-row-label">Fila 2</span>' +
+                    '<button type="button" class="tm-export-color-trigger" data-row="2" data-color="' + escapeHtml(c2) + '" aria-haspopup="listbox" aria-expanded="false">' +
+                    '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c2) + '"></span></button>' +
+                    '<div class="tm-export-color-menu" role="listbox" hidden>' + colorMenuHtml + '</div></div></div>';
+                if (valueLabels && valueLabels.length > 0) {
+                    block += '<div class="tm-export-count-table-row2-values"><span class="tm-export-color-row-label">Fila 2 por valor:</span><div class="tm-export-count-table-value-colors">';
+                    valueLabels.forEach(function (vlabel) {
+                        var vc = row2Values[vlabel] || defaultRow2;
+                        block += '<div class="tm-export-count-table-value-color" data-value="' + escapeHtml(vlabel) + '">' +
+                            '<span class="tm-export-value-label">' + escapeHtml(vlabel) + '</span>' +
+                            '<button type="button" class="tm-export-color-trigger" data-color="' + escapeHtml(vc) + '" aria-haspopup="listbox" aria-expanded="false">' +
+                            '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(vc) + '"></span></button>' +
+                            '<div class="tm-export-color-menu" role="listbox" hidden>' + colorMenuHtml + '</div></div>';
+                    });
+                    block += '</div></div>';
+                }
+                return block;
+            };
+            var getValueLabelsForField = function (key, entries) {
+                var seen = {};
+                var list = [];
+                if (!entries || !entries.length) { return list; }
+                entries.forEach(function (e) {
+                    var v = (e.data && e.data[key]) !== undefined ? e.data[key] : null;
+                    var label = (typeof v === 'boolean') ? (v ? 'Sí' : 'No') : (v != null ? String(v).trim() : '');
+                    if (label !== '') {
+                        var lower = label.toLowerCase();
+                        if (!seen[lower]) { seen[lower] = label; list.push(label); }
+                    }
+                });
+                list.sort(function (a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); });
+                return list;
+            };
+            container.innerHTML = '';
+            var totalRow = document.createElement('div');
+            totalRow.className = 'tm-export-count-table-color-item tm-export-personalize-col';
+            totalRow.setAttribute('role', 'listitem');
+            totalRow.dataset.key = '_total';
+            totalRow.innerHTML = oneColorBlock('_total', 'Total de registros', savedColors['_total'], null);
+            container.appendChild(totalRow);
+            if (countByFieldsEl) {
+                countByFieldsEl.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
+                    var key = cb.getAttribute('data-count-key') || cb.value;
+                    var labelEl = cb.closest('label');
+                    var label = (labelEl && labelEl.textContent) ? labelEl.textContent.replace(/^\s+|\s+$/g, '') : key;
+                    if (!key) { return; }
+                    var valueLabels = getValueLabelsForField(key, previewEntries);
+                    var row = document.createElement('div');
+                    row.className = 'tm-export-count-table-color-item tm-export-personalize-col';
+                    row.setAttribute('role', 'listitem');
+                    row.dataset.key = key;
+                    row.innerHTML = oneColorBlock(key, label, savedColors[key], valueLabels);
+                    container.appendChild(row);
+                });
+            }
+        }
+
         function getPersonalizeState() {
             var container = document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
@@ -1414,7 +1536,31 @@
                 }
                 return { key, color, imageWidth, imageHeight };
             });
-            return { title: titleEl ? titleEl.value : '', titleAlign: titleAlign, columns: columns };
+            var countTableColors = {};
+            var countColorList = document.getElementById('tmExportCountTableColorList');
+            if (countColorList) {
+                countColorList.querySelectorAll('.tm-export-count-table-color-item').forEach(function (row) {
+                    var k = row.getAttribute('data-key');
+                    if (!k) { return; }
+                    var t1 = row.querySelector('.tm-export-color-trigger[data-row="1"]');
+                    var t2 = row.querySelector('.tm-export-color-trigger[data-row="2"]');
+                    var obj = {
+                        row1: (t1 && t1.getAttribute('data-color')) ? t1.getAttribute('data-color') : 'var(--clr-primary)',
+                        row2: (t2 && t2.getAttribute('data-color')) ? t2.getAttribute('data-color') : 'var(--clr-secondary)'
+                    };
+                    var row2Values = {};
+                    row.querySelectorAll('.tm-export-count-table-value-color').forEach(function (vrow) {
+                        var v = vrow.getAttribute('data-value');
+                        var vt = vrow.querySelector('.tm-export-color-trigger');
+                        if (v && vt) { row2Values[v] = vt.getAttribute('data-color') || 'var(--clr-secondary)'; }
+                    });
+                    if (Object.keys(row2Values).length) { obj.row2Values = row2Values; }
+                    countTableColors[k] = obj;
+                });
+            }
+            var countTableCellWidthEl = document.getElementById('tmExportCountTableCellWidth');
+            var countTableCellWidth = (countTableCellWidthEl && countTableCellWidthEl.value) ? (parseInt(countTableCellWidthEl.value, 10) || 12) : 12;
+            return { title: titleEl ? titleEl.value : '', titleAlign: titleAlign, columns: columns, countTableColors: countTableColors, countTableCellWidth: countTableCellWidth };
         }
 
         function readSampleRowFromPreview(previewEl) {
@@ -1428,15 +1574,103 @@
             return sample;
         }
 
-        function buildPersonalizePreview(columns, previewEl, sampleRow) {
+        function formatPreviewCellValue(val) {
+            if (val === null || val === undefined) { return ''; }
+            if (typeof val === 'boolean') { return val ? 'Sí' : 'No'; }
+            if (Array.isArray(val)) { return val.map(function (v) { return typeof v === 'object' ? JSON.stringify(v) : String(v); }).join(', '); }
+            return String(val);
+        }
+
+        function buildPersonalizePreview(columns, previewEl, sampleRow, previewEntries, microrregionMeta) {
             if (!previewEl) { return; }
-            const savedRow = sampleRow || readSampleRowFromPreview(previewEl);
+            var modal = previewEl.closest && previewEl.closest('.tm-modal');
+            var entries = previewEntries || (modal && modal._previewEntries);
+            var meta = microrregionMeta || (modal && modal._previewMicrorregionMeta) || {};
+            const savedRow = sampleRow || (entries && entries.length ? null : readSampleRowFromPreview(previewEl));
             const state = getPersonalizeState();
             const colorMap = {};
             state.columns.forEach(function (c) { colorMap[c.key] = c.color; });
             const titleAlign = state.titleAlign || 'center';
             const titleStyle = 'text-align:' + (titleAlign === 'left' ? 'left' : titleAlign === 'right' ? 'right' : 'center');
-            let html = '<div class="tm-export-preview-table"><div class="tm-export-preview-row tm-export-preview-title"><div class="tm-export-preview-cell tm-export-preview-title-cell" style="' + titleStyle + '" colspan="' + columns.length + '">' + escapeHtml(state.title || 'Título') + '</div></div><div class="tm-export-preview-row tm-export-preview-header">';
+            var countTableHtml = '';
+            var root = modal || document;
+            var includeCountEl = root.querySelector ? root.querySelector('#tmExportIncludeCountTable') : document.getElementById('tmExportIncludeCountTable');
+            var countByFieldsEl = root.querySelector ? root.querySelector('#tmExportCountByFields') : document.getElementById('tmExportCountByFields');
+            if (includeCountEl && includeCountEl.checked && countByFieldsEl) {
+                var totalCount = Array.isArray(entries) ? entries.length : 0;
+                var groups = [{ label: 'Total de registros', values: [{ label: '', count: totalCount }] }];
+                countByFieldsEl.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
+                    var key = cb.getAttribute('data-count-key') || cb.value;
+                    if (!key) { return; }
+                    var labelEl = cb.closest('label');
+                    var fieldLabel = (labelEl && labelEl.textContent) ? labelEl.textContent.replace(/^\s+|\s+$/g, '') : key;
+                    var byVal = {};
+                    var labelByLower = {};
+                    if (Array.isArray(entries)) {
+                        entries.forEach(function (e) {
+                            var v = (e.data && e.data[key]) !== undefined ? e.data[key] : null;
+                            var k = (typeof v === 'boolean') ? (v ? 'Sí' : 'No') : (v != null ? String(v) : '');
+                            if (k !== '') {
+                                var lower = k.toLowerCase();
+                                byVal[lower] = (byVal[lower] || 0) + 1;
+                                if (!labelByLower[lower]) { labelByLower[lower] = k; }
+                            }
+                        });
+                    }
+                    var values = [];
+                    Object.keys(byVal).sort().forEach(function (lower) {
+                        values.push({ label: labelByLower[lower] || lower, count: byVal[lower] });
+                    });
+                    if (values.length) { groups.push({ label: fieldLabel, values: values }); }
+                });
+                if (groups.length > 0) {
+                    var countTableKeys = [];
+                    if (root.querySelector) {
+                        var colorListEl = root.querySelector('#tmExportCountTableColorList');
+                        if (colorListEl) {
+                            colorListEl.querySelectorAll('.tm-export-count-table-color-item').forEach(function (r) {
+                                var k = r.getAttribute('data-key');
+                                if (k) { countTableKeys.push(k); }
+                            });
+                        }
+                    }
+                    var countTableColors = state.countTableColors || {};
+                    var getCountColor = function (groupIndex, rowNum, valueLabel) {
+                        var key = countTableKeys[groupIndex];
+                        if (!key) { return rowNum === 1 ? '#861e34' : '#2d5a27'; }
+                        var c = countTableColors[key];
+                        if (typeof c === 'string') { return c; }
+                        if (rowNum === 1) { return (c && c.row1) ? c.row1 : '#861e34'; }
+                        if (valueLabel && c && c.row2Values && (c.row2Values[valueLabel] || c.row2Values[valueLabel.toLowerCase()])) {
+                            return c.row2Values[valueLabel] || c.row2Values[valueLabel.toLowerCase()];
+                        }
+                        return (c && c.row2) ? c.row2 : '#2d5a27';
+                    };
+                    countTableHtml = '<table class="tm-export-preview-count-table">';
+                    countTableHtml += '<thead><tr>';
+                    groups.forEach(function (g, gi) {
+                        var bg = getCountColor(gi, 1);
+                        countTableHtml += '<th class="tm-export-preview-count-group-header" colspan="' + g.values.length + '" style="background-color:' + escapeHtml(bg) + '">' + escapeHtml(g.label) + '</th>';
+                    });
+                    countTableHtml += '</tr><tr>';
+                    groups.forEach(function (g, gi) {
+                        g.values.forEach(function (v) {
+                            var subLabel = v.label !== '' ? v.label : g.label;
+                            var bg = getCountColor(gi, 2, subLabel);
+                            countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + '">' + escapeHtml(subLabel) + '</th>';
+                        });
+                    });
+                    countTableHtml += '</tr></thead><tbody><tr>';
+                    groups.forEach(function (g) {
+                        g.values.forEach(function (v) {
+                            countTableHtml += '<td class="tm-export-preview-count-value">' + escapeHtml(String(v.count)) + '</td>';
+                        });
+                    });
+                    countTableHtml += '</tr></tbody></table>';
+                    countTableHtml += '<div class="tm-export-preview-desglose-label">Desglose</div>';
+                }
+            }
+            let html = countTableHtml + '<div class="tm-export-preview-table"><div class="tm-export-preview-row tm-export-preview-title"><div class="tm-export-preview-cell tm-export-preview-title-cell" style="' + titleStyle + '" colspan="' + columns.length + '">' + escapeHtml(state.title || 'Título') + '</div></div><div class="tm-export-preview-row tm-export-preview-header">';
             columns.forEach(function (col) {
                 const color = colorMap[col.key] || '#861e34';
                 if (col.is_image) {
@@ -1449,22 +1683,47 @@
                     html += '<div class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(color) + ';min-width:' + ch + 'ch;max-width:' + ch + 'ch">' + escapeHtml(col.label) + '</div>';
                 }
             });
-            html += '</div><div class="tm-export-preview-row tm-export-preview-data">';
-            columns.forEach(function (col) {
-                const color = colorMap[col.key] || 'var(--clr-primary)';
-                const cellColor = '#f5f5f5';
-                if (col.is_image) {
-                    const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
-                    const w = (c.imageWidth || 120) + 'px';
-                    const h = (c.imageHeight || 80) + 'px';
-                    html += '<div class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" data-key="' + escapeHtml(col.key) + '" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">—</span></div>';
-                } else {
-                    const ch = Math.min(col.max_width_chars || 24, 60);
-                    const val = savedRow[col.key] !== undefined ? escapeHtml(savedRow[col.key]) : '';
-                    html += '<div class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="min-width:' + ch + 'ch;max-width:' + ch + 'ch;background:' + escapeHtml(cellColor) + '" data-placeholder="Ejemplo">' + val + '</div>';
-                }
-            });
-            html += '</div></div>';
+            html += '</div>';
+            if (Array.isArray(entries) && entries.length > 0) {
+                var itemNum = 1;
+                entries.forEach(function (entry) {
+                    var mrLabel = (meta[entry.microrregion_id] && meta[entry.microrregion_id].label) ? meta[entry.microrregion_id].label : 'Sin microrregión';
+                    html += '<div class="tm-export-preview-row tm-export-preview-data">';
+                    columns.forEach(function (col) {
+                        const cellColor = '#f5f5f5';
+                        if (col.is_image) {
+                            const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
+                            const w = (c.imageWidth || 120) + 'px';
+                            const h = (c.imageHeight || 80) + 'px';
+                            html += '<div class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">—</span></div>';
+                        } else {
+                            const ch = Math.min(col.max_width_chars || 24, 60);
+                            var val = '';
+                            if (col.key === 'item') { val = String(itemNum++); } else if (col.key === 'microrregion') { val = mrLabel; } else { val = formatPreviewCellValue(entry.data && entry.data[col.key]); }
+                            html += '<div class="tm-export-preview-cell tm-export-preview-data-cell" style="min-width:' + ch + 'ch;max-width:' + ch + 'ch;background:' + escapeHtml(cellColor) + '">' + escapeHtml(val) + '</div>';
+                        }
+                    });
+                    html += '</div>';
+                });
+            } else {
+                html += '<div class="tm-export-preview-row tm-export-preview-data">';
+                columns.forEach(function (col) {
+                    const color = colorMap[col.key] || 'var(--clr-primary)';
+                    const cellColor = '#f5f5f5';
+                    if (col.is_image) {
+                        const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
+                        const w = (c.imageWidth || 120) + 'px';
+                        const h = (c.imageHeight || 80) + 'px';
+                        html += '<div class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" data-key="' + escapeHtml(col.key) + '" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">—</span></div>';
+                    } else {
+                        const ch = Math.min(col.max_width_chars || 24, 60);
+                        const val = (savedRow && savedRow[col.key] !== undefined) ? escapeHtml(savedRow[col.key]) : '';
+                        html += '<div class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="min-width:' + ch + 'ch;max-width:' + ch + 'ch;background:' + escapeHtml(cellColor) + '" data-placeholder="Ejemplo">' + val + '</div>';
+                    }
+                });
+                html += '</div>';
+            }
+            html += '</div>';
             previewEl.innerHTML = html;
         }
 
@@ -1641,6 +1900,10 @@
             const applyWordBtn = document.getElementById('tmExportApplyWord');
             const restoreWrap = document.getElementById('tmExportRestoreWrap');
             const restoreBtn = document.getElementById('tmExportRestoreBtn');
+            const includeCountTableEl = document.getElementById('tmExportIncludeCountTable');
+            const countByWrapEl = document.getElementById('tmExportCountByWrap');
+            const countByFieldsEl = document.getElementById('tmExportCountByFields');
+            const countTableColorListEl = document.getElementById('tmExportCountTableColorList');
 
             if (loadingEl) { loadingEl.hidden = false; }
             if (contentEl) { contentEl.hidden = true; }
@@ -1652,10 +1915,91 @@
                 .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('Error al cargar')); })
                 .then(function (data) {
                     let columns = Array.isArray(data.columns) ? data.columns : [];
-                    if (personalizeModal) { personalizeModal._personalizeColumns = columns; }
+                    if (personalizeModal) {
+                        personalizeModal._personalizeColumns = columns;
+                        personalizeModal._previewEntries = Array.isArray(data.entries) ? data.entries : [];
+                        personalizeModal._previewMicrorregionMeta = data.microrregion_meta && typeof data.microrregion_meta === 'object' ? data.microrregion_meta : {};
+                    }
+                    var countableColumns = columns.filter(function (c) {
+                        var k = (c && c.key) ? c.key : '';
+                        return k !== 'item' && k !== 'microrregion' && !c.is_image;
+                    });
+                    if (personalizeModal) { personalizeModal._countableColumns = countableColumns; }
                     if (titleEl) { titleEl.value = data.title || ''; }
+                    if (countByFieldsEl) {
+                        countByFieldsEl.innerHTML = '';
+                        countableColumns.forEach(function (col) {
+                            var label = document.createElement('label');
+                            label.className = 'tm-export-count-by-check';
+                            var cb = document.createElement('input');
+                            cb.type = 'checkbox';
+                            cb.setAttribute('data-count-key', col.key || '');
+                            cb.value = col.key || '';
+                            label.appendChild(cb);
+                            label.appendChild(document.createTextNode(' ' + (col.label || col.key || '')));
+                            countByFieldsEl.appendChild(label);
+                        });
+                    }
+                    if (includeCountTableEl && countByWrapEl) {
+                        countByWrapEl.hidden = !includeCountTableEl.checked;
+                        includeCountTableEl.addEventListener('change', function () {
+                            countByWrapEl.hidden = !includeCountTableEl.checked;
+                            buildCountTableColorList(countTableColorListEl, countByFieldsEl, personalizeModal._previewEntries);
+                            buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                        });
+                    }
+                    var countColorsCollapsible = document.getElementById('tmExportCountColorsCollapsible');
+                    var countColorsToggle = document.getElementById('tmExportCountColorsToggle');
+                    if (countColorsCollapsible && countColorsToggle) {
+                        countColorsToggle.addEventListener('click', function () {
+                            var isOpen = countColorsCollapsible.classList.toggle('is-open');
+                            countColorsToggle.setAttribute('aria-expanded', String(isOpen));
+                        });
+                    }
+                    if (countByFieldsEl) {
+                        countByFieldsEl.addEventListener('change', function () {
+                            buildCountTableColorList(countTableColorListEl, countByFieldsEl, personalizeModal._previewEntries);
+                            buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                        });
+                    }
                     buildPersonalizeColumnsList(columns, columnsEl);
-                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                    buildCountTableColorList(countTableColorListEl, countByFieldsEl, personalizeModal._previewEntries);
+                    if (personalizeModal && !personalizeModal._countTableColorListenersBound) {
+                        personalizeModal._countTableColorListenersBound = true;
+                        personalizeModal.addEventListener('click', function (e) {
+                            var colorList = document.getElementById('tmExportCountTableColorList');
+                            if (!colorList || !colorList.contains(e.target)) { return; }
+                            var trigger = e.target.closest('.tm-export-color-trigger');
+                            var option = e.target.closest('.tm-export-color-option');
+                            if (trigger) {
+                                var menu = trigger.nextElementSibling;
+                                if (!(menu instanceof HTMLElement)) { return; }
+                                var isOpen = !menu.hidden;
+                                Array.from(personalizeModal.querySelectorAll('.tm-export-color-menu')).forEach(function (m) { m.hidden = true; });
+                                trigger.setAttribute('aria-expanded', String(!isOpen));
+                                menu.hidden = isOpen;
+                                if (!isOpen && menu.scrollIntoView) {
+                                    setTimeout(function () { menu.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 0);
+                                }
+                            } else if (option) {
+                                var color = option.getAttribute('data-color') || '';
+                                var menu = option.closest('.tm-export-color-menu');
+                                var colorCell = menu ? menu.closest('.tm-export-col-color') : null;
+                                if (!colorCell) { colorCell = menu ? menu.closest('.tm-export-count-table-value-color') : null; }
+                                var tr = colorCell ? colorCell.querySelector('.tm-export-color-trigger') : null;
+                                if (colorCell && tr) {
+                                    colorCell.querySelectorAll('.tm-export-color-option').forEach(function (opt) { opt.classList.remove('is-active'); });
+                                    option.classList.add('is-active');
+                                    tr.setAttribute('data-color', color);
+                                    var swatch = tr.querySelector('.tm-export-color-swatch');
+                                    if (swatch instanceof HTMLElement) { swatch.style.backgroundColor = color; }
+                                }
+                                if (menu) { menu.hidden = true; }
+                                buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                            }
+                        });
+                    }
+                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
                     if (restoreWrap) { restoreWrap.hidden = true; }
                     if (personalizeModal) { personalizeModal._previewZoom = 100; }
                     setupPreviewZoom();
@@ -1694,10 +2038,22 @@
                             const orientBtn = personalizeModal.querySelector('.tm-export-orient-btn.is-active');
                             const orientation = orientBtn ? (orientBtn.getAttribute('data-orientation') || 'portrait') : 'portrait';
 
+                            var includeCountTable = !!(includeCountTableEl && includeCountTableEl.checked);
+                            var countByFields = [];
+                            if (includeCountTable && countByFieldsEl) {
+                                countByFieldsEl.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
+                                    var k = cb.getAttribute('data-count-key') || cb.value;
+                                    if (k) { countByFields.push(k); }
+                                });
+                            }
                             const cfg = {
                                 title: state.title || '',
                                 title_align: state.titleAlign || 'center',
                                 orientation: orientation,
+                                include_count_table: includeCountTable,
+                                count_by_fields: countByFields,
+                                count_table_colors: state.countTableColors || {},
+                                count_table_cell_width: state.countTableCellWidth || 12,
                                 columns: orderedCols.map(function (col) {
                                     const colState = state.columns.find(function (c) { return c.key === col.key; }) || {};
                                     return {

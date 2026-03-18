@@ -498,6 +498,57 @@ class TemporaryModuleExportService
         return $columns;
     }
 
+    /**
+     * Build count table data as groups: each group has a title (field name) and sub-values with counts.
+     *
+     * @param \Illuminate\Support\Collection $entries collection of entries with 'data'
+     * @param array<string> $countByFields field keys to count by value
+     * @param array<string, string> $fieldLabels map field key => display label (e.g. estatus => ESTATUS)
+     * @return array{groups: list<array{label: string, values: list<array{label: string, count: int}>}>}
+     */
+    private function buildCountTableData(Collection $entries, array $countByFields, array $fieldLabels = []): array
+    {
+        $total = $entries->count();
+        $groups = [
+            ['label' => 'Total de registros', 'values' => [['label' => '', 'count' => $total]]],
+        ];
+
+        foreach ($countByFields as $fieldKey) {
+            $valueCounts = [];
+            $labelByLower = [];
+            foreach ($entries as $entry) {
+                $val = $entry->data[$fieldKey] ?? null;
+                if (is_bool($val)) {
+                    $key = $val ? 'Sí' : 'No';
+                } elseif (is_scalar($val)) {
+                    $key = trim((string) $val);
+                } else {
+                    $key = '';
+                }
+                if ($key !== '') {
+                    $lower = mb_strtolower($key);
+                    $valueCounts[$lower] = ($valueCounts[$lower] ?? 0) + 1;
+                    if (!isset($labelByLower[$lower])) {
+                        $labelByLower[$lower] = $key;
+                    }
+                }
+            }
+            ksort($valueCounts, SORT_NATURAL);
+            $values = [];
+            foreach ($valueCounts as $lower => $count) {
+                $values[] = ['label' => $labelByLower[$lower] ?? $lower, 'count' => $count];
+            }
+            if ($values !== []) {
+                $groups[] = [
+                    'label' => $fieldLabels[$fieldKey] ?? $fieldKey,
+                    'values' => $values,
+                ];
+            }
+        }
+
+        return ['groups' => $groups];
+    }
+
     private function fillSheet(Worksheet $sheet, TemporaryModule $temporaryModule, $entriesQuery, Collection $microrregionMeta, \DateTimeInterface $fechaCorte): void
     {
         $exportColumns = $this->buildExportColumns($temporaryModule);
@@ -517,7 +568,107 @@ class TemporaryModuleExportService
         $lastColumnLetter = Coordinate::stringFromColumnIndex($totalColumns);
         $titleRow = 1;
         $dateRow = 2;
-        $headerStartRow = 3;
+
+        $includeCountTable = !empty($this->exportConfig['include_count_table']);
+        $countByFields = $includeCountTable && is_array($this->exportConfig['count_by_fields'] ?? null)
+            ? array_values(array_filter(array_map('strval', $this->exportConfig['count_by_fields'])))
+            : [];
+        $countTableRows = 0;
+        if ($includeCountTable) {
+            $entriesForCount = (clone $entriesQuery)->get(['id', 'data']);
+            $fieldLabels = [];
+            foreach ($temporaryModule->fields as $f) {
+                if ($f->type !== 'seccion') {
+                    $fieldLabels[$f->key] = (string) ($f->label ?? $f->key);
+                }
+            }
+            $countData = $this->buildCountTableData($entriesForCount, $countByFields, $fieldLabels);
+            $groups = $countData['groups'];
+            $colIdx = 1;
+            $groupRow = 3;
+            $valueRow = 4;
+            $dataRow = 5;
+            foreach ($groups as $group) {
+                $span = count($group['values']);
+                $startCol = $colIdx;
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($startCol).$groupRow, $group['label']);
+                if ($span > 1) {
+                    $endCol = $startCol + $span - 1;
+                    $sheet->mergeCells(
+                        Coordinate::stringFromColumnIndex($startCol).$groupRow.':'.
+                        Coordinate::stringFromColumnIndex($endCol).$groupRow
+                    );
+                }
+                foreach ($group['values'] as $v) {
+                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$valueRow, $v['label'] !== '' ? $v['label'] : $group['label']);
+                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$dataRow, $v['count']);
+                    $colIdx++;
+                }
+            }
+            $countLastCol = $colIdx - 1;
+            $countLastColLetter = Coordinate::stringFromColumnIndex($countLastCol);
+            $sheet->getStyle('A'.$groupRow.':'.$countLastColLetter.$dataRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+            $sheet->getStyle('A'.$groupRow.':'.$countLastColLetter.$groupRow)->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
+            $sheet->getStyle('A'.$valueRow.':'.$countLastColLetter.$valueRow)->getFont()->setBold(true);
+            $sheet->getStyle('A'.$valueRow.':'.$countLastColLetter.$valueRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+            $sheet->getStyle('A'.$dataRow.':'.$countLastColLetter.$dataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+            $sheet->getStyle('A'.$dataRow.':'.$countLastColLetter.$dataRow)->getFont()->getColor()->setARGB('FFFF0000');
+            $countTableColors = is_array($this->exportConfig['count_table_colors'] ?? null) ? $this->exportConfig['count_table_colors'] : [];
+            $resolveCountColor = function (string $key, int $rowNum, ?string $valueLabel = null) use ($countTableColors): string {
+                $c = $countTableColors[$key] ?? null;
+                if (is_string($c) && $c !== '') {
+                    $argb = $this->mapCssColorToArgb($c);
+                    return $argb ?? ($rowNum === 1 ? self::HEADER_FILL_COLOR : 'FF2d5a27');
+                }
+                if (is_array($c)) {
+                    if ($rowNum === 1) {
+                        $css = $c['row1'] ?? '';
+                        $argb = $css !== '' ? $this->mapCssColorToArgb((string) $css) : null;
+                        return $argb ?? self::HEADER_FILL_COLOR;
+                    }
+                    if ($valueLabel !== null && isset($c['row2Values']) && is_array($c['row2Values'])) {
+                        $css = $c['row2Values'][$valueLabel] ?? $c['row2Values'][mb_strtolower($valueLabel)] ?? null;
+                        if ($css !== null && $css !== '') {
+                            $argb = $this->mapCssColorToArgb((string) $css);
+                            if ($argb !== null) {
+                                return $argb;
+                            }
+                        }
+                    }
+                    $css = $c['row2'] ?? '';
+                    $argb = $css !== '' ? $this->mapCssColorToArgb((string) $css) : null;
+                    return $argb ?? 'FF2d5a27';
+                }
+                return $rowNum === 1 ? self::HEADER_FILL_COLOR : 'FF2d5a27';
+            };
+            $colIdx = 1;
+            foreach ($groups as $gi => $group) {
+                $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
+                $argb1 = $resolveCountColor($key, 1);
+                $span = count($group['values']);
+                $startCol = $colIdx;
+                $endCol = $colIdx + $span - 1;
+                $startLetter = Coordinate::stringFromColumnIndex($startCol);
+                $endLetter = Coordinate::stringFromColumnIndex($endCol);
+                $sheet->getStyle($startLetter.$groupRow.':'.$endLetter.$groupRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($argb1);
+                foreach ($group['values'] as $v) {
+                    $valueLabel = $v['label'] !== '' ? $v['label'] : $group['label'];
+                    $argb2 = $resolveCountColor($key, 2, $valueLabel);
+                    $letter = Coordinate::stringFromColumnIndex($colIdx);
+                    $sheet->getStyle($letter.$valueRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($argb2);
+                    $colIdx++;
+                }
+            }
+            $countTableRows = 4;
+        }
+
+        $headerStartRow = 3 + $countTableRows;
+        if ($includeCountTable) {
+            $desgloseRow = 3 + 3;
+            $sheet->setCellValue('A'.$desgloseRow, 'Desglose');
+            $sheet->mergeCells('A'.$desgloseRow.':'.$lastColumnLetter.$desgloseRow);
+            $sheet->getStyle('A'.$desgloseRow)->getFont()->setBold(true);
+        }
 
         // Título (letra grande) usando configuración si existe
         $configuredTitle = null;

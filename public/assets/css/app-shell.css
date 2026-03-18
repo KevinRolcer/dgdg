@@ -1062,18 +1062,18 @@ body.sidebar-collapsed .sidebar-logout-btn {
 .home-shell .home-shell-main-title,
 .agenda-shell .agenda-shell-title,
 .tm-shell .tm-shell-title,
-.mesas-paz-shell .mesas-paz-shell-main-title {
-    font-size: var(--fs-title);
+.mesas-paz-shell .mesas-paz-shell-title {
+    font-size: 1rem;
     line-height: var(--lh-title);
-    font-weight: 700;
+    font-weight: 800;
     color: var(--clr-accent);
 }
 .settings-shell .settings-shell-main-desc,
 .home-shell .home-shell-main-desc,
 .agenda-shell .agenda-shell-desc,
 .tm-shell .tm-shell-desc,
-.mesas-paz-shell .mesas-paz-shell-main-desc {
-    font-size: var(--fs-body);
+.mesas-paz-shell .mesas-paz-shell-desc {
+    font-size: 0.76rem;
     line-height: var(--lh-body);
     color: var(--clr-text-light);
 }

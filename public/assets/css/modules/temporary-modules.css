@@ -1184,6 +1184,15 @@ html.theme-dark .tm-target-box h3 {
     overflow-x: auto;
 }
 
+.tm-excel-map-table-wrap {
+    /* Mantiene scroll solo dentro de la tabla de mapeo (paso 2) */
+    max-height: 260px;
+    overflow-y: auto;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+}
+
 .tm-table-wrap.tm-table-wrap-scroll {
     /* max-height: min(62vh, 620px); */
     /* overflow: auto; */
@@ -2388,8 +2397,9 @@ a.tm-paginator-btn:hover {
     }
 
     .tm-modal-dialog-entry .tm-modal-body {
-        max-height: none;
-        overflow: visible;
+        /* Evita que el scroll desaparezca en pantallas <= 900px */
+        max-height: calc(100vh - 180px);
+        overflow-y: auto;
         padding-right: 0;
     }
 
@@ -2423,10 +2433,11 @@ a.tm-paginator-btn:hover {
 }
 
 .tm-export-personalize-modal .tm-modal-dialog {
-    width: min(860px, calc(100vw - 24px));
+    width: min(1100px, calc(100vw - 24px));
     max-width: calc(100vw - 24px);
+    height: min(88vh, 900px);
     max-height: 90vh;
-    min-height: 0;
+    min-height: 520px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -2581,6 +2592,203 @@ a.tm-paginator-btn:hover {
     background: var(--clr-primary);
     border-color: var(--clr-primary);
     color: #fff;
+}
+
+.tm-export-count-table-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tm-export-count-table-toggle {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--clr-text-main);
+    cursor: pointer;
+}
+
+.tm-export-count-by-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px 16px;
+    padding-left: 4px;
+}
+
+.tm-export-count-table-sizes {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+}
+
+.tm-export-count-cell-width-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.88rem;
+    color: var(--clr-text-main);
+    cursor: default;
+}
+
+.tm-export-count-cell-width-input {
+    width: 4ch;
+    padding: 4px 6px;
+    border: 1px solid var(--clr-border);
+    border-radius: 6px;
+    background: var(--clr-bg);
+    color: var(--clr-text-main);
+    font-size: 0.88rem;
+}
+
+.tm-export-count-table-colors-collapsible {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.tm-export-count-colors-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    border: none;
+    background: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--clr-accent);
+    cursor: pointer;
+    text-align: left;
+}
+
+.tm-export-count-colors-header:hover {
+    color: var(--clr-primary);
+}
+
+.tm-export-count-colors-arrow {
+    display: inline-block;
+    color: var(--clr-primary);
+    font-size: 0.75rem;
+    transition: transform 0.2s ease;
+}
+
+.tm-export-count-table-colors-collapsible.is-open .tm-export-count-colors-arrow {
+    transform: rotate(90deg);
+}
+
+.tm-export-count-table-colors-wrap {
+    margin-top: 6px;
+    margin-left: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tm-export-count-table-colors-collapsible:not(.is-open) .tm-export-count-table-colors-wrap {
+    display: none;
+}
+
+.tm-export-count-by-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+}
+
+.tm-export-count-by-check {
+    font-size: 0.85rem;
+    color: var(--clr-text-main);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.tm-export-count-table-colors-wrap {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tm-export-count-table-color-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tm-export-count-table-color-list .tm-export-count-table-color-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 6px 10px;
+    background: var(--clr-card);
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    overflow: visible;
+}
+
+.tm-export-count-table-color-list .tm-export-col-label {
+    flex: 1;
+    font-weight: 500;
+    color: var(--clr-text-main);
+}
+
+.tm-export-count-table-two-colors {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tm-export-count-table-two-colors .tm-export-col-color {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tm-export-color-row-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--clr-text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.tm-export-count-table-row2-values {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--clr-border);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow: visible;
+}
+
+.tm-export-count-table-value-colors {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+}
+
+.tm-export-count-table-value-color {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+}
+
+.tm-export-count-table-value-color .tm-export-color-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 10;
+    margin-top: 2px;
+}
+
+.tm-export-count-table-value-color .tm-export-value-label {
+    font-size: 0.8rem;
+    color: var(--clr-text-main);
+    min-width: 1.5em;
 }
 
 .tm-export-orient-btn {
@@ -2917,6 +3125,47 @@ a.tm-paginator-btn:hover {
     box-sizing: border-box;
 }
 
+.tm-export-preview-count-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.75rem;
+    margin-bottom: 10px;
+}
+
+.tm-export-preview-count-table th,
+.tm-export-preview-count-table td {
+    padding: 5px 8px;
+    border: 1px solid var(--clr-border);
+    vertical-align: middle;
+    text-align: center;
+}
+
+.tm-export-preview-count-group-header {
+    background: #861e34;
+    color: #fff;
+    font-weight: 600;
+}
+
+.tm-export-preview-count-value-header {
+    background: #861e34;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.7rem;
+}
+
+.tm-export-preview-count-value {
+    background: var(--clr-card);
+    color: #c00;
+    font-weight: 600;
+}
+
+.tm-export-preview-desglose-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--clr-text-main);
+    margin: 8px 0 4px 0;
+}
+
 .tm-export-preview-table {
     display: table;
     border-collapse: collapse;
@@ -2993,6 +3242,8 @@ a.tm-paginator-btn:hover {
 
     .tm-export-personalize-modal .tm-modal-dialog {
         width: calc(100vw - 16px);
+        height: auto;
+        min-height: 70vh;
         max-height: 85vh;
     }
 

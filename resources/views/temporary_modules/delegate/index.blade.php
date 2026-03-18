@@ -41,6 +41,9 @@
     </section>
 
     @foreach ($modules as $module)
+        @php
+            $tmImportable = $module->fields->filter(fn ($f) => in_array($f->type, \App\Services\TemporaryModules\TemporaryModuleExcelImportService::IMPORTABLE_TYPES, true));
+        @endphp
         <div class="tm-modal" id="delegate-preview-{{ $module->id }}" aria-hidden="true" role="dialog" aria-modal="true">
             <div class="tm-modal-backdrop" data-close-module-preview></div>
             <div class="tm-modal-dialog tm-modal-dialog-entry">
@@ -49,9 +52,19 @@
                         <h3>Registro de modulo temporal</h3>
                         <p class="tm-modal-subtitle">{{ $module->name }}</p>
                     </div>
-                    <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
-                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                    </button>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        @if ($tmImportable->isNotEmpty())
+                            <button type="button"
+                                    class="tm-btn tm-btn-outline"
+                                    data-open-excel-import="tmImportarExcelModal-{{ $module->id }}"
+                                    aria-label="Importar Excel">
+                                <i class="fa-regular fa-file-excel" aria-hidden="true"></i> Importar Excel
+                            </button>
+                        @endif
+                        <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="tm-modal-body">
@@ -212,6 +225,93 @@
             </div>
         </div>
 
+        @if ($tmImportable->isNotEmpty())
+            <div class="tm-modal tm-excel-import-modal" id="tmImportarExcelModal-{{ $module->id }}" aria-hidden="true" role="dialog" aria-modal="true"
+                 aria-labelledby="tmImportarExcelModalLabel-{{ $module->id }}"
+                 data-excel-preview-url="{{ route('temporary-modules.import-excel-preview', $module->id) }}"
+                 data-excel-import-url="{{ route('temporary-modules.import-excel', $module->id) }}">
+                <div class="tm-modal-backdrop" data-close-module-preview></div>
+                <div class="tm-modal-dialog tm-modal-dialog-entry tm-excel-modal-dialog">
+                    <div class="tm-modal-head">
+                        <h3 id="tmImportarExcelModalLabel-{{ $module->id }}">Importar desde Excel</h3>
+                        <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
+                    <div class="tm-modal-body tm-excel-modal-body">
+                        <p class="tm-field-help" style="margin-bottom:12px;">
+                            Si el archivo trae totales o títulos arriba, al leer columnas se <strong>detecta</strong> la fila de la tabla (MUNICIPIO, MICROREGION, ACCION…).
+                            Luego asocia cada campo del módulo con una columna.
+                        </p>
+
+                        <div class="tm-excel-step1">
+                            <div class="tm-excel-grid">
+                                <label>Fila encabezados
+                                    <input type="number" class="tm-excel-header-row" value="1" min="1" max="500">
+                                </label>
+                                <label>Primera fila datos
+                                    <input type="number" class="tm-excel-data-start-row" value="2" min="2" max="50000">
+                                </label>
+                                @if ($microsAsignadas->count() > 1)
+                                    <label>Microregión
+                                        <select class="tm-excel-mr-input tm-input" name="selected_microrregion_id">
+                                            @foreach ($microsAsignadas as $micro)
+                                                <option value="{{ $micro->id }}" @selected($loop->first)>
+                                                    MR {{ $micro->microrregion }} — {{ $micro->cabecera }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                @else
+                                    @if ($microsAsignadas->count() === 1)
+                                        <input type="hidden" class="tm-excel-mr-input" name="selected_microrregion_id" value="{{ $microsAsignadas->first()->id }}">
+                                    @endif
+                                @endif
+                            </div>
+
+                            <label class="tm-col-full" style="margin-top:10px;">Archivo
+                                <input type="file" class="tm-excel-file-input" accept=".xlsx,.xls">
+                            </label>
+
+                            <div class="inline-alert inline-alert-error tm-hidden tm-excel-preview-err" role="alert"></div>
+                            <div class="inline-alert inline-alert-success tm-hidden tm-excel-detect-note" style="margin-top:8px;" role="status"></div>
+
+                            <div class="tm-actions" style="margin-top:10px;">
+                                <button type="button" class="tm-btn tm-btn-primary tm-excel-read-columns">
+                                    Leer columnas
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="tm-excel-step2 tm-hidden">
+                            <div class="tm-table-wrap tm-excel-map-table-wrap">
+                                <table class="tm-table tm-table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Encabezado (Excel)</th>
+                                            <th>Asignar a campo del módulo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="tm-excel-map-body"></tbody>
+                                </table>
+                            </div>
+
+                            <div class="inline-alert inline-alert-error tm-hidden tm-excel-import-err" role="alert"></div>
+                            <div class="inline-alert inline-alert-success tm-hidden tm-excel-import-ok" role="alert"></div>
+
+                            <div class="tm-actions" style="margin-top:10px;">
+                                <button type="button" class="tm-btn tm-excel-back">Volver</button>
+                                <button type="button" class="tm-btn tm-btn-primary tm-excel-importar" style="margin-left:8px;">
+                                    Importar filas
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         @foreach ($module->getRelation('myEntries') as $entry)
             @php
                 $entryMicrorregion = ($microrregionesAsignadas ?? collect())->firstWhere('id', $entry->microrregion_id);
@@ -225,9 +325,19 @@
                             <h3>Editar registro</h3>
                             <p class="tm-modal-subtitle">{{ $module->name }}</p>
                         </div>
-                        <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
-                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                        </button>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            @if ($tmImportable->isNotEmpty())
+                                <button type="button"
+                                        class="tm-btn tm-btn-outline"
+                                        data-open-excel-import="tmImportarExcelModal-{{ $module->id }}"
+                                        aria-label="Importar Excel">
+                                    <i class="fa-regular fa-file-excel" aria-hidden="true"></i> Importar Excel
+                                </button>
+                            @endif
+                            <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
+                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="tm-modal-body">
@@ -541,8 +651,12 @@
         let lastFocusedImageInput = null;
         const modalOpeners = new Map();
         const notify = function (title, message, type) {
-            if (typeof window.swal === 'function') {
-                window.swal(title, message, type);
+            if (typeof Swal !== 'undefined') {
+                Swal.fire(title, message, type);
+            } else if (typeof window.swal === 'function') {
+                try { window.swal(title, message, type); } catch (e) { window.swal.fire(title, message, type); }
+            } else {
+                alert(title + '\n' + (message || ''));
             }
         };
 
@@ -1227,6 +1341,362 @@
             Array.from(document.querySelectorAll('.tm-modal.is-open')).forEach(function (modal) {
                 closeModal(modal);
             });
+        });
+
+        /* Importar Excel (eventos temporales) */
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json(csrf_token());
+
+        const stripAccents = function (value) {
+            try {
+                return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            } catch (e) {
+                return String(value || '');
+            }
+        };
+
+        const escapeHtml = function (value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        };
+
+        const findMunicipioHeaderIndex = function (headers) {
+            if (!Array.isArray(headers) || !headers.length) return null;
+            const exact = headers.find(function (h) {
+                const label = stripAccents(h && h.label ? h.label : '').toUpperCase();
+                return /MUNICIPIO/.test(label);
+            });
+            if (exact && typeof exact.index !== 'undefined') return exact.index;
+
+            const munLike = headers.find(function (h) {
+                const label = stripAccents(h && h.label ? h.label : '').toUpperCase();
+                // Fallback: MUNICIP, MUN, MUNICIPOS, etc.
+                return /\bMUN\b/.test(label) || /MUNICIP/.test(label);
+            });
+            if (munLike && typeof munLike.index !== 'undefined') return munLike.index;
+
+            return null;
+        };
+
+        const excelModals = Array.from(document.querySelectorAll('.tm-excel-import-modal'));
+        excelModals.forEach(function (modal) {
+            const previewUrl = String(modal.getAttribute('data-excel-preview-url') || '');
+            const importUrl = String(modal.getAttribute('data-excel-import-url') || '');
+
+            const step1 = modal.querySelector('.tm-excel-step1');
+            const step2 = modal.querySelector('.tm-excel-step2');
+            const fileInput = modal.querySelector('.tm-excel-file-input');
+            const headerRowInput = modal.querySelector('.tm-excel-header-row');
+            const dataStartRowInput = modal.querySelector('.tm-excel-data-start-row');
+            const mrInput = modal.querySelector('.tm-excel-mr-input');
+            const mapBody = modal.querySelector('.tm-excel-map-body');
+
+            const errPreviewEl = modal.querySelector('.tm-excel-preview-err');
+            const detectNoteEl = modal.querySelector('.tm-excel-detect-note');
+            const errImportEl = modal.querySelector('.tm-excel-import-err');
+            const okImportEl = modal.querySelector('.tm-excel-import-ok');
+
+            const resetModal = function () {
+                excelModals.forEach(function (m) {
+                    if (m === modal) return;
+                });
+
+                if (step1) step1.classList.remove('tm-hidden');
+                if (step2) step2.classList.add('tm-hidden');
+
+                if (mapBody) mapBody.innerHTML = '';
+                modal.__excelHeaderToFieldState = null;
+
+                ['.tm-excel-preview-err', '.tm-excel-detect-note', '.tm-excel-import-err', '.tm-excel-import-ok'].forEach(function (sel) {
+                    const el = modal.querySelector(sel);
+                    if (!el) return;
+                    el.textContent = '';
+                    el.classList.add('tm-hidden');
+                });
+            };
+
+            modal.__excelReset = resetModal;
+
+            const readColumnsBtn = modal.querySelector('.tm-excel-read-columns');
+            readColumnsBtn?.addEventListener('click', function () {
+                const file = fileInput && fileInput.files && fileInput.files[0];
+                if (!file) {
+                    if (errPreviewEl) {
+                        errPreviewEl.textContent = 'Selecciona un archivo Excel.';
+                        errPreviewEl.classList.remove('tm-hidden');
+                    }
+                    return;
+                }
+
+                const fd = new FormData();
+                fd.append('archivo_excel', file);
+                fd.append('header_row', (headerRowInput ? headerRowInput.value : '1') || '1');
+                fd.append('auto_detect', '1');
+                fd.append('_token', csrfToken);
+
+                if (errPreviewEl) errPreviewEl.classList.add('tm-hidden');
+                if (detectNoteEl) detectNoteEl.classList.add('tm-hidden');
+                if (errImportEl) errImportEl.classList.add('tm-hidden');
+                if (okImportEl) okImportEl.classList.add('tm-hidden');
+
+                fetch(previewUrl, {
+                    method: 'POST',
+                    body: fd,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+                    credentials: 'same-origin'
+                })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                .then(function (_ref) {
+                    if (!_ref.ok || !_ref.j.success) {
+                        if (errPreviewEl) {
+                            errPreviewEl.textContent = _ref.j.message || 'Error al leer el archivo.';
+                            errPreviewEl.classList.remove('tm-hidden');
+                        }
+                        return;
+                    }
+
+                    if (typeof _ref.j.header_row === 'number' && headerRowInput) headerRowInput.value = String(_ref.j.header_row);
+                    if (typeof _ref.j.data_start_row === 'number' && dataStartRowInput) dataStartRowInput.value = String(_ref.j.data_start_row);
+
+                    if (_ref.j.detection_note && detectNoteEl) {
+                        detectNoteEl.textContent = _ref.j.detection_note;
+                        detectNoteEl.classList.remove('tm-hidden');
+                    }
+
+                    const excelHeaders = _ref.j.headers || [];
+                    const excelFields = _ref.j.fields || [];
+                    const excelSuggested = _ref.j.suggested_map || {};
+
+                    const municipioHeaderIndex = findMunicipioHeaderIndex(excelHeaders);
+
+                    if (mapBody) {
+                        mapBody.innerHTML = '';
+
+                        // Estado 1-1: un encabezado -> un campo (y un campo no se repite).
+                        // fieldToHeader: fieldKey => headerIndex
+                        // headerToField: headerIndex => fieldKey
+                        const state = {
+                            fieldToHeader: {},
+                            headerToField: {}
+                        };
+
+                        const municipioField = (Array.isArray(excelFields) ? excelFields : []).find(function (f) {
+                            return String(f && f.type || '') === 'municipio';
+                        });
+
+                        // Preasignar MUNICIPIO si existe encabezado MUNICIPIO
+                        if (municipioField && municipioHeaderIndex !== null) {
+                            state.fieldToHeader[String(municipioField.key)] = municipioHeaderIndex;
+                            state.headerToField[String(municipioHeaderIndex)] = String(municipioField.key);
+                        }
+
+                        // Usar sugerencias del backend para preasignar
+                        Object.keys(excelSuggested || {}).forEach(function (fieldKey) {
+                            const idx = excelSuggested[fieldKey];
+                            if (idx === null || typeof idx === 'undefined') return;
+                            if (typeof idx !== 'number') return;
+                            if (!Number.isFinite(idx)) return;
+
+                            // No sobreescribir si ya está asignado (por MUNICIPIO)
+                            if (Object.prototype.hasOwnProperty.call(state.fieldToHeader, fieldKey)) return;
+                            if (Object.prototype.hasOwnProperty.call(state.headerToField, String(idx))) return;
+
+                            state.fieldToHeader[String(fieldKey)] = idx;
+                            state.headerToField[String(idx)] = String(fieldKey);
+                        });
+
+                        // Opciones de campos
+                        const fieldOptionsHtml = (Array.isArray(excelFields) ? excelFields : []).map(function (f) {
+                            const k = String(f.key || '').replace(/"/g, '');
+                            const label = String(f.label || k || '');
+                            const req = f.is_required ? ' *' : '';
+                            const type = String(f.type || '');
+                            const optLabel = label !== '' ? label + req : k + req;
+                            const typeSuffix = type ? ' (' + type + ')' : '';
+                            return '<option value="' + escapeHtml(k) + '">' + escapeHtml(optLabel) + escapeHtml(typeSuffix) + '</option>';
+                        }).join('');
+
+                        excelHeaders.forEach(function (h) {
+                            const headerIdx = h && typeof h.index !== 'undefined' ? h.index : null;
+                            if (headerIdx === null) return;
+
+                            const assignedFieldKey = state.headerToField[String(headerIdx)] || '';
+
+                            const lab = (h.letter + ': ' + (h.label || '(vacío)')).replace(/</g, '');
+                            const tr = document.createElement('tr');
+
+                            // select de campo asignado a este encabezado
+                            tr.innerHTML =
+                                '<td>' + escapeHtml(lab) + '</td>' +
+                                '<td>' +
+                                    '<select class="tm-excel-header-map-select" data-header-index="' + escapeHtml(headerIdx) + '">' +
+                                        '<option value="">— No importar —</option>' +
+                                        fieldOptionsHtml +
+                                    '</select>' +
+                                '</td>';
+
+                            mapBody.appendChild(tr);
+
+                            const sel = tr.querySelector('select.tm-excel-header-map-select');
+                            if (sel) {
+                                sel.value = assignedFieldKey;
+                            }
+                        });
+
+                        // listeners para mantener 1-1 (un campo asignado solo a un encabezado)
+                        const headerSelects = Array.from(mapBody.querySelectorAll('select.tm-excel-header-map-select'));
+                        headerSelects.forEach(function (sel) {
+                            sel.addEventListener('change', function () {
+                                const headerIdx = String(sel.getAttribute('data-header-index') || '');
+                                const newFieldKey = String(sel.value || '');
+
+                                // quitar asignación previa de este encabezado
+                                const prevFieldKey = state.headerToField[headerIdx] || '';
+                                if (prevFieldKey) {
+                                    delete state.fieldToHeader[prevFieldKey];
+                                }
+                                delete state.headerToField[headerIdx];
+
+                                // si no se seleccionó campo, ya terminamos
+                                if (!newFieldKey) {
+                                    return;
+                                }
+
+                                // si el campo ya estaba asignado a otro encabezado, limpiar ese otro
+                                const oldHeader = state.fieldToHeader[newFieldKey];
+                                if (typeof oldHeader !== 'undefined') {
+                                    const oldHeaderKey = String(oldHeader);
+                                    state.headerToField[oldHeaderKey] = '';
+                                    delete state.fieldToHeader[newFieldKey];
+
+                                    // limpiar UI en el select del encabezado anterior
+                                    const oldSel = mapBody.querySelector('select.tm-excel-header-map-select[data-header-index="' + oldHeaderKey + '"]');
+                                    if (oldSel instanceof HTMLSelectElement) {
+                                        oldSel.value = '';
+                                    }
+                                }
+
+                                // asignar
+                                state.fieldToHeader[newFieldKey] = parseInt(headerIdx, 10);
+                                state.headerToField[headerIdx] = newFieldKey;
+                            });
+                        });
+
+                        // guardar el state dentro del modal para usarlo en el import
+                        modal.__excelHeaderToFieldState = state;
+                    }
+
+                    if (step1) step1.classList.add('tm-hidden');
+                    if (step2) step2.classList.remove('tm-hidden');
+                })
+                .catch(function () {
+                    if (errPreviewEl) {
+                        errPreviewEl.textContent = 'Error de red al subir el archivo.';
+                        errPreviewEl.classList.remove('tm-hidden');
+                    }
+                });
+            });
+
+            const backBtn = modal.querySelector('.tm-excel-back');
+            backBtn?.addEventListener('click', function () {
+                if (step2) step2.classList.add('tm-hidden');
+                if (step1) step1.classList.remove('tm-hidden');
+            });
+
+            const importBtn = modal.querySelector('.tm-excel-importar');
+            importBtn?.addEventListener('click', function () {
+                const file = fileInput && fileInput.files && fileInput.files[0];
+                if (!file) {
+                    if (errImportEl) {
+                        errImportEl.textContent = 'Vuelve al paso 1 y selecciona el archivo.';
+                        errImportEl.classList.remove('tm-hidden');
+                    }
+                    return;
+                }
+
+                const mapping = {};
+                const state = modal.__excelHeaderToFieldState;
+                if (state && state.fieldToHeader && typeof state.fieldToHeader === 'object') {
+                    Object.keys(state.fieldToHeader).forEach(function (fieldKey) {
+                        const idx = state.fieldToHeader[fieldKey];
+                        if (typeof idx === 'number' && Number.isFinite(idx)) {
+                            mapping[fieldKey] = idx;
+                        }
+                    });
+                } else {
+                    // fallback (si el estado no se inicializó bien)
+                    Array.from(modal.querySelectorAll('select.tm-excel-header-map-select')).forEach(function (sel) {
+                        const headerIdx = sel.getAttribute('data-header-index');
+                        const fieldKey = sel.value;
+                        if (!headerIdx || !fieldKey) return;
+                        const idx = parseInt(String(headerIdx), 10);
+                        if (Number.isFinite(idx)) mapping[String(fieldKey)] = idx;
+                    });
+                }
+
+                const fd = new FormData();
+                fd.append('archivo_excel', file);
+                fd.append('header_row', (headerRowInput ? headerRowInput.value : '1') || '1');
+                fd.append('data_start_row', (dataStartRowInput ? dataStartRowInput.value : '2') || '2');
+                fd.append('mapping', JSON.stringify(mapping));
+                fd.append('selected_microrregion_id', mrInput ? String(mrInput.value || '') : '');
+                fd.append('_token', csrfToken);
+
+                if (errImportEl) errImportEl.classList.add('tm-hidden');
+                if (okImportEl) okImportEl.classList.add('tm-hidden');
+
+                fetch(importUrl, {
+                    method: 'POST',
+                    body: fd,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+                    credentials: 'same-origin'
+                })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                .then(function (_ref) {
+                    if (!_ref.ok || !_ref.j.success) {
+                        if (errImportEl) {
+                            errImportEl.textContent = _ref.j.message || 'Error al importar.';
+                            errImportEl.classList.remove('tm-hidden');
+                        }
+                        return;
+                    }
+
+                    let msg = _ref.j.message || 'Listo.';
+                    if (_ref.j.row_errors && _ref.j.row_errors.length) {
+                        msg += ' Avisos: ' + _ref.j.row_errors.slice(0, 5).map(function (e) { return 'fila ' + e.row; }).join(', ');
+                    }
+                    if (okImportEl) {
+                        okImportEl.textContent = msg;
+                        okImportEl.classList.remove('tm-hidden');
+                    }
+
+                    if (_ref.j.imported > 0) {
+                        setTimeout(function () { window.location.reload(); }, 1200);
+                    }
+                })
+                .catch(function () {
+                    if (errImportEl) {
+                        errImportEl.textContent = 'Error de red.';
+                        errImportEl.classList.remove('tm-hidden');
+                    }
+                });
+            });
+        });
+
+        document.addEventListener('click', function (event) {
+            const btn = event.target.closest('[data-open-excel-import]');
+            if (!btn) return;
+
+            const modalId = btn.getAttribute('data-open-excel-import');
+            const modal = modalId ? document.getElementById(modalId) : null;
+            if (!modal) return;
+
+            event.preventDefault();
+            if (typeof modal.__excelReset === 'function') modal.__excelReset();
+            openModal(modal, btn);
         });
 
         document.addEventListener('paste', function (event) {

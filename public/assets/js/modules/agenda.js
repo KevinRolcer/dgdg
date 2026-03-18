@@ -44,6 +44,7 @@ function openAgendaModal(id = null, tipo = 'asunto') {
     const container = document.getElementById('extraAddressesContainer');
     const tipoInput = document.getElementById('modalTipo');
     const subTipoInput = document.getElementById('modalSubtipo');
+    const assignModal = document.getElementById('agendaAssignModal');
     
     // Elements to toggle
     const fieldsGira = document.getElementById('fieldsGira');
@@ -139,7 +140,9 @@ function openAgendaModal(id = null, tipo = 'asunto') {
             if (usersIds.length > 0) {
                 setUnfoldState('unfoldAsignar', true);
                 usersIds.forEach(uid => {
-                    const cb = form.querySelector(`input[name="usuarios_asignados[]"][value="${uid}"]`);
+                    // Los checkboxes están dentro del modal de asignación (fuera del <form>),
+                    // por eso no deben buscarse con form.querySelector().
+                    const cb = assignModal ? assignModal.querySelector(`input[name="usuarios_asignados[]"][value="${uid}"]`) : null;
                     if (cb) cb.checked = true;
                 });
             }
@@ -187,7 +190,9 @@ function openAgendaModal(id = null, tipo = 'asunto') {
             btnOpenDescRef.classList.remove('is-active');
         }
     }
-    if (isGira) {
+    // En edición ya hicimos dispatchEvent('change') al seleccionar la microrregión,
+    // y ese handler puede limpiar el `municipio`. Por eso solo lo hacemos al crear.
+    if (!id && isGira) {
         const microSel = document.getElementById('modalMicrorregion');
         if (microSel && typeof microSel.dispatchEvent === 'function') {
             microSel.dispatchEvent(new Event('change'));
@@ -609,6 +614,48 @@ window.agendaVerDescripcion = function(btn) {
 /** Cierra el modal de ver descripción. */
 window.agendaCerrarVerDescripcion = function() {
     var modal = document.getElementById('agendaVerDescripcionModal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    }
+};
+
+/** Abre el modal de solo lectura con usuarios asignados (botón "Ver" en la tabla). */
+window.agendaVerUsuariosAsignados = function(btn) {
+    var usersRaw = btn && btn.getAttribute ? (btn.getAttribute('data-users') || '[]') : '[]';
+    var users = [];
+    try {
+        users = JSON.parse(usersRaw);
+    } catch (e) {
+        users = [];
+    }
+    var body = document.getElementById('agendaVerUsuariosBody');
+    if (body) {
+        if (!Array.isArray(users) || users.length === 0) {
+            body.textContent = 'Sin asignar';
+        } else {
+            body.innerHTML = users.map(function (u) {
+                var name = (u && u.name) ? String(u.name) : '';
+                var email = (u && u.email) ? String(u.email) : '';
+                if (!name && !email) return '';
+                return '<div style="padding:8px 10px;border:1px solid var(--clr-border);border-radius:10px;margin-bottom:8px;background:var(--clr-card)">' +
+                    '<div style="font-weight:700;color:var(--clr-text-main)">' + escapeHtml(name || 'Usuario') + '</div>' +
+                    '<div style="font-size:.85rem;color:var(--clr-text-light)">' + escapeHtml(email) + '</div>' +
+                '</div>';
+            }).filter(Boolean).join('');
+        }
+    }
+
+    var modal = document.getElementById('agendaVerUsuariosModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+    }
+};
+
+/** Cierra el modal de ver usuarios asignados. */
+window.agendaCerrarVerUsuariosAsignados = function() {
+    var modal = document.getElementById('agendaVerUsuariosModal');
     if (modal) {
         modal.style.display = 'none';
         modal.setAttribute('aria-hidden', 'true');

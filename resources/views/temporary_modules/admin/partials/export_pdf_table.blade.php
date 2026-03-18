@@ -42,10 +42,65 @@
         tbody tr:nth-child(even) td {
             background: #f7f7f7;
         }
+        .count-table th { background: #861E34; color: #fff; text-align: center; }
+        .count-table td { text-align: center; color: #c00; font-weight: bold; }
     </style>
 </head>
 <body>
 <h1>{{ $title }}</h1>
+@if(!empty($countTable) && isset($countTable['groups']))
+@php
+    $countTableColorKeys = $countTableColorKeys ?? [];
+    $countTableColors = $countTableColors ?? [];
+    $vars = ['var(--clr-primary)' => '#861E34', 'var(--clr-secondary)' => '#2d5a27', 'var(--clr-accent)' => '#c9a227'];
+    $resolveCss = function ($css) use ($vars) {
+        return isset($vars[$css]) ? $vars[$css] : (str_starts_with($css ?? '', '#') ? $css : '#861E34');
+    };
+    $countTableResolveColor = function ($index, $rowNum, $valueLabel = null) use ($countTableColorKeys, $countTableColors, $vars, $resolveCss) {
+        $key = $countTableColorKeys[$index] ?? null;
+        if ($key === null) return $rowNum === 1 ? '#861E34' : '#2d5a27';
+        $c = $countTableColors[$key] ?? null;
+        if (is_array($c)) {
+            if ($rowNum === 1) return $resolveCss($c['row1'] ?? '#861E34');
+            if ($valueLabel !== null && isset($c['row2Values'][$valueLabel])) return $resolveCss($c['row2Values'][$valueLabel]);
+            if ($valueLabel !== null && isset($c['row2Values']) && is_array($c['row2Values'])) {
+                $lower = mb_strtolower($valueLabel);
+                foreach ($c['row2Values'] as $k => $v) { if (mb_strtolower($k) === $lower) return $resolveCss($v); }
+            }
+            return $resolveCss($c['row2'] ?? '#2d5a27');
+        }
+        if (is_string($c) && $c !== '') return $resolveCss($c);
+        return $rowNum === 1 ? '#861E34' : '#2d5a27';
+    };
+@endphp
+<table class="count-table" style="margin-bottom: 16px;">
+    <thead>
+    <tr>
+        @foreach ($countTable['groups'] as $gi => $group)
+            <th colspan="{{ count($group['values']) }}" style="background-color: {{ $countTableResolveColor($gi, 1) }};">{{ $group['label'] }}</th>
+        @endforeach
+    </tr>
+    <tr>
+        @foreach ($countTable['groups'] as $gi => $group)
+            @foreach ($group['values'] as $v)
+                @php $subLabel = $v['label'] !== '' ? $v['label'] : $group['label']; @endphp
+                <th style="background-color: {{ $countTableResolveColor($gi, 2, $subLabel) }};">{{ $subLabel }}</th>
+            @endforeach
+        @endforeach
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        @foreach ($countTable['groups'] as $group)
+            @foreach ($group['values'] as $v)
+                <td>{{ $v['count'] }}</td>
+            @endforeach
+        @endforeach
+    </tr>
+    </tbody>
+</table>
+<p style="font-weight: bold; margin: 8px 0 4px 0;">Desglose</p>
+@endif
 <table>
     <thead>
     <tr>

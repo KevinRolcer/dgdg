@@ -159,6 +159,24 @@
     </div>
 </div>
 
+<!-- Modal Solo Lectura para Usuarios Asignados -->
+<div id="agendaVerUsuariosModal" class="modal-agenda-overlay" style="display:none; z-index: 10000;">
+    <div class="modal-agenda-content" style="max-width: 520px; padding: 20px;">
+        <div class="modal-agenda-header">
+            <h3>Usuarios asignados</h3>
+            <button type="button" class="modal-close-btn" onclick="window.agendaCerrarVerUsuariosAsignados()" aria-label="Cerrar">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="modal-body-scroll" style="max-height: 50vh; overflow-y: auto;">
+            <div id="agendaVerUsuariosBody" class="agenda-assigned-users-body"></div>
+        </div>
+        <div class="modal-agenda-footer" style="margin-top: 12px;">
+            <button type="button" class="btn-agenda btn-secondary-agenda" onclick="window.agendaCerrarVerUsuariosAsignados()">Cerrar</button>
+        </div>
+    </div>
+</div>
+
 <div id="agendaAssignModal" class="modal-agenda-overlay" style="display:none;">
     <div class="modal-agenda-content modal-assign-content">
         <div class="modal-agenda-header">

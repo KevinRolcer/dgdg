@@ -11,6 +11,9 @@
             </div>
             <div class="tm-upload-card-foot">
                 <button type="button" class="tm-btn tm-btn-primary" data-open-module-preview="delegate-preview-{{ $module->id }}">Registrar informacion</button>
+                <a href="{{ route('temporary-modules.records') }}?module={{ $module->id }}" class="tm-btn tm-btn-outline" title="Ver historial de registros">
+                    Historial de registros
+                </a>
             </div>
         </article>
     @empty

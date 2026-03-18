@@ -14,9 +14,9 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 class TemporaryModuleExcelImportService
 {
-    /** Tipos que se pueden llenar desde Excel (sin archivo/imagen/geopunto). */
+    /** Tipos que se pueden llenar desde Excel (sin archivo/imagen). */
     public const IMPORTABLE_TYPES = [
-        'text', 'textarea', 'number', 'date', 'datetime', 'select', 'boolean', 'categoria', 'municipio',
+        'text', 'textarea', 'number', 'date', 'datetime', 'select', 'boolean', 'categoria', 'municipio', 'geopoint',
     ];
 
     public function importableFields(Collection $fields): Collection
