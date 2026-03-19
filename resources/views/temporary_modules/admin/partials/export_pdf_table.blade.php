@@ -10,43 +10,47 @@
         * { box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, Arial, Helvetica, sans-serif;
-            font-size: 11px;
-            margin: 24px;
+            font-size: 9px;
+            margin: 15px;
+            color: #333;
         }
         h1 {
-            font-size: 18px;
+            font-size: 16px;
             color: #861E34;
             text-align: center;
-            margin: 0 0 12px 0;
+            margin: 0 0 8px 0;
         }
         table {
-            width: 100%;
+            width: 100% !important;
+            max-width: 100% !important;
             border-collapse: collapse;
-            @if(isset($stretch) && $stretch)
-            table-layout: fixed;
-            @endif
+            table-layout: fixed; /* Forzamos fixed para evitar que las celdas empujen la tabla fuera de la hoja */
         }
         th, td {
             border: 1px solid #999;
-            padding: 4px 6px;
+            padding: 3px 4px;
             vertical-align: top;
             word-wrap: break-word;
             word-break: break-all;
+            overflow: hidden;
         }
         th {
             background: #861E34;
             color: #fff;
             font-weight: bold;
-            text-align: left;
+            text-align: center;
         }
         tbody tr:nth-child(even) td {
-            background: #f7f7f7;
+            background: #fdfdfd;
         }
-        .count-table th { background: #861E34; color: #fff; text-align: center; }
-        .count-table td { text-align: center; color: #c00; font-weight: bold; }
+        .count-table {
+            table-layout: auto; /* La tabla de conteo suele ser pequeña, auto está bien */
+            margin-bottom: 20px;
+        }
+        .count-table th { background: #861E34; color: #fff; text-align: center; font-size: 8px; }
+        .count-table td { text-align: center; color: #c00; font-weight: bold; font-size: 10px; }
     </style>
 </head>
-<body>
 <body>
 <h1 style="margin-bottom: 2px;">{{ $title }}</h1>
 @if(isset($fechaCorteStr))
@@ -134,14 +138,21 @@
 </table>
 <p style="font-weight: bold; margin: 8px 0 4px 0;">Desglose</p>
 @endif
-<table style="table-layout: auto;">
+<table>
     <thead>
     <tr>
         @foreach ($columns as $idx => $col)
             @php
                 $bg = !empty($col['color']) ? $resolveCss($col['color']) : '#861E34';
+                $key = $col['key'] ?? '';
+                $wStyle = '';
+                if ($key === 'item') $wStyle = 'width: 30px;';
+                elseif ($key === 'microrregion') $wStyle = 'width: 80px;';
+                elseif ($key === 'municipio') $wStyle = 'width: 80px;';
             @endphp
-            <th style="background-color: {{ $bg }}; color: #fff; text-align: center; vertical-align: middle;">{{ $col['label'] }}</th>
+            <th style="background-color: {{ $bg }}; color: #fff; text-align: center; vertical-align: middle; {{ $wStyle }}">
+                {{ $col['label'] }}
+            </th>
         @endforeach
     </tr>
     </thead>
