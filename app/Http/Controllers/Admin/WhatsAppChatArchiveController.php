@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\WhatsAppChatAccessLog;
 use App\Models\WhatsAppChatArchive;
 use App\Services\WhatsApp\WhatsAppChatEncryptionService;
+use App\Services\WhatsApp\WhatsAppChatPathNormalizer;
 use App\Services\WhatsApp\WhatsAppTotpService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -116,6 +117,13 @@ class WhatsAppChatArchiveController extends Controller
     public function index(Request $request)
     {
         $chats = WhatsAppChatArchive::query()
+            ->select([
+                'id',
+                'title',
+                'original_zip_name',
+                'imported_at',
+                'message_parts_count',
+            ])
             ->orderByDesc('imported_at')
             ->paginate(15)
             ->withQueryString();
@@ -126,16 +134,21 @@ class WhatsAppChatArchiveController extends Controller
             'pageTitle' => 'Chats WhatsApp',
             'pageDescription' => 'Respaldo cifrado de exportaciones. Requiere permiso y código TOTP (una vez por sesión).',
             'chats' => $chats,
+            'maxUploadMb' => (int) config('whatsapp_chats.max_upload_mb', 768),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $maxKb = (int) config('whatsapp_chats.max_upload_kb', 786432);
+        $maxMb = (int) config('whatsapp_chats.max_upload_mb', 768);
+
         $validated = $request->validate([
-            'archivo_zip' => ['required', 'file', 'mimes:zip', 'max:204800'],
+            'archivo_zip' => ['required', 'file', 'mimes:zip', 'max:'.$maxKb],
         ], [
             'archivo_zip.required' => 'Selecciona un archivo ZIP de exportación de WhatsApp.',
             'archivo_zip.mimes' => 'El archivo debe ser un ZIP (.zip).',
+            'archivo_zip.max' => 'El ZIP supera el límite permitido por la aplicación (~'.$maxMb.' MB). Si necesitas más, sube WHATSAPP_CHATS_MAX_UPLOAD_MB en .env y aumenta upload_max_filesize y post_max_size en PHP (y el límite del servidor web).',
         ]);
 
         $user = $request->user();
@@ -184,11 +197,14 @@ class WhatsAppChatArchiveController extends Controller
             $disk->delete($extractDirRelative.'/upload.zip');
         }
 
+        $compactParts = WhatsAppChatPathNormalizer::normalizeStoragePaths($messageParts, $chatRootDirRelative);
+
         $chat = WhatsAppChatArchive::create([
             'title' => $chatTitle,
             'original_zip_name' => $originalZipName,
             'storage_root_path' => $chatRootDirRelative,
-            'message_parts' => $messageParts,
+            'message_parts' => $compactParts,
+            'message_parts_count' => count($compactParts),
             'created_by' => $user->id,
             'is_encrypted' => true,
             'wrapped_dek' => $wrapped,
@@ -206,7 +222,10 @@ class WhatsAppChatArchiveController extends Controller
     public function show(Request $request, WhatsAppChatArchive $chat)
     {
         $disk = $chat->disk();
-        $messageParts = $chat->message_parts ?? [];
+        $messageParts = WhatsAppChatPathNormalizer::expandStoragePaths(
+            is_array($chat->message_parts) ? $chat->message_parts : [],
+            (string) $chat->storage_root_path
+        );
         $dek = null;
         if ($chat->is_encrypted) {
             if (empty($chat->wrapped_dek)) {
@@ -303,7 +322,10 @@ class WhatsAppChatArchiveController extends Controller
         if ($storageRoot !== '') {
             $disk->deleteDirectory($storageRoot);
         } else {
-            $parts = is_array($chat->message_parts) ? $chat->message_parts : [];
+            $parts = WhatsAppChatPathNormalizer::expandStoragePaths(
+                is_array($chat->message_parts) ? $chat->message_parts : [],
+                $storageRoot
+            );
             foreach ($parts as $relPath) {
                 $relPath = trim((string) $relPath, '/');
                 if ($relPath !== '') {

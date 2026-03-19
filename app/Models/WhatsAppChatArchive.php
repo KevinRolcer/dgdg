@@ -18,6 +18,7 @@ class WhatsAppChatArchive extends Model
         'original_zip_name',
         'storage_root_path',
         'message_parts',
+        'message_parts_count',
         'created_by',
         'is_encrypted',
         'wrapped_dek',
@@ -27,6 +28,7 @@ class WhatsAppChatArchive extends Model
 
     protected $casts = [
         'message_parts' => 'array',
+        'message_parts_count' => 'integer',
         'imported_at' => 'datetime',
         'is_encrypted' => 'boolean',
         'encrypted_key_version' => 'integer',

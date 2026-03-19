@@ -42,6 +42,9 @@
                     </div>
                     <p style="margin:10px 0 0;color:var(--clr-text-muted);font-size:0.82rem;">
                         Compatible con export clásico (_chat.txt + media) y export en HTML por partes.
+                        <br>
+                        <strong>Tamaño máximo (app):</strong> ~{{ (int) ($maxUploadMb ?? 768) }} MB.
+                        El servidor (PHP <code>upload_max_filesize</code> / <code>post_max_size</code> y, si aplica, Nginx/Apache) debe permitir al menos ese tamaño o la subida fallará antes de validar.
                     </p>
                 </form>
             </div>
@@ -61,7 +64,7 @@
                     <tbody>
                         @forelse ($chats as $chat)
                             @php
-                                $partsCount = is_array($chat->message_parts) ? count($chat->message_parts) : 0;
+                                $partsCount = (int) ($chat->message_parts_count ?? 0);
                             @endphp
                             <tr>
                                 <td>
