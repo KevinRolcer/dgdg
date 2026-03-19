@@ -77,5 +77,11 @@ return [
                 ],
             ],
         ],
+        [
+            'icon' => 'fa-brands fa-whatsapp',
+            'title' => 'Chats WhatsApp',
+            'route' => 'whatsapp-chats.admin.index',
+            'permission' => 'Chats-WhatsApp-Sensible',
+        ],
     ],
 ];

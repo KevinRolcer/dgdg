@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -402,20 +403,20 @@ class TemporaryModuleAdminSeedService
                 $itemColHint = $this->cellStrMerged($sheet, 0, $row);
                 $itemColHint2 = $this->cellStrMerged($sheet, 1, $row);
                 $looksLikeItemRow = (preg_match('/^\s*\d+\s*$/', $itemColHint) || preg_match('/^\s*\d+\s*$/', $itemColHint2));
-                if (!$looksLikeItemRow && preg_match('/^\s*\d{1,4}\s*$/', trim($itemColHint.''))) {
+                if (! $looksLikeItemRow && preg_match('/^\s*\d{1,4}\s*$/', trim($itemColHint.''))) {
                     $looksLikeItemRow = true;
                 }
 
                 $hasGeo = $hasMunCol ? ($lastMunicipioCell !== '' || $cellMun !== '') : ($lastMicroId !== null);
-                if (!$rowHasAny && $insideDataBlock && $hasGeo) {
+                if (! $rowHasAny && $insideDataBlock && $hasGeo) {
                     if ($looksLikeItemRow || $differsFromCarry) {
                         $rowHasAny = true;
                     }
                 }
-                if (!$rowHasAny && $hasGeo && $row <= $scanEnd && $looksLikeItemRow) {
+                if (! $rowHasAny && $hasGeo && $row <= $scanEnd && $looksLikeItemRow) {
                     $rowHasAny = true;
                 }
-                if (!$rowHasAny) {
+                if (! $rowHasAny) {
                     continue;
                 }
 
@@ -423,7 +424,8 @@ class TemporaryModuleAdminSeedService
                     $municipioSearch = $cellMun !== '' ? $cellMun : $lastMunicipioCell;
                     if ($municipioSearch === '') {
                         $stats['skipped']++;
-                        $this->pushDiscarded($stats, $sheet, $row, 'Sin municipio en fila', $colMicrorregion, $colMunicipio, $fieldColumnIndices, $cellMr, '', $hasMrCol, $hasMunCol);
+                        $this->pushDiscarded($stats, $sheet, $row, 'Sin municipio en fila', $colMicrorregion, $colMunicipio, $fieldColumnIndices, $cellMr, '', $hasMrCol, $hasMunCol, null, null);
+
                         continue;
                     }
                     // Prioridad: municipio → MR por BD (sin filtrar primero por celda MR)
@@ -437,7 +439,24 @@ class TemporaryModuleAdminSeedService
                         if (count($stats['unmatched']) < 150) {
                             $stats['unmatched'][] = ['row' => $row, 'reason' => 'Municipio: '.$municipioSearch];
                         }
-                        $this->pushDiscarded($stats, $sheet, $row, 'Municipio no resuelto: '.$municipioSearch, $colMicrorregion, $colMunicipio, $fieldColumnIndices, $cellMr, $municipioSearch, $hasMrCol, $hasMunCol);
+                        $entryPayload = $this->buildSeedRowFieldPayload($sheet, $row, $fieldColumnIndices, $indexToKey, $lastFieldCarry);
+                        $suggestions = $this->suggestMunicipiosForDiscard($municipioSearch, $microId, $municipiosGlobalNorm, $microLabels);
+                        $this->pushDiscarded(
+                            $stats,
+                            $sheet,
+                            $row,
+                            'Municipio no resuelto: '.$municipioSearch,
+                            $colMicrorregion,
+                            $colMunicipio,
+                            $fieldColumnIndices,
+                            $cellMr,
+                            $municipioSearch,
+                            $hasMrCol,
+                            $hasMunCol,
+                            $entryPayload,
+                            $suggestions,
+                        );
+
                         continue;
                     }
                     $microrregionId = (int) $municipioDB->microrregion_id;
@@ -450,7 +469,8 @@ class TemporaryModuleAdminSeedService
                     // Solo microrregión (sin columna municipio)
                     if ($microId === null) {
                         $stats['skipped']++;
-                        $this->pushDiscarded($stats, $sheet, $row, 'Sin microrregión en fila', $colMicrorregion, $colMunicipio, $fieldColumnIndices, $cellMr, '', $hasMrCol, $hasMunCol);
+                        $this->pushDiscarded($stats, $sheet, $row, 'Sin microrregión en fila', $colMicrorregion, $colMunicipio, $fieldColumnIndices, $cellMr, '', $hasMrCol, $hasMunCol, null, null);
+
                         continue;
                     }
                     $microrregionId = $microId;
@@ -508,6 +528,10 @@ class TemporaryModuleAdminSeedService
     /**
      * @param  array<int>  $fieldColumnIndices
      */
+    /**
+     * @param  array<int, string|null>  $entryPayload  clave de campo => valor (para reintentar registro desde el log)
+     * @param  list<array{id:int, municipio:string, microrregion_id:int, label:string}>|null  $suggestions
+     */
     private function pushDiscarded(
         array &$stats,
         Worksheet $sheet,
@@ -520,6 +544,8 @@ class TemporaryModuleAdminSeedService
         string $municipioCell,
         bool $hasMrCol = true,
         bool $hasMunCol = true,
+        ?array $entryPayload = null,
+        ?array $suggestions = null,
     ): void {
         if (count($stats['discarded'] ?? []) >= 250) {
             return;
@@ -543,13 +569,250 @@ class TemporaryModuleAdminSeedService
         if (mb_strlen($accion) > 220) {
             $accion = mb_substr($accion, 0, 217).'…';
         }
-        $stats['discarded'][] = [
+        $entry = [
+            'discard_uid' => (string) Str::uuid(),
             'row' => $row,
             'reason' => $reason,
             'microrregion' => ($hasMrCol && $cellMr !== '') ? $cellMr : null,
             'municipio' => ($hasMunCol && $municipioCell !== '') ? $municipioCell : null,
             'accion' => $accion !== '' ? $accion : null,
         ];
+        if (is_array($entryPayload) && $entryPayload !== []) {
+            $entry['entry_payload'] = $entryPayload;
+        }
+        if (is_array($suggestions) && $suggestions !== []) {
+            $entry['municipio_suggestions'] = $suggestions;
+        }
+        $stats['discarded'][] = $entry;
+    }
+
+    /**
+     * Datos de campos del módulo para una fila (misma lógica que al crear el registro), sin tocar lastFieldCarry global.
+     *
+     * @param  array<int, mixed>  $lastFieldCarrySnapshot
+     * @return array<string, string>
+     */
+    private function buildSeedRowFieldPayload(
+        Worksheet $sheet,
+        int $row,
+        array $fieldColumnIndices,
+        array $indexToKey,
+        array $lastFieldCarrySnapshot,
+    ): array {
+        $carry = $lastFieldCarrySnapshot;
+        $data = [];
+        foreach ($fieldColumnIndices as $colIdx) {
+            $colIdx = (int) $colIdx;
+            $key = $indexToKey[$colIdx] ?? null;
+            if (! $key) {
+                continue;
+            }
+            $raw = $this->cellStrMerged($sheet, $colIdx, $row);
+            if ($raw !== '') {
+                $carry[$colIdx] = $raw;
+            }
+            $data[$key] = $raw !== '' ? $raw : ($carry[$colIdx] ?? '');
+        }
+        $data['_fila_excel'] = (string) $row;
+
+        return $data;
+    }
+
+    /**
+     * Sugerencias de municipio del catálogo (para el log de descartes).
+     *
+     * @param  array<string, list<object>>  $municipiosGlobalNorm
+     * @param  array<int, string>  $microLabels
+     * @return list<array{id:int, municipio:string, microrregion_id:int, label:string}>
+     */
+    private function suggestMunicipiosForDiscard(
+        string $municipioSearch,
+        ?int $hintMicroId,
+        array $municipiosGlobalNorm,
+        array $microLabels,
+    ): array {
+        $raw = trim($municipioSearch);
+        // Delimitador # para no chocar con / dentro de la clase; comillas dobles para que \s sea espacio en regex.
+        $variants = preg_split("#\s*[/\\\\|]+\s*|\s*,\s*#u", $raw) ?: [];
+        $variants = array_values(array_filter(array_map('trim', $variants)));
+        if ($variants === []) {
+            $variants = [$raw];
+        }
+        $bestById = [];
+        foreach ($variants as $variant) {
+            $normV = $this->normalizeMunicipioName($variant);
+            if ($normV === '') {
+                continue;
+            }
+            foreach ($municipiosGlobalNorm as $rows) {
+                foreach ($rows as $m) {
+                    $id = (int) $m->id;
+                    $dbN = $this->normalizeMunicipioName($m->municipio);
+                    $cCell = $this->compactAlnum($normV);
+                    $cDb = $this->compactAlnum($dbN);
+                    $score = 0.0;
+                    if ($dbN === $normV) {
+                        $score = 100;
+                    } elseif ($cCell !== '' && $cCell === $cDb) {
+                        $score = 98;
+                    } elseif (str_contains($dbN, $normV) && mb_strlen($normV) >= 4) {
+                        $score = 88;
+                    } elseif (str_contains($normV, $dbN) && mb_strlen($dbN) >= 5) {
+                        $score = 82;
+                    } else {
+                        similar_text($cCell, $cDb, $pct);
+                        if ($pct >= 42) {
+                            $score = min(78.0, $pct * 0.82);
+                        }
+                    }
+                    if ($hintMicroId !== null && (int) $m->microrregion_id === $hintMicroId) {
+                        $score += 4;
+                    }
+                    if ($score < 40) {
+                        continue;
+                    }
+                    if (! isset($bestById[$id]) || $score > $bestById[$id]['_s']) {
+                        $mid = (int) $m->microrregion_id;
+                        $bestById[$id] = [
+                            '_s' => $score,
+                            'id' => $id,
+                            'municipio' => (string) $m->municipio,
+                            'microrregion_id' => $mid,
+                            'label' => $microLabels[$mid] ?? ('MR '.$mid),
+                        ];
+                    }
+                }
+            }
+        }
+        $list = array_values($bestById);
+        usort($list, fn ($a, $b) => $b['_s'] <=> $a['_s']);
+        $list = array_slice($list, 0, 10);
+        foreach ($list as &$item) {
+            unset($item['_s']);
+        }
+        unset($item);
+
+        return $list;
+    }
+
+    /**
+     * Crea el registro a partir de una fila del log y actualiza el JSON del módulo.
+     *
+     * @return array{entry: TemporaryModuleEntry, seed_discard_log: array<int, mixed>}
+     */
+    public function registerDiscardedSeedRow(
+        TemporaryModule $module,
+        string $discardUid,
+        int $municipioId,
+        int $actingUserId,
+    ): array {
+        $discardUid = trim($discardUid);
+        if ($discardUid === '') {
+            throw ValidationException::withMessages(['discard_uid' => 'Identificador de fila no válido.']);
+        }
+
+        $module->loadMissing('fields');
+        $log = $module->seed_discard_log;
+        if (! is_array($log)) {
+            $log = [];
+        }
+
+        $foundIndex = null;
+        $foundItem = null;
+        foreach ($log as $i => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            if (($item['discard_uid'] ?? '') === $discardUid) {
+                $foundIndex = $i;
+                $foundItem = $item;
+                break;
+            }
+        }
+        if ($foundItem === null || $foundIndex === null) {
+            throw ValidationException::withMessages(['discard_uid' => 'Esta fila ya no está en el log. Recarga la página.']);
+        }
+
+        $reason = (string) ($foundItem['reason'] ?? '');
+        if ($reason === '' || ! str_starts_with($reason, 'Municipio no resuelto')) {
+            throw ValidationException::withMessages(['discard_uid' => 'Esta fila no admite registro manual desde el log.']);
+        }
+
+        $payload = $foundItem['entry_payload'] ?? null;
+        if (! is_array($payload) || $payload === []) {
+            throw ValidationException::withMessages(['discard_uid' => 'No hay datos guardados para esta fila (módulo creado con una versión anterior).']);
+        }
+
+        $munRow = DB::table('municipios as mu')
+            ->join('microrregiones as mr', 'mr.id', '=', 'mu.microrregion_id')
+            ->where('mu.id', $municipioId)
+            ->select(['mu.id', 'mu.municipio', 'mu.microrregion_id'])
+            ->first();
+        if (! $munRow) {
+            throw ValidationException::withMessages(['municipio_id' => 'El municipio no existe o no tiene microrregión asignada en el catálogo.']);
+        }
+
+        $microrregionId = (int) $munRow->microrregion_id;
+        $allowedKeys = $module->fields->pluck('key')->all();
+        $data = [];
+        foreach ($payload as $k => $v) {
+            if ($k === '_fila_excel') {
+                $data[$k] = is_scalar($v) ? (string) $v : '';
+
+                continue;
+            }
+            if (in_array($k, $allowedKeys, true)) {
+                $data[$k] = is_scalar($v) ? (string) $v : '';
+            }
+        }
+
+        $microLabels = [];
+        foreach (DB::table('microrregiones')->select(['id', 'microrregion', 'cabecera'])->get() as $mr) {
+            $n = str_pad(trim((string) $mr->microrregion), 2, '0', STR_PAD_LEFT);
+            $id = (int) $mr->id;
+            $microLabels[$id] = 'MR '.$n.' '.trim((string) ($mr->cabecera ?? ''));
+        }
+
+        $data['_microrregion_reporte'] = $microLabels[$microrregionId] ?? ('MR '.$microrregionId);
+        $data['_municipio_reporte'] = (string) $munRow->municipio;
+
+        $userId = $this->resolveUserIdForMicrorregion($microrregionId) ?? $actingUserId;
+
+        return DB::transaction(function () use ($module, $data, $userId, $microrregionId, $log, $foundIndex, $actingUserId) {
+            $entry = TemporaryModuleEntry::query()->create([
+                'temporary_module_id' => $module->id,
+                'user_id' => $userId,
+                'microrregion_id' => $microrregionId,
+                'data' => $data,
+                'main_image_field_key' => null,
+                'submitted_at' => Carbon::now(),
+            ]);
+
+            unset($log[$foundIndex]);
+            $newLog = array_values($log);
+            $module->seed_discard_log = $newLog;
+            $module->save();
+
+            $accessService = app(TemporaryModuleAccessService::class);
+            $microrregionIdsUsed = TemporaryModuleEntry::query()
+                ->where('temporary_module_id', $module->id)
+                ->pluck('microrregion_id')
+                ->unique()
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+            $allTargetUserIds = $accessService->userIdsForMicrorregionIds($microrregionIdsUsed);
+            if ($allTargetUserIds === []) {
+                $allTargetUserIds = [$actingUserId];
+            }
+            $module->targetUsers()->sync($allTargetUserIds);
+
+            return [
+                'entry' => $entry,
+                'seed_discard_log' => $newLog,
+            ];
+        });
     }
 
     private function cellStr($sheet, int $colZeroBased, int $row): string
@@ -997,8 +1260,9 @@ class TemporaryModuleAdminSeedService
         foreach ($entries as $entry) {
             $data = $entry->data ?? [];
             $raw = $data[$fieldKey] ?? null;
-            if (!is_string($raw) || trim($raw) === '') {
+            if (! is_string($raw) || trim($raw) === '') {
                 $skipped++;
+
                 continue;
             }
 
@@ -1006,16 +1270,17 @@ class TemporaryModuleAdminSeedService
             $municipioDB = $this->resolveMunicipioGlobal($municipioSearch, null, $municipiosGlobalNorm, $municipiosByMicro);
 
             $microId = (int) ($entry->microrregion_id ?? 0);
-            if (!$municipioDB && $microId > 0) {
+            if (! $municipioDB && $microId > 0) {
                 $municipioDB = $this->resolveMunicipioInMicrorregion($municipioSearch, $microId, $municipiosByMicro)
                     ?: $this->resolveMunicipioGlobal($municipioSearch, $microId, $municipiosGlobalNorm, $municipiosByMicro);
             }
 
-            if (!$municipioDB) {
+            if (! $municipioDB) {
                 $skipped++;
                 if (count($unmatched) < 100) {
                     $unmatched[] = $municipioSearch;
                 }
+
                 continue;
             }
 

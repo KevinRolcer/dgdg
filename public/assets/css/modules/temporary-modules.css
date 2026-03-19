@@ -180,6 +180,13 @@
     min-width: 0;
 }
 
+@media (min-width: 1440px) {
+    .tm-module-grid {
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 20px;
+    }
+}
+
 .tm-module-card {
     align-content: start;
     min-width: 0;
@@ -3343,10 +3350,34 @@ a.tm-paginator-btn:hover {
     margin-top: 8px;
 }
 .tm-seed-log-accion {
-    max-width: 320px;
+    max-width: 280px;
     white-space: normal;
     word-break: break-word;
     font-size: 0.85rem;
+}
+.tm-seed-log-link-cell {
+    vertical-align: top;
+    min-width: 200px;
+    max-width: 280px;
+}
+.tm-seed-log-muni-select {
+    display: block;
+    width: 100%;
+    max-width: 260px;
+    margin-bottom: 6px;
+    font-size: 0.76rem;
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid var(--clr-border);
+    background: var(--tm-input-bg, var(--clr-card));
+    color: var(--clr-text-main);
+}
+.tm-seed-log-register-btn {
+    width: 100%;
+    max-width: 260px;
+}
+.tm-seed-log-no-sug {
+    font-size: 0.76rem;
 }
 .tm-table.tm-table-sm th,
 .tm-table.tm-table-sm td {

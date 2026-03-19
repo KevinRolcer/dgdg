@@ -29,6 +29,12 @@
                 <span class="settings-shell-label">Importación y exportación</span>
             </a>
             @endcan
+            @can('Chats-WhatsApp-Sensible')
+            <a href="{{ route('settings.whatsapp-totp-reset') }}" class="settings-shell-item @if(request()->routeIs('settings.whatsapp-totp-reset')) is-active @endif">
+                <span class="settings-shell-badge settings-shell-badge--icon" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
+                <span class="settings-shell-label">Chats WhatsApp (autenticador)</span>
+            </a>
+            @endcan
         </nav>
     </aside>
     <div class="settings-shell-main">

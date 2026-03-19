@@ -93,38 +93,5 @@
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const deleteForms = Array.from(document.querySelectorAll('form[data-confirm-delete]'));
-        
-        deleteForms.forEach(function (form) {
-            form.addEventListener('submit', function (event) {
-                event.preventDefault();
-                const moduleName = form.getAttribute('data-module-name') || 'este módulo';
-                
-                Swal.fire({
-                    title: '¿Eliminar módulo?',
-                    text: '¿Estás seguro de eliminar el módulo "' + moduleName + '"? Los registros capturados se conservarán.',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonText: 'Sí, eliminar',
-                    cancelButtonText: 'Cancelar',
-                    reverseButtons: true,
-                    buttonsStyling: false,
-                    customClass: {
-                        popup: 'tm-swal-popup',
-                        title: 'tm-swal-title',
-                        htmlContainer: 'tm-swal-text',
-                        confirmButton: 'tm-swal-confirm',
-                        cancelButton: 'tm-swal-cancel'
-                    }
-                }).then(function (result) {
-                    if (result.isConfirmed) {
-                        form.submit();
-                    }
-                });
-            });
-        });
-    });
-</script>
+<script src="{{ asset('assets/js/modules/temporary-modules-admin-index.js') }}?v={{ @filemtime(public_path('assets/js/modules/temporary-modules-admin-index.js')) ?: time() }}"></script>
 @endpush

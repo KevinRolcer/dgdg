@@ -11,6 +11,7 @@
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{{ asset('assets/js/modules/temporary-modules-seed-discard-log.js') }}?v={{ @filemtime(public_path('assets/js/modules/temporary-modules-seed-discard-log.js')) ?: time() }}"></script>
 @endpush
 
 @section('content')
@@ -88,6 +89,7 @@
                                         data-tm-seed-log-open
                                         data-module-name="{{ e($module->name) }}"
                                         data-json-id="tm-seed-discard-{{ $module->id }}"
+                                        data-register-url="{{ route('temporary-modules.admin.seed-discard-register', $module->id) }}"
                                     >
                                         Log
                                     </button>
@@ -524,7 +526,15 @@
     </div>
 
     {{-- Log de filas descartadas al crear módulo desde Excel (solo si ya exportó) --}}
-    <div class="tm-modal" id="tmSeedDiscardLogModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="tmSeedDiscardLogTitle">
+    <div
+        class="tm-modal"
+        id="tmSeedDiscardLogModal"
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tmSeedDiscardLogTitle"
+        data-csrf-token="{{ csrf_token() }}"
+    >
         <div class="tm-modal-backdrop" data-tm-seed-log-close></div>
         <div class="tm-modal-dialog tm-seed-log-dialog">
             <div class="tm-modal-head">
@@ -545,6 +555,7 @@
                                 <th>MR</th>
                                 <th>Municipio (celda)</th>
                                 <th>Acción / texto</th>
+                                <th>Enlazar municipio</th>
                             </tr>
                         </thead>
                         <tbody id="tmSeedDiscardLogTbody"></tbody>
@@ -589,7 +600,7 @@
         const seedLogEmpty = document.getElementById('tmSeedDiscardLogEmpty');
         const seedLogTableWrap = document.getElementById('tmSeedDiscardLogTableWrap');
 
-        function openSeedDiscardLog(moduleName, jsonId) {
+        function openSeedDiscardLog(moduleName, jsonId, registerUrl) {
             if (!seedLogModal || !seedLogTbody) return;
             var el = document.getElementById(jsonId);
             var list = [];
@@ -600,29 +611,45 @@
             }
             if (!Array.isArray(list)) list = [];
             seedLogModuleEl.textContent = moduleName || 'Módulo';
-            seedLogTbody.innerHTML = '';
+            var csrf = seedLogModal.getAttribute('data-csrf-token') || '';
             if (list.length === 0) {
                 seedLogEmpty.hidden = false;
                 seedLogTableWrap.hidden = true;
+                seedLogTbody.innerHTML = '';
             } else {
                 seedLogEmpty.hidden = true;
                 seedLogTableWrap.hidden = false;
-                list.forEach(function (row) {
-                    var tr = document.createElement('tr');
-                    var esc = function (s) {
-                        if (s == null || s === '') return '—';
-                        var d = document.createElement('div');
-                        d.textContent = String(s);
-                        return d.innerHTML;
-                    };
-                    tr.innerHTML =
-                        '<td>' + esc(row.row) + '</td>' +
-                        '<td>' + esc(row.reason) + '</td>' +
-                        '<td>' + esc(row.microrregion) + '</td>' +
-                        '<td>' + esc(row.municipio) + '</td>' +
-                        '<td class="tm-seed-log-accion">' + esc(row.accion) + '</td>';
-                    seedLogTbody.appendChild(tr);
-                });
+                if (window.tmSeedDiscardLog && registerUrl) {
+                    window.tmSeedDiscardLog.renderRows(seedLogTbody, list, {
+                        registerUrl: registerUrl,
+                        csrfToken: csrf,
+                        jsonScriptEl: el,
+                        onUpdateList: function () {},
+                        onEmpty: function () {
+                            seedLogEmpty.hidden = false;
+                            seedLogTableWrap.hidden = true;
+                        },
+                    });
+                } else {
+                    seedLogTbody.innerHTML = '';
+                    list.forEach(function (row) {
+                        var tr = document.createElement('tr');
+                        var esc = function (s) {
+                            if (s == null || s === '') return '—';
+                            var d = document.createElement('div');
+                            d.textContent = String(s);
+                            return d.innerHTML;
+                        };
+                        tr.innerHTML =
+                            '<td>' + esc(row.row) + '</td>' +
+                            '<td>' + esc(row.reason) + '</td>' +
+                            '<td>' + esc(row.microrregion) + '</td>' +
+                            '<td>' + esc(row.municipio) + '</td>' +
+                            '<td class="tm-seed-log-accion">' + esc(row.accion) + '</td>' +
+                            '<td>—</td>';
+                        seedLogTbody.appendChild(tr);
+                    });
+                }
             }
             seedLogModal.classList.add('is-open');
             seedLogModal.setAttribute('aria-hidden', 'false');
@@ -636,7 +663,11 @@
         }
         document.querySelectorAll('[data-tm-seed-log-open]').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                openSeedDiscardLog(btn.getAttribute('data-module-name'), btn.getAttribute('data-json-id'));
+                openSeedDiscardLog(
+                    btn.getAttribute('data-module-name'),
+                    btn.getAttribute('data-json-id'),
+                    btn.getAttribute('data-register-url') || ''
+                );
             });
         });
         document.querySelectorAll('[data-tm-seed-log-close]').forEach(function (el) {

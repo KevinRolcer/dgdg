@@ -33,6 +33,13 @@
     }
 }
 
+@media (min-width: 1440px) {
+    .home-shell-main {
+        max-width: var(--content-max-width);
+        margin: 0 auto;
+    }
+}
+
 .home-shell-main-head {
     margin-bottom: 0.5rem;
     padding-bottom: 0.5rem;

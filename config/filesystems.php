@@ -54,6 +54,20 @@ return [
             'report' => false,
         ],
 
+        /*
+         * Chats WhatsApp cifrados (no exponer vía /storage público).
+         * Local: storage/app/whatsapp_chats_private
+         * HostGator: WHATSAPP_CHATS_USE_SHARED=1 + SHARED_UPLOADS_PATH/…/whatsapp_chats_private
+         */
+        'whatsapp_chats' => [
+            'driver' => 'local',
+            'root' => env('WHATSAPP_CHATS_USE_SHARED', false)
+                ? rtrim((string) env('SHARED_UPLOADS_PATH', ''), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.'whatsapp_chats_private'
+                : storage_path('app/whatsapp_chats_private'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

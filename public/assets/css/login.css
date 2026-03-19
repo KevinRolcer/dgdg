@@ -118,7 +118,7 @@ body {
 .form-input:focus {
     outline: none;
     border-color: var(--clr-secondary);
-    box-shadow: 0 0 0 3px rgba(36, 98, 87, 0.12);
+    box-shadow: none;
 }
 
 .input-group-pass {
@@ -187,12 +187,12 @@ body {
     letter-spacing: 0.01em;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 4px 10px rgba(134, 30, 52, 0.2);
+    box-shadow: none;
 }
 
 .btn-primary:hover {
     background: var(--clr-primary-dark);
-    box-shadow: 0 6px 15px rgba(134, 30, 52, 0.3);
+    box-shadow: none;
     transform: translateY(-1px);
 }
 

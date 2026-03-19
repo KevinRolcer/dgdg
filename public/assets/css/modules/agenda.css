@@ -620,6 +620,26 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     flex-shrink: 0;
 }
 
+@media (min-width: 1440px) {
+    .modal-agenda-content {
+        max-width: 850px;
+    }
+    
+    .agenda-row-two-cols {
+        gap: 20px;
+    }
+}
+
+@media (min-width: 1440px) {
+    .modal-agenda-content {
+        max-width: 850px;
+    }
+    
+    .agenda-row-two-cols {
+        gap: 20px;
+    }
+}
+
 .modal-agenda-header {
     padding: 0.85rem 1.25rem;
     border-bottom: 1px solid #e2e8f0;

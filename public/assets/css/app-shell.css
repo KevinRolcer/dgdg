@@ -1169,15 +1169,17 @@ body.sidebar-collapsed .sidebar-logout-btn {
         padding: var(--ui-gap) var(--ui-pad);
     }
 
-    .app-content:has(> .settings-shell),
-    .app-content:has(> .home-shell),
-    .app-content:has(> .mesas-paz-shell),
-    .app-content:has(> .agenda-shell),
-    .app-content:has(> .tm-shell),
     .app-content:has(> .um-page) {
         padding: 1rem 1.25rem;
     }
+}
 
+@media (min-width: 1440px) {
+    :root {
+        --content-max-width: 1560px;
+        --fs-title: 1.35rem;
+        --fs-subtitle: 1.1rem;
+    }
 }
 
 @media (max-width: 640px) {

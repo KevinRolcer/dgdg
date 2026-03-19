@@ -64,7 +64,7 @@ class SecurityHeaders
 
     private function mustRedirectToHttps(Request $request): bool
     {
-        if (app()->isLocal() || !config('app.force_https', false)) {
+        if (app()->isLocal() || ! config('app.force_https', false)) {
             return false;
         }
 
@@ -128,7 +128,7 @@ class SecurityHeaders
         }
 
         $host = parse_url($appUrl, PHP_URL_HOST);
-        if (!is_string($host) || trim($host) === '') {
+        if (! is_string($host) || trim($host) === '') {
             return null;
         }
 
@@ -137,6 +137,14 @@ class SecurityHeaders
 
     private function buildContentSecurityPolicy(Request $request): string
     {
+        $isLocal = app()->isLocal();
+        $imageSrc = $isLocal
+            ? "img-src 'self' data: blob: https: http:"
+            : "img-src 'self' data: blob: https:";
+        $mediaSrc = $isLocal
+            ? "media-src 'self' data: blob: https: http:"
+            : "media-src 'self' data: blob: https:";
+
         $directives = [
             "default-src 'self'",
             "base-uri 'self'",
@@ -145,7 +153,8 @@ class SecurityHeaders
             "object-src 'none'",
             "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://static.cloudflareinsights.com",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
-            "img-src 'self' data: blob: https:",
+            $imageSrc,
+            $mediaSrc,
             "font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
             "connect-src 'self' https://static.cloudflareinsights.com",
         ];

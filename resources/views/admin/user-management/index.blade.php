@@ -189,34 +189,5 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('form[data-confirm-delete]').forEach(function (form) {
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            const name = form.getAttribute('data-user-name') || 'este usuario';
-            Swal.fire({
-                title: '¿Eliminar usuario?',
-                text: 'Se eliminará a "' + name + '" de manera permanente.',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Sí, eliminar',
-                cancelButtonText: 'Cancelar',
-                reverseButtons: true,
-                buttonsStyling: false,
-                customClass: {
-                    popup: 'tm-swal-popup',
-                    title: 'tm-swal-title',
-                    htmlContainer: 'tm-swal-text',
-                    confirmButton: 'tm-swal-confirm',
-                    cancelButton: 'tm-swal-cancel'
-                }
-            }).then(function (result) {
-                if (result.isConfirmed) form.submit();
-            });
-        });
-    });
-});
-</script>
+<script src="{{ asset('assets/js/modules/user-management-index.js') }}?v={{ @filemtime(public_path('assets/js/modules/user-management-index.js')) ?: time() }}"></script>
 @endpush

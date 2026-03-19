@@ -30,7 +30,15 @@
         </div>
 
         @if (!is_null($temporaryModule->seed_discard_log))
-        <div class="tm-modal" id="tmSeedDiscardLogModalEdit" aria-hidden="true" role="dialog" aria-modal="true">
+        <div
+            class="tm-modal"
+            id="tmSeedDiscardLogModalEdit"
+            aria-hidden="true"
+            role="dialog"
+            aria-modal="true"
+            data-register-url="{{ route('temporary-modules.admin.seed-discard-register', $temporaryModule->id) }}"
+            data-csrf-token="{{ csrf_token() }}"
+        >
             <div class="tm-modal-backdrop" data-tm-seed-log-close-edit></div>
             <div class="tm-modal-dialog tm-seed-log-dialog">
                 <div class="tm-modal-head">
@@ -42,7 +50,7 @@
                     <p class="tm-muted" id="tmSeedDiscardLogEmptyEdit" hidden>Sin filas descartadas.</p>
                     <div class="tm-table-wrap tm-seed-log-table-wrap" id="tmSeedDiscardLogTableWrapEdit" hidden>
                         <table class="tm-table tm-table-sm">
-                            <thead><tr><th>Fila</th><th>Motivo</th><th>MR</th><th>Municipio</th><th>Acción</th></tr></thead>
+                            <thead><tr><th>Fila</th><th>Motivo</th><th>MR</th><th>Municipio</th><th>Acción</th><th>Enlazar municipio</th></tr></thead>
                             <tbody id="tmSeedDiscardLogTbodyEdit"></tbody>
                         </table>
                     </div>
@@ -305,6 +313,7 @@
 @endsection
 
 @push('scripts')
+<script src="{{ asset('assets/js/modules/temporary-modules-seed-discard-log.js') }}?v={{ @filemtime(public_path('assets/js/modules/temporary-modules-seed-discard-log.js')) ?: time() }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const container = document.getElementById('tmFieldsContainer');
@@ -804,32 +813,33 @@
             var btn = document.getElementById('tmEditSeedLogBtn');
             var modal = document.getElementById('tmSeedDiscardLogModalEdit');
             var jsonEl = document.getElementById('tm-seed-discard-edit');
-            if (!btn || !modal || !jsonEl) return;
-            function esc(s) {
-                if (s == null || s === '') return '—';
-                var d = document.createElement('div');
-                d.textContent = String(s);
-                return d.innerHTML;
-            }
+            if (!btn || !modal || !jsonEl || !window.tmSeedDiscardLog) return;
+            var currentList = [];
             function openLog() {
-                var list = [];
-                try { list = JSON.parse(jsonEl.textContent || '[]'); } catch (e) {}
-                if (!Array.isArray(list)) list = [];
+                try { currentList = JSON.parse(jsonEl.textContent || '[]'); } catch (e) { currentList = []; }
+                if (!Array.isArray(currentList)) currentList = [];
                 document.getElementById('tmSeedDiscardLogModuleEdit').textContent = btn.getAttribute('data-module-name') || '';
                 var tbody = document.getElementById('tmSeedDiscardLogTbodyEdit');
                 var empty = document.getElementById('tmSeedDiscardLogEmptyEdit');
                 var wrap = document.getElementById('tmSeedDiscardLogTableWrapEdit');
-                tbody.innerHTML = '';
-                if (list.length === 0) {
+                if (currentList.length === 0) {
                     empty.hidden = false;
                     wrap.hidden = true;
+                    tbody.innerHTML = '';
                 } else {
                     empty.hidden = true;
                     wrap.hidden = false;
-                    list.forEach(function (row) {
-                        var tr = document.createElement('tr');
-                        tr.innerHTML = '<td>' + esc(row.row) + '</td><td>' + esc(row.reason) + '</td><td>' + esc(row.microrregion) + '</td><td>' + esc(row.municipio) + '</td><td class="tm-seed-log-accion">' + esc(row.accion) + '</td>';
-                        tbody.appendChild(tr);
+                    window.tmSeedDiscardLog.renderRows(tbody, currentList, {
+                        registerUrl: modal.getAttribute('data-register-url') || '',
+                        csrfToken: modal.getAttribute('data-csrf-token') || '',
+                        jsonScriptEl: jsonEl,
+                        onUpdateList: function (newLog) {
+                            currentList = newLog;
+                        },
+                        onEmpty: function () {
+                            empty.hidden = false;
+                            wrap.hidden = true;
+                        },
                     });
                 }
                 modal.classList.add('is-open');

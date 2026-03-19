@@ -1,19 +1,17 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-
-use App\Http\Controllers\HomeController;
+use App\Http\Controllers\AdminSettingsController;
+use App\Http\Controllers\AgendaController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\CanvaController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\MesasPazController;
+use App\Http\Controllers\MesasPazSupervisionController;
 use App\Http\Controllers\PowerPointController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
-use App\Http\Controllers\MesasPazController;
-use App\Http\Controllers\MesasPazSupervisionController;
 use App\Http\Controllers\TemporaryModuleController;
-use App\Http\Controllers\AdminSettingsController;
-use App\Http\Controllers\CanvaController;
-use App\Http\Controllers\AgendaController;
-
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return redirect('/login');
@@ -37,6 +35,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/ajustes/microrregiones/distribuir-excel', [AdminSettingsController::class, 'distribuirMunicipiosExcel'])
         ->middleware('can:Modulos-Temporales-Admin')
         ->name('settings.microrregiones.distribuir-excel');
+    Route::get('/ajustes/chats-whatsapp-autenticador', [SettingsController::class, 'whatsappTotpReset'])
+        ->middleware('can:Chats-WhatsApp-Sensible')
+        ->name('settings.whatsapp-totp-reset');
+    Route::post('/ajustes/chats-whatsapp-autenticador', [SettingsController::class, 'whatsappTotpResetSubmit'])
+        ->middleware(['can:Chats-WhatsApp-Sensible', 'throttle:8,1'])
+        ->name('settings.whatsapp-totp-reset.post');
     Route::post('/mi-perfil/password', [ProfileController::class, 'updatePassword'])
         ->middleware('throttle:6,1')
         ->name('profile.password.update');
@@ -108,6 +112,10 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.normalize-municipio');
+            Route::post('/{module}/registro-desde-log-semilla', [TemporaryModuleController::class, 'registerSeedDiscardRow'])
+                ->whereNumber('module')
+                ->middleware(['can:Modulos-Temporales-Admin', 'throttle:60,1'])
+                ->name('temporary-modules.admin.seed-discard-register');
             Route::get('/{module}/analisis-preview', [TemporaryModuleController::class, 'analysisPreviewJson'])
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')
@@ -205,4 +213,38 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{id}', [\App\Http\Controllers\Admin\UserManagementController::class, 'destroy'])->name('admin.usuarios.destroy');
         Route::post('/{id}/toggle-status', [\App\Http\Controllers\Admin\UserManagementController::class, 'toggleStatus'])->name('admin.usuarios.toggle-status');
     });
+
+    Route::prefix('admin/whatsapp-chats')
+        ->middleware([
+            'auth',
+            'can:Chats-WhatsApp-Sensible',
+            \App\Http\Middleware\WhatsAppNoStoreResponse::class,
+        ])
+        ->group(function () {
+            Route::get('/desbloqueo', function (\Illuminate\Http\Request $request) {
+                return redirect()->route('whatsapp-chats.admin.totp', $request->query());
+            });
+
+            Route::get('/totp', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'totpForm'])
+                ->name('whatsapp-chats.admin.totp');
+            Route::post('/totp', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'totpSubmit'])
+                ->middleware('throttle:12,1')
+                ->name('whatsapp-chats.admin.totp.post');
+
+            Route::middleware([\App\Http\Middleware\ConfirmWhatsAppSensitiveAccess::class])->group(function () {
+                Route::get('/', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'index'])
+                    ->name('whatsapp-chats.admin.index');
+                Route::post('/', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'store'])
+                    ->name('whatsapp-chats.admin.store');
+                Route::get('/{chat}', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'show'])
+                    ->whereNumber('chat')
+                    ->name('whatsapp-chats.admin.show');
+                Route::get('/{chat}/media', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'media'])
+                    ->whereNumber('chat')
+                    ->name('whatsapp-chats.admin.media');
+                Route::delete('/{chat}', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'destroy'])
+                    ->whereNumber('chat')
+                    ->name('whatsapp-chats.admin.destroy');
+            });
+        });
 });

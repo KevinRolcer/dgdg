@@ -2,31 +2,30 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\GenerateTemporaryModuleAnalysisWordJob;
 use App\Models\TemporaryModule;
 use App\Models\TemporaryModuleEntry;
 use App\Services\TemporaryModules\TemporaryModuleAccessService;
-use App\Services\TemporaryModules\TemporaryModuleEntryDataService;
-use App\Jobs\GenerateTemporaryModuleAnalysisWordJob;
-use App\Services\TemporaryModules\TemporaryModuleAnalysisWordService;
 use App\Services\TemporaryModules\TemporaryModuleAdminSeedService;
-use App\Services\TemporaryModules\TemporaryModuleSlugService;
+use App\Services\TemporaryModules\TemporaryModuleAnalysisWordService;
+use App\Services\TemporaryModules\TemporaryModuleEntryDataService;
 use App\Services\TemporaryModules\TemporaryModuleExcelImportService;
 use App\Services\TemporaryModules\TemporaryModuleExportService;
 use App\Services\TemporaryModules\TemporaryModuleFieldService;
+use App\Services\TemporaryModules\TemporaryModuleSlugService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Dompdf\Dompdf;
 
 class TemporaryModuleController extends Controller
 {
@@ -201,14 +200,14 @@ class TemporaryModuleController extends Controller
         }
 
         $fieldColumns = json_decode((string) $request->input('field_columns'), true);
-        if (!is_array($fieldColumns) || $fieldColumns === []) {
+        if (! is_array($fieldColumns) || $fieldColumns === []) {
             throw ValidationException::withMessages(['field_columns' => 'Elige al menos una columna como campo del módulo.']);
         }
         $fieldColumns = array_map('intval', $fieldColumns);
 
         $isIndefinite = (bool) $request->boolean('is_indefinite');
         $expiresAt = null;
-        if (!$isIndefinite) {
+        if (! $isIndefinite) {
             $request->validate(['expires_at' => ['required', 'date']]);
             $expiresAt = Carbon::parse($request->input('expires_at'));
         }
@@ -272,7 +271,7 @@ class TemporaryModuleController extends Controller
                 foreach ($field->options as $c) {
                     $name = $c['name'] ?? '';
                     $subs = $c['sub'] ?? [];
-                    $lines[] = $name . (count($subs) ? ': ' . implode(', ', $subs) : '');
+                    $lines[] = $name.(count($subs) ? ': '.implode(', ', $subs) : '');
                 }
                 $row['options'] = implode("\n", $lines);
             } elseif ($field->type === 'seccion' && is_array($field->options)) {
@@ -281,6 +280,7 @@ class TemporaryModuleController extends Controller
             } else {
                 $row['options'] = is_array($field->options) ? implode(', ', $field->options) : '';
             }
+
             return $row;
         })->values()->all();
 
@@ -334,7 +334,7 @@ class TemporaryModuleController extends Controller
 
         $validated = $request->validate($rules);
 
-        if (!$this->isIndefiniteMode($validated) && empty($validated['expires_at'])) {
+        if (! $this->isIndefiniteMode($validated) && empty($validated['expires_at'])) {
             throw ValidationException::withMessages([
                 'expires_at' => 'Selecciona una fecha límite o activa la opción indefinido.',
             ]);
@@ -375,7 +375,7 @@ class TemporaryModuleController extends Controller
 
             $module->fields()->createMany($preparedFields);
 
-            if (!$module->applies_to_all) {
+            if (! $module->applies_to_all) {
                 $module->targetUsers()->sync($selectedDelegateIds);
             }
         });
@@ -427,7 +427,7 @@ class TemporaryModuleController extends Controller
 
         $validated = $request->validate($rules);
 
-        if (!$this->isIndefiniteMode($validated) && empty($validated['expires_at'])) {
+        if (! $this->isIndefiniteMode($validated) && empty($validated['expires_at'])) {
             throw ValidationException::withMessages([
                 'expires_at' => 'Selecciona una fecha límite o activa la opción indefinido.',
             ]);
@@ -444,6 +444,7 @@ class TemporaryModuleController extends Controller
         $submittedExisting = collect($validated['existing_fields'] ?? [])
             ->mapWithKeys(function ($row) {
                 $id = isset($row['id']) ? (int) $row['id'] : 0;
+
                 return $id > 0 ? [$id => $row] : [];
             });
 
@@ -509,6 +510,7 @@ class TemporaryModuleController extends Controller
                 if ($hasData) {
                     $destructiveKeys[] = $oldKey;
                 }
+
                 continue;
             }
 
@@ -553,8 +555,8 @@ class TemporaryModuleController extends Controller
             $conflictAction = 'none';
         }
 
-        if (!empty($destructiveKeys)) {
-            if (!in_array($conflictAction, ['clear_module', 'clear_field_data'], true)) {
+        if (! empty($destructiveKeys)) {
+            if (! in_array($conflictAction, ['clear_module', 'clear_field_data'], true)) {
                 throw ValidationException::withMessages([
                     'conflict_action' => 'Hay datos capturados en los campos que deseas modificar/eliminar. Elige cómo resolver el conflicto antes de guardar.',
                 ]);
@@ -601,7 +603,7 @@ class TemporaryModuleController extends Controller
 
             foreach ($existingDefinitions as $definition) {
                 $field = $temporaryModule->fields()->find($definition['id']);
-                if (!$field) {
+                if (! $field) {
                     continue;
                 }
 
@@ -616,15 +618,15 @@ class TemporaryModuleController extends Controller
                 ]);
             }
 
-            if (!empty($deletedFieldIds)) {
+            if (! empty($deletedFieldIds)) {
                 $temporaryModule->fields()->whereIn('id', $deletedFieldIds)->delete();
             }
 
-            if (!empty($preparedExtraFields)) {
+            if (! empty($preparedExtraFields)) {
                 $temporaryModule->fields()->createMany($preparedExtraFields);
             }
 
-            if (!empty($invalidMainImageKeys)) {
+            if (! empty($invalidMainImageKeys)) {
                 $temporaryModule->entries()
                     ->whereIn('main_image_field_key', $invalidMainImageKeys)
                     ->update(['main_image_field_key' => null]);
@@ -906,7 +908,7 @@ class TemporaryModuleController extends Controller
             : null;
 
         $microrregionIdsPermitidos = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
-        if ($requestedMicrorregionId !== null && !in_array($requestedMicrorregionId, $microrregionIdsPermitidos, true)) {
+        if ($requestedMicrorregionId !== null && ! in_array($requestedMicrorregionId, $microrregionIdsPermitidos, true)) {
             throw ValidationException::withMessages([
                 'selected_microrregion_id' => 'La microrregión seleccionada no está dentro de tus asignaciones.',
             ]);
@@ -946,7 +948,7 @@ class TemporaryModuleController extends Controller
                 $existingValue = $existingEntry?->data[$field->key] ?? null;
                 $hasExistingImage = is_string($existingValue) && trim($existingValue) !== '';
                 $removeRequested = filter_var($request->input('remove_images.'.$field->key), FILTER_VALIDATE_BOOLEAN);
-                $isRequiredNow = (bool) $field->is_required && (!$hasExistingImage || $removeRequested);
+                $isRequiredNow = (bool) $field->is_required && (! $hasExistingImage || $removeRequested);
 
                 $rules[$key] = $isRequiredNow
                     ? ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240']
@@ -989,7 +991,7 @@ class TemporaryModuleController extends Controller
 
                 $value = $storedPath;
             } elseif (in_array($field->type, ['file', 'image'], true)) {
-                if ($existingEntry && !$removeRequested && is_string($existingValue) && trim($existingValue) !== '') {
+                if ($existingEntry && ! $removeRequested && is_string($existingValue) && trim($existingValue) !== '') {
                     $value = $existingValue;
                 } else {
                     if ($existingEntry && $removeRequested && is_string($existingValue) && trim($existingValue) !== '') {
@@ -1145,7 +1147,7 @@ class TemporaryModuleController extends Controller
         ]);
 
         $mapping = json_decode((string) $request->input('mapping'), true);
-        if (!is_array($mapping)) {
+        if (! is_array($mapping)) {
             return response()->json(['success' => false, 'message' => 'Mapeo inválido.'], 422);
         }
         $normalizedMap = [];
@@ -1161,7 +1163,7 @@ class TemporaryModuleController extends Controller
             ? (int) $request->input('selected_microrregion_id')
             : null;
         $microrregionIdsPermitidos = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
-        if ($requestedMicrorregionId !== null && !in_array($requestedMicrorregionId, $microrregionIdsPermitidos, true)) {
+        if ($requestedMicrorregionId !== null && ! in_array($requestedMicrorregionId, $microrregionIdsPermitidos, true)) {
             return response()->json(['success' => false, 'message' => 'Microrregión no permitida.'], 403);
         }
 
@@ -1224,6 +1226,38 @@ class TemporaryModuleController extends Controller
             ->with('status', 'Se vaciaron los registros del módulo correctamente.');
     }
 
+    public function registerSeedDiscardRow(Request $request, int $module): JsonResponse
+    {
+        abort_unless(auth()->user()?->can('Modulos-Temporales-Admin'), 403);
+
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+        $validated = $request->validate([
+            'discard_uid' => ['required', 'string', 'max:120'],
+            'municipio_id' => ['required', 'integer', 'exists:municipios,id'],
+        ]);
+
+        try {
+            $result = $this->adminSeedService->registerDiscardedSeedRow(
+                $temporaryModule,
+                $validated['discard_uid'],
+                (int) $validated['municipio_id'],
+                (int) $request->user()->id,
+            );
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'No se pudo registrar la fila.',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Registro creado correctamente.',
+            'entry_id' => $result['entry']->id,
+            'seed_discard_log' => $result['seed_discard_log'],
+        ]);
+    }
+
     public function normalizeMunicipioField(int $module): RedirectResponse
     {
         $temporaryModule = TemporaryModule::query()
@@ -1232,7 +1266,7 @@ class TemporaryModuleController extends Controller
         abort_unless(auth()->user()?->can('Modulos-Temporales-Admin'), 403);
 
         $field = $temporaryModule->fields->firstWhere('key', 'municipio');
-        if (!$field) {
+        if (! $field) {
             return redirect()
                 ->back()
                 ->with('status', 'El módulo no tiene un campo con clave "municipio".');
@@ -1242,7 +1276,7 @@ class TemporaryModuleController extends Controller
         $result = $adminSeed->normalizeMunicipioField($temporaryModule, 'municipio');
 
         $msg = 'Normalización de municipio completada. '.$result['updated'].' registro(s) actualizados.';
-        if (!empty($result['unmatched'])) {
+        if (! empty($result['unmatched'])) {
             $ejemplos = implode(', ', array_slice($result['unmatched'], 0, 5));
             $msg .= ' No se pudo mapear '.count($result['unmatched']).' valor(es), por ejemplo: '.$ejemplos.'.';
         }
@@ -1255,12 +1289,12 @@ class TemporaryModuleController extends Controller
     public function exportExcel(Request $request, int $module)
     {
         $format = (string) $request->query('format', 'excel');
-        if (!in_array($format, ['excel', 'word', 'pdf'], true)) {
+        if (! in_array($format, ['excel', 'word', 'pdf'], true)) {
             $format = 'excel';
         }
 
         $mode = (string) $request->query('mode', 'single');
-        if (!in_array($mode, ['single', 'mr'], true)) {
+        if (! in_array($mode, ['single', 'mr'], true)) {
             $mode = 'single';
         }
         $includeAnalysis = false;
@@ -1294,7 +1328,8 @@ class TemporaryModuleController extends Controller
             );
 
             $docType = $format === 'word' ? 'Word' : 'PDF';
-            return redirect()->back()->with('toast', 'La generación del archivo ' . $docType . ' se ha enviado a segundo plano. Revisa tus notificaciones para ver el estado.');
+
+            return redirect()->back()->with('toast', 'La generación del archivo '.$docType.' se ha enviado a segundo plano. Revisa tus notificaciones para ver el estado.');
         }
 
         $exportRequestId = Str::uuid()->toString();
@@ -1318,7 +1353,7 @@ class TemporaryModuleController extends Controller
             ->where('data->export_request_id', $exportRequest)
             ->first();
 
-        if (!$notification) {
+        if (! $notification) {
             abort(404);
         }
 
@@ -1326,7 +1361,7 @@ class TemporaryModuleController extends Controller
         $data = [
             'status' => $isPending ? 'pending' : (($notification->data['export_status'] ?? 'completed')),
         ];
-        if (!$isPending && is_array($notification->data) && ($data['status'] === 'completed')) {
+        if (! $isPending && is_array($notification->data) && ($data['status'] === 'completed')) {
             $data['url'] = $notification->data['url'] ?? null;
             $data['file_name'] = $notification->data['file_name'] ?? null;
         }
@@ -1351,6 +1386,7 @@ class TemporaryModuleController extends Controller
         foreach ($exportColumns as $col) {
             if (($col['is_image'] ?? false)) {
                 $maxWidths[$col['key']] = ['chars' => 12, 'image_height' => 80];
+
                 continue;
             }
             $key = $col['key'];
@@ -1418,10 +1454,11 @@ class TemporaryModuleController extends Controller
                     'title' => (string) ($opts['title'] ?? $field->label),
                     'subsections' => array_values((array) ($opts['subsections'] ?? [])),
                 ];
+
                 continue;
             }
             $label = $field->label;
-            if ($currentSection !== null && !empty($currentSection['subsections'])) {
+            if ($currentSection !== null && ! empty($currentSection['subsections'])) {
                 $idx = (int) ($field->subsection_index ?? 0);
                 $label = $currentSection['subsections'][$idx] ?? $field->label;
             }
@@ -1433,6 +1470,7 @@ class TemporaryModuleController extends Controller
             ];
             $currentSection = null;
         }
+
         return $cols;
     }
 
@@ -1544,7 +1582,7 @@ class TemporaryModuleController extends Controller
         $fullPath = $this->entryDataService->resolveStoredFilePath($path);
 
         abort_unless(is_string($fullPath) && is_file($fullPath), 404);
+
         return response()->file($fullPath);
     }
-
 }

@@ -1,31 +1,7 @@
 @extends('layouts.app')
 
 @push('css')
-<style>
-    .admin-settings-wrap {
-        display: flex;
-        justify-content: flex-start;
-    }
-
-    .admin-settings-card {
-        width: min(560px, 92vw);
-        min-width: min(30vw, 92vw);
-        max-height: 78vh;
-        overflow: auto;
-    }
-
-    .admin-settings-summary {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
-    }
-
-    @media (max-width: 768px) {
-        .admin-settings-summary {
-            grid-template-columns: 1fr;
-        }
-    }
-</style>
+<link rel="stylesheet" href="{{ asset('assets/css/modules/admin-settings.css') }}?v={{ @filemtime(public_path('assets/css/modules/admin-settings.css')) ?: time() }}">
 @endpush
 
 @section('content')

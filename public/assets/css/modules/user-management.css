@@ -149,6 +149,16 @@
     background: var(--clr-card, #fff);
 }
 
+@media (min-width: 1440px) {
+    .um-table-scroll-wrap {
+        max-height: min(60vh, 600px);
+    }
+    
+    .um-grid-3 {
+        gap: 20px 24px;
+    }
+}
+
 .um-page .um-card-wrap .um-filter-bar {
     flex-shrink: 0;
 }

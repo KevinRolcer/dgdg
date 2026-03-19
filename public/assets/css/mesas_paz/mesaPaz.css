@@ -324,6 +324,16 @@
     color: var(--clr-text-main);
 }
 
+@media (min-width: 1440px) {
+    #mesasPazApp .modal-content {
+        max-width: 900px;
+        margin: auto;
+    }
+    #mesasPazApp .evidencias-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    }
+}
+
 /* Dropzone Excel (modal Cargar Excel) — claro por defecto */
 .mesa-dropzone-excel {
     cursor: pointer;

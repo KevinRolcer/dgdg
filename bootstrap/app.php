@@ -1,12 +1,12 @@
 <?php
 
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use App\Http\Middleware\SecurityHeaders;
 
 // Hostgator include path
-ini_set("include_path", '/home3/kevinast/php:' . ini_get("include_path"));
+ini_set('include_path', '/home3/kevinast/php:'.ini_get('include_path'));
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -21,13 +21,16 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'agenda.access' => \App\Http\Middleware\AgendaAccess::class,
             'agenda.access.escritura' => \App\Http\Middleware\AgendaAccessEscritura::class,
+            'whatsapp.nostore' => \App\Http\Middleware\WhatsAppNoStoreResponse::class,
+            'whatsapp.sensitive.confirm' => \App\Http\Middleware\ConfirmWhatsAppSensitiveAccess::class,
         ]);
     })
     ->withSchedule(function (\Illuminate\Console\Scheduling\Schedule $schedule) {
         $schedule->job(new \App\Jobs\SendAgendaRemindersJob)->everyMinute();
+        $schedule->command('whatsapp-chats:prune')->dailyAt('03:15');
+        $schedule->command('whatsapp-chats:backup')->weeklyOn(1, '04:00');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
 
         //
     })->create();
-

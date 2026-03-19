@@ -1,0 +1,12 @@
+.wa-upload-box {
+    border: 1px solid var(--clr-border);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.03);
+    padding: 16px;
+}
+.wa-form-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}

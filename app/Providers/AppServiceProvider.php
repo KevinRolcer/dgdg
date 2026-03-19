@@ -4,12 +4,12 @@ namespace App\Providers;
 
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\URL;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\ServiceProvider;
 use Spatie\Permission\Models\Permission;
 
 class AppServiceProvider extends ServiceProvider
@@ -33,12 +33,13 @@ class AppServiceProvider extends ServiceProvider
             'Modulos-Temporales-Admin-consulta',
             'Modulos-Temporales-consulta',
             'Agenda-consulta',
+            'Chats-WhatsApp-Sensible',
         ] as $permName) {
             Permission::findOrCreate($permName, 'web');
         }
 
         Gate::define('mesas-paz-ver', function ($user) {
-            if (!$user) {
+            if (! $user) {
                 return false;
             }
             if (Gate::forUser($user)->allows('Mesas-Paz')) {
@@ -52,7 +53,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::define('modulos-temporales-admin-ver', function ($user) {
-            if (!$user) {
+            if (! $user) {
                 return false;
             }
             if ($user->can('Modulos-Temporales-Admin')) {
@@ -66,7 +67,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::define('modulos-temporales-ver', function ($user) {
-            if (!$user) {
+            if (! $user) {
                 return false;
             }
             if ($user->can('Modulos-Temporales')) {
@@ -80,7 +81,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::define('Mesas-Paz', function ($user) {
-            if (!$user) {
+            if (! $user) {
                 return false;
             }
 
@@ -144,7 +145,7 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
-        if (!app()->isLocal() && config('app.force_https', false)) {
+        if (! app()->isLocal() && config('app.force_https', false)) {
             URL::forceScheme('https');
         }
 
