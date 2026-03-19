@@ -1400,10 +1400,10 @@
                 } else {
                     var approx = col.max_width_chars || 24;
                     if (!Number.isFinite(approx)) { approx = 24; }
-                    approx = Math.max(8, Math.min(approx, 60));
+                    approx = Math.max(2, Math.min(approx, 60));
                     mid = '<label class="tm-export-col-width-preview" data-width-hint="' + escapeHtml(String(approx)) + '">' +
                         '<span>Ancho (ch)</span>' +
-                        '<input type="number" class="tm-export-col-width-input" min="8" max="60" value="' + String(approx) + '" data-key="' + escapeHtml(col.key) + '">' +
+                        '<input type="number" class="tm-export-col-width-input" min="2" max="60" value="' + String(approx) + '" data-key="' + escapeHtml(col.key) + '">' +
                         '</label>';
                 }
                 item.innerHTML =
@@ -1427,9 +1427,11 @@
                 if (!k) { return; }
                 var t1 = row.querySelector('.tm-export-color-trigger[data-row="1"]');
                 var t2 = row.querySelector('.tm-export-color-trigger[data-row="2"]');
+                var pctCheck = row.querySelector('.tm-export-count-pct-check');
                 savedColors[k] = {
                     row1: (t1 && t1.getAttribute('data-color')) ? t1.getAttribute('data-color') : 'var(--clr-primary)',
                     row2: (t2 && t2.getAttribute('data-color')) ? t2.getAttribute('data-color') : 'var(--clr-secondary)',
+                    showPct: !!(pctCheck && pctCheck.checked),
                     row2Values: {}
                 };
                 row.querySelectorAll('.tm-export-count-table-value-color').forEach(function (vrow) {
@@ -1448,6 +1450,7 @@
             var oneColorBlock = function (key, label, colors, valueLabels) {
                 var c1 = (colors && colors.row1) ? colors.row1 : defaultRow1;
                 var c2 = (colors && colors.row2) ? colors.row2 : defaultRow2;
+                var showPct = !!(colors && colors.showPct);
                 var row2Values = (colors && colors.row2Values) ? colors.row2Values : {};
                 var block = '<span class="tm-export-col-label">' + escapeHtml(label) + '</span>' +
                     '<div class="tm-export-count-table-two-colors">' +
@@ -1460,7 +1463,11 @@
                     '<span class="tm-export-color-row-label">Fila 2</span>' +
                     '<button type="button" class="tm-export-color-trigger" data-row="2" data-color="' + escapeHtml(c2) + '" aria-haspopup="listbox" aria-expanded="false">' +
                     '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c2) + '"></span></button>' +
-                    '<div class="tm-export-color-menu" role="listbox" hidden>' + colorMenuHtml + '</div></div></div>';
+                    '<div class="tm-export-color-menu" role="listbox" hidden>' + colorMenuHtml + '</div></div>' +
+                    '<label class="tm-export-count-pct-item-check" title="Incluir columna de porcentaje (%) para este campo" style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.75rem;color:var(--clr-text-main);margin-left:auto;">' +
+                    '<input type="checkbox" class="tm-export-count-pct-check"' + (showPct ? ' checked' : '') + '> %' +
+                    '</label>' +
+                    '</div>';
                 if (valueLabels && valueLabels.length > 0) {
                     block += '<div class="tm-export-count-table-row2-values"><span class="tm-export-color-row-label">Fila 2 por valor:</span><div class="tm-export-count-table-value-colors">';
                     valueLabels.forEach(function (vlabel) {
@@ -1555,6 +1562,8 @@
                         if (v && vt) { row2Values[v] = vt.getAttribute('data-color') || 'var(--clr-secondary)'; }
                     });
                     if (Object.keys(row2Values).length) { obj.row2Values = row2Values; }
+                    var pctCheck = row.querySelector('.tm-export-count-pct-check');
+                    obj.showPct = !!(pctCheck && pctCheck.checked);
                     countTableColors[k] = obj;
                 });
             }
@@ -1595,6 +1604,7 @@
             var countTableHtml = '';
             var root = modal || document;
             var includeCountEl = root.querySelector ? root.querySelector('#tmExportIncludeCountTable') : document.getElementById('tmExportIncludeCountTable');
+            var includePercentagesEl = root.querySelector ? root.querySelector('#tmExportIncludePercentages') : document.getElementById('tmExportIncludePercentages');
             var countByFieldsEl = root.querySelector ? root.querySelector('#tmExportCountByFields') : document.getElementById('tmExportCountByFields');
             if (includeCountEl && includeCountEl.checked && countByFieldsEl) {
                 var totalCount = Array.isArray(entries) ? entries.length : 0;
@@ -1646,84 +1656,143 @@
                         }
                         return (c && c.row2) ? c.row2 : '#2d5a27';
                     };
-                    countTableHtml = '<table class="tm-export-preview-count-table">';
+
+                    const cellW = state.countTableCellWidth || 12;
+                    const pctCellW = Math.max(6, Math.floor(cellW * 0.7));
+
+                    countTableHtml = '<table class="tm-export-preview-count-table" style="table-layout:fixed;width:auto;">';
                     countTableHtml += '<thead><tr>';
                     groups.forEach(function (g, gi) {
                         var bg = getCountColor(gi, 1);
-                        countTableHtml += '<th class="tm-export-preview-count-group-header" colspan="' + g.values.length + '" style="background-color:' + escapeHtml(bg) + '">' + escapeHtml(g.label) + '</th>';
+                        var key = countTableKeys[gi] || (gi === 0 ? '_total' : '');
+                        var groupCfg = countTableColors[key] || {};
+                        var showPct = !!groupCfg.showPct;
+
+                        var isRedundant = (g.values.length === 1 && (String(g.values[0].label).trim() === '' || String(g.values[0].label).trim() === String(g.label).trim())) || key === '_total';
+                        var rs = (isRedundant && !showPct) ? ' rowspan="2"' : '';
+                        var cs = showPct ? g.values.length * 2 : g.values.length;
+                        countTableHtml += '<th class="tm-export-preview-count-group-header" ' + rs + ' colspan="' + cs + '" style="background-color:' + escapeHtml(bg) + '">' + escapeHtml(g.label) + '</th>';
                     });
                     countTableHtml += '</tr><tr>';
                     groups.forEach(function (g, gi) {
+                        var key = countTableKeys[gi] || (gi === 0 ? '_total' : '');
+                        var groupCfg = countTableColors[key] || {};
+                        var showPct = !!groupCfg.showPct;
+
+                        var isRedundant = (g.values.length === 1 && (String(g.values[0].label).trim() === '' || String(g.values[0].label).trim() === String(g.label).trim())) || key === '_total';
+                        if (isRedundant && !showPct) {
+                            return; // Saltar esta columna en la segunda fila si se combinó verticalmente y NO hay porcentajes
+                        }
                         g.values.forEach(function (v) {
                             var subLabel = v.label !== '' ? v.label : g.label;
                             var bg = getCountColor(gi, 2, subLabel);
-                            countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + '">' + escapeHtml(subLabel) + '</th>';
+                            if (showPct && isRedundant) {
+                                countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + cellW + 'ch;">Cantidad</th>';
+                                countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + pctCellW + 'ch;font-size:0.75rem;">%</th>';
+                            } else {
+                                countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + cellW + 'ch;min-width:' + cellW + 'ch;max-width:' + cellW + 'ch;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(subLabel) + '</th>';
+                                if (showPct) {
+                                    countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + pctCellW + 'ch;font-size:0.75rem;">%</th>';
+                                }
+                            }
                         });
                     });
                     countTableHtml += '</tr></thead><tbody><tr>';
-                    groups.forEach(function (g) {
+                    groups.forEach(function (g, gi) {
+                        var key = countTableKeys[gi] || (gi === 0 ? '_total' : '');
+                        var groupCfg = countTableColors[key] || {};
+                        var showPct = !!groupCfg.showPct;
+
+                        var gTotal = 0;
+                        g.values.forEach(function(ev) { gTotal += ev.count; });
                         g.values.forEach(function (v) {
-                            countTableHtml += '<td class="tm-export-preview-count-value">' + escapeHtml(String(v.count)) + '</td>';
+                            countTableHtml += '<td class="tm-export-preview-count-value" style="width:' + cellW + 'ch;min-width:' + cellW + 'ch;max-width:' + cellW + 'ch;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(String(v.count)) + '</td>';
+                            if (showPct) {
+                                var pct = gTotal > 0 ? Math.round((v.count / gTotal) * 100) : 0;
+                                countTableHtml += '<td class="tm-export-preview-count-value" style="width:' + pctCellW + 'ch;font-size:0.75rem;color:#666;">' + pct + '%</td>';
+                            }
                         });
                     });
                     countTableHtml += '</tr></tbody></table>';
-                    countTableHtml += '<div class="tm-export-preview-desglose-label">Desglose</div>';
                 }
             }
-            let html = countTableHtml + '<div class="tm-export-preview-table"><div class="tm-export-preview-row tm-export-preview-title"><div class="tm-export-preview-cell tm-export-preview-title-cell" style="' + titleStyle + '" colspan="' + columns.length + '">' + escapeHtml(state.title || 'Título') + '</div></div><div class="tm-export-preview-row tm-export-preview-header">';
+            const totalColSpan = columns.length;
+            const dateStr = 'Fecha y hora de corte: ' + new Date().toLocaleString();
+            
+            let html = '';
+            
+            // Área de Título y Fecha (superior)
+            html += '<div class="tm-export-preview-header" style="width:100%;margin-bottom:15px;border-bottom:1px solid #eee;padding-bottom:10px;">';
+            html += '<div class="tm-export-preview-title" style="' + titleStyle + ';text-align:center;">' + escapeHtml(state.title || 'Título') + '</div>';
+            html += '<div class="tm-export-preview-date" style="text-align:right;font-size:0.8rem;color:#666;margin-top:8px;">' + escapeHtml(dateStr) + '</div>';
+            html += '</div>';
+
+            // Tabla de Conteo (Resumen)
+            html += countTableHtml;
+
+            // Tabla de Datos (Desglose)
+            html += '<table class="tm-export-preview-table" style="table-layout:fixed;width:auto;border-collapse:collapse;margin-top:10px;">';
+            
+            // Fila de Desglose (dentro de la tabla para alineación)
+            html += '<tr class="tm-export-preview-row">';
+            html += '<td class="tm-export-preview-cell tm-export-preview-desglose-label" style="font-weight:600;padding:12px 0 6px 0;border-left:0;border-right:0;border-bottom:0;" colspan="' + totalColSpan + '">Desglose</td>';
+            html += '</tr>';
+
+            // Encabezados
+            html += '<tr class="tm-export-preview-row tm-export-preview-header">';
             columns.forEach(function (col) {
                 const color = colorMap[col.key] || '#861e34';
                 if (col.is_image) {
                     const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
                     const w = (c.imageWidth || 120) + 'px';
                     const h = (c.imageHeight || 80) + 'px';
-                    html += '<div class="tm-export-preview-cell tm-export-preview-header-cell tm-export-preview-image-cell" style="background-color:' + escapeHtml(color) + ';width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + '"><span class="tm-export-preview-image-placeholder">Imagen</span></div>';
+                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell tm-export-preview-image-cell" style="background-color:' + escapeHtml(color) + ';width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + '"><span class="tm-export-preview-image-placeholder">Imagen</span></th>';
                 } else {
                     const ch = Math.min(col.max_width_chars || 24, 60);
-                    html += '<div class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(color) + ';min-width:' + ch + 'ch;max-width:' + ch + 'ch">' + escapeHtml(col.label) + '</div>';
+                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(color) + ';width:' + ch + 'ch">' + escapeHtml(col.label) + '</th>';
                 }
             });
-            html += '</div>';
+            html += '</tr>';
+
             if (Array.isArray(entries) && entries.length > 0) {
                 var itemNum = 1;
                 entries.forEach(function (entry) {
                     var mrLabel = (meta[entry.microrregion_id] && meta[entry.microrregion_id].label) ? meta[entry.microrregion_id].label : 'Sin microrregión';
-                    html += '<div class="tm-export-preview-row tm-export-preview-data">';
+                    html += '<tr class="tm-export-preview-row tm-export-preview-data">';
                     columns.forEach(function (col) {
                         const cellColor = '#f5f5f5';
                         if (col.is_image) {
                             const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
                             const w = (c.imageWidth || 120) + 'px';
                             const h = (c.imageHeight || 80) + 'px';
-                            html += '<div class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">—</span></div>';
+                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">—</span></td>';
                         } else {
                             const ch = Math.min(col.max_width_chars || 24, 60);
                             var val = '';
                             if (col.key === 'item') { val = String(itemNum++); } else if (col.key === 'microrregion') { val = mrLabel; } else { val = formatPreviewCellValue(entry.data && entry.data[col.key]); }
-                            html += '<div class="tm-export-preview-cell tm-export-preview-data-cell" style="min-width:' + ch + 'ch;max-width:' + ch + 'ch;background:' + escapeHtml(cellColor) + '">' + escapeHtml(val) + '</div>';
+                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="width:' + ch + 'ch;background:' + escapeHtml(cellColor) + '">' + escapeHtml(val) + '</td>';
                         }
                     });
-                    html += '</div>';
+                    html += '</tr>';
                 });
             } else {
-                html += '<div class="tm-export-preview-row tm-export-preview-data">';
+                html += '<tr class="tm-export-preview-row tm-export-preview-data">';
                 columns.forEach(function (col) {
-                    const color = colorMap[col.key] || 'var(--clr-primary)';
                     const cellColor = '#f5f5f5';
                     if (col.is_image) {
                         const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
                         const w = (c.imageWidth || 120) + 'px';
                         const h = (c.imageHeight || 80) + 'px';
-                        html += '<div class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" data-key="' + escapeHtml(col.key) + '" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">—</span></div>';
+                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" data-key="' + escapeHtml(col.key) + '" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">—</span></td>';
                     } else {
                         const ch = Math.min(col.max_width_chars || 24, 60);
                         const val = (savedRow && savedRow[col.key] !== undefined) ? escapeHtml(savedRow[col.key]) : '';
-                        html += '<div class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="min-width:' + ch + 'ch;max-width:' + ch + 'ch;background:' + escapeHtml(cellColor) + '" data-placeholder="Ejemplo">' + val + '</div>';
+                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="width:' + ch + 'ch;background:' + escapeHtml(cellColor) + '" data-placeholder="Ejemplo">' + val + '</td>';
                     }
                 });
-                html += '</div>';
+                html += '</tr>';
             }
-            html += '</div>';
+            html += '</table>';
             previewEl.innerHTML = html;
         }
 
@@ -1741,7 +1810,7 @@
                     if (widthInput) {
                         var raw = parseInt(widthInput.value, 10);
                         if (!Number.isNaN(raw)) {
-                            col.max_width_chars = Math.max(8, Math.min(raw, 60));
+                            col.max_width_chars = Math.max(2, Math.min(raw, 60));
                         }
                     }
                 }
@@ -1995,6 +2064,8 @@
                                     if (swatch instanceof HTMLElement) { swatch.style.backgroundColor = color; }
                                 }
                                 if (menu) { menu.hidden = true; }
+                                buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                            } else if (e.target.closest('.tm-export-count-pct-check')) {
                                 buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
                             }
                         });

@@ -1367,8 +1367,8 @@ class TemporaryModuleController extends Controller
         }
 
         $columns = [];
-        $columns[] = ['key' => 'item', 'label' => 'Ítem', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 6];
-        $columns[] = ['key' => 'microrregion', 'label' => 'Microrregión', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 22];
+        $columns[] = ['key' => 'item', 'label' => 'Ítem', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 4];
+        $columns[] = ['key' => 'microrregion', 'label' => 'Microrregión', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 18];
         foreach ($exportColumns as $col) {
             $info = $maxWidths[$col['key']] ?? ['chars' => 15];
             $columns[] = [

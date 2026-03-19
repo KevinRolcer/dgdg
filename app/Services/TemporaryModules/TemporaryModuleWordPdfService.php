@@ -50,6 +50,7 @@ class TemporaryModuleWordPdfService
             $columnMap[$key] = [
                 'key' => $key,
                 'label' => (string) ($col['label'] ?? $key),
+                'color' => (string) ($col['color'] ?? ''),
             ];
         }
         $columns = array_values($columnMap);
@@ -140,7 +141,11 @@ class TemporaryModuleWordPdfService
                 'right' => \PhpOffice\PhpWord\SimpleType\Jc::END,
                 default => \PhpOffice\PhpWord\SimpleType\Jc::CENTER,
             };
-            $section->addText($title, ['bold' => true, 'size' => 14, 'color' => '861E34'], ['alignment' => $jc, 'spaceAfter' => 200]);
+            $section->addText($title, ['bold' => true, 'size' => 14, 'color' => '861E34'], ['alignment' => $jc, 'spaceAfter' => 100]);
+            
+            $fechaCorteStr = now()->format('d/m/Y H:i');
+            $section->addText('Fecha y hora de corte: ' . $fechaCorteStr, ['size' => 9], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::END, 'spaceAfter' => 200]);
+            
             $section->addTextBreak(1);
 
             if ($countTable !== null && isset($countTable['groups'])) {
@@ -170,23 +175,54 @@ class TemporaryModuleWordPdfService
                 foreach ($countTable['groups'] as $gi => $group) {
                     $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
                     $bgHex = $resolveCountColor($key, 1);
-                    $span = count($group['values']);
-                    $cell = $countTbl->addCell(null, ['gridSpan' => $span, 'bgColor' => $bgHex]);
-                    $cell->addText((string) $group['label'], ['bold' => true]);
+                    $includePct = !empty($countTableColors[$key]['showPct']);
+                    $numValues = count($group['values']);
+                    $span = $includePct ? $numValues * 2 : $numValues;
+                    $isRedundant = ($gi === 0 || ($numValues === 1 && (trim((string)($group['values'][0]['label'] ?? '')) === '' || trim((string)($group['values'][0]['label'] ?? '')) === trim((string)($group['label'] ?? '')))));
+                    
+                    $cellStyle = ['gridSpan' => $span, 'bgColor' => $bgHex, 'valign' => 'center'];
+                    if ($isRedundant && !$includePct) {
+                        $cellStyle['vMerge'] = 'restart';
+                    }
+                    
+                    $cell = $countTbl->addCell(null, $cellStyle);
+                    $cell->addText((string) $group['label'], ['bold' => true, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
                 }
                 $countTbl->addRow();
                 foreach ($countTable['groups'] as $gi => $group) {
                     $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
+                    $includePct = !empty($countTableColors[$key]['showPct']);
+                    
                     foreach ($group['values'] as $v) {
                         $subLabel = $v['label'] !== '' ? $v['label'] : $group['label'];
                         $bgHex = $resolveCountColor($key, 2, $subLabel);
-                        $countTbl->addCell(['bgColor' => $bgHex])->addText((string) $subLabel, ['bold' => true]);
+                        
+                        $isRedundant = ($gi === 0 || (count($group['values']) === 1 && (trim((string)$v['label']) === '' || trim((string)$v['label']) === trim((string)$group['label']))));
+                        
+                        if ($includePct) {
+                            $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText($isRedundant ? 'Cantidad' : (string) $subLabel, ['bold' => true, 'size' => 8, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                            $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText('%', ['bold' => true, 'size' => 8, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                        } else {
+                            if ($isRedundant) {
+                                $countTbl->addCell(null, ['bgColor' => $bgHex, 'vMerge' => 'continue']);
+                            } else {
+                                $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText((string)$subLabel, ['bold' => true, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                            }
+                        }
                     }
                 }
                 $countTbl->addRow();
-                foreach ($countTable['groups'] as $group) {
+                foreach ($countTable['groups'] as $gi => $group) {
+                    $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
+                    $includePct = !empty($countTableColors[$key]['showPct']);
+                    $gTotal = array_sum(array_column($group['values'], 'count'));
+
                     foreach ($group['values'] as $v) {
                         $countTbl->addCell()->addText((string) $v['count'], ['color' => 'c00000']);
+                        if ($includePct) {
+                            $pct = $gTotal > 0 ? round(($v['count'] / $gTotal) * 100, 2) : 0;
+                            $countTbl->addCell()->addText($pct . '%', ['color' => 'c00000', 'size' => 8]);
+                        }
                     }
                 }
                 $section->addTextBreak(1);
@@ -214,8 +250,10 @@ class TemporaryModuleWordPdfService
 
             // Encabezados
             $table->addRow();
-            foreach ($columns as $col) {
-                $table->addCell($dynTwips)->addText((string) $col['label'], ['bold' => true]);
+            foreach ($columns as $idx => $col) {
+                // Determinar color de fondo para encabezados dinámicos
+                $bgIdx = $this->getColumnBgColor($col, $idx);
+                $table->addCell($dynTwips, ['bgColor' => $bgIdx, 'valign' => 'center'])->addText((string) $col['label'], ['bold' => true, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
             }
 
             // Filas
@@ -258,12 +296,15 @@ class TemporaryModuleWordPdfService
         $pdfFileName = $baseSlug.'_'.now()->format('Ymd_His').'.pdf';
         $fullPdfPath = $exportDir.'/'.$pdfFileName;
 
+        $fechaCorteStr = now()->format('d/m/Y H:i');
+
         $countTableColorKeys = $countTable !== null && isset($countTable['groups'])
             ? array_merge(['_total'], $countByFields)
             : [];
         $countTableColors = is_array($exportConfig['count_table_colors'] ?? null) ? $exportConfig['count_table_colors'] : [];
         $html = view('temporary_modules.admin.partials.export_pdf_table', [
             'title' => $title,
+            'fechaCorteStr' => $fechaCorteStr,
             'orientation' => $orientationConfig,
             'columns' => $columns,
             'entries' => $entries,
@@ -355,5 +396,15 @@ class TemporaryModuleWordPdfService
             'var(--clr-accent)' => 'c9a227',
         ];
         return $map[$color] ?? '861E34';
+    }
+
+    private function getColumnBgColor(array $col, int $idx): string
+    {
+        // En este servicio no siempre tenemos column_config_by_key, pero podemos buscar en el config de la columna
+        if (isset($col['color']) && is_string($col['color']) && $col['color'] !== '') {
+            return $this->cssColorToHex($col['color']);
+        }
+        // Default color institucional
+        return '861E34';
     }
 }

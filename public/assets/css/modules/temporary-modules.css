@@ -3144,7 +3144,8 @@ a.tm-paginator-btn:hover {
 
 .tm-export-preview-count-table {
     border-collapse: collapse;
-    width: 100%;
+    width: auto;
+    min-width: 0;
     font-size: 0.75rem;
     margin-bottom: 10px;
 }
@@ -3186,7 +3187,10 @@ a.tm-paginator-btn:hover {
 .tm-export-preview-table {
     display: table;
     border-collapse: collapse;
-    width: 100%;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    table-layout: fixed;
     font-size: 0.75rem;
 }
 
@@ -3196,9 +3200,13 @@ a.tm-paginator-btn:hover {
 
 .tm-export-preview-cell {
     display: table-cell;
-    padding: 6px 8px;
+    padding: 3px 5px;
     border: 1px solid var(--clr-border);
     vertical-align: middle;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    box-sizing: border-box;
 }
 
 .tm-export-preview-title-cell {
@@ -3210,7 +3218,9 @@ a.tm-paginator-btn:hover {
 .tm-export-preview-header-cell {
     color: #fff;
     font-weight: 600;
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-all;
+    line-height: 1.1;
 }
 
 .tm-export-preview-image-cell {
@@ -3230,6 +3240,7 @@ a.tm-paginator-btn:hover {
     font-size: 0.75rem;
     color: var(--clr-text-main);
     outline: none;
+    white-space: normal;
 }
 
 .tm-export-preview-data-cell[contenteditable="true"] {

@@ -14,6 +14,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -373,7 +374,9 @@ class TemporaryModuleExportService
             ->setOrientation($orientation === 'landscape'
                 ? PageSetup::ORIENTATION_LANDSCAPE
                 : PageSetup::ORIENTATION_PORTRAIT)
-            ->setPaperSize(PageSetup::PAPERSIZE_A4);
+            ->setPaperSize(PageSetup::PAPERSIZE_A4)
+            ->setFitToWidth(1)
+            ->setFitToHeight(0);
     }
 
     /**
@@ -564,16 +567,18 @@ class TemporaryModuleExportService
         $fixedHeaders = ['Ítem', 'Microrregión'];
         $numFixed = count($fixedHeaders);
         $fechaCorteStr = $fechaCorte->format('d/m/Y H:i');
-        $totalColumns = $numFixed + count($exportColumns);
-        $lastColumnLetter = Coordinate::stringFromColumnIndex($totalColumns);
+        $dataColumnsCount = $numFixed + count($exportColumns);
+        
         $titleRow = 1;
         $dateRow = 2;
-
         $includeCountTable = !empty($this->exportConfig['include_count_table']);
         $countByFields = $includeCountTable && is_array($this->exportConfig['count_by_fields'] ?? null)
             ? array_values(array_filter(array_map('strval', $this->exportConfig['count_by_fields'])))
             : [];
+        $countTableColors = is_array($this->exportConfig['count_table_colors'] ?? null) ? $this->exportConfig['count_table_colors'] : [];
         $countTableRows = 0;
+        $maxColIdx = $dataColumnsCount;
+
         if ($includeCountTable) {
             $entriesForCount = (clone $entriesQuery)->get(['id', 'data']);
             $fieldLabels = [];
@@ -588,111 +593,119 @@ class TemporaryModuleExportService
             $groupRow = 3;
             $valueRow = 4;
             $dataRow = 5;
-            foreach ($groups as $group) {
-                $span = count($group['values']);
+
+            // Primero: Escribir contenido y calcular ancho
+            foreach ($groups as $gi => $group) {
+                $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
+                $groupCfg = $countTableColors[$key] ?? [];
+                $includePct = !empty($groupCfg['showPct']);
+
+                $numValues = count($group['values']);
+                $span = $includePct ? $numValues * 2 : $numValues;
                 $startCol = $colIdx;
+                $isRedundant = ($numValues === 1 && (trim((string)($group['values'][0]['label'] ?? '')) === '' || trim((string)($group['values'][0]['label'] ?? '')) === trim((string)($group['label'] ?? '')))) || $key === '_total';
+                
                 $sheet->setCellValue(Coordinate::stringFromColumnIndex($startCol).$groupRow, $group['label']);
+                
                 if ($span > 1) {
                     $endCol = $startCol + $span - 1;
-                    $sheet->mergeCells(
-                        Coordinate::stringFromColumnIndex($startCol).$groupRow.':'.
-                        Coordinate::stringFromColumnIndex($endCol).$groupRow
-                    );
+                    $sheet->mergeCells(Coordinate::stringFromColumnIndex($startCol).$groupRow.':'.Coordinate::stringFromColumnIndex($endCol).$groupRow);
+                } elseif ($isRedundant && !$includePct) {
+                    $sheet->mergeCells(Coordinate::stringFromColumnIndex($startCol).$groupRow.':'.Coordinate::stringFromColumnIndex($startCol).$valueRow);
                 }
+
+                $gTotal = array_sum(array_column($group['values'], 'count'));
                 foreach ($group['values'] as $v) {
-                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$valueRow, $v['label'] !== '' ? $v['label'] : $group['label']);
-                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$dataRow, $v['count']);
-                    $colIdx++;
+                    $label = $v['label'] !== '' ? $v['label'] : $group['label'];
+                    if ($includePct) {
+                        $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$valueRow, $isRedundant ? 'Cantidad' : $label);
+                        $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx + 1).$valueRow, '%');
+                        $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$dataRow, $v['count']);
+                        $pct = $gTotal > 0 ? ($v['count'] / $gTotal) : 0;
+                        $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx + 1).$dataRow, $pct);
+                        $sheet->getStyle(Coordinate::stringFromColumnIndex($colIdx + 1).$dataRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE_00);
+                        $sheet->getStyle(Coordinate::stringFromColumnIndex($colIdx+1).$valueRow)->getFont()->setSize(8);
+                        $sheet->getStyle(Coordinate::stringFromColumnIndex($colIdx+1).$dataRow)->getFont()->setSize(8);
+                        $colIdx += 2;
+                    } else {
+                        if (!$isRedundant) {
+                            $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$valueRow, $label);
+                        }
+                        $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$dataRow, $v['count']);
+                        $colIdx++;
+                    }
                 }
             }
+            $maxColIdx = max($maxColIdx, $colIdx - 1);
             $countLastCol = $colIdx - 1;
             $countLastColLetter = Coordinate::stringFromColumnIndex($countLastCol);
+
+            // Estilos de la tabla de conteo
             $sheet->getStyle('A'.$groupRow.':'.$countLastColLetter.$dataRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
             $sheet->getStyle('A'.$groupRow.':'.$countLastColLetter.$groupRow)->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
             $sheet->getStyle('A'.$valueRow.':'.$countLastColLetter.$valueRow)->getFont()->setBold(true);
-            $sheet->getStyle('A'.$valueRow.':'.$countLastColLetter.$valueRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+            $sheet->getStyle('A'.$valueRow.':'.$countLastColLetter.$valueRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
             $sheet->getStyle('A'.$dataRow.':'.$countLastColLetter.$dataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
             $sheet->getStyle('A'.$dataRow.':'.$countLastColLetter.$dataRow)->getFont()->getColor()->setARGB('FFFF0000');
-            $countTableColors = is_array($this->exportConfig['count_table_colors'] ?? null) ? $this->exportConfig['count_table_colors'] : [];
+
+            // Colores personalizados del conteo
             $resolveCountColor = function (string $key, int $rowNum, ?string $valueLabel = null) use ($countTableColors): string {
                 $c = $countTableColors[$key] ?? null;
-                if (is_string($c) && $c !== '') {
-                    $argb = $this->mapCssColorToArgb($c);
-                    return $argb ?? ($rowNum === 1 ? self::HEADER_FILL_COLOR : 'FF2d5a27');
-                }
-                if (is_array($c)) {
-                    if ($rowNum === 1) {
-                        $css = $c['row1'] ?? '';
-                        $argb = $css !== '' ? $this->mapCssColorToArgb((string) $css) : null;
-                        return $argb ?? self::HEADER_FILL_COLOR;
-                    }
-                    if ($valueLabel !== null && isset($c['row2Values']) && is_array($c['row2Values'])) {
-                        $css = $c['row2Values'][$valueLabel] ?? $c['row2Values'][mb_strtolower($valueLabel)] ?? null;
-                        if ($css !== null && $css !== '') {
-                            $argb = $this->mapCssColorToArgb((string) $css);
-                            if ($argb !== null) {
-                                return $argb;
-                            }
-                        }
-                    }
-                    $css = $c['row2'] ?? '';
-                    $argb = $css !== '' ? $this->mapCssColorToArgb((string) $css) : null;
-                    return $argb ?? 'FF2d5a27';
-                }
-                return $rowNum === 1 ? self::HEADER_FILL_COLOR : 'FF2d5a27';
+                if (!is_array($c)) return $rowNum === 1 ? self::HEADER_FILL_COLOR : 'FF2d5a27';
+                if ($rowNum === 1) return $this->mapCssColorToArgb((string)($c['row1'] ?? '')) ?: self::HEADER_FILL_COLOR;
+                if ($valueLabel !== null && isset($c['row2Values'][$valueLabel])) return $this->mapCssColorToArgb((string)$c['row2Values'][$valueLabel]) ?: 'FF2d5a27';
+                return $this->mapCssColorToArgb((string)($c['row2'] ?? '')) ?: 'FF2d5a27';
             };
             $colIdx = 1;
             foreach ($groups as $gi => $group) {
                 $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
+                $includePct = !empty($countTableColors[$key]['showPct']);
                 $argb1 = $resolveCountColor($key, 1);
-                $span = count($group['values']);
-                $startCol = $colIdx;
-                $endCol = $colIdx + $span - 1;
-                $startLetter = Coordinate::stringFromColumnIndex($startCol);
-                $endLetter = Coordinate::stringFromColumnIndex($endCol);
-                $sheet->getStyle($startLetter.$groupRow.':'.$endLetter.$groupRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($argb1);
+                $span = $includePct ? count($group['values']) * 2 : count($group['values']);
+                $sheet->getStyle(Coordinate::stringFromColumnIndex($colIdx).$groupRow.':'.Coordinate::stringFromColumnIndex($colIdx+$span-1).$groupRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($argb1);
                 foreach ($group['values'] as $v) {
-                    $valueLabel = $v['label'] !== '' ? $v['label'] : $group['label'];
-                    $argb2 = $resolveCountColor($key, 2, $valueLabel);
-                    $letter = Coordinate::stringFromColumnIndex($colIdx);
-                    $sheet->getStyle($letter.$valueRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($argb2);
-                    $colIdx++;
+                    $vLabel = $v['label'] !== '' ? $v['label'] : $group['label'];
+                    $argb2 = $resolveCountColor($key, 2, $vLabel);
+                    $sheet->getStyle(Coordinate::stringFromColumnIndex($colIdx).$valueRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($argb2);
+                    if ($includePct) {
+                        $sheet->getStyle(Coordinate::stringFromColumnIndex($colIdx+1).$valueRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($argb2);
+                        $colIdx += 2;
+                    } else { $colIdx++; }
                 }
             }
             $countTableRows = 4;
         }
 
-        $headerStartRow = 3 + $countTableRows;
-        if ($includeCountTable) {
-            $desgloseRow = 3 + 3;
-            $sheet->setCellValue('A'.$desgloseRow, 'Desglose');
-            $sheet->mergeCells('A'.$desgloseRow.':'.$lastColumnLetter.$desgloseRow);
-            $sheet->getStyle('A'.$desgloseRow)->getFont()->setBold(true);
-        }
-
-        // Título (letra grande) usando configuración si existe
-        $configuredTitle = null;
-        if (is_array($this->exportConfig) && isset($this->exportConfig['title'])) {
-            $configuredTitle = trim((string) $this->exportConfig['title']);
-        }
-        $titleText = $configuredTitle !== '' ? $configuredTitle : (string) $temporaryModule->name;
+        $lastColumnLetter = Coordinate::stringFromColumnIndex($maxColIdx);
+        
+        // Título y Fecha con el ancho máximo real
+        $titleText = !empty($this->exportConfig['title']) ? (string)$this->exportConfig['title'] : (string)$temporaryModule->name;
         $sheet->setCellValue('A'.$titleRow, $titleText);
         $sheet->mergeCells('A'.$titleRow.':'.$lastColumnLetter.$titleRow);
         $sheet->getStyle('A'.$titleRow)->getFont()->setSize(16)->setBold(true);
+        
         $titleAlign = Alignment::HORIZONTAL_CENTER;
         if (is_array($this->exportConfig) && isset($this->exportConfig['title_align'])) {
             $alignCfg = (string) $this->exportConfig['title_align'];
-            if ($alignCfg === 'left') {
-                $titleAlign = Alignment::HORIZONTAL_LEFT;
-            } elseif ($alignCfg === 'right') {
-                $titleAlign = Alignment::HORIZONTAL_RIGHT;
-            }
+            if ($alignCfg === 'left') $titleAlign = Alignment::HORIZONTAL_LEFT;
+            elseif ($alignCfg === 'right') $titleAlign = Alignment::HORIZONTAL_RIGHT;
         }
         $sheet->getStyle('A'.$titleRow)->getAlignment()->setHorizontal($titleAlign)->setVertical(Alignment::VERTICAL_CENTER);
 
-        // Fecha y hora de corte a la derecha, parte inferior del bloque título
-        $sheet->setCellValue($lastColumnLetter.$dateRow, 'Fecha y hora de corte: '.$fechaCorteStr);
-        $sheet->getStyle($lastColumnLetter.$dateRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT)->setVertical(Alignment::VERTICAL_TOP);
+        // Fecha y hora de corte
+        $sheet->setCellValue('A'.$dateRow, 'Fecha y hora de corte: ' . $fechaCorteStr);
+        $sheet->mergeCells('A'.$dateRow.':'.$lastColumnLetter.$dateRow);
+        $sheet->getStyle('A'.$dateRow)->getFont()->setSize(10);
+        $sheet->getStyle('A'.$dateRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT)->setVertical(Alignment::VERTICAL_TOP);
+
+        $headerStartRow = 3 + $countTableRows;
+        if ($includeCountTable) {
+            $desgloseRow = 3 + $countTableRows;
+            $sheet->setCellValue('A'.$desgloseRow, 'Desglose');
+            $sheet->mergeCells('A'.$desgloseRow.':'.$lastColumnLetter.$desgloseRow);
+            $sheet->getStyle('A'.$desgloseRow)->getFont()->setBold(true);
+            $headerStartRow++;
+        }
 
         if ($hasSections) {
             $r1 = $headerStartRow;
@@ -757,7 +770,7 @@ class TemporaryModuleExportService
         $sheet->getStyle($headerRange)
             ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::HEADER_FILL_COLOR);
         $sheet->getStyle($headerRange)
-            ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+            ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true)->setShrinkToFit(true);
 
         // Aplicar colores por columna según configuración (solo encabezados)
         if (!empty($this->columnConfigByKey)) {
@@ -853,7 +866,11 @@ class TemporaryModuleExportService
                                         }
                                         $drawing->setHeight($height);
                                         $drawing->setWorksheet($sheet);
-                                        $sheet->getRowDimension($rowIndex)->setRowHeight($height);
+                                        // Asegurar que el alto de la fila sea suficiente para la imagen más alta en ella
+                                        $currentRowHeight = (float) $sheet->getRowDimension($rowIndex)->getRowHeight();
+                                        if ($height > $currentRowHeight || $currentRowHeight < 0) {
+                                            $sheet->getRowDimension($rowIndex)->setRowHeight($height + 4);
+                                        }
                                     } else {
                                         $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
                                     }
@@ -900,25 +917,35 @@ class TemporaryModuleExportService
         // Celdas de datos se mantienen con color de fondo por defecto (blanco),
         // solo los encabezados se colorean por columna.
 
-        for ($colIdx = 1; $colIdx <= $totalColumns; $colIdx++) {
+        for ($colIdx = 1; $colIdx <= $maxColIdx; $colIdx++) {
             $columnLetter = Coordinate::stringFromColumnIndex($colIdx);
+            
+            $cfgWidth = null;
+            $fieldKey = null;
+
             if ($colIdx === 1) {
-                $sheet->getColumnDimension($columnLetter)->setWidth(6);
+                $fieldKey = 'item';
+                $defaultWidth = 4;
             } elseif ($colIdx === 2) {
-                $sheet->getColumnDimension($columnLetter)->setWidth(22);
+                $fieldKey = 'microrregion';
+                $defaultWidth = 18;
             } else {
-                $cfgWidth = null;
                 $exportColIndex = $colIdx - 3;
                 if (isset($exportColumns[$exportColIndex])) {
                     $fieldKey = (string) $exportColumns[$exportColIndex]['field']->key;
-                    $colCfg = $this->columnConfigByKey[$fieldKey] ?? null;
-                    if (is_array($colCfg) && isset($colCfg['max_width_chars']) && is_numeric($colCfg['max_width_chars'])) {
-                        $chars = (int) $colCfg['max_width_chars'];
-                        $cfgWidth = max(8, min($chars + 2, 60));
-                    }
                 }
-                $sheet->getColumnDimension($columnLetter)->setWidth($cfgWidth ?? 32);
+                $defaultWidth = 20;
             }
+
+            if ($fieldKey) {
+                $colCfg = $this->columnConfigByKey[$fieldKey] ?? null;
+                if (is_array($colCfg) && isset($colCfg['max_width_chars']) && is_numeric($colCfg['max_width_chars'])) {
+                    $chars = (int) $colCfg['max_width_chars'];
+                    $cfgWidth = max(4, min($chars + 2, 50));
+                }
+            }
+
+            $sheet->getColumnDimension($columnLetter)->setWidth($cfgWidth ?? $defaultWidth);
         }
     }
 

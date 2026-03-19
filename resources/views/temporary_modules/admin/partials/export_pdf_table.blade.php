@@ -47,7 +47,12 @@
     </style>
 </head>
 <body>
-<h1>{{ $title }}</h1>
+<body>
+<h1 style="margin-bottom: 2px;">{{ $title }}</h1>
+@if(isset($fechaCorteStr))
+    <p style="text-align: right; margin: 0 0 10px 0; font-size: 10px;">Fecha y hora de corte: {{ $fechaCorteStr }}</p>
+@endif
+
 @if(!empty($countTable) && isset($countTable['groups']))
 @php
     $countTableColorKeys = $countTableColorKeys ?? [];
@@ -56,7 +61,7 @@
     $resolveCss = function ($css) use ($vars) {
         return isset($vars[$css]) ? $vars[$css] : (str_starts_with($css ?? '', '#') ? $css : '#861E34');
     };
-    $countTableResolveColor = function ($index, $rowNum, $valueLabel = null) use ($countTableColorKeys, $countTableColors, $vars, $resolveCss) {
+    $countTableResolveColor = function ($index, $rowNum, $valueLabel = null) use ($countTableColorKeys, $countTableColors, $resolveCss) {
         $key = $countTableColorKeys[$index] ?? null;
         if ($key === null) return $rowNum === 1 ? '#861E34' : '#2d5a27';
         $c = $countTableColors[$key] ?? null;
@@ -77,23 +82,51 @@
     <thead>
     <tr>
         @foreach ($countTable['groups'] as $gi => $group)
-            <th colspan="{{ count($group['values']) }}" style="background-color: {{ $countTableResolveColor($gi, 1) }};">{{ $group['label'] }}</th>
+            @php
+                $key = $countTableColorKeys[$gi] ?? '';
+                $includePct = !empty($countTableColors[$key]['showPct']);
+                $numValues = count($group['values']);
+                $span = $includePct ? $numValues * 2 : $numValues;
+                $isRedundant = ($gi === 0 || ($numValues === 1 && (trim((string)($group['values'][0]['label'] ?? '')) === '' || trim((string)($group['values'][0]['label'] ?? '')) === trim((string)($group['label'] ?? '')))));
+            @endphp
+            <th colspan="{{ $span }}" @if($isRedundant && !$includePct) rowspan="2" @endif style="background-color: {{ $countTableResolveColor($gi, 1) }}; color: #fff;">{{ $group['label'] }}</th>
         @endforeach
     </tr>
     <tr>
         @foreach ($countTable['groups'] as $gi => $group)
+            @php 
+                $key = $countTableColorKeys[$gi] ?? '';
+                $includePct = !empty($countTableColors[$key]['showPct']);
+                $numValues = count($group['values']);
+                $isRedundant = ($gi === 0 || ($numValues === 1 && (trim((string)($group['values'][0]['label'] ?? '')) === '' || trim((string)($group['values'][0]['label'] ?? '')) === trim((string)($group['label'] ?? '')))));
+            @endphp
             @foreach ($group['values'] as $v)
                 @php $subLabel = $v['label'] !== '' ? $v['label'] : $group['label']; @endphp
-                <th style="background-color: {{ $countTableResolveColor($gi, 2, $subLabel) }};">{{ $subLabel }}</th>
+                @if($isRedundant && !$includePct)
+                    @continue
+                @endif
+                <th @if($includePct) colspan="2" @endif style="background-color: {{ $countTableResolveColor($gi, 2, $subLabel) }}; color: #fff;">
+                    {{ $isRedundant && $includePct ? 'Cantidad' : $subLabel }}
+                </th>
             @endforeach
         @endforeach
     </tr>
     </thead>
     <tbody>
     <tr>
-        @foreach ($countTable['groups'] as $group)
+        @foreach ($countTable['groups'] as $gi => $group)
+            @php
+                $key = $countTableColorKeys[$gi] ?? '';
+                $includePct = !empty($countTableColors[$key]['showPct']);
+                $gTotal = array_sum(array_column($group['values'], 'count'));
+            @endphp
             @foreach ($group['values'] as $v)
                 <td>{{ $v['count'] }}</td>
+                @if($includePct)
+                    <td style="font-size: 9px; color: #666;">
+                        {{ $gTotal > 0 ? round(($v['count'] / $gTotal) * 100, 2) : 0 }}%
+                    </td>
+                @endif
             @endforeach
         @endforeach
     </tr>
@@ -101,11 +134,14 @@
 </table>
 <p style="font-weight: bold; margin: 8px 0 4px 0;">Desglose</p>
 @endif
-<table>
+<table style="table-layout: auto;">
     <thead>
     <tr>
-        @foreach ($columns as $col)
-            <th>{{ $col['label'] }}</th>
+        @foreach ($columns as $idx => $col)
+            @php
+                $bg = !empty($col['color']) ? $resolveCss($col['color']) : '#861E34';
+            @endphp
+            <th style="background-color: {{ $bg }}; color: #fff; text-align: center; vertical-align: middle;">{{ $col['label'] }}</th>
         @endforeach
     </tr>
     </thead>
