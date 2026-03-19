@@ -28,10 +28,16 @@ class TemporaryModuleWordPdfService
             : [];
             
         // Si no hay configuracion de columnas, tomar todas como es el caso por defecto.
+        $dbFieldLabels = $temporaryModule->fields->pluck('label', 'key')->all();
+
         if ($columnsCfg === []) {
              $cols = [];
              foreach ($temporaryModule->fields as $field) {
-                 $cols[] = ['key' => $field->key, 'label' => (string) ($field->label ?? $field->key)];
+                 $cols[] = [
+                     'key' => $field->key, 
+                     'label' => (string) ($field->label ?? $field->key),
+                     'color' => ''
+                 ];
              }
              if(count($cols) > 0) {
                  $columnsCfg = $cols;
@@ -47,9 +53,17 @@ class TemporaryModuleWordPdfService
             if ($key === '') {
                 continue;
             }
+            
+            // Preferir etiqueta del config si no es el mismo key y no está vacía, 
+            // de lo contrario usar la de la DB.
+            $label = (string) ($col['label'] ?? '');
+            if ($label === '' || $label === $key) {
+                $label = $dbFieldLabels[$key] ?? $key;
+            }
+
             $columnMap[$key] = [
                 'key' => $key,
-                'label' => (string) ($col['label'] ?? $key),
+                'label' => $label,
                 'color' => (string) ($col['color'] ?? ''),
             ];
         }

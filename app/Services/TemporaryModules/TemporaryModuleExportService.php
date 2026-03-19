@@ -403,7 +403,12 @@ class TemporaryModuleExportService
             }
             $key = (string) $cfgCol['key'];
             if (isset($byKey[$key])) {
-                $ordered[] = $byKey[$key];
+                $col = $byKey[$key];
+                $label = (string) ($cfgCol['label'] ?? '');
+                if ($label !== '' && $label !== $key) {
+                    $col['header2'] = $label;
+                }
+                $ordered[] = $col;
             }
         }
 
