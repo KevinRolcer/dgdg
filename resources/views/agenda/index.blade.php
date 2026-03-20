@@ -27,6 +27,9 @@
         <article class="agenda-card agenda-card-in-shell">
             <div class="agenda-head agenda-head-actions-only">
                 <div class="agenda-head-actions">
+                <a href="{{ route('agenda.calendar', array_filter(['clasificacion' => $clasificacion, 'buscar' => $buscar])) }}" class="agenda-btn agenda-btn-secondary" title="Ver el mes en calendario, lista o fichas">
+                    <i class="fa-solid fa-calendar-days" aria-hidden="true"></i> Vista calendario
+                </a>
                 @if(!empty($puedeAsignarModuloAgenda))
                 <button type="button" class="agenda-btn agenda-btn-secondary" onclick="openAgendaModuloModal()" title="Dar acceso a Agenda Directiva a Enlaces">
                     <i class="fa-solid fa-user-check"></i> Asignar módulo

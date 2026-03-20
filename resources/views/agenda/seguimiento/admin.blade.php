@@ -1,8 +1,8 @@
 @extends('layouts.app')
 
-@section('title', 'Asignaciones de agenda')
+@section('title', 'Asignaciones de Agenda')
 @php
-    $pageTitle = 'Asignaciones de agenda';
+    $pageTitle = 'Asignaciones de Agenda';
     $hidePageHeader = true;
 @endphp
 
@@ -16,7 +16,7 @@
 <section class="agenda-seg-page agenda-shell app-density-compact">
     <div class="agenda-shell-main">
         <header class="agenda-shell-head">
-            <h1 class="agenda-shell-title">Asignaciones de agenda</h1>
+            <h1 class="agenda-shell-title">Asignaciones de Agenda</h1>
             <p class="agenda-shell-desc">Vista por usuario: qué actividades tiene asignadas cada quien y cómo les dan seguimiento.</p>
         </header>
 

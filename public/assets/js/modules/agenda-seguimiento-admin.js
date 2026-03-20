@@ -273,4 +273,3 @@ document.addEventListener('DOMContentLoaded', function () {
     applyFilter();
     renderWeek();
 });
-</script>

@@ -181,6 +181,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware(['agenda.access'])->group(function () {
         Route::get('agenda/modulo/enlaces', [AgendaController::class, 'moduloEnlaces'])->name('agenda.modulo.enlaces');
         Route::get('agenda/seguimiento', [\App\Http\Controllers\AgendaSeguimientoController::class, 'index'])->name('agenda.seguimiento.index');
+        Route::get('agenda/calendario', [AgendaController::class, 'calendar'])->name('agenda.calendar');
         Route::get('agenda', [AgendaController::class, 'index'])->name('agenda.index');
         Route::get('agenda/{agenda}', [AgendaController::class, 'show'])->name('agenda.show');
     });

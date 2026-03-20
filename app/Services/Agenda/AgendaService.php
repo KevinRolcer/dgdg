@@ -24,7 +24,7 @@ class AgendaService
     public function paginateAgendas(array $filters, ?User $viewer = null): LengthAwarePaginator
     {
         $clasificacion = $filters['clasificacion'] ?? '';
-        if (!in_array($clasificacion, ['', 'gira', 'pre_gira', 'agenda'], true)) {
+        if (! in_array($clasificacion, ['', 'gira', 'pre_gira', 'agenda'], true)) {
             $clasificacion = '';
         }
         $buscar = trim((string) ($filters['buscar'] ?? ''));
@@ -51,7 +51,7 @@ class AgendaService
         }
 
         if ($buscar !== '') {
-            $term = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $buscar) . '%';
+            $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $buscar).'%';
             $query->where(function ($q) use ($term) {
                 $q->where('asunto', 'like', $term)
                     ->orWhere('descripcion', 'like', $term);
@@ -138,7 +138,7 @@ class AgendaService
     {
         Permission::findOrCreate(self::PERMISO_AGENDA_DIRECTIVA, 'web');
         $user = User::findOrFail($userId);
-        if (!$user->hasRole('Enlace')) {
+        if (! $user->hasRole('Enlace')) {
             return [
                 'ok' => false,
                 'message' => 'Solo se puede asignar a usuarios con rol Enlace.',
@@ -174,19 +174,20 @@ class AgendaService
             ]);
             // Si es gira/pre-gira, agregar delegado encargado a la descripción
             if (($datos['tipo'] ?? null) === 'gira' && $request->filled('delegado_encargado')) {
-                $desc = trim((string)($datos['descripcion'] ?? ''));
-                $delegadoTexto = 'Delegad@ encargado: ' . $request->input('delegado_encargado');
+                $desc = trim((string) ($datos['descripcion'] ?? ''));
+                $delegadoTexto = 'Delegad@ encargado: '.$request->input('delegado_encargado');
                 if (stripos($desc, $delegadoTexto) === false) {
-                    $desc = ($desc ? $desc . "\n" : '') . $delegadoTexto;
+                    $desc = ($desc ? $desc."\n" : '').$delegadoTexto;
                 }
                 $datos['descripcion'] = $desc;
             }
             $agenda = Agenda::create($datos);
-            if (!empty($validated['usuarios_asignados'])) {
+            if (! empty($validated['usuarios_asignados'])) {
                 $agenda->usuariosAsignados()->sync($validated['usuarios_asignados']);
             }
             $agenda->load('usuariosAsignados');
             $this->sincronizarPermisoSeguimientoAsignados($agenda);
+
             return $agenda;
         });
     }
@@ -206,10 +207,10 @@ class AgendaService
             ]);
             // Si es gira/pre-gira, agregar delegado encargado a la descripción
             if (($datos['tipo'] ?? null) === 'gira' && $request->filled('delegado_encargado')) {
-                $desc = trim((string)($datos['descripcion'] ?? ''));
-                $delegadoTexto = 'Delegad@ encargado: ' . $request->input('delegado_encargado');
+                $desc = trim((string) ($datos['descripcion'] ?? ''));
+                $delegadoTexto = 'Delegad@ encargado: '.$request->input('delegado_encargado');
                 if (stripos($desc, $delegadoTexto) === false) {
-                    $desc = ($desc ? $desc . "\n" : '') . $delegadoTexto;
+                    $desc = ($desc ? $desc."\n" : '').$delegadoTexto;
                 }
                 $datos['descripcion'] = $desc;
             }
@@ -225,7 +226,7 @@ class AgendaService
      */
     public function usuarioVeSoloSusAsignaciones(?User $user): bool
     {
-        if (!$user) {
+        if (! $user) {
             return false;
         }
         if ($user->can('Modulos-Temporales-Admin') || $user->can(self::PERMISO_AGENDA_DIRECTIVA)) {
@@ -240,14 +241,32 @@ class AgendaService
         return $user && ($user->can('Modulos-Temporales-Admin') || $user->can(self::PERMISO_AGENDA_DIRECTIVA));
     }
 
+    /**
+     * Puede ver el detalle de un ítem (listado completo o asignado a él).
+     */
+    public function puedeVerAgenda(?User $viewer, Agenda $agenda): bool
+    {
+        if (! $viewer) {
+            return false;
+        }
+        if ($this->puedeEditarAgendaCompleta($viewer)) {
+            return true;
+        }
+        if ($this->usuarioVeSoloSusAsignaciones($viewer)) {
+            return $agenda->usuariosAsignados->contains('id', $viewer->id);
+        }
+
+        return true;
+    }
+
     public function sincronizarPermisoSeguimientoAsignados(?Agenda $agenda): void
     {
-        if (!$agenda) {
+        if (! $agenda) {
             return;
         }
         Permission::findOrCreate(self::PERMISO_AGENDA_SEGUIMIENTO, 'web');
         foreach ($agenda->usuariosAsignados as $u) {
-            if (!$u->can(self::PERMISO_AGENDA_SEGUIMIENTO)) {
+            if (! $u->can(self::PERMISO_AGENDA_SEGUIMIENTO)) {
                 $u->givePermissionTo(self::PERMISO_AGENDA_SEGUIMIENTO);
             }
         }

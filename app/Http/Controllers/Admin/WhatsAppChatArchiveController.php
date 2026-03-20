@@ -8,6 +8,7 @@ use App\Models\WhatsAppChatArchive;
 use App\Services\WhatsApp\WhatsAppChatEncryptionService;
 use App\Services\WhatsApp\WhatsAppChatPathNormalizer;
 use App\Services\WhatsApp\WhatsAppTotpService;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -267,6 +268,14 @@ class WhatsAppChatArchiveController extends Controller
             return $msg;
         })->values();
 
+        $txtMessages = $txtMessages->map(function (array $msg) {
+            $msg['datetime_ts'] = $this->parseMessageDatetimeToTimestamp((string) ($msg['datetime_raw'] ?? ''));
+
+            return $msg;
+        });
+
+        $waPreviewMode = $txtMessages->isNotEmpty() ? 'txt' : 'html';
+
         $this->audit($request, $chat->id, 'view');
 
         return view('admin.whatsapp-chats.show', [
@@ -277,6 +286,7 @@ class WhatsAppChatArchiveController extends Controller
             'activePartIndex' => 0,
             'txtPartPath' => $txtPartPath,
             'txtMessages' => $txtMessages,
+            'waPreviewMode' => $waPreviewMode,
         ]);
     }
 
@@ -617,6 +627,23 @@ class WhatsAppChatArchiveController extends Controller
         $name = mb_strtolower($filename);
 
         return str_contains($name, '-sticker-') || str_ends_with($name, '.webp');
+    }
+
+    /**
+     * Intento de parsear la marca de tiempo del export TXT (WhatsApp) para filtros por fecha.
+     */
+    private function parseMessageDatetimeToTimestamp(string $raw): ?int
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($raw)->timestamp;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function guessMimeFromPath(string $relativePath): string

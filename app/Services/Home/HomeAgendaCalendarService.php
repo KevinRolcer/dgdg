@@ -5,6 +5,7 @@ namespace App\Services\Home;
 use App\Models\Agenda;
 use App\Models\User;
 use Carbon\Carbon;
+
 /**
  * Eventos de Agenda Directiva visibles en inicio: asignados al usuario o creados por él.
  */
@@ -24,7 +25,7 @@ class HomeAgendaCalendarService
      */
     public function calendarDataForUser(?User $user): array
     {
-        if (!$user) {
+        if (! $user) {
             return ['agendaDays' => [], 'upcomingEvents' => [], 'pastEvents' => []];
         }
 
@@ -47,7 +48,7 @@ class HomeAgendaCalendarService
         $occurrences = [];
 
         foreach ($agendas as $agenda) {
-            if (!$agenda->fecha_inicio) {
+            if (! $agenda->fecha_inicio) {
                 continue;
             }
             try {
@@ -60,7 +61,7 @@ class HomeAgendaCalendarService
                 $title = $this->displayTitle($agenda);
                 $time = $occ['time_label'];
 
-                if (!isset($byDay[$dayKey])) {
+                if (! isset($byDay[$dayKey])) {
                     $byDay[$dayKey] = [];
                 }
                 $byDay[$dayKey][] = ['title' => $title, 'time' => $time];
@@ -77,7 +78,7 @@ class HomeAgendaCalendarService
             $seen = [];
             $uniq = [];
             foreach ($items as $item) {
-                $sig = $item['title'] . "\0" . $item['time'];
+                $sig = $item['title']."\0".$item['time'];
                 if (isset($seen[$sig])) {
                     continue;
                 }
@@ -95,14 +96,14 @@ class HomeAgendaCalendarService
         });
 
         $upcoming = array_values(array_filter($occurrences, function ($o) use ($now) {
-            if (!($o['starts_at'] instanceof Carbon)) {
+            if (! ($o['starts_at'] instanceof Carbon)) {
                 return false;
             }
 
             return $o['starts_at']->gte($now);
         }));
         $past = array_values(array_filter($occurrences, function ($o) use ($now) {
-            if (!($o['starts_at'] instanceof Carbon)) {
+            if (! ($o['starts_at'] instanceof Carbon)) {
                 return false;
             }
 
@@ -123,13 +124,35 @@ class HomeAgendaCalendarService
         ];
     }
 
-    private function displayTitle(Agenda $agenda): string
+    /**
+     * Ocurrencias de un evento que caen dentro del mes indicado (misma lógica que el calendario de inicio).
+     *
+     * @return list<array{date: \Carbon\Carbon, starts_at: \Carbon\Carbon, ends_at: \Carbon\Carbon, time_label: string}>
+     */
+    public function occurrencesInCalendarMonth(Agenda $agenda, int $year, int $month): array
+    {
+        $tz = config('app.timezone', 'UTC');
+        $monthStart = Carbon::create($year, $month, 1, 0, 0, 0, $tz)->startOfMonth();
+        $monthEnd = $monthStart->copy()->endOfMonth();
+        $all = $this->expandOccurrences($agenda, $tz);
+        $out = [];
+        foreach ($all as $occ) {
+            $d = $occ['date'];
+            if ($d->gte($monthStart) && $d->lte($monthEnd)) {
+                $out[] = $occ;
+            }
+        }
+
+        return $out;
+    }
+
+    public function displayTitle(Agenda $agenda): string
     {
         $asunto = trim((string) ($agenda->asunto ?? ''));
         if ($agenda->tipo === 'gira') {
             $pre = (strtolower((string) ($agenda->subtipo ?? '')) === 'pre-gira') ? 'Pre-gira — ' : 'Gira — ';
 
-            return $pre . ($asunto !== '' ? $asunto : 'Sin título');
+            return $pre.($asunto !== '' ? $asunto : 'Sin título');
         }
 
         return $asunto !== '' ? $asunto : 'Asunto';
@@ -141,7 +164,7 @@ class HomeAgendaCalendarService
     private function expandOccurrences(Agenda $agenda, string $tz): array
     {
         $fechaInicio = $agenda->fecha_inicio;
-        if (!$fechaInicio instanceof Carbon) {
+        if (! $fechaInicio instanceof Carbon) {
             $fechaInicio = Carbon::parse($fechaInicio, $tz);
         }
         $start = $fechaInicio->copy()->timezone($tz)->startOfDay();
@@ -157,13 +180,13 @@ class HomeAgendaCalendarService
 
         $timeLabel = 'Todo el día';
         $hour = null;
-        if ($agenda->habilitar_hora && !empty($agenda->hora)) {
+        if ($agenda->habilitar_hora && ! empty($agenda->hora)) {
             $h = trim((string) $agenda->hora);
             if (substr_count($h, ':') === 1) {
                 $h .= ':00';
             }
             try {
-                $hour = Carbon::parse('2000-01-01 ' . $h, $tz)->format('H:i');
+                $hour = Carbon::parse('2000-01-01 '.$h, $tz)->format('H:i');
                 $timeLabel = $hour;
             } catch (\Throwable) {
                 $hour = null;
@@ -193,14 +216,14 @@ class HomeAgendaCalendarService
                         }
                     }
                 }
-                if (!$match) {
+                if (! $match) {
                     continue;
                 }
             }
 
             $day = $d->copy();
             if ($hour !== null) {
-                $startsAt = Carbon::parse($day->format('Y-m-d') . ' ' . $hour . ':00', $tz);
+                $startsAt = Carbon::parse($day->format('Y-m-d').' '.$hour.':00', $tz);
                 $endsAt = $startsAt->copy()->addHour();
             } else {
                 $startsAt = $day->copy()->startOfDay();

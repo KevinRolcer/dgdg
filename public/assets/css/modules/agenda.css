@@ -364,6 +364,13 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     animation: fadeIn 0.4s ease-out;
 }
 
+/* .agenda-page viene después en la cascada y pisa .agenda-shell { display:flex }; sin esto el shell queda en grid y el ancho puede colapsar al contenido al actualizar por AJAX. */
+.agenda-page.agenda-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
 .agenda-page:not(.agenda-shell) {
     padding: 0 1rem 1.5rem;
 }
