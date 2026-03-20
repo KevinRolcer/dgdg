@@ -235,6 +235,30 @@ class TemporaryModuleExportService
             $style->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
             $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::HEADER_FILL_COLOR);
 
+            // Placeholder content in first data row
+            $placeholder = '';
+            $type = (string) $field->type;
+            if ($type === 'select') {
+                $opts = is_array($field->options) ? $field->options : [];
+                $placeholder = '('.implode(', ', $opts).')';
+            } elseif ($type === 'image' || $type === 'file') {
+                $comment = trim((string) ($field->comment ?? ''));
+                $placeholder = $comment !== '' ? $comment : '';
+            } elseif ($type === 'geopoint') {
+                $placeholder = '(Enlace de google maps)';
+            } elseif ($type === 'boolean') {
+                $placeholder = '(Sí / No)';
+            } elseif ($type === 'date') {
+                $placeholder = '(AAAA-MM-DD)';
+            } elseif ($type === 'datetime') {
+                $placeholder = '(AAAA-MM-DD HH:MM)';
+            }
+
+            if ($placeholder !== '') {
+                $sheet->setCellValue($letter.'2', $placeholder);
+                $sheet->getStyle($letter.'2')->getFont()->setItalic(true)->getColor()->setARGB('FF777777');
+            }
+
             $sheet->getColumnDimension($letter)->setAutoSize(true);
             $col++;
         }
