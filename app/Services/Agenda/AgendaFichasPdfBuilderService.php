@@ -2,6 +2,7 @@
 
 namespace App\Services\Agenda;
 
+use App\Models\Agenda;
 use App\Models\User;
 use Carbon\Carbon;
 use Dompdf\Dompdf;
@@ -69,12 +70,23 @@ class AgendaFichasPdfBuilderService
             return in_array($k, $allowedKinds, true);
         }));
 
-        $orientation = $params['orientation'] === 'landscape' ? 'landscape' : 'portrait';
-        $cols = $orientation === 'landscape' ? 3 : 2;
+        $template = $params['template'] ?? 'summary';
+        $view = $template === 'individual' ? 'agenda.pdf.ficha-individual' : 'agenda.pdf.fichas-calendario';
+
+        // Individual cards are always portrait, summary can be either
+        $orientation = $template === 'individual' ? 'portrait' : ($params['orientation'] === 'landscape' ? 'landscape' : 'portrait');
+        $cols = ($template === 'individual') ? 1 : ($orientation === 'landscape' ? 3 : 2);
 
         $rows = [];
-        for ($i = 0, $n = count($cards); $i < $n; $i += $cols) {
-            $rows[] = array_slice($cards, $i, $cols);
+        if ($template === 'individual') {
+            // Un card por "fila" (página)
+            foreach ($cards as $card) {
+                $rows[] = [$card];
+            }
+        } else {
+            for ($i = 0, $n = count($cards); $i < $n; $i += $cols) {
+                $rows[] = array_slice($cards, $i, $cols);
+            }
         }
 
         $monthLabel = $this->fichasPdfPeriodLabel(
@@ -101,7 +113,7 @@ class AgendaFichasPdfBuilderService
         $pdfFontFamily = $this->registerDompdfAgendaFichasFonts($pdf->getDomPDF());
 
         $binary = $pdf
-            ->loadView('agenda.pdf.fichas-calendario', [
+            ->loadView($view, [
                 'documentTitle' => $documentTitle,
                 'rows' => $rows,
                 'cols' => $cols,
@@ -111,6 +123,35 @@ class AgendaFichasPdfBuilderService
             ->setPaper('a4', $orientation)
             ->output();
 
+        File::put($absolutePath, $binary);
+    }
+
+    public function renderSingleFichaPdfBinary(User $user, Agenda $agenda): string
+    {
+        $card = $this->agendaDirectivaCalendar->buildSingleFichaCardForAgenda($agenda);
+        $rows = [[$card]];
+        $documentTitle = 'Ficha de agenda - '.$card['title'];
+
+        /** @var \Barryvdh\DomPDF\PDF $pdf */
+        $pdf = app('dompdf.wrapper');
+        $pdf->getDomPDF()->setBasePath(public_path());
+        
+        // Registrar fuentes institucionales (Gilroy, etc.) para que coincida con el export masivo
+        $pdfFontFamily = $this->registerDompdfAgendaFichasFonts($pdf->getDomPDF());
+
+        return $pdf
+            ->loadView('agenda.pdf.ficha-individual', [
+                'documentTitle' => $documentTitle,
+                'rows' => $rows,
+                'pdfFontFamily' => $pdfFontFamily,
+            ])
+            ->setPaper('a4', 'portrait')
+            ->output();
+    }
+
+    public function renderSingleFichaToFile(User $user, Agenda $agenda, string $absolutePath): void
+    {
+        $binary = $this->renderSingleFichaPdfBinary($user, $agenda);
         File::put($absolutePath, $binary);
     }
 
@@ -149,6 +190,7 @@ class AgendaFichasPdfBuilderService
             'kind_gira' => filter_var($params['kind_gira'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'kind_pre_gira' => filter_var($params['kind_pre_gira'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'kind_agenda' => filter_var($params['kind_agenda'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'template' => (string) ($params['template'] ?? 'summary'),
         ];
     }
 
@@ -204,23 +246,26 @@ class AgendaFichasPdfBuilderService
             800 => 'Gilroy-ExtraBold',
         ];
 
+        $gilroyTtfFiles = [];
+        foreach ($gilroyWeights as $weight => $base) {
+            $gilroyTtfFiles[$weight] = $base.'.ttf';
+        }
+        // En preview web solo existen pesos 400..800; 900 se resuelve como 800.
+        // Registrar primero TTF mantiene el mismo trazo en vista previa y PDF.
+        $gilroyTtfFiles[900] = 'Gilroy-ExtraBold.ttf';
+        if ($this->registerDompdfFontFamily($fm, 'Gilroy', $agendaPdfDir, $gilroyTtfFiles)) {
+            return 'Gilroy';
+        }
+
         if ($this->registerDompdfFontFamily($fm, 'Gilroy', $gilroyOtfDir, [
             400 => 'Gilroy-Regular.otf',
             500 => 'Gilroy-Medium.otf',
             600 => 'Gilroy-SemiBold.otf',
             700 => 'Gilroy-Bold.otf',
             800 => 'Gilroy-ExtraBold.otf',
-            900 => 'Gilroy-Black.otf',
+            // Mantener 900 en ExtraBold para que coincida con preview (sin Black).
+            900 => 'Gilroy-ExtraBold.otf',
         ])) {
-            return 'Gilroy';
-        }
-
-        $gilroyTtfFiles = [];
-        foreach ($gilroyWeights as $weight => $base) {
-            $gilroyTtfFiles[$weight] = $base.'.ttf';
-        }
-        $gilroyTtfFiles[900] = 'Gilroy-ExtraBold.ttf';
-        if ($this->registerDompdfFontFamily($fm, 'Gilroy', $agendaPdfDir, $gilroyTtfFiles)) {
             return 'Gilroy';
         }
 
@@ -276,6 +321,7 @@ class AgendaFichasPdfBuilderService
         bool $kindGira,
         bool $kindPreGira,
         bool $kindAgenda,
+        string $template = 'summary',
         string $buscar = '',
     ): string {
         $slugPeriod = match ($scope) {
@@ -293,7 +339,7 @@ class AgendaFichasPdfBuilderService
 
         $slugKinds = self::slugKindsForFileName($kindGira, $kindPreGira, $kindAgenda);
 
-        $parts = ['fichas', $slugPeriod, $slugList, $slugKinds];
+        $parts = ['fichas', $template, $slugPeriod, $slugList, $slugKinds];
         if (trim($buscar) !== '') {
             $parts[] = 'con-busqueda';
         }

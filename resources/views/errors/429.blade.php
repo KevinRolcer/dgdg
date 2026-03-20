@@ -1,11 +1,11 @@
 @php
     $httpCode = 429;
-    $pageTitle = 'Demasiados intentos';
-    $headline = 'Hay que esperar un poco';
-    $message = 'Se hicieron varios intentos muy seguidos (por ejemplo al poner la contraseña). Es normal: el sistema se detiene un momento para cuidar tu cuenta.';
+    $pageTitle = 'Límite de intentos';
+    $headline = 'Debe esperar antes de continuar';
+    $message = 'Se registraron varios intentos consecutivos en poco tiempo (por ejemplo, al ingresar la contraseña). El sistema aplica una pausa temporal para proteger su cuenta.';
     $hints = [
-        'Espera uno o dos minutos y vuelve a intentar.',
-        'Si no intentaste tú entrar varias veces, cuando puedas entrar conviene cambiar la contraseña.',
+        'Espere uno o dos minutos e intente nuevamente.',
+        'Si usted no realizó esos intentos, una vez que recupere el acceso le recomendamos cambiar su contraseña.',
     ];
 @endphp
 @include('errors._frame')

@@ -14,7 +14,7 @@
                 'gira' => 'Gira',
                 default => 'Agenda',
             };
-            $fichaShowUrl = route('agenda.show', ['agenda' => $card['agenda_id'], 'return' => $previewReturn]);
+            $fichaShowUrl = route('agenda.show', ['agenda' => $card['agenda_id'], 'return' => $previewReturn, 'preview' => 'ficha']);
         @endphp
         <article class="agenda-cal-card">
             <div class="agenda-cal-card-head agenda-cal-card-head--{{ $fichaKind }}">

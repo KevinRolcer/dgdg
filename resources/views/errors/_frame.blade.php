@@ -5,7 +5,7 @@
 @php
     $httpCode = (int) ($httpCode ?? 500);
     $pageTitle = $pageTitle ?? 'Error';
-    $headline = $headline ?? 'Hubo un inconveniente';
+    $headline = $headline ?? 'Se presentó un inconveniente';
     $message = $message ?? '';
     $hints = $hints ?? [];
 @endphp
@@ -65,7 +65,7 @@
                 </ul>
             @endif
             <div class="error-actions">
-                <a href="{{ route('login') }}" class="error-btn error-btn--primary">Volver a entrar</a>
+                <a href="{{ route('login') }}" class="error-btn error-btn--primary">Iniciar sesión</a>
                 @auth
                     <a href="{{ route('home') }}" class="error-btn error-btn--ghost">Ir al inicio</a>
                 @endauth

@@ -38,10 +38,12 @@ class AgendaDirectivaCalendarService
         $monthEnd = $monthStart->copy()->endOfMonth();
 
         $agendas = $this->queryAgendasForMonth($viewer, $monthStart, $monthEnd, $filters);
+        $preparedAgendaMonthData = $this->prepareAgendaMonthData($agendas, $year, $month);
 
         $byDay = [];
-        foreach ($agendas as $agenda) {
-            $occs = $this->homeAgendaCalendar->occurrencesInCalendarMonth($agenda, $year, $month);
+        foreach ($preparedAgendaMonthData as $item) {
+            $agenda = $item['agenda'];
+            $occs = $item['occurrences'];
             foreach ($occs as $occ) {
                 $key = $occ['date']->format('Y-m-d');
                 if (! isset($byDay[$key])) {
@@ -49,7 +51,7 @@ class AgendaDirectivaCalendarService
                 }
                 $byDay[$key][] = [
                     'agenda_id' => $agenda->id,
-                    'title' => $this->homeAgendaCalendar->displayTitle($agenda),
+                    'title' => $item['display_title'],
                     'time' => $occ['time_label'],
                     'kind' => $this->cardKindForFicha($agenda),
                 ];
@@ -64,8 +66,9 @@ class AgendaDirectivaCalendarService
         $gridWeeks = $this->buildGridWeeks($year, $month, $byDay, $tz);
 
         $listRows = [];
-        foreach ($agendas as $agenda) {
-            $occs = $this->homeAgendaCalendar->occurrencesInCalendarMonth($agenda, $year, $month);
+        foreach ($preparedAgendaMonthData as $item) {
+            $agenda = $item['agenda'];
+            $occs = $item['occurrences'];
             foreach ($occs as $occ) {
                 $d = $occ['date'];
                 $listRows[] = [
@@ -74,7 +77,7 @@ class AgendaDirectivaCalendarService
                     'weekday' => mb_convert_case($d->copy()->locale('es')->isoFormat('ddd'), MB_CASE_TITLE, 'UTF-8'),
                     'day' => $d->day,
                     'time_label' => $occ['time_label'],
-                    'title' => $this->homeAgendaCalendar->displayTitle($agenda),
+                    'title' => $item['display_title'],
                     'lugar' => trim((string) ($agenda->lugar ?? '')) !== '' ? (string) $agenda->lugar : '—',
                 ];
             }
@@ -88,9 +91,7 @@ class AgendaDirectivaCalendarService
             return strcmp((string) $a['time_label'], (string) $b['time_label']);
         });
 
-        $cards = $includeFichasCards
-            ? $this->buildFichasCardsFromAgendas($agendas, $year, $month)
-            : [];
+        $cards = $includeFichasCards ? $this->buildFichasCardsFromPreparedMonthData($preparedAgendaMonthData) : [];
 
         $current = $monthStart->copy();
         $prev = $current->copy()->subMonth();
@@ -123,21 +124,42 @@ class AgendaDirectivaCalendarService
         $monthEnd = $monthStart->copy()->endOfMonth();
         $agendas = $this->queryAgendasForMonth($viewer, $monthStart, $monthEnd, $filters);
 
-        return $this->buildFichasCardsFromAgendas($agendas, $year, $month);
+        return $this->buildFichasCardsFromPreparedMonthData($this->prepareAgendaMonthData($agendas, $year, $month));
     }
 
     /**
      * @param  Collection<int, Agenda>  $agendas
-     * @return list<array<string, mixed>>
+     * @return list<array{agenda: Agenda, occurrences: list<array{date: \Carbon\Carbon, starts_at: \Carbon\Carbon, ends_at: \Carbon\Carbon, time_label: string}>, display_title: string}>
      */
-    private function buildFichasCardsFromAgendas(Collection $agendas, int $year, int $month): array
+    private function prepareAgendaMonthData(Collection $agendas, int $year, int $month): array
     {
-        $cards = [];
+        $prepared = [];
         foreach ($agendas as $agenda) {
-            $occs = $this->homeAgendaCalendar->occurrencesInCalendarMonth($agenda, $year, $month);
-            if (count($occs) === 0) {
+            $occurrences = $this->homeAgendaCalendar->occurrencesInCalendarMonth($agenda, $year, $month);
+            if ($occurrences === []) {
                 continue;
             }
+
+            $prepared[] = [
+                'agenda' => $agenda,
+                'occurrences' => $occurrences,
+                'display_title' => $this->homeAgendaCalendar->displayTitle($agenda),
+            ];
+        }
+
+        return $prepared;
+    }
+
+    /**
+     * @param  list<array{agenda: Agenda, occurrences: list<array{date: \Carbon\Carbon, starts_at: \Carbon\Carbon, ends_at: \Carbon\Carbon, time_label: string}>, display_title: string}>  $preparedAgendaMonthData
+     * @return list<array<string, mixed>>
+     */
+    private function buildFichasCardsFromPreparedMonthData(array $preparedAgendaMonthData): array
+    {
+        $cards = [];
+        foreach ($preparedAgendaMonthData as $item) {
+            $agenda = $item['agenda'];
+            $occs = $item['occurrences'];
 
             // Línea bajo el día grande en fichas: solo mes y año de esa misma fecha (el día ya va aparte).
             $headAnchor = $occs[0]['date']->copy()->locale('es');
@@ -183,7 +205,6 @@ class AgendaDirectivaCalendarService
 
         $query = Agenda::query()
             ->activas()
-            ->with(['creador', 'usuariosAsignados'])
             ->whereDate('fecha_inicio', '<=', $monthEnd->toDateString())
             ->whereRaw('COALESCE(DATE(fecha_fin), DATE(fecha_inicio)) >= ?', [$monthStart->toDateString()]);
 
@@ -359,6 +380,21 @@ class AgendaDirectivaCalendarService
         }
 
         return [];
+    }
+
+    /**
+     * Ficha única para vista previa/descarga individual.
+     *
+     * @return array<string, mixed>
+     */
+    public function buildSingleFichaCardForAgenda(Agenda $agenda): array
+    {
+        $tz = config('app.timezone', 'UTC');
+        $anchor = $agenda->fecha_inicio instanceof Carbon
+            ? $agenda->fecha_inicio->copy()->timezone($tz)
+            : Carbon::parse((string) $agenda->fecha_inicio, $tz);
+
+        return $this->pdfCardFromAgenda($agenda, $anchor->copy()->locale('es'));
     }
 
     /**

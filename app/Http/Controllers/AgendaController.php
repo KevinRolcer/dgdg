@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\GenerateAgendaFichasPdfJob;
+use App\Jobs\GenerateAgendaSingleFichaPdfJob;
 use App\Models\Agenda;
 use App\Notifications\ExcelExportPending;
 use App\Services\Agenda\AgendaDirectivaCalendarService;
@@ -10,6 +11,7 @@ use App\Services\Agenda\AgendaFichasPdfBuilderService;
 use App\Services\Agenda\AgendaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -70,7 +72,7 @@ class AgendaController extends Controller
                 ->header('Content-Type', 'text/html; charset=UTF-8');
         }
 
-        $includeFichasCards = ! $wantsPartial || $request->boolean('fichas_cards');
+        $includeFichasCards = $request->boolean('fichas_cards');
 
         $payload = $this->agendaDirectivaCalendar->buildMonthPayload($user, $year, $month, [
             'clasificacion' => $clasificacion,
@@ -121,6 +123,7 @@ class AgendaController extends Controller
             'orientation' => ['required', 'string', 'in:portrait,landscape'],
             'clasificacion' => ['nullable', 'string', 'max:32'],
             'buscar' => ['nullable', 'string', 'max:500'],
+            'template' => ['nullable', 'string', 'in:summary,individual'],
         ]);
 
         $clasificacionRaw = (string) ($validated['clasificacion'] ?? '');
@@ -188,6 +191,7 @@ class AgendaController extends Controller
             $kindGira,
             $kindPreGira,
             $kindAgenda,
+            $validated['template'] ?? 'summary',
             $buscar
         );
 
@@ -205,6 +209,7 @@ class AgendaController extends Controller
             'kind_gira' => $kindGira,
             'kind_pre_gira' => $kindPreGira,
             'kind_agenda' => $kindAgenda,
+            'template' => $validated['template'] ?? 'summary',
         ];
 
         $user->notify(new ExcelExportPending($exportRequestId, 'Fichas agenda', 'pdf_fichas'));
@@ -357,11 +362,87 @@ class AgendaController extends Controller
             ? $return
             : null;
 
+        $previewMode = trim((string) $request->query('preview', ''));
+        if ($previewMode === 'ficha') {
+            $fichaCard = $this->agendaDirectivaCalendar->buildSingleFichaCardForAgenda($agenda);
+
+            return view('agenda.preview-ficha', [
+                'agenda' => $agenda,
+                'card' => $fichaCard,
+                'returnUrl' => $returnUrl,
+                'queueUrl' => route('agenda.ficha.queue', ['agenda' => $agenda->id]),
+            ]);
+        }
+
         return view('agenda.preview', [
             'agenda' => $agenda,
             'returnUrl' => $returnUrl,
             'puedeEditarAgenda' => $this->agendaService->puedeEditarAgendaCompleta($request->user()),
         ]);
+    }
+
+    public function downloadSingleFichaPdf(Request $request, Agenda $agenda, AgendaFichasPdfBuilderService $builder): \Symfony\Component\HttpFoundation\Response
+    {
+        abort_unless($this->agendaService->puedeVerAgenda($request->user(), $agenda), 403);
+
+        $cacheDir = storage_path('app/agenda-ficha-single-cache');
+        File::ensureDirectoryExists($cacheDir);
+
+        $templateVersion = (string) (@filemtime(resource_path('views/agenda/pdf/ficha-individual.blade.php')) ?: 0);
+        $versionBase = $agenda->updated_at ? (string) $agenda->updated_at->timestamp : (string) now()->timestamp;
+        $version = $versionBase.'-'.$templateVersion;
+        $cacheFile = 'agenda-ficha-'.$agenda->id.'-'.$version.'.pdf';
+        $cachePath = $cacheDir.DIRECTORY_SEPARATOR.$cacheFile;
+
+        $safe = (string) preg_replace('/[^A-Za-z0-9\-]+/', '-', (string) $agenda->id.'-'.$agenda->asunto);
+        $safe = trim($safe, '-');
+        $downloadName = 'ficha-'.($safe === '' ? 'agenda-'.$agenda->id : $safe).'.pdf';
+
+        if (! is_file($cachePath)) {
+            $binary = $builder->renderSingleFichaPdfBinary($request->user(), $agenda);
+            File::put($cachePath, $binary);
+        }
+
+        return response()->download($cachePath, $downloadName, [
+            'Content-Type' => 'application/pdf',
+            'Cache-Control' => 'private, max-age=0, must-revalidate',
+        ]);
+    }
+
+    public function queueSingleFichaPdf(Request $request, Agenda $agenda): \Illuminate\Http\JsonResponse|RedirectResponse
+    {
+        abort_unless($this->agendaService->puedeVerAgenda($request->user(), $agenda), 403);
+
+        $user = $request->user();
+        $safe = (string) preg_replace('/[^A-Za-z0-9\-]+/', '-', (string) $agenda->id.'-'.$agenda->asunto);
+        $safe = trim($safe, '-');
+        if ($safe === '') {
+            $safe = 'agenda-'.$agenda->id;
+        }
+
+        $downloadFileName = 'ficha-'.$safe.'.pdf';
+        $exportRequestId = (string) Str::uuid();
+        $storageBaseName = 'agenda-fichas-'.$user->id.'-'.str_replace('-', '', $exportRequestId).'.pdf';
+
+        $user->notify(new ExcelExportPending($exportRequestId, 'Ficha agenda', 'pdf_fichas'));
+
+        GenerateAgendaSingleFichaPdfJob::dispatchAfterResponse(
+            (int) $user->id,
+            (int) $agenda->id,
+            $exportRequestId,
+            $storageBaseName,
+            $downloadFileName
+        );
+
+        $message = 'Se está generando la ficha. Te avisaremos en notificaciones cuando esté lista.';
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'queued' => true,
+                'message' => $message,
+            ]);
+        }
+
+        return back()->with('toast', $message);
     }
 
     /**

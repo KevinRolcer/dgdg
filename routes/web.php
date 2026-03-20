@@ -199,6 +199,8 @@ Route::middleware('auth')->group(function () {
         Route::get('agenda/calendario/fichas-export/{file}', [AgendaController::class, 'downloadFichasExport'])
             ->where('file', '[A-Za-z0-9._\-]+')
             ->name('agenda.calendar.fichas-export.download');
+        Route::get('agenda/{agenda}/ficha-pdf', [AgendaController::class, 'downloadSingleFichaPdf'])->name('agenda.ficha.download');
+        Route::post('agenda/{agenda}/ficha-pdf', [AgendaController::class, 'queueSingleFichaPdf'])->name('agenda.ficha.queue');
         Route::get('agenda', [AgendaController::class, 'index'])->name('agenda.index');
         Route::get('agenda/{agenda}', [AgendaController::class, 'show'])->name('agenda.show');
     });

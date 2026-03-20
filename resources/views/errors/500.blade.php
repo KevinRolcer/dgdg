@@ -1,11 +1,11 @@
 @php
     $httpCode = 500;
-    $pageTitle = 'Fallo temporal';
-    $headline = 'El sistema no pudo terminar lo que pediste';
-    $message = 'Ocurrió un fallo de nuestro lado. No es por algo que hayas hecho mal en tu computadora.';
+    $pageTitle = 'Error del servidor';
+    $headline = 'El sistema no pudo completar la operación';
+    $message = 'Se produjo un error en el servidor. No se trata de un fallo en su equipo.';
     $hints = [
-        'Intenta otra vez en unos minutos.',
-        'Si sigue igual, avisa a quien da soporte del sistema e indica la hora aproximada y qué estabas haciendo.',
+        'Intente nuevamente en unos minutos.',
+        'Si el problema persiste, comuníquese con el área de soporte técnico e indique la hora aproximada y la acción que realizaba.',
     ];
 @endphp
 @include('errors._frame')

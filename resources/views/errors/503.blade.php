@@ -1,10 +1,10 @@
 @php
     $httpCode = 503;
     $pageTitle = 'Sistema no disponible';
-    $headline = 'Ahora no podemos atenderte';
-    $message = 'El sistema está en pausa por mantenimiento o está muy ocupado. En un rato debería volver a la normalidad.';
+    $headline = 'Servicio temporalmente no disponible';
+    $message = 'El sistema se encuentra en mantenimiento o con alta demanda. En breve debería restablecerse el servicio con normalidad.';
     $hints = [
-        'Vuelve a intentar en unos minutos.',
+        'Intente nuevamente en unos minutos.',
     ];
 @endphp
 @include('errors._frame')

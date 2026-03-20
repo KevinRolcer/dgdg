@@ -99,6 +99,13 @@
             </div>
 
             <div class="agenda-cal-print-kinds-box">
+                <span class="agenda-cal-print-legend agenda-cal-print-legend--inline">Formato de ficha</span>
+                <p class="agenda-cal-print-hint">Elige el estilo visual del PDF.</p>
+                <label class="agenda-cal-print-radio"><input type="radio" name="template" value="summary" checked> Ficha Resumen (Listado compacto)</label>
+                <label class="agenda-cal-print-radio"><input type="radio" name="template" value="individual"> Ficha Individual (Una por página, estilizada)</label>
+            </div>
+
+            <div class="agenda-cal-print-kinds-box">
                 <span class="agenda-cal-print-legend agenda-cal-print-legend--inline">Incluir tipos</span>
                 <p class="agenda-cal-print-hint">Puedes elegir una o varias categorías.</p>
                 <label class="agenda-cal-print-check"><input type="checkbox" name="kind_gira" value="1" checked> Gira</label>

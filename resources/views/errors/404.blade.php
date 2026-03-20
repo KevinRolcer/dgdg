@@ -1,11 +1,11 @@
 @php
     $httpCode = 404;
     $pageTitle = 'Página no encontrada';
-    $headline = 'Esta página no existe';
-    $message = 'El enlace puede estar equivocado, incompleto o la página ya no está disponible.';
+    $headline = 'La página solicitada no existe';
+    $message = 'El enlace puede ser incorrecto, estar incompleto o el contenido ya no se encuentra disponible.';
     $hints = [
-        'Revisa que la dirección esté bien escrita.',
-        'Usa el menú del sistema o vuelve a entrar desde el inicio.',
+        'Verifique que la dirección esté escrita correctamente.',
+        'Utilice el menú del sistema o inicie sesión nuevamente desde la página principal.',
     ];
 @endphp
 @include('errors._frame')

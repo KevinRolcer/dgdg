@@ -1,12 +1,12 @@
 @php
     $httpCode = 403;
-    $pageTitle = 'No tienes acceso aquí';
-    $headline = 'No pudimos dejarte pasar';
-    $message = 'Puede ser que tu usuario no tenga permiso para esta sección, o que el navegador esté bloqueando algo necesario para entrar (por ejemplo extensiones que bloquean anuncios o programas de seguridad).';
+    $pageTitle = 'Acceso no autorizado';
+    $headline = 'No tiene permiso para acceder a este recurso';
+    $message = 'Es posible que su usuario no cuente con los permisos necesarios para esta sección, o que el navegador o alguna extensión esté impidiendo el acceso (por ejemplo, bloqueadores de contenido o software de seguridad).';
     $hints = [
-        'Sal del sistema si ya habías entrado, y entra otra vez con tu usuario y contraseña.',
-        'Prueba otra ventana del navegador o desactiva por un momento las extensiones en este sitio.',
-        'Entra siempre por la página web oficial del sistema.',
+        'Cierre sesión si ya había ingresado e inicie sesión nuevamente con su usuario y contraseña.',
+        'Pruebe en otra ventana del navegador o desactive temporalmente las extensiones para este sitio.',
+        'Acceda siempre mediante la dirección oficial del sistema.',
     ];
 @endphp
 @include('errors._frame')
