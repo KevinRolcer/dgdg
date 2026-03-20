@@ -4,7 +4,49 @@
 (function () {
     'use strict';
 
-    var ACTIVE_TAB_KEY = 'agendaCalActiveTab';
+    var VISTA_QUERY = 'vista';
+
+    function readVistaFromUrl() {
+        try {
+            var u = new URL(window.location.href);
+            var v = (u.searchParams.get(VISTA_QUERY) || '').toLowerCase();
+            if (v === 'lista' || v === 'fichas') {
+                return v;
+            }
+            return null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /** Actualiza ?vista= sin nueva entrada en el historial (F5 conserva pestaña; enlace sin vista = predeterminado). */
+    function syncVistaQueryToUrl(tabName) {
+        try {
+            var u = new URL(window.location.href);
+            if (tabName === 'lista' || tabName === 'fichas') {
+                u.searchParams.set(VISTA_QUERY, tabName);
+            } else {
+                u.searchParams.delete(VISTA_QUERY);
+            }
+            history.replaceState({ agendaCal: true }, '', u.pathname + u.search + u.hash);
+        } catch (e2) {
+            /* ignore */
+        }
+    }
+
+    function mergeVistaIntoCalendarUrl(urlString, tabName) {
+        try {
+            var u = new URL(urlString, window.location.origin);
+            if (tabName === 'lista' || tabName === 'fichas') {
+                u.searchParams.set(VISTA_QUERY, tabName);
+            } else {
+                u.searchParams.delete(VISTA_QUERY);
+            }
+            return u.pathname + u.search + u.hash;
+        } catch (e3) {
+            return urlString;
+        }
+    }
 
     /** Aviso flotante (misma idea que #appToast en app-shell). */
     function showAgendaCalToast(message, durationMs) {
@@ -41,11 +83,6 @@
         var root = scope || document;
         if (!name || ['mes', 'lista', 'fichas'].indexOf(name) === -1) {
             name = 'mes';
-        }
-        try {
-            sessionStorage.setItem(ACTIVE_TAB_KEY, name);
-        } catch (e) {
-            /* ignore */
         }
         var tabs = root.querySelectorAll('[data-agenda-cal-tab]');
         var panels = root.querySelectorAll('[data-agenda-cal-panel]');
@@ -148,6 +185,7 @@
                 var name = btn.getAttribute('data-agenda-cal-tab');
                 if (name) {
                     activateTabInScope(root, name);
+                    syncVistaQueryToUrl(name);
                 }
             });
         });
@@ -233,8 +271,8 @@
             return;
         }
         bindAgendaCalendarTabs(ajaxRoot);
-        /* Siempre Mes al entrar al calendario; al cambiar de mes vía AJAX se conserva la pestaña activa (getActiveTabName). */
-        activateTabInScope(ajaxRoot, 'mes');
+        /* ?vista=lista|fichas: recarga conserva pestaña. Sin parámetro (p. ej. desde listado): Mes. */
+        activateTabInScope(ajaxRoot, readVistaFromUrl() || 'mes');
     }
 
     function appendPartialParam(url) {
@@ -310,7 +348,9 @@
                 }
                 ajaxRoot.innerHTML = inner;
                 bindAgendaCalendarTabs(ajaxRoot);
-                activateTabInScope(ajaxRoot, tabBefore);
+                /* pushHistory: la URL del navegador sigue siendo la del mes anterior → usar tabBefore. popstate: la URL ya es la destino → priorizar ?vista=. */
+                var tabToShow = pushHistory ? tabBefore : (readVistaFromUrl() || tabBefore || 'mes');
+                activateTabInScope(ajaxRoot, tabToShow);
                 try {
                     var doc2 = new DOMParser().parseFromString('<div>' + inner + '</div>', 'text/html');
                     var label = doc2.querySelector('.agenda-cal-month-label');
@@ -322,7 +362,8 @@
                 }
                 if (pushHistory) {
                     try {
-                        history.pushState({ agendaCal: true }, '', stripPartialFromUrl(fullUrl));
+                        var pathQs = mergeVistaIntoCalendarUrl(stripPartialFromUrl(fullUrl), tabBefore);
+                        history.pushState({ agendaCal: true }, '', pathQs);
                     } catch (e4) {
                         /* ignore */
                     }

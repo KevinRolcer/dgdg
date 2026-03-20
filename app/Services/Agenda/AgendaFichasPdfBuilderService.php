@@ -83,7 +83,12 @@ class AgendaFichasPdfBuilderService
             $params['month'],
             $params['custom_months']
         );
-        $filtersNote = $this->fichasPdfFiltersNote($params['clasificacion'], $params['buscar']);
+        $allKindsSelected = $params['kind_gira'] && $params['kind_pre_gira'] && $params['kind_agenda'];
+        $filtersNote = $this->fichasPdfFiltersNote(
+            $params['clasificacion'],
+            $params['buscar'],
+            $allKindsSelected
+        );
         $kindsNote = $this->fichasPdfSelectedKindsLabel(
             $params['kind_gira'],
             $params['kind_pre_gira'],
@@ -356,29 +361,32 @@ class AgendaFichasPdfBuilderService
         return implode(' — ', $parts);
     }
 
+    /**
+     * Sufijo corto para el título del PDF (sin texto cuando están los tres tipos).
+     */
     private function fichasPdfSelectedKindsLabel(bool $kindGira, bool $kindPreGira, bool $kindAgenda): string
     {
         if ($kindGira && $kindPreGira && $kindAgenda) {
-            return 'Todos los tipos de ficha (giras, pre-giras y agenda)';
+            return '';
         }
 
         $labels = [];
         if ($kindGira) {
-            $labels[] = 'giras';
+            $labels[] = 'Giras';
         }
         if ($kindPreGira) {
-            $labels[] = 'pre-giras';
+            $labels[] = 'Pre-giras';
         }
         if ($kindAgenda) {
-            $labels[] = 'agenda';
+            $labels[] = 'Agenda';
         }
 
         if (count($labels) === 1) {
-            return 'Solo '.$labels[0];
+            return $labels[0];
         }
 
         if (count($labels) === 2) {
-            return 'Solo '.implode(' y ', $labels);
+            return $labels[0].' y '.$labels[1];
         }
 
         return '';
@@ -391,7 +399,7 @@ class AgendaFichasPdfBuilderService
         return 'file://'.$normalized;
     }
 
-    private function fichasPdfFiltersNote(string $clasificacion, string $buscar): string
+    private function fichasPdfFiltersNote(string $clasificacion, string $buscar, bool $allKindsSelected): string
     {
         $parts = [];
         if ($clasificacion !== '') {
@@ -401,7 +409,7 @@ class AgendaFichasPdfBuilderService
                 'agenda' => 'solo agenda (asuntos)',
                 default => $clasificacion,
             };
-        } else {
+        } elseif (! $allKindsSelected) {
             $parts[] = 'Listado: todos los tipos de evento';
         }
         if ($buscar !== '') {

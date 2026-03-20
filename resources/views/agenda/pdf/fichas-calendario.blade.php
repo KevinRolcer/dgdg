@@ -78,7 +78,7 @@
         }
         .card-h {
             position: relative;
-            padding: 2.85mm 3.1mm 3.45mm;
+            padding: 2.65mm 3.1mm 2.25mm;
             color: #fff;
             font-size: 7pt;
             font-weight: 800;
@@ -114,22 +114,24 @@
         }
         .card-h-right {
             text-align: right;
-            width: 40%;
-            max-width: 40%;
+            vertical-align: middle;
+            width: 42%;
+            max-width: 42%;
             word-wrap: break-word;
             overflow-wrap: break-word;
         }
         .card-kind {
-            font-size: 10.25pt;
+            display: inline-block;
+            font-size: 14pt;
             font-weight: 900;
-            letter-spacing: 0.08em;
-            line-height: 1.15;
+            letter-spacing: 0.1em;
+            line-height: 1.08;
         }
         .card-daynum {
-            font-size: 17pt;
-            font-weight: 800;
-            line-height: 0.95;
-            letter-spacing: -0.04em;
+            font-size: 23pt;
+            font-weight: 900;
+            line-height: 0.88;
+            letter-spacing: -0.045em;
         }
         .card-h--gira .card-daynum,
         .card-h--agenda .card-daynum {
@@ -139,13 +141,15 @@
             color: #5f1b2d;
         }
         .card-my {
-            font-size: 5.7pt;
-            font-weight: 700;
-            margin-top: 0.6mm;
+            font-size: 7pt;
+            font-weight: 800;
+            margin-top: 0.35mm;
+            padding-top: 0.15mm;
             color: #fff;
-            letter-spacing: 0.04em;
-            line-height: 1.15;
+            letter-spacing: 0.06em;
+            line-height: 1.25;
             word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .card-body {
             margin-top: -1.8mm;
