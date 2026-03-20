@@ -1,0 +1,201 @@
+/* Pantallas de error (400, 403, 419, 429, 500, …): mismo tono que login + tema oscuro */
+:root {
+    --err-primary-dark: #5f1b2d;
+    --err-primary: #861e34;
+    --err-accent: #c79b66;
+    --err-text: #484747;
+    --err-text-muted: #6b6a6a;
+    --err-border: rgba(72, 71, 71, 0.14);
+    --err-bg: #f9f9f9;
+    --err-card: #ffffff;
+    --err-shadow: 0 10px 24px rgba(72, 71, 71, 0.1);
+    --err-radius: 22px;
+    --font-err: 'Gilroy', system-ui, sans-serif;
+}
+
+html.theme-dark,
+html.theme-dark.theme-dark--deep {
+    --err-text: #e8e9ed;
+    --err-text-muted: #9aa3b2;
+    --err-border: rgba(255, 255, 255, 0.08);
+    --err-bg: #0e1015;
+    --err-card: #161920;
+    --err-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+
+html.theme-dark.theme-dark--soft {
+    --err-text: #f0f1f4;
+    --err-text-muted: #b8bec8;
+    --err-border: rgba(255, 255, 255, 0.14);
+    --err-bg: #3d424b;
+    --err-card: #484e59;
+    --err-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+}
+
+html.theme-dark.theme-dark--slate {
+    --err-text: #e6eaf0;
+    --err-text-muted: #8e9aaf;
+    --err-border: rgba(130, 160, 200, 0.14);
+    --err-bg: #121922;
+    --err-card: #1a2330;
+    --err-shadow: 0 8px 28px rgba(0, 0, 0, 0.42);
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body.error-page-body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: var(--font-err);
+    background: var(--err-bg);
+    color: var(--err-text);
+    display: grid;
+    place-items: center;
+    padding: 24px 16px;
+    line-height: 1.5;
+}
+
+.error-wrap {
+    width: 100%;
+    max-width: 480px;
+}
+
+.error-card {
+    background: var(--err-card);
+    border: 1px solid var(--err-border);
+    border-radius: var(--err-radius);
+    box-shadow: var(--err-shadow);
+    overflow: hidden;
+    text-align: center;
+    padding: 32px 28px 36px;
+}
+
+.error-brand {
+    margin-bottom: 22px;
+}
+
+.error-brand img {
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+    margin: 0 auto;
+    display: block;
+}
+
+.error-brand__logo--dark {
+    display: none;
+}
+
+html.theme-dark .error-brand__logo--light {
+    display: none;
+}
+
+html.theme-dark .error-brand__logo--dark {
+    display: block;
+}
+
+.error-code {
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--err-text-muted);
+    margin-bottom: 8px;
+}
+
+.error-headline {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--err-primary-dark);
+    margin: 0 0 14px;
+    line-height: 1.25;
+}
+
+html.theme-dark .error-headline {
+    color: var(--err-accent);
+}
+
+.error-message {
+    font-size: 0.9rem;
+    color: var(--err-text);
+    margin: 0 0 12px;
+    text-align: left;
+}
+
+.error-hints {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 22px;
+    text-align: left;
+}
+
+.error-hints li {
+    position: relative;
+    padding-left: 1.1em;
+    font-size: 0.82rem;
+    color: var(--err-text-muted);
+    margin-bottom: 8px;
+}
+
+.error-hints li::before {
+    content: '·';
+    position: absolute;
+    left: 0;
+    font-weight: 800;
+    color: var(--err-accent);
+}
+
+.error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+.error-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 18px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.error-btn--primary {
+    background: var(--err-primary);
+    color: #fff;
+    border-color: var(--err-primary);
+}
+
+.error-btn--primary:hover {
+    background: var(--err-primary-dark);
+    border-color: var(--err-primary-dark);
+    color: #fff;
+}
+
+.error-btn--ghost {
+    background: transparent;
+    color: var(--err-text);
+    border-color: var(--err-border);
+}
+
+.error-btn--ghost:hover {
+    border-color: var(--err-accent);
+    color: var(--err-accent);
+}
+
+html.theme-dark .error-btn--ghost:hover {
+    color: var(--err-accent);
+}
