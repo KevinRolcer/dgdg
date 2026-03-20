@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ingreso al Sistema | Dirección General de Delegaciones</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/gob_edo.png') }}">
     <script src="{{ asset('assets/js/theme-init.js') }}"></script>
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
     <meta http-equiv="Pragma" content="no-cache">
