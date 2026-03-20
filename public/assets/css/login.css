@@ -7,7 +7,7 @@
     --clr-text-light: #6b6a6a;
     --clr-border: rgba(72, 71, 71, 0.14);
     --clr-bg-card: #ffffff;
-    --font-main: 'Montserrat', sans-serif;
+    --font-main: 'Gilroy', system-ui, sans-serif;
     --radius-card: 22px;
     --radius-input: 12px;
     --shadow-ux: 0 10px 24px rgba(72, 71, 71, 0.10);

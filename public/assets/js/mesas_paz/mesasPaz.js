@@ -1448,19 +1448,23 @@ document.addEventListener('DOMContentLoaded', function () {
             inputExcelHidden.click();
         });
 
-        ['dragover', 'dragenter'].forEach(function(eventName) {
+        function mesaDropzoneSetDragState(isDrag) {
+            dropzoneExcel.classList.toggle('mesa-dropzone-excel--drag', !!isDrag);
+            dropzoneExcel.style.removeProperty('background-color');
+            dropzoneExcel.style.removeProperty('border-color');
+        }
+
+        ['dragover', 'dragenter'].forEach(function (eventName) {
             dropzoneExcel.addEventListener(eventName, function (e) {
                 e.preventDefault();
-                dropzoneExcel.style.backgroundColor = '#e9ecef';
-                dropzoneExcel.style.borderColor = '#0d6efd';
+                mesaDropzoneSetDragState(true);
             });
         });
 
-        ['dragleave', 'dragend', 'drop'].forEach(function(eventName) {
+        ['dragleave', 'dragend', 'drop'].forEach(function (eventName) {
             dropzoneExcel.addEventListener(eventName, function (e) {
                 e.preventDefault();
-                dropzoneExcel.style.backgroundColor = '#f8f9fa';
-                dropzoneExcel.style.borderColor = '#dee2e6';
+                mesaDropzoneSetDragState(false);
             });
         });
 
@@ -1502,6 +1506,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 excelFileStatus.classList.remove('d-flex');
                 dropzoneExcel.querySelector('p').classList.remove('d-none');
             }
+        }
+
+        const importarExcelModalEl = document.getElementById('importarExcelModal');
+        if (importarExcelModalEl) {
+            importarExcelModalEl.addEventListener('hidden.bs.modal', function () {
+                mesaDropzoneSetDragState(false);
+            });
+            importarExcelModalEl.addEventListener('shown.bs.modal', function () {
+                mesaDropzoneSetDragState(false);
+            });
         }
     }
 
@@ -1590,9 +1604,9 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(function(willDelete) {
                 if (!willDelete) return;
 
-                const originalText = btnVaciarMicrorregion.innerHTML;
+                const originalHtml = btnVaciarMicrorregion.innerHTML;
                 btnVaciarMicrorregion.disabled = true;
-                btnVaciarMicrorregion.textContent = 'Vaciando...';
+                btnVaciarMicrorregion.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span><span class="visually-hidden">Vaciando…</span>';
 
             const url = vaciarMicrorregionUrl;
 
@@ -1628,10 +1642,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 const message = backendErrors[0] || (errorData.data && errorData.data.message) || errorData.message || 'Error al vaciar los registros.';
                 swal('Error', message, 'error');
                 btnVaciarMicrorregion.disabled = false;
-                btnVaciarMicrorregion.innerHTML = originalText;
+                btnVaciarMicrorregion.innerHTML = originalHtml;
+            });
             });
         });
-    });
-}
+    }
 
 });

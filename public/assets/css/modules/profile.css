@@ -363,7 +363,6 @@
     background: rgba(134, 30, 52, 0.14);
 }
 
-/* Contenedor de chips: una sola fila con scroll horizontal para evitar scroll vertical de la página */
 .profile-micro-chips {
     display: flex;
     flex-wrap: nowrap;

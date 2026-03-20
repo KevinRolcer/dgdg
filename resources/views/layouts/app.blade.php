@@ -6,9 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ ($pageTitle ?? 'Inicio') . ' | Dirección General de Delegaciones' }}</title>
     <script src="{{ asset('assets/js/theme-init.js') }}"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('assets/css/fonts-gilroy.css') }}?v={{ @filemtime(public_path('assets/css/fonts-gilroy.css')) ?: time() }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="{{ asset('assets/css/app-shell.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/theme-dark.css') }}">

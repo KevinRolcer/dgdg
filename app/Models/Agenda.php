@@ -55,7 +55,7 @@ class Agenda extends Model
 
     public function scopeActivas($query)
     {
-        if (!Schema::hasColumn((new static)->getTable(), 'estado_seguimiento')) {
+        if (! Schema::hasColumn((new static)->getTable(), 'estado_seguimiento')) {
             return $query;
         }
 
@@ -76,13 +76,12 @@ class Agenda extends Model
         return $this->hasMany(self::class, 'parent_id');
     }
 
-
     /**
      * Users assigned to this agenda item.
      */
     public function usuariosAsignados(): BelongsToMany
     {
-        return $this->belongsToMany(User::class , 'agenda_user', 'agenda_id', 'user_id');
+        return $this->belongsToMany(User::class, 'agenda_user', 'agenda_id', 'user_id');
     }
 
     /**
@@ -90,7 +89,7 @@ class Agenda extends Model
      */
     public function creador(): BelongsTo
     {
-        return $this->belongsTo(User::class , 'creado_por');
+        return $this->belongsTo(User::class, 'creado_por');
     }
 
     /**
@@ -103,14 +102,15 @@ class Agenda extends Model
             return '—';
         }
         if ($min < 60) {
-            return $min . ' min';
+            return $min.' min';
         }
         $h = (int) floor($min / 60);
         $m = $min % 60;
         if ($m === 0) {
-            return $h . ' h';
+            return $h.' h';
         }
-        return $h . ' h ' . $m . ' min';
+
+        return $h.' h '.$m.' min';
     }
 
     /**
@@ -124,6 +124,86 @@ class Agenda extends Model
     }
 
     /**
+     * Texto de aforo para tarjetas (p. ej. "Aforo: 50 personas"), o null si no hay línea Aforo: N.
+     */
+    public function aforoEtiquetaTarjeta(): ?string
+    {
+        $d = (string) ($this->descripcion ?? '');
+        foreach (preg_split("/\r\n|\n|\r/", $d) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            if (preg_match('/^Aforo:\s*(\d+)(?:\s*personas)?\s*$/i', $line, $m)) {
+                return 'Aforo: '.$m[1].' personas';
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Descripción sin líneas que sean solo "Aforo: N" (el aforo se muestra aparte en fichas).
+     */
+    public function descripcionSinLineaAforo(): string
+    {
+        $lines = preg_split("/\r\n|\n|\r/", (string) ($this->descripcion ?? ''));
+        $out = [];
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*Aforo:\s*\d+/', $line)) {
+                continue;
+            }
+            $out[] = $line;
+        }
+
+        return trim(implode("\n", $out));
+    }
+
+    /**
+     * Para PDF / exportación: quita líneas de delegad@ encargado, delegado a cargo y “creado por”.
+     */
+    public static function textoParaPdfSinMetaUsuarios(?string $text): string
+    {
+        if ($text === null || trim($text) === '') {
+            return '';
+        }
+        $lines = preg_split('/\R/u', $text);
+        $out = [];
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*Delegad@?\s*encargad[oa]\s*:/iu', $line)) {
+                continue;
+            }
+            if (preg_match('/^\s*Delegado\s+a\s+cargo\s*:/iu', $line)) {
+                continue;
+            }
+            if (preg_match('/^\s*Creado\s+por\s*:/iu', $line)) {
+                continue;
+            }
+            if (preg_match('/^\s*Registrad[oa]\s+por\s*:/iu', $line)) {
+                continue;
+            }
+            $out[] = $line;
+        }
+
+        return trim(implode("\n", $out));
+    }
+
+    /**
+     * Primer bloque de la descripción (sin línea de aforo): hasta el primer separador
+     * de párrafo (una o más saltos de línea, con líneas intermedias solo de espacios/tabs).
+     */
+    public function descripcionPrimerElementoSinAforo(): string
+    {
+        $text = trim($this->descripcionSinLineaAforo());
+        if ($text === '') {
+            return '';
+        }
+        $parts = preg_split('/\R(?:[ \t]*\R)+/u', $text, 2);
+
+        return trim($parts[0] ?? '');
+    }
+
+    /**
      * Emoji + banner HTML para semáforo en Google Calendar (título y descripción).
      *
      * @return array{emoji: string, label: string, banner_html: string}|null
@@ -133,6 +213,7 @@ class Agenda extends Model
         if (empty($semaforo)) {
             return null;
         }
+
         return match ($semaforo) {
             'rojo' => [
                 'emoji' => '🔴',
@@ -152,7 +233,7 @@ class Agenda extends Model
             default => [
                 'emoji' => '⚪',
                 'label' => ucfirst((string) $semaforo),
-                'banner_html' => '<div style="background:#f5f5f5;color:#424242;padding:10px 12px;border-radius:8px;margin-bottom:10px;font-weight:700;">Semáforo: ' . htmlspecialchars(ucfirst((string) $semaforo), ENT_QUOTES, 'UTF-8') . '</div>',
+                'banner_html' => '<div style="background:#f5f5f5;color:#424242;padding:10px 12px;border-radius:8px;margin-bottom:10px;font-weight:700;">Semáforo: '.htmlspecialchars(ucfirst((string) $semaforo), ENT_QUOTES, 'UTF-8').'</div>',
             ],
         };
     }
@@ -170,7 +251,7 @@ class Agenda extends Model
         $title = $this->asunto;
         if ($this->tipo === 'gira') {
             $prefix = (strtolower((string) ($this->subtipo ?? 'gira')) === 'pre-gira') ? 'Pre-gira - ' : 'Gira - ';
-            $title = $prefix . $title;
+            $title = $prefix.$title;
         }
         // Al inicio del título: semáforo (emoji) y municipio, juntos, luego el resto (Gira/Pre-gira + asunto)
         $leadParts = [];
@@ -182,7 +263,7 @@ class Agenda extends Model
             $leadParts[] = $muni;
         }
         if ($leadParts !== []) {
-            $title = implode(' ', $leadParts) . ' ' . $title;
+            $title = implode(' ', $leadParts).' '.$title;
         }
         $text = urlencode($title);
 
@@ -203,21 +284,21 @@ class Agenda extends Model
             }
             $block = '';
             if ($semaforoVis !== null) {
-                $block .= $semaforoVis['banner_html'] . "\n";
+                $block .= $semaforoVis['banner_html']."\n";
             }
-            $block .= "Microrregión: " . ($this->microrregion ?? '') . "\n";
-            $block .= "Municipio: " . ($this->municipio ?? '') . "\n";
-            $block .= "Ubicación: " . ($this->lugar ?? '') . "\n";
+            $block .= 'Microrregión: '.($this->microrregion ?? '')."\n";
+            $block .= 'Municipio: '.($this->municipio ?? '')."\n";
+            $block .= 'Ubicación: '.($this->lugar ?? '')."\n";
             $block .= "Delegado a cargo: {$delegadoNombre}\n";
-            if ($semaforoVis === null && !empty($this->semaforo)) {
-                $block .= 'Semáforo: ' . ucfirst((string) $this->semaforo) . "\n";
+            if ($semaforoVis === null && ! empty($this->semaforo)) {
+                $block .= 'Semáforo: '.ucfirst((string) $this->semaforo)."\n";
             }
             if ($this->seguimiento) {
                 $block .= "Seguimiento: {$this->seguimiento}\n";
             }
-            $detailsText = $block . $detailsText;
+            $detailsText = $block.$detailsText;
         } elseif ($semaforoVis !== null) {
-            $detailsText = $semaforoVis['banner_html'] . "\n\n" . $detailsText;
+            $detailsText = $semaforoVis['banner_html']."\n\n".$detailsText;
         }
         $details = urlencode($detailsText);
         $location = urlencode($this->lugar ?? '');
@@ -232,19 +313,21 @@ class Agenda extends Model
             if (substr_count($horaNormalized, ':') === 1) {
                 $horaNormalized .= ':00';
             }
-            $startDt = Carbon::parse($this->fecha_inicio->format('Y-m-d') . ' ' . $horaNormalized, $tz);
+            $startDt = Carbon::parse($this->fecha_inicio->format('Y-m-d').' '.$horaNormalized, $tz);
             if ($start === $end) {
                 $endDt = $startDt->copy()->addHour();
             } else {
-                $endDt = Carbon::parse($endDate->format('Y-m-d') . ' ' . $horaNormalized, $tz);
+                $endDt = Carbon::parse($endDate->format('Y-m-d').' '.$horaNormalized, $tz);
             }
             $startDt->setTimezone('UTC');
             $endDt->setTimezone('UTC');
-            $dates = $startDt->format('Ymd\THis') . 'Z/' . $endDt->format('Ymd\THis') . 'Z';
+            $dates = $startDt->format('Ymd\THis').'Z/'.$endDt->format('Ymd\THis').'Z';
+
             return "{$baseUrl}&text={$text}&details={$details}&location={$location}&dates={$dates}";
         }
 
-        $dates = "{$start}/" . ($this->fecha_fin ? $this->fecha_fin->copy()->addDay()->format('Ymd') : $this->fecha_inicio->copy()->addDay()->format('Ymd'));
+        $dates = "{$start}/".($this->fecha_fin ? $this->fecha_fin->copy()->addDay()->format('Ymd') : $this->fecha_inicio->copy()->addDay()->format('Ymd'));
+
         return "{$baseUrl}&text={$text}&details={$details}&location={$location}&dates={$dates}";
     }
 }

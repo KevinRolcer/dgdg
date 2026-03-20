@@ -1,8 +1,4 @@
-/**
- * Agenda Directiva — modo oscuro (html.theme-dark)
- */
 
-/* Shell: sin caja, mismo plano que contenido */
 html.theme-dark .agenda-shell .agenda-card-in-shell {
     background: transparent !important;
     border: none !important;
@@ -70,7 +66,6 @@ html.theme-dark .agenda-shell .agenda-btn-secondary:hover {
     border-color: rgba(199, 155, 102, 0.35) !important;
 }
 
-/* Chips: inactivo transparente, activo sutil */
 html.theme-dark .agenda-shell .agenda-filters-compact .tm-module-chip:not(.is-active):not(.tm-btn-clear) {
     background: transparent !important;
     border-color: var(--clr-border) !important;
@@ -101,7 +96,7 @@ html.theme-dark .agenda-modulo-list li {
 html.theme-dark .modal-agenda-content {
     background: var(--clr-card) !important;
     border: 1px solid var(--clr-border);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    box-shadow: none;
 }
 
 html.theme-dark .modal-agenda-header {
@@ -127,8 +122,13 @@ html.theme-dark .modal-body-scroll::-webkit-scrollbar-track {
 }
 
 html.theme-dark .modal-agenda-footer {
-    border-top-color: var(--clr-border) !important;
-    background: var(--clr-bg) !important;
+    border-top: 1px solid var(--clr-border) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+html.theme-dark .modal-agenda-footer--readonly {
+    border-top: none !important;
 }
 
 html.theme-dark .btn-secondary-agenda {
@@ -184,6 +184,10 @@ html.theme-dark .agenda-table th {
     border-bottom-color: var(--clr-border) !important;
 }
 
+html.theme-dark .agenda-shell .agenda-table th {
+    background: var(--clr-bg) !important;
+}
+
 html.theme-dark .agenda-table td strong {
     color: var(--clr-text-main) !important;
 }
@@ -192,7 +196,6 @@ html.theme-dark .agenda-table tbody tr:hover {
     background: rgba(255, 255, 255, 0.03) !important;
 }
 
-/* Botones de tabla y Eliminar: legibles en oscuro */
 html.theme-dark .agenda-btn-table {
     background: transparent !important;
     border-color: var(--clr-border) !important;
@@ -269,7 +272,6 @@ html.theme-dark .agenda-page {
     background: transparent;
 }
 
-/* Chips borrar filtro (sin shell): refuerzo */
 html.theme-dark .agenda-filters-compact .tm-module-chip.tm-btn-clear {
     background: transparent !important;
     color: var(--clr-text-light) !important;

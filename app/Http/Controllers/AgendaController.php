@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\GenerateAgendaFichasPdfJob;
 use App\Models\Agenda;
+use App\Notifications\ExcelExportPending;
 use App\Services\Agenda\AgendaDirectivaCalendarService;
+use App\Services\Agenda\AgendaFichasPdfBuilderService;
 use App\Services\Agenda\AgendaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AgendaController extends Controller
 {
@@ -34,19 +39,8 @@ class AgendaController extends Controller
             : '';
         $buscar = trim((string) $request->query('buscar', ''));
 
-        $payload = $this->agendaDirectivaCalendar->buildMonthPayload($user, $year, $month, [
-            'clasificacion' => $clasificacion,
-            'buscar' => $buscar,
-        ]);
-
-        $qBase = array_filter([
-            'clasificacion' => $clasificacion,
-            'buscar' => $buscar,
-        ]);
-        $prevUrl = route('agenda.calendar', array_merge($qBase, ['year' => $payload['prev']['y'], 'month' => $payload['prev']['m']]));
-        $nextUrl = route('agenda.calendar', array_merge($qBase, ['year' => $payload['next']['y'], 'month' => $payload['next']['m']]));
         $previewReturn = route('agenda.calendar', array_filter(array_merge(
-            ['year' => $payload['year'], 'month' => $payload['month']],
+            ['year' => $year, 'month' => $month],
             ['clasificacion' => $clasificacion !== '' ? $clasificacion : null, 'buscar' => $buscar !== '' ? $buscar : null]
         )));
 
@@ -55,6 +49,40 @@ class AgendaController extends Controller
             || $partialRaw === 1
             || $partialRaw === 'true'
             || filter_var($partialRaw, FILTER_VALIDATE_BOOLEAN);
+
+        $fichasOnlyRaw = $request->query('fichas_only');
+        $fichasOnly = $fichasOnlyRaw === '1'
+            || $fichasOnlyRaw === 1
+            || $fichasOnlyRaw === 'true'
+            || filter_var($fichasOnlyRaw, FILTER_VALIDATE_BOOLEAN);
+
+        if ($wantsPartial && $fichasOnly) {
+            $cards = $this->agendaDirectivaCalendar->buildFichasCardsForMonth($user, $year, $month, [
+                'clasificacion' => $clasificacion,
+                'buscar' => $buscar,
+            ]);
+
+            return response()
+                ->view('agenda.partials.calendar-fichas-fragment', [
+                    'cards' => $cards,
+                    'previewReturn' => $previewReturn,
+                ])
+                ->header('Content-Type', 'text/html; charset=UTF-8');
+        }
+
+        $includeFichasCards = ! $wantsPartial || $request->boolean('fichas_cards');
+
+        $payload = $this->agendaDirectivaCalendar->buildMonthPayload($user, $year, $month, [
+            'clasificacion' => $clasificacion,
+            'buscar' => $buscar,
+        ], $includeFichasCards);
+
+        $qBase = array_filter([
+            'clasificacion' => $clasificacion,
+            'buscar' => $buscar,
+        ]);
+        $prevUrl = route('agenda.calendar', array_merge($qBase, ['year' => $payload['prev']['y'], 'month' => $payload['prev']['m']]));
+        $nextUrl = route('agenda.calendar', array_merge($qBase, ['year' => $payload['next']['y'], 'month' => $payload['next']['m']]));
 
         if ($wantsPartial) {
             return response()
@@ -76,6 +104,144 @@ class AgendaController extends Controller
             'puedeEditarAgenda' => $this->agendaService->puedeEditarAgendaCompleta($user),
             'soloAsignaciones' => $this->agendaService->usuarioVeSoloSusAsignaciones($user),
         ]);
+    }
+
+    /**
+     * Encola la generación del PDF de fichas; el archivo queda en notificaciones al terminar.
+     */
+    public function calendarFichasPdf(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'scope' => ['required', 'string', 'in:all,current_month,custom_months'],
+            'year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+            'month' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'custom_months_json' => ['nullable', 'string', 'max:8000'],
+            'orientation' => ['required', 'string', 'in:portrait,landscape'],
+            'clasificacion' => ['nullable', 'string', 'max:32'],
+            'buscar' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $clasificacionRaw = (string) ($validated['clasificacion'] ?? '');
+        $clasificacion = in_array($clasificacionRaw, ['', 'gira', 'pre_gira', 'agenda'], true)
+            ? $clasificacionRaw
+            : '';
+        $buscar = trim((string) ($validated['buscar'] ?? ''));
+
+        $kindGira = $request->boolean('kind_gira');
+        $kindPreGira = $request->boolean('kind_pre_gira');
+        $kindAgenda = $request->boolean('kind_agenda');
+        if (! $kindGira && ! $kindPreGira && ! $kindAgenda) {
+            return response()->json(['message' => 'Selecciona al menos un tipo: Gira, Pre-gira o Agenda.'], 422);
+        }
+
+        $scope = $validated['scope'];
+        $year = isset($validated['year']) ? (int) $validated['year'] : null;
+        $month = isset($validated['month']) ? (int) $validated['month'] : null;
+        $customMonths = null;
+
+        if ($scope === 'current_month') {
+            if ($year === null || $month === null || $year < 2000 || $year > 2100 || $month < 1 || $month > 12) {
+                return response()->json(['message' => 'No se pudo determinar el mes del calendario. Recarga e inténtalo de nuevo.'], 422);
+            }
+        }
+
+        if ($scope === 'custom_months') {
+            $raw = trim((string) ($validated['custom_months_json'] ?? ''));
+            $decoded = json_decode($raw, true);
+            if (! is_array($decoded) || $decoded === []) {
+                return response()->json(['message' => 'Agrega al menos un mes a la lista.'], 422);
+            }
+            $seen = [];
+            $customMonths = [];
+            foreach ($decoded as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+                $y = (int) ($item[0] ?? 0);
+                $m = (int) ($item[1] ?? 0);
+                if ($y < 2000 || $y > 2100 || $m < 1 || $m > 12) {
+                    continue;
+                }
+                $key = $y.'-'.$m;
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $customMonths[] = [$y, $m];
+            }
+            if ($customMonths === []) {
+                return response()->json(['message' => 'Ningún mes de la lista es válido.'], 422);
+            }
+            if (count($customMonths) > 60) {
+                return response()->json(['message' => 'Como máximo 60 meses por exportación.'], 422);
+            }
+        }
+
+        $downloadFileName = AgendaFichasPdfBuilderService::buildDownloadFileName(
+            $scope,
+            $year,
+            $month,
+            $customMonths,
+            $clasificacion,
+            $kindGira,
+            $kindPreGira,
+            $kindAgenda,
+            $buscar
+        );
+
+        $exportRequestId = (string) Str::uuid();
+        $storageBaseName = 'agenda-fichas-'.$user->id.'-'.str_replace('-', '', $exportRequestId).'.pdf';
+
+        $params = [
+            'scope' => $scope,
+            'year' => $year,
+            'month' => $month,
+            'custom_months' => $customMonths,
+            'orientation' => $validated['orientation'],
+            'clasificacion' => $clasificacion,
+            'buscar' => $buscar,
+            'kind_gira' => $kindGira,
+            'kind_pre_gira' => $kindPreGira,
+            'kind_agenda' => $kindAgenda,
+        ];
+
+        $user->notify(new ExcelExportPending($exportRequestId, 'Fichas agenda', 'pdf_fichas'));
+
+        GenerateAgendaFichasPdfJob::dispatchAfterResponse(
+            $user->id,
+            $exportRequestId,
+            $params,
+            $storageBaseName,
+            $downloadFileName
+        );
+
+        return response()->json([
+            'queued' => true,
+            'message' => 'Se está generando el PDF. Te avisaremos en notificaciones cuando esté listo.',
+        ]);
+    }
+
+    public function downloadFichasExport(Request $request, string $file): BinaryFileResponse
+    {
+        $file = trim($file);
+        abort_unless(preg_match('/\Aagenda-fichas-\d+-[a-f0-9]{32}\.pdf\z/i', $file) === 1, 404);
+        if (preg_match('/\Aagenda-fichas-(\d+)-/i', $file, $m) !== 1) {
+            abort(404);
+        }
+        abort_unless((int) $m[1] === (int) $request->user()->id, 403);
+
+        $path = storage_path('app/agenda-fichas-exports'.DIRECTORY_SEPARATOR.$file);
+        abort_unless(is_file($path), 404);
+
+        $dlNamePath = $path.'.dlname';
+        $downloadName = is_file($dlNamePath) ? trim((string) file_get_contents($dlNamePath)) : $file;
+        if ($downloadName === '') {
+            $downloadName = $file;
+        }
+
+        return response()->download($path, $downloadName);
     }
 
     public function index(Request $request)

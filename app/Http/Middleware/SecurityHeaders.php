@@ -156,7 +156,8 @@ class SecurityHeaders
             $imageSrc,
             $mediaSrc,
             "font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
-            "connect-src 'self' https://static.cloudflareinsights.com",
+            // source maps y fetch desde los mismos CDNs ya permitidos en script-src/style-src
+            "connect-src 'self' https://static.cloudflareinsights.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com",
         ];
 
         if ($request->isSecure()) {

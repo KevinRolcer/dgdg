@@ -1,7 +1,5 @@
-/* Vista previa de actividad (Agenda) — alineada a agenda-seguimiento / Directiva */
 
 .agenda-preview-page {
-    /* Permite que la tarjeta calcule altura útil respecto al viewport */
     min-height: 0;
 }
 
@@ -40,7 +38,6 @@
     padding: 1.25rem 1.35rem;
     background: var(--clr-card);
     box-shadow: var(--shadow-soft);
-    /* Scroll interno: descripción larga y demás bloques sin cortar la pantalla */
     max-height: min(75vh, calc(100dvh - 9.5rem));
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;

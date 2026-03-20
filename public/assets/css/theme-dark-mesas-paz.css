@@ -1,13 +1,11 @@
-/**
- * Mesas de Paz + Supervisión evidencias — modo oscuro (admin, delegados, enlaces).
- * Cargar después de Bootstrap y mesaPaz.css / mesaPazSupervision.css.
- *
- * Los modales viven FUERA de #mesasPazApp / #supervisionEvidenciasPage → reglas globales
- * solo en páginas que incluyen este archivo.
- */
+
 html.theme-dark .modal-backdrop {
     --bs-backdrop-bg: #000;
     --bs-backdrop-opacity: 0.65;
+}
+
+html.theme-dark .modal {
+    color-scheme: dark;
 }
 
 html.theme-dark .modal-content {
@@ -72,6 +70,12 @@ html.theme-dark #dropzoneExcel:hover {
     border-color: rgba(199, 155, 102, 0.35) !important;
 }
 
+html.theme-dark .mesa-dropzone-excel.mesa-dropzone-excel--drag,
+html.theme-dark #dropzoneExcel.mesa-dropzone-excel--drag {
+    background-color: rgba(199, 155, 102, 0.16) !important;
+    border-color: rgba(199, 155, 102, 0.55) !important;
+}
+
 html.theme-dark .mesa-dropzone-excel p,
 html.theme-dark #dropzoneExcel p {
     color: var(--clr-text-light) !important;
@@ -117,7 +121,6 @@ html.theme-dark .modal .btn-close {
     opacity: 0.8;
 }
 
-/* Alertas Bootstrap (vacíos, avisos, etc.) — evitar cajas grises claras en oscuro */
 html.theme-dark #mesasPazApp .alert,
 html.theme-dark #supervisionEvidenciasPage .alert {
     border-width: 1px;
@@ -242,7 +245,6 @@ html.theme-dark #supervisionEvidenciasPage .modal-body {
     color: var(--clr-text-main);
 }
 
-/* Calendario “Selecciona la semana a evaluar”: título usa --cal-* del tema */
 html.theme-dark .presentation-calendar-label {
     color: var(--cal-month-text) !important;
 }
@@ -257,7 +259,6 @@ html.theme-dark #supervisionEvidenciasPage .btn-close {
     opacity: 0.75;
 }
 
-/* SweetAlert v1 (sweetalert.min.js) */
 html.theme-dark .sweet-alert,
 html.theme-dark .sweet-overlay {
     background: rgba(0, 0, 0, 0.65) !important;
@@ -281,7 +282,6 @@ html.theme-dark .sweet-alert .sa-button-container .cancel {
     border: 1px solid var(--clr-border) !important;
 }
 
-/* SweetAlert2 por si se usa en otra pantalla */
 html.theme-dark .swal2-popup {
     background: var(--clr-card) !important;
     color: var(--clr-text-main) !important;
@@ -312,7 +312,6 @@ html.theme-dark #supervisionEvidenciasPage .supervision-table-row:hover {
     background: rgba(199, 155, 102, 0.08);
 }
 
-/* Botón Limpiar y btn-default: visibles en modo oscuro */
 html.theme-dark #supervisionEvidenciasPage .btn-default {
     background: rgba(255, 255, 255, 0.06) !important;
     color: var(--clr-text-main) !important;
@@ -325,32 +324,27 @@ html.theme-dark #supervisionEvidenciasPage .btn-default:hover:not(:disabled) {
     color: var(--clr-text-main) !important;
 }
 
-/* Encabezados lista evidencias */
 html.theme-dark #supervisionEvidenciasPage .evidencias-list-header {
     color: var(--clr-text-main);
 }
 
-/* Parte/Sin evidencia: legible en oscuro */
 html.theme-dark #supervisionEvidenciasPage .badge-supervision-soft {
     color: var(--clr-text-light) !important;
     background: rgba(255, 255, 255, 0.06) !important;
     border-color: var(--clr-border) !important;
 }
 
-/* Badge municipios presentes en oscuro */
 html.theme-dark #supervisionEvidenciasPage .badge-evidencia-presente {
     background-color: var(--clr-secondary) !important;
     color: #fff !important;
 }
 
-/* No presentes: badge warning legible */
 html.theme-dark #supervisionEvidenciasPage .badge.bg-warning.text-dark {
     color: #1a1a1a !important;
     background: rgba(199, 155, 102, 0.35) !important;
     border: 1px solid rgba(199, 155, 102, 0.5);
 }
 
-/* Tema pizarra: encabezados de tabla y texto primario → acento (no rojo) */
 html.theme-dark.theme-dark--slate #mesasPazApp .table thead th,
 html.theme-dark.theme-dark--slate #supervisionEvidenciasPage .table thead th,
 html.theme-dark.theme-dark--slate #supervisionEvidenciasPage .text-primary {

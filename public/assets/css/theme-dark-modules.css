@@ -1,15 +1,10 @@
-/**
- * Modo oscuro — módulos (TM, perfil, home, agenda, mesas, usuarios, Word).
- * Cargar después de theme-dark.css y de los CSS de cada módulo.
- */
+
 html.theme-dark {
     --tm-surface: #1a1f28;
     --tm-surface-2: #222830;
     --tm-input-bg: #1e242e;
     --tm-muted-bg: #252b36;
-    /* Repite acento por si el bloque :root de otro CSS pisa variables */
     --clr-accent: #c79b66;
-    /* Vista previa Excel/Word: escritorio (más oscuro) vs hoja (gris medio) vs celdas */
     --tm-preview-desk: #383e4a;
     --tm-preview-sheet: #636b7b;
     --tm-preview-cell: #565e6e;
@@ -18,7 +13,6 @@ html.theme-dark {
     --tm-preview-sheet-edge: rgba(199, 155, 102, 0.42);
 }
 
-/* ---------- Formularios globales en área autenticada ---------- */
 html.theme-dark .app-content input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="file"]):not([type="hidden"]),
 html.theme-dark .app-content select,
 html.theme-dark .app-content textarea,
@@ -29,7 +23,6 @@ html.theme-dark .app-content input.form-control {
     border-color: var(--clr-border) !important;
 }
 
-/* Tablas TM / admin: celdas con inputs (evita cajas blancas) */
 html.theme-dark .tm-table td input,
 html.theme-dark .tm-table td select,
 html.theme-dark .tm-table td textarea,
@@ -49,7 +42,6 @@ html.theme-dark .app-content table {
     color: var(--clr-text-main);
 }
 
-/* ---------- Shell Eventos temporales (todos los temas oscuros) ---------- */
 html.theme-dark .tm-shell .tm-shell-title {
     color: var(--clr-text-main);
 }
@@ -58,26 +50,26 @@ html.theme-dark .tm-shell .tm-shell-desc {
 }
 html.theme-dark .tm-shell .tm-card-in-shell,
 html.theme-dark .tm-shell .tm-module-grid .tm-card {
-    background: var(--clr-bg) !important;
-    border: none !important;
+    background: transparent !important;
+    border: 1px solid var(--clr-border) !important;
     box-shadow: none !important;
-    border-bottom: 1px solid var(--clr-border);
 }
-/* Contenedor tabla: mismo fondo que app-main */
+html.theme-dark .tm-shell .tm-module-grid .tm-card:hover {
+    border-color: var(--clr-accent) !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+}
 html.theme-dark .tm-shell .tm-table-wrap,
 html.theme-dark .tm-shell .tm-table-wrap-scroll {
     background: var(--clr-bg) !important;
     border: 1px solid var(--clr-border);
     border-radius: 8px;
 }
-/* Pie de paginación dentro del shell: sin caja */
 html.theme-dark .tm-shell .tm-pagination-wrap.tm-pagination--footer {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
 }
 
-/* ---------- Módulos temporales (.tm-*) ---------- */
 html.theme-dark .tm-section-switch,
 html.theme-dark .tm-upload-meta-pill,
 html.theme-dark .tm-btn:not(.tm-btn-primary):not(.tm-btn-success),
@@ -140,7 +132,6 @@ html.theme-dark .tm-table tbody tr:nth-child(even) {
     background: rgba(255, 255, 255, 0.02);
 }
 
-/* Tabla en shell (admin Eventos temporales): UI más limpia, mismo fondo que app-main */
 html.theme-dark .tm-shell .tm-table thead th {
     background: var(--clr-bg) !important;
     color: var(--clr-text-light) !important;
@@ -157,7 +148,6 @@ html.theme-dark .tm-table td {
     border-color: var(--clr-border);
 }
 
-/* Encabezados = acento de marca (Mis registros / tablas delegado); shell = texto suave */
 html.theme-dark .tm-table th {
     color: var(--clr-accent) !important;
 }
@@ -171,7 +161,6 @@ html.theme-dark .tm-admin-col-title {
     background: rgba(199, 155, 102, 0.1) !important;
 }
 
-/* Chips de módulo activo + pestañas Subir / Registros: mismo acento */
 html.theme-dark .tm-module-chip.is-active {
     border-color: rgba(199, 155, 102, 0.85) !important;
     background: rgba(199, 155, 102, 0.22) !important;
@@ -181,6 +170,35 @@ html.theme-dark .tm-module-chip.is-active {
 
 html.theme-dark .tm-module-chip:not(.is-active) {
     color: var(--clr-text-main);
+}
+
+html.theme-dark .tm-module-filters-nav {
+    background: var(--tm-muted-bg, rgba(255, 255, 255, 0.06)) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .tm-module-filters-nav:hover:not(:disabled) {
+    background: rgba(199, 155, 102, 0.12) !important;
+    border-color: rgba(199, 155, 102, 0.45) !important;
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .tm-records-filter-input,
+html.theme-dark .tm-records-filter-select {
+    background: var(--tm-input-bg) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .tm-records-search-clear {
+    color: var(--clr-text-light) !important;
+    background: transparent !important;
+}
+
+html.theme-dark .tm-records-search-clear:hover {
+    color: var(--clr-accent) !important;
+    background: rgba(199, 155, 102, 0.12) !important;
 }
 
 html.theme-dark .tm-section-tab.is-active {
@@ -198,7 +216,6 @@ html.theme-dark .tm-image-preview {
     background: var(--tm-surface) !important;
 }
 
-/* ---------- Modales TM (refuerzo: pie, cabecera, cuerpo) ---------- */
 html.theme-dark .tm-modal-dialog,
 html.theme-dark .tm-modal-head,
 html.theme-dark .tm-modal-body,
@@ -207,14 +224,15 @@ html.theme-dark .tm-modal-foot {
     background: var(--clr-card) !important;
     border-color: var(--clr-border) !important;
     color: var(--clr-text-main);
+    box-shadow: none !important;
 }
 
 html.theme-dark .tm-modal-foot {
     background: var(--clr-bg) !important;
 }
 
-html.theme-dark .tm-entry-form .tm-actions {
-    box-shadow: 0 -12px 24px rgba(0, 0, 0, 0.35);
+html.theme-dark .tm-modal-head h3 {
+    color: var(--clr-accent) !important;
 }
 
 html.theme-dark .tm-modal-body::-webkit-scrollbar-track {
@@ -229,7 +247,6 @@ html.theme-dark .tm-export-color-option:hover {
     background: rgba(255, 255, 255, 0.06) !important;
 }
 
-/* ---------- Admin TM: Alcance del módulo (create/edit) ---------- */
 html.theme-dark .tm-target-users {
     background: var(--clr-bg) !important;
     border-color: var(--clr-border) !important;
@@ -311,7 +328,6 @@ html.theme-dark a.tm-paginator-btn:hover {
     color: var(--clr-accent) !important;
 }
 
-/* ---------- Perfil ---------- */
 html.theme-dark .profile-hero-card {
     background-color: var(--tm-surface);
     border-color: var(--clr-border);
@@ -427,7 +443,6 @@ html.theme-dark .texture-option.is-active {
     box-shadow: 0 0 0 2px rgba(199, 155, 102, 0.55);
 }
 
-/* ---------- Home + calendario ---------- */
 html.theme-dark .calendar-card {
     background: var(--clr-card) !important;
     border: 1px solid var(--clr-border);
@@ -460,7 +475,6 @@ html.theme-dark .calendar-grid {
     border-color: var(--clr-border);
 }
 
-/* Inicio: calendario sin caja en celdas (fondo solo en hover/hoy) */
 html.theme-dark .home-shell-aside .calendar-day:not(.is-today),
 html.theme-dark .home-shell-aside .calendar-grid {
     background: transparent !important;
@@ -528,13 +542,11 @@ html.theme-dark .inline-alert-error {
     color: var(--clr-text-main);
 }
 
-/* ---------- Gestión de usuarios ---------- */
 html.theme-dark .um-conditional-section {
     background: var(--tm-muted-bg) !important;
     border-color: var(--clr-border);
 }
 
-/* Tarjetas de usuario en vista móvil: mismo fondo que la página en tema oscuro */
 html.theme-dark .um-page .um-card {
     background: var(--clr-bg) !important;
     border-color: var(--clr-border) !important;
@@ -552,7 +564,6 @@ html.theme-dark .um-page .um-card-label {
     color: var(--clr-text-light) !important;
 }
 
-/* Gestión de Usuarios: anular estilos .tm-table; fondo homogéneo como app-main */
 html.theme-dark .um-page .um-table-scroll-wrap {
     background: var(--clr-bg) !important;
 }
@@ -576,7 +587,6 @@ html.theme-dark .um-page .tm-table.um-table tbody tr:nth-child(even) {
     background: transparent !important;
 }
 
-/* Gestión de Usuarios: filtros sin gris, como Ajustes */
 html.theme-dark .um-page .um-filter-bar .tm-section-switch {
     background: transparent !important;
     border: none !important;
@@ -604,7 +614,6 @@ html.theme-dark .um-table tbody tr:hover {
     background: rgba(255, 255, 255, 0.04) !important;
 }
 
-/* Paginación UM: mismo criterio que filtros (sin bloque gris), todos los temas oscuros */
 html.theme-dark .um-pagination-wrap {
     background: transparent !important;
     border-top-color: var(--clr-border) !important;
@@ -627,7 +636,6 @@ html.theme-dark .um-pagination .page-item.active .page-link {
     color: #fff !important;
 }
 
-/* Agenda Directiva: ver theme-dark-agenda.css */
 
 html.theme-dark input:checked + .slider-mini {
     background-color: var(--clr-primary) !important;
@@ -638,7 +646,6 @@ html.theme-dark input:checked + .slider-mini:before {
     background-color: var(--clr-card) !important;
 }
 
-/* ---------- Mesas de paz (#mesasPazApp) ---------- */
 html.theme-dark #mesasPazApp .mesa-micro-page:not(.is-active) {
     background: var(--tm-surface) !important;
     color: var(--clr-text-main);
@@ -665,14 +672,12 @@ html.theme-dark .swal-button--cancel {
     color: var(--clr-text-main) !important;
 }
 
-/* ---------- Supervisión evidencias ---------- */
 html.theme-dark .supervision-layout .card,
 html.theme-dark .supervision-layout table thead th {
     background: var(--tm-surface) !important;
     color: var(--clr-text-main);
 }
 
-/* ---------- Análisis Word (tm-analysis) — paleta arrastrable etc. ---------- */
 html.theme-dark .tm-analysis-root,
 html.theme-dark .tm-word-slot,
 html.theme-dark .tm-word-dyn-table td,
@@ -683,7 +688,6 @@ html.theme-dark .tm-word-acc-row {
     border-color: var(--clr-border);
 }
 
-/* Paleta de campos arrastrables y slots: adaptados a tema oscuro */
 html.theme-dark .tm-word-field-palette {
     background: var(--tm-surface) !important;
     border-color: var(--clr-border) !important;
@@ -708,11 +712,6 @@ html.theme-dark .tm-word-acc-label {
     color: var(--clr-text-main) !important;
 }
 
-/* Solo el título del modal Word usa acento (--clr-accent) */
-html.theme-dark .tm-analysis-word-personalize-modal .tm-modal-head h3 {
-    color: var(--clr-accent) !important;
-}
-
 html.theme-dark .tm-word-accounting-summary td.tm-word-accounting-val {
     background: var(--tm-input-bg) !important;
     color: #f87171 !important;
@@ -732,12 +731,10 @@ html.theme-dark .tm-analysis-toolbar {
     border-color: var(--clr-border);
 }
 
-/* ---------- Ajustes toggle ---------- */
 html.theme-dark .settings-toggle-track::after {
     background: var(--clr-card);
 }
 
-/* ---------- SweetAlert / swal si aplica ---------- */
 html.theme-dark .swal2-popup {
     background: var(--clr-card) !important;
     color: var(--clr-text-main) !important;
@@ -748,13 +745,6 @@ html.theme-dark .swal2-title {
     color: var(--clr-text-main) !important;
 }
 
-/* =============================================================================
-   Vista previa Excel + Word — solo tema oscuro
-   Solo hoja (página) + celdas de CONTENIDO/EJEMPLO (.tm-export-preview-data-cell).
-   Título, encabezados y th no se tocan (siguen color configurable en UI).
-   ============================================================================= */
-
-/* --- Excel: escritorio + hoja A4 --- */
 html.theme-dark .tm-export-preview-a4 {
     background: var(--tm-preview-desk) !important;
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25) !important;
@@ -772,7 +762,6 @@ html.theme-dark .tm-export-personalize-preview {
     background: transparent !important;
 }
 
-/* Solo fila de datos / ejemplo (no título ni encabezados de columna) */
 html.theme-dark .tm-export-preview-data-cell {
     background: var(--tm-preview-cell) !important;
     border: 1px solid var(--tm-preview-border) !important;
@@ -783,7 +772,6 @@ html.theme-dark .tm-export-preview-row.tm-export-preview-data .tm-export-preview
     background: var(--tm-preview-cell-alt) !important;
 }
 
-/* --- Word: modal simple (panel + doc) --- */
 html.theme-dark .tm-analysis-preview-panel {
     background: var(--clr-card) !important;
     border-color: var(--clr-border) !important;
@@ -807,7 +795,6 @@ html.theme-dark .tm-analysis-doc-sub {
     color: #a8b0c0 !important;
 }
 
-/* Word: no tocar th / thead (color configurable). Solo td = contenido. */
 html.theme-dark .tm-analysis-mini-table td,
 html.theme-dark .tm-analysis-big-table tbody td {
     background: var(--tm-preview-cell) !important;
@@ -819,7 +806,6 @@ html.theme-dark .tm-analysis-big-table tbody tr:nth-child(even) td {
     background: var(--tm-preview-cell-alt) !important;
 }
 
-/* Rejilla N×M = solo celdas de contenido */
 html.theme-dark .tm-analysis-grid-table td {
     background: var(--tm-preview-cell) !important;
     border-color: var(--tm-preview-border) !important;
@@ -840,7 +826,6 @@ html.theme-dark .tm-word-preview-zoom-hint {
     color: var(--clr-text-light) !important;
 }
 
-/* --- Word: A4 personalizar (misma caja que Excel) --- */
 html.theme-dark .tm-analysis-word-preview-a4 {
     background: var(--tm-preview-desk) !important;
 }
@@ -873,7 +858,6 @@ html.theme-dark .tm-word-orient-btn:not(.is-active) {
     color: var(--clr-text-main) !important;
 }
 
-/* ---------- Variantes de modo oscuro (Ajustes) ---------- */
 html.theme-dark.theme-dark--soft {
     --tm-surface: #505660;
     --tm-surface-2: #565c68;
@@ -900,7 +884,6 @@ html.theme-dark.theme-dark--slate {
     --tm-preview-sheet-edge: rgba(130, 170, 220, 0.35);
 }
 
-/* Tema pizarra: textos rojos → acento en módulos (TM, UM, supervisión, etc.) */
 html.theme-dark.theme-dark--slate .tm-shell .tm-table th,
 html.theme-dark.theme-dark--slate .supervision-layout table thead th {
     color: var(--clr-accent) !important;

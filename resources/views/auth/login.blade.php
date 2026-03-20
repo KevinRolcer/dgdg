@@ -9,9 +9,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="Sat, 01 Jan 2000 00:00:00 GMT">
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('assets/css/fonts-gilroy.css') }}?v={{ @filemtime(public_path('assets/css/fonts-gilroy.css')) ?: time() }}">
     <link rel="stylesheet" href="{{ asset('assets/css/login.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/theme-dark.css') }}">
 </head>

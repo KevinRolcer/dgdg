@@ -15,7 +15,7 @@
 
 #mesasPazApp .panel-heading {
     background: var(--clr-card);
-    padding: 13px 16px;
+    padding: 9px 12px;
     border-bottom: 1px solid var(--clr-border);
 }
 
@@ -27,20 +27,20 @@
 }
 
 #mesasPazApp .mesa-heading-date {
-    font-size: 0.8rem;
+    font-size: 0.74rem;
     font-weight: 700;
     color: var(--clr-text-light);
     background: rgba(72, 71, 71, 0.08);
     border: 1px solid rgba(72, 71, 71, 0.16);
     border-radius: 999px;
-    padding: 4px 10px;
+    padding: 3px 8px;
     white-space: nowrap;
 }
 
 #mesasPazApp .panel-title {
     margin: 0;
     color: var(--clr-text-main);
-    font-size: 0.92rem;
+    font-size: 0.82rem;
     font-weight: 700;
 }
 
@@ -51,10 +51,10 @@
     background: rgba(72, 71, 71, 0.07);
     border: 1px solid rgba(72, 71, 71, 0.15);
     border-radius: var(--mesa-radius-sm);
-    padding: 6px 14px;
+    padding: 4px 11px;
     cursor: pointer;
     transition: all 0.25s ease;
-    font-size: 0.88rem;
+    font-size: 0.8rem;
     font-weight: 700;
     color: var(--clr-text-main);
 }
@@ -86,16 +86,16 @@
 }
 
 #mesasPazApp .mesa-micro-pagination-wrap {
-    border: 1px solid var(--clr-border);
-    border-radius: var(--mesa-radius-md);
-    background: var(--clr-card);
-    padding: 10px 12px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 0.15rem 0 0.55rem;
     display: grid;
-    gap: 8px;
+    gap: 6px;
 }
 
 #mesasPazApp .mesa-micro-pagination-title {
-    font-size: 0.8rem;
+    font-size: 0.74rem;
     font-weight: 700;
     color: var(--clr-text-light);
 }
@@ -103,19 +103,19 @@
 #mesasPazApp .mesa-micro-pagination {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
 }
 
 #mesasPazApp .mesa-micro-page {
-    min-height: 34px;
+    min-height: 30px;
     border: 1px solid var(--clr-border);
     border-radius: 999px;
     background: var(--clr-card);
     color: var(--clr-text-main);
     text-decoration: none;
-    font-size: 0.82rem;
+    font-size: 0.76rem;
     font-weight: 700;
-    padding: 6px 12px;
+    padding: 4px 10px;
     display: inline-flex;
     align-items: center;
 }
@@ -133,7 +133,7 @@
 }
 
 #mesasPazApp .panel-body {
-    padding: 14px;
+    padding: 10px 12px;
     background: var(--clr-card);
 }
 
@@ -141,7 +141,19 @@
 #mesasPazApp .historial-filter .btn,
 #mesasPazApp .inline-asistencia .form-select,
 #mesasPazApp .inline-asistencia .btn {
-    min-height: 38px;
+    min-height: 34px;
+    font-size: 0.8rem;
+}
+
+#mesasPazApp .inline-asistencia .form-label,
+#mesasPazApp .historial-col .form-label {
+    font-size: 0.72rem;
+    margin-bottom: 0.25rem;
+}
+
+#mesasPazApp textarea.form-control {
+    font-size: 0.8rem;
+    min-height: 4.5rem;
 }
 
 #mesasPazApp .border.rounded,
@@ -339,10 +351,29 @@
     cursor: pointer;
     background-color: #f8f9fa;
     border-color: rgba(72, 71, 71, 0.2) !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .mesa-dropzone-excel:hover {
     background-color: #eef0f2;
+}
+
+.mesa-dropzone-excel.mesa-dropzone-excel--drag {
+    background-color: #e9ecef;
+    border-color: #0d6efd !important;
+}
+
+/* Icono vaciar junto a Cargar Excel */
+#mesasPazApp .mesa-btn-vaciar-registros {
+    padding: 0.28rem 0.5rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#mesasPazApp .mesa-btn-vaciar-registros i {
+    font-size: 0.85rem;
 }
 
 #mesasPazApp .modal-header {

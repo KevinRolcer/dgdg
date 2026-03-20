@@ -8,7 +8,7 @@
     --clr-border: rgba(72, 71, 71, 0.14);
     --clr-bg: #f7f7f8;
     --clr-card: #ffffff;
-    --font-main: 'Montserrat', sans-serif;
+    --font-main: 'Gilroy', system-ui, sans-serif;
     --shadow-soft: 0 2px 8px rgba(72, 71, 71, 0.06);
     --sidebar-width: 236px;
     --sidebar-collapsed-width: 72px;
@@ -32,7 +32,6 @@
     --ui-gap-lg: 14px;
     --ui-border: 1px solid var(--clr-border);
     --ui-input-height: 2.25rem;
-    /* Calendario Inicio — tema claro (celdas sin caja, fondo solo en hover/hoy) */
     --cal-cell-bg: transparent;
     --cal-cell-hover-bg: rgba(72, 71, 71, 0.06);
     --cal-cell-border: transparent;
@@ -79,7 +78,6 @@ select {
     transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Páginas tipo shell (UM, Agenda): sin scroll en body solo en viewport ≥ 801px */
 @media (min-width: 801px) {
     .app-shell:has(.um-page),
     .app-shell:has(.agenda-shell) {
@@ -706,7 +704,6 @@ body.sidebar-collapsed .sidebar-logout-btn {
     line-height: 1.25;
 }
 
-/* En el dropdown (campana) mantenemos el texto más compacto */
 .topbar-notify-panel .topbar-notify-list strong {
     font-size: 0.72rem;
     word-break: break-word;
@@ -931,7 +928,7 @@ body.sidebar-collapsed .sidebar-logout-btn {
     position: fixed;
     top: 14px;
     right: 16px;
-    z-index: 200;
+    z-index: 13050;
     background: var(--clr-accent);
     border-radius: 999px;
     box-shadow: var(--shadow-soft);
@@ -985,6 +982,60 @@ body.sidebar-collapsed .sidebar-logout-btn {
 .app-content:has(> .agenda-shell){
     padding: 1.25rem 1.5rem;
 
+}
+
+@media (min-width: 1400px) {
+    .app-content:has(> .agenda-page.agenda-cal-page) {
+        max-width: min(1680px, 96vw);
+    }
+}
+
+@media (min-width: 1920px) {
+    .app-content:has(> .agenda-page.agenda-cal-page) {
+        max-width: min(1900px, 94vw);
+    }
+}
+
+@media (min-width: 2400px) {
+    .app-content:has(> .agenda-page.agenda-cal-page) {
+        max-width: min(2160px, 92vw);
+    }
+}
+
+@media (min-width: 1400px) {
+    .app-content:has(> .home-shell) {
+        max-width: min(1660px, 96vw);
+    }
+}
+
+@media (min-width: 1920px) {
+    .app-content:has(> .home-shell) {
+        max-width: min(1820px, 94vw);
+    }
+}
+
+@media (min-width: 2400px) {
+    .app-content:has(> .home-shell) {
+        max-width: min(1980px, 92vw);
+    }
+}
+
+@media (min-width: 1400px) {
+    .app-content:has(> .settings-shell) {
+        max-width: min(1660px, 96vw);
+    }
+}
+
+@media (min-width: 1920px) {
+    .app-content:has(> .settings-shell) {
+        max-width: min(1820px, 94vw);
+    }
+}
+
+@media (min-width: 2400px) {
+    .app-content:has(> .settings-shell) {
+        max-width: min(1980px, 92vw);
+    }
 }
 
 .app-content > .content-card:first-child {
@@ -1057,23 +1108,29 @@ body.sidebar-collapsed .sidebar-logout-btn {
     color: var(--clr-text-light);
 }
 
-/* Shells (Ajustes, Inicio, Agenda, TM, Mesas): títulos y descripción con estándar tipográfico (tema pizarra: subtítulos en accent) */
 .settings-shell .settings-shell-main-title,
-.home-shell .home-shell-main-title,
 .agenda-shell .agenda-shell-title,
-.tm-shell .tm-shell-title,
-.mesas-paz-shell .mesas-paz-shell-title {
+.tm-shell .tm-shell-title {
     font-size: 1rem;
     line-height: var(--lh-title);
     font-weight: 800;
     color: var(--clr-accent);
 }
+.home-shell .home-shell-main-title {
+    font-size: 0.875rem;
+    line-height: var(--lh-title);
+    font-weight: 800;
+    color: var(--clr-accent);
+}
 .settings-shell .settings-shell-main-desc,
-.home-shell .home-shell-main-desc,
 .agenda-shell .agenda-shell-desc,
-.tm-shell .tm-shell-desc,
-.mesas-paz-shell .mesas-paz-shell-desc {
+.tm-shell .tm-shell-desc {
     font-size: 0.76rem;
+    line-height: var(--lh-body);
+    color: var(--clr-text-light);
+}
+.home-shell .home-shell-main-desc {
+    font-size: 0.68rem;
     line-height: var(--lh-body);
     color: var(--clr-text-light);
 }
@@ -1233,6 +1290,10 @@ body.sidebar-collapsed .sidebar-logout-btn {
     .app-content:has(> .tm-shell),
     .app-content:has(> .um-page) {
         padding: 0.75rem 1rem;
+    }
+
+    .app-content:has(> .agenda-page.agenda-cal-page) {
+        padding-bottom: max(1rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem));
     }
 
 }

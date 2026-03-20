@@ -1,7 +1,4 @@
-/* =========================================================
-   Inicio — mismo plano que Ajustes: sin caja exterior;
-   división suave main | aside (1px), mismo fondo que .app-content
-   ========================================================= */
+
 
 .home-shell {
     display: block;
@@ -13,15 +10,14 @@
     background: var(--clr-bg);
     box-shadow: none;
     overflow: visible;
-    font-size: var(--fs-body, 0.875rem);
-    line-height: 1.45;
+    font-size: 0.8125rem;
+    line-height: 1.42;
     position: relative;
     min-height: 0;
 }
 
-/* Área principal — mismo estilo que settings-shell-main */
 .home-shell-main {
-    padding: 0.85rem 1.25rem 1.25rem;
+    padding: 0.65rem 1rem 1rem;
     min-width: 0;
     background: var(--clr-bg);
     border: none;
@@ -29,14 +25,7 @@
 
 @media (min-width: 900px) {
     .home-shell-main {
-        padding: 1rem 1.5rem 1.5rem;
-    }
-}
-
-@media (min-width: 1440px) {
-    .home-shell-main {
-        max-width: var(--content-max-width);
-        margin: 0 auto;
+        padding: 0.75rem 1.25rem 1.15rem;
     }
 }
 
@@ -46,25 +35,24 @@
     border-bottom: 1px solid var(--clr-border);
 }
 
-.home-shell-main-title {
-    margin: 0 0 0.1rem;
-    font-size: 1rem;
+.home-shell .home-shell-main-title {
+    margin: 0 0 0.08rem;
+    font-size: 0.875rem;
     font-weight: 800;
     color: var(--clr-accent);
 }
 
-html.theme-dark .home-shell-main-title {
+html.theme-dark .home-shell .home-shell-main-title {
     color: var(--clr-text-main);
 }
 
-.home-shell-main-desc {
+.home-shell .home-shell-main-desc {
     margin: 0;
-    font-size: 0.76rem;
+    font-size: 0.68rem;
     color: var(--clr-text-light);
-    line-height: 1.45;
+    line-height: 1.42;
 }
 
-/* Alertas — discretas, sin caja */
 .home-inline-alert {
     border-radius: 6px;
     padding: 0.4rem 0.6rem;
@@ -85,7 +73,6 @@ html.theme-dark .home-shell-main-title {
     color: var(--clr-primary-dark);
 }
 
-/* Bloque de contenido — títulos y texto como en Ajustes */
 .home-panel-block {
     min-width: 0;
     margin-top: 0.5rem;
@@ -105,17 +92,26 @@ html.theme-dark .home-shell-main-title {
     line-height: 1.35;
 }
 
-/* Aside calendario — en escritorio: columna fija a la derecha; en móvil: drawer que se abre con "Eventos" */
 @media (min-width: 769px) {
     .home-shell {
         display: grid;
-        grid-template-columns: 1fr 320px;
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
         gap: 0;
         align-items: start;
+        width: 100%;
+        max-width: min(1180px, calc(100% - 16px));
+        margin-inline: auto;
+        box-sizing: border-box;
     }
     .home-shell-main {
         padding-right: 0;
         border-right: 1px solid var(--clr-border);
+    }
+
+    .home-shell-main-head,
+    .home-panel-block,
+    .home-inline-alert {
+        max-width: min(40rem, 100%);
     }
     .home-shell-aside {
         position: relative;
@@ -135,6 +131,37 @@ html.theme-dark .home-shell-main-title {
     .home-calendar-mobile-tab,
     .home-calendar-mobile-backdrop {
         display: none !important;
+    }
+}
+
+@media (min-width: 1200px) {
+    .home-shell {
+        max-width: min(1280px, calc(100% - 24px));
+    }
+}
+
+@media (min-width: 1400px) {
+    .home-shell {
+        max-width: min(1420px, calc(100% - 32px));
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+    }
+}
+
+@media (min-width: 1600px) {
+    .home-shell {
+        max-width: min(1560px, calc(100% - 40px));
+    }
+}
+
+@media (min-width: 1920px) {
+    .home-shell {
+        max-width: min(1680px, calc(100% - 48px));
+    }
+}
+
+@media (min-width: 2400px) {
+    .home-shell {
+        max-width: min(1820px, calc(100% - 56px));
     }
 }
 
@@ -206,7 +233,6 @@ html.theme-dark .home-aside-title {
     }
 }
 
-/* Filtros / vista: Mes | Próximos | Anteriores */
 .home-calendar-view-switch {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -237,15 +263,29 @@ html.theme-dark .home-aside-title {
 }
 
 .home-calendar-view-btn.is-active {
+    background: var(--clr-primary);
     border-color: var(--clr-primary);
-    background: rgba(134, 30, 52, 0.08);
-    color: var(--clr-primary-dark);
+    color: var(--clr-bg);
+}
+
+.home-calendar-view-btn.is-active:hover {
+    background: var(--clr-primary);
+    border-color: var(--clr-primary);
+    color: var(--clr-bg);
+    filter: brightness(1.06);
 }
 
 html.theme-dark .home-calendar-view-btn.is-active {
-    border-color: var(--clr-accent);
-    background: rgba(199, 155, 102, 0.12);
-    color: var(--clr-accent);
+    background: var(--clr-primary);
+    border-color: var(--clr-primary);
+    color: #f7f7f8;
+}
+
+html.theme-dark .home-calendar-view-btn.is-active:hover {
+    background: var(--clr-primary);
+    border-color: var(--clr-primary);
+    color: #f7f7f8;
+    filter: brightness(1.08);
 }
 
 .home-calendar-panel {
@@ -306,7 +346,6 @@ html.theme-dark .home-calendar-view-btn.is-active {
     color: var(--cal-weekday-text, var(--clr-text-light));
 }
 
-/* Grid de días (clase genérica para no romper JS) */
 .home-shell-aside .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -426,7 +465,6 @@ html.theme-dark .home-calendar-view-btn.is-active {
     margin-top: 2px;
 }
 
-/* Tooltip creado por JS y añadido a body */
 body:has(.home-shell) .calendar-agenda-tooltip {
     max-width: min(260px, calc(100vw - 24px));
     padding: 8px 10px;
@@ -456,7 +494,6 @@ body:has(.home-shell) .calendar-agenda-tooltip-time {
     margin-top: 2px;
 }
 
-/* Listas de eventos — altura limitada para menos scroll */
 .home-calendar-event-list {
     margin: 0;
     padding: 0;
@@ -485,7 +522,6 @@ body:has(.home-shell) .calendar-agenda-tooltip-time {
     color: var(--clr-text-light);
 }
 
-/* Botón "Eventos" — visible en desktop y móvil para abrir el panel (cerrado por defecto) */
 .home-calendar-mobile-tab {
     position: fixed;
     right: 0;

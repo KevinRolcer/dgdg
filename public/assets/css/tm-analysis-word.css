@@ -1,4 +1,3 @@
-/* Modal informe Word análisis — módulos temporales */
 .tm-analysis-word-dialog {
     max-width: min(96vw, 1100px);
     width: 100%;
@@ -75,7 +74,7 @@
     overflow: auto;
     max-height: 55vh;
 }
-.tm-analysis-doc-inner { font-family: Calibri, 'Segoe UI', sans-serif; font-size: 11pt; color: #111; }
+.tm-analysis-doc-inner { font-family: 'Gilroy', system-ui, sans-serif; font-size: 11pt; color: #111; }
 .tm-analysis-doc-title { color: #861E34; font-size: 16pt; margin: 0 0 4px; }
 .tm-analysis-doc-sub { font-size: 9pt; color: #666; margin: 0 0 12px; }
 .tm-analysis-mini-table {
@@ -124,7 +123,6 @@
     align-items: center;
     gap: 8px;
 }
-/* Modal personalizar Word encima del modal simple */
 .tm-analysis-word-personalize-modal.is-open {
     z-index: 10060;
 }
@@ -136,7 +134,6 @@
     max-width: min(96vw, 1200px);
     width: min(96vw, 1200px);
 }
-/* Mismo layout que Excel: formulario izquierda, vista previa derecha */
 .tm-analysis-word-personalize-body {
     flex: 1;
     min-height: 0;
@@ -161,7 +158,6 @@
     flex-wrap: wrap;
     justify-content: flex-end;
 }
-/* Área gris: scroll para ver hoja A4 completa; zoom con Ctrl+rueda / pellizco */
 .tm-analysis-word-preview-a4 {
     min-height: 240px;
     display: flex;
@@ -177,7 +173,6 @@
     color: #64748b;
     font-size: 0.72em;
 }
-/* ISO 216 A4: 210 mm × 297 mm (vertical); apaisado 297 mm × 210 mm */
 .tm-word-preview-page {
     margin: 0 auto;
     background: #fff;
@@ -220,7 +215,6 @@
     height: 100%;
     box-sizing: border-box;
 }
-/* Rellena el marco A4; el scroll es dentro del marco */
 .tm-analysis-word-preview-a4 .tm-analysis-preview-doc--personalize {
     min-height: 100%;
     width: 100%;
@@ -242,12 +236,11 @@
     overflow-x: auto;
 }
 
-/* Vista previa: imagen de la hoja real (plantilla); el informe se dibuja encima del área de cuerpo */
 .tm-word-sheet-preview {
     width: 100%;
     max-width: 640px;
     margin: 0 auto;
-    aspect-ratio: 8.5 / 11; /* hoja en blanco vertical */
+    aspect-ratio: 8.5 / 11; 
     background-size: 100% 100%;
     background-position: center top;
     background-repeat: no-repeat;
@@ -258,7 +251,6 @@
 }
 .tm-word-sheet-overlay {
     position: absolute;
-    /* Zona bajo el membrete y sobre la marca de agua (ajustable si cambias la captura) */
     top: 26%;
     left: 7.5%;
     right: 7.5%;
@@ -297,7 +289,6 @@
     }
 }
 
-/* Word personalizar: orientación, paleta arrastrable, columnas */
 .tm-word-orient-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .tm-word-orient-btn {
     padding: 6px 12px;

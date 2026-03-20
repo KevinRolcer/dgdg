@@ -2,7 +2,7 @@
 
 @section('settings_panel')
     {{-- Una sola columna de contenido: sin caja dentro de caja; filas = separadores ligeros --}}
-    <section class="settings-panel-block" aria-labelledby="settings-appearance-heading">
+    <section class="settings-panel-block settings-appearance-panel" aria-labelledby="settings-appearance-heading">
         <h2 class="settings-panel-heading" id="settings-appearance-heading">Modo oscuro</h2>
         <p class="settings-panel-lead">Se aplica en todo el sistema y se guarda en este navegador.</p>
 

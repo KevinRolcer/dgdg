@@ -166,9 +166,10 @@ html.theme-dark .agenda-shell-title {
     min-height: 0;
     overflow-y: auto;
     overflow-x: auto;
-    border: 1px solid var(--clr-border);
-    border-radius: 8px;
-    background: var(--clr-card, #fff);
+    /* Mismo plano que .app-content / main (sin caja tipo tarjeta) */
+    border: none;
+    border-radius: 0;
+    background: transparent;
 }
 
 .agenda-shell .agenda-pagination-wrap {
@@ -681,10 +682,9 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     overflow-y: auto !important;
     overflow-x: hidden !important;
     flex: 1 1 auto;
-    min-height: 0; /* scroll dentro de max-height del modal */
+    min-height: 0; 
 }
 
-/* Modal agregar/editar: altura adaptable; form en flex para que el pie quede siempre hasta abajo */
 #agendaModal .modal-agenda-content {
     height: auto;
     max-height: calc(100vh - 2rem);
@@ -766,16 +766,22 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
 }
 
 .modal-agenda-footer {
-    padding: 1rem 1.25rem 1.25rem;
-    border-top: 1px solid #e2e8f0;
+    padding: 0.75rem 1.25rem 1.25rem;
+    border-top: 1px solid var(--clr-border, #e2e8f0);
     display: flex;
     justify-content: flex-end;
     gap: 0.75rem;
-    background: #f8fafc;
+    background: transparent;
     flex-shrink: 0;
+    box-shadow: none;
 }
 
-/* Form Controls */
+.modal-agenda-footer--readonly {
+    border-top: none;
+    padding-top: 0.65rem;
+    margin-top: 0;
+}
+
 .form-group-agenda {
     margin-bottom: 0.85rem;
 }
@@ -815,7 +821,6 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     box-shadow: 0 0 0 3px rgba(134, 30, 52, 0.12);
 }
 
-/* Type selector pills */
 .agenda-type-switch {
     display: flex;
     flex-direction: column;
@@ -873,7 +878,6 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     color: #64748b;
 }
 
-/* Gira: delegado + Asignar usuario + Aforo en una fila */
 .agenda-gira-delegado-aforo-row {
     display: flex;
     flex-wrap: wrap;
@@ -925,7 +929,6 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     overflow-y: auto;
 }
 
-/* Compact assistant button near microrregión */
 #btnOpenAssignModal.btn-toggle-unfold {
     width: auto;
     justify-content: flex-start;
@@ -945,7 +948,6 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     }
 }
 
-/* Unfold Helpers */
 .btn-toggle-unfold {
     display: flex;
     align-items: center;
@@ -989,7 +991,6 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
 }
 
-/* Tabla: scroll interno, cabecera fija, estilo limpio (como Gestión de Usuarios) */
 .agenda-table-wrap {
     overflow-x: auto;
 }
@@ -1037,7 +1038,7 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
 }
 
 .agenda-shell .agenda-table th {
-    background: var(--clr-card, #fff);
+    background: var(--clr-bg);
 }
 
 .agenda-table td strong {
@@ -1154,7 +1155,6 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     }
 }
 
-/* User Items Mini */
 .user-selection-list-mini {
     max-height: 260px;
     overflow-y: auto;
@@ -1181,7 +1181,6 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
 .u-name { font-size: 0.875rem; font-weight: 600; color: #1e293b; }
 .u-email { font-size: 0.75rem; color: #64748b; }
 
-/* Toggles and Pills */
 .toggle-switch-mini {
     position: relative;
     display: inline-block;
@@ -1213,7 +1212,6 @@ input:checked + .slider-mini:before { transform: translateX(16px); }
     color: var(--clr-secondary); font-size: 0.75rem; font-weight: 600; background: none; border: none; cursor: pointer;
 }
 
-/* Números telefónicos adicionales */
 .agenda-phones-container {
     display: flex;
     flex-direction: column;
@@ -1290,7 +1288,6 @@ input:checked + .slider-mini:before { transform: translateX(16px); }
     cursor: pointer;
 }
 
-/* Semáforo Status Dots */
 .status-dot {
     display: inline-block;
     width: 10px;

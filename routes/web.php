@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\AgendaController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CanvaController;
+use App\Http\Controllers\GilroyFontController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\MesasPazController;
 use App\Http\Controllers\MesasPazSupervisionController;
@@ -16,6 +17,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return redirect('/login');
 });
+
+Route::get('/fonts/gilroy/{file}', GilroyFontController::class)
+    ->where('file', '[A-Za-z0-9\-\.]+\.otf')
+    ->name('fonts.gilroy');
 
 Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:login');
@@ -170,6 +175,14 @@ Route::middleware('auth')->group(function () {
             ->whereNumber('module')
             ->whereNumber('entry')
             ->name('temporary-modules.entry.destroy');
+        Route::get('/{module}/plantilla', [TemporaryModuleController::class, 'downloadTemplate'])
+            ->middleware('can:modulos-temporales-ver')
+            ->whereNumber('module')
+            ->name('temporary-modules.download-template');
+        Route::get('/plantillas/{file}', [TemporaryModuleController::class, 'downloadTemplateFile'])
+            ->where('file', 'plantilla_[A-Za-z0-9_\-]+\.xlsx')
+            ->middleware('can:modulos-temporales-ver')
+            ->name('temporary-modules.plantilla.download');
         Route::get('/{module}/registros/{entry}/archivo/{fieldKey}', [TemporaryModuleController::class, 'previewEntryFile'])
             ->middleware('can:modulos-temporales-ver')
             ->whereNumber('entry')
@@ -182,6 +195,10 @@ Route::middleware('auth')->group(function () {
         Route::get('agenda/modulo/enlaces', [AgendaController::class, 'moduloEnlaces'])->name('agenda.modulo.enlaces');
         Route::get('agenda/seguimiento', [\App\Http\Controllers\AgendaSeguimientoController::class, 'index'])->name('agenda.seguimiento.index');
         Route::get('agenda/calendario', [AgendaController::class, 'calendar'])->name('agenda.calendar');
+        Route::post('agenda/calendario/fichas-pdf', [AgendaController::class, 'calendarFichasPdf'])->name('agenda.calendar.fichas-pdf');
+        Route::get('agenda/calendario/fichas-export/{file}', [AgendaController::class, 'downloadFichasExport'])
+            ->where('file', '[A-Za-z0-9._\-]+')
+            ->name('agenda.calendar.fichas-export.download');
         Route::get('agenda', [AgendaController::class, 'index'])->name('agenda.index');
         Route::get('agenda/{agenda}', [AgendaController::class, 'show'])->name('agenda.show');
     });

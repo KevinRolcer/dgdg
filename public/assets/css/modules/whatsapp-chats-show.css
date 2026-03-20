@@ -1,4 +1,3 @@
-/* Vista previa WhatsApp: 3 columnas (filtros | chat | búsqueda) */
 :root {
     --wa-accent: #c79b66;
     --wa-accent-hover: #b58955;
@@ -31,7 +30,7 @@
 
 .wa-preview-cols {
     display: grid;
-    grid-template-columns: minmax(220px, 270px) 1fr minmax(240px, 320px);
+    grid-template-columns: minmax(180px, 18%) 1fr minmax(200px, 22%);
     gap: 16px;
     align-items: start;
 }
@@ -91,7 +90,6 @@
     background: rgba(0, 0, 0, 0.2);
 }
 
-/* Filtros izquierda */
 .wa-field {
     margin-bottom: 12px;
 }
@@ -163,7 +161,6 @@
     background: rgba(255, 255, 255, 0.12);
 }
 
-/* Partes verticales (modo HTML) */
 .wa-parts-vertical {
     display: flex;
     flex-direction: column;
@@ -197,7 +194,6 @@
     box-shadow: 0 0 0 1px rgba(199, 155, 102, 0.35);
 }
 
-/* Centro */
 .wa-preview-main {
     min-width: 0;
 }
@@ -325,7 +321,6 @@
     font-size: 0.82rem;
 }
 
-/* Búsqueda derecha */
 .wa-side-card--search {
     border: none;
     background: transparent;
@@ -436,7 +431,6 @@
     width: 100%;
 }
 
-/* Flatpickr Custom Institutional Theme - Fully Theme Aware */
 .flatpickr-calendar {
     background: var(--clr-card, #fff) !important;
     border: 1px solid var(--clr-border, rgba(0, 0, 0, 0.1)) !important;

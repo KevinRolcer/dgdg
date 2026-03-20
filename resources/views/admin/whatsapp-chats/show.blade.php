@@ -57,7 +57,7 @@
                                 <div class="wa-field">
                                     <label class="wa-label" for="waFilterAuthor">Autor</label>
                                     <select id="waFilterAuthor" class="wa-input wa-select">
-                                        <option value="">Todos los autores</option>
+                                        <option value="">Todos</option>
                                         @foreach (($txtMessages ?? collect())->pluck('author')->unique()->filter() as $authorName)
                                             <option value="{{ $authorName }}">{{ $authorName }}</option>
                                         @endforeach

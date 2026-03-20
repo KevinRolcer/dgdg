@@ -172,7 +172,7 @@
         <div class="modal-body-scroll" style="max-height: 50vh; overflow-y: auto;">
             <div id="agendaVerUsuariosBody" class="agenda-assigned-users-body"></div>
         </div>
-        <div class="modal-agenda-footer" style="margin-top: 12px;">
+        <div class="modal-agenda-footer modal-agenda-footer--readonly">
             <button type="button" class="btn-agenda btn-secondary-agenda" onclick="window.agendaCerrarVerUsuariosAsignados()">Cerrar</button>
         </div>
     </div>

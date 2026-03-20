@@ -26,10 +26,11 @@ class AgendaDirectivaCalendarService
      *   grid_weeks: list<list<array<string,mixed>>>,
      *   list_rows: list<array<string,mixed>>,
      *   cards: list<array<string,mixed>>,
-     *   today: string
+     *   today: string,
+     *   fichas_cards_included: bool
      * }
      */
-    public function buildMonthPayload(User $viewer, int $year, int $month, array $filters): array
+    public function buildMonthPayload(User $viewer, int $year, int $month, array $filters, bool $includeFichasCards = true): array
     {
         $tz = config('app.timezone', 'UTC');
 
@@ -50,6 +51,7 @@ class AgendaDirectivaCalendarService
                     'agenda_id' => $agenda->id,
                     'title' => $this->homeAgendaCalendar->displayTitle($agenda),
                     'time' => $occ['time_label'],
+                    'kind' => $this->cardKindForFicha($agenda),
                 ];
             }
         }
@@ -86,42 +88,9 @@ class AgendaDirectivaCalendarService
             return strcmp((string) $a['time_label'], (string) $b['time_label']);
         });
 
-        $cards = [];
-        foreach ($agendas as $agenda) {
-            $occs = $this->homeAgendaCalendar->occurrencesInCalendarMonth($agenda, $year, $month);
-            if (count($occs) === 0) {
-                continue;
-            }
-            $fi = $agenda->fecha_inicio instanceof Carbon
-                ? $agenda->fecha_inicio->copy()->locale('es')
-                : Carbon::parse($agenda->fecha_inicio)->locale('es');
-            $ff = $agenda->fecha_fin
-                ? ($agenda->fecha_fin instanceof Carbon
-                    ? $agenda->fecha_fin->copy()->locale('es')
-                    : Carbon::parse($agenda->fecha_fin)->locale('es'))
-                : $fi->copy();
-
-            if ($fi->toDateString() === $ff->toDateString()) {
-                $rangeLabel = $fi->translatedFormat('j \d\e F \d\e Y');
-            } elseif ($fi->format('Y-m') === $ff->format('Y-m')) {
-                $rangeLabel = $fi->format('j').' al '.$ff->translatedFormat('j \d\e F \d\e Y');
-            } elseif ($fi->year === $ff->year) {
-                $rangeLabel = $fi->translatedFormat('j \d\e F').' al '.$ff->translatedFormat('j \d\e F \d\e Y');
-            } else {
-                $rangeLabel = $fi->translatedFormat('j M Y').' – '.$ff->translatedFormat('j M Y');
-            }
-
-            $desc = trim((string) ($agenda->descripcion ?? ''));
-            $desc = $desc !== '' ? Str::limit($agenda->descripcionConAforoPersonas(), 180) : '';
-
-            $cards[] = [
-                'agenda_id' => $agenda->id,
-                'range_label' => $rangeLabel,
-                'badge_day' => $occs[0]['date']->day,
-                'title' => $this->homeAgendaCalendar->displayTitle($agenda),
-                'descripcion' => $desc,
-            ];
-        }
+        $cards = $includeFichasCards
+            ? $this->buildFichasCardsFromAgendas($agendas, $year, $month)
+            : [];
 
         $current = $monthStart->copy();
         $prev = $current->copy()->subMonth();
@@ -137,7 +106,67 @@ class AgendaDirectivaCalendarService
             'list_rows' => $listRows,
             'cards' => $cards,
             'today' => Carbon::now($tz)->format('Y-m-d'),
+            'fichas_cards_included' => $includeFichasCards,
         ];
+    }
+
+    /**
+     * Tarjetas de la pestaña Fichas para un mes (misma forma que en buildMonthPayload).
+     *
+     * @param  array{clasificacion?: string, buscar?: string}  $filters
+     * @return list<array<string, mixed>>
+     */
+    public function buildFichasCardsForMonth(User $viewer, int $year, int $month, array $filters): array
+    {
+        $tz = config('app.timezone', 'UTC');
+        $monthStart = Carbon::create($year, $month, 1, 0, 0, 0, $tz)->startOfMonth();
+        $monthEnd = $monthStart->copy()->endOfMonth();
+        $agendas = $this->queryAgendasForMonth($viewer, $monthStart, $monthEnd, $filters);
+
+        return $this->buildFichasCardsFromAgendas($agendas, $year, $month);
+    }
+
+    /**
+     * @param  Collection<int, Agenda>  $agendas
+     * @return list<array<string, mixed>>
+     */
+    private function buildFichasCardsFromAgendas(Collection $agendas, int $year, int $month): array
+    {
+        $cards = [];
+        foreach ($agendas as $agenda) {
+            $occs = $this->homeAgendaCalendar->occurrencesInCalendarMonth($agenda, $year, $month);
+            if (count($occs) === 0) {
+                continue;
+            }
+
+            // Línea bajo el día grande en fichas: solo mes y año de esa misma fecha (el día ya va aparte).
+            $headAnchor = $occs[0]['date']->copy()->locale('es');
+            $monthYearLabel = $headAnchor->translatedFormat('F \d\e Y');
+
+            $descBody = $agenda->descripcionPrimerElementoSinAforo();
+            $descNorm = $descBody !== '' ? $this->sentenceCaseIfAllCaps($descBody) : '';
+            $desc = $descNorm !== '' ? Str::limit($descNorm, 320) : '';
+
+            $asunto = trim((string) ($agenda->asunto ?? ''));
+            $titleRaw = $asunto !== '' ? $asunto : ($agenda->tipo === 'gira' ? 'Sin título' : 'Asunto');
+            $titleFicha = $this->sentenceCaseIfAllCaps($titleRaw);
+
+            $lugarRaw = trim((string) ($agenda->lugar ?? ''));
+            $lugarCard = $lugarRaw !== '' ? $this->sentenceCaseIfAllCaps($lugarRaw) : '';
+
+            $cards[] = [
+                'agenda_id' => $agenda->id,
+                'month_year_label' => $monthYearLabel,
+                'badge_day' => $occs[0]['date']->day,
+                'title' => $titleFicha,
+                'lugar' => $lugarCard,
+                'descripcion' => $desc,
+                'aforo_label' => $agenda->aforoEtiquetaTarjeta(),
+                'kind' => $this->cardKindForFicha($agenda),
+            ];
+        }
+
+        return $cards;
     }
 
     /**
@@ -217,5 +246,162 @@ class AgendaDirectivaCalendarService
         }
 
         return $weeks;
+    }
+
+    /**
+     * Si el texto parece escrito todo en mayúsculas (sin letras minúsculas), pasarlo a oración:
+     * primera letra en mayúscula y el resto en minúsculas (UTF-8).
+     */
+    private function sentenceCaseIfAllCaps(string $text): string
+    {
+        $t = trim($text);
+        if ($t === '') {
+            return $text;
+        }
+        if (preg_match('/\p{Ll}/u', $t)) {
+            return $text;
+        }
+        if (! preg_match('/\p{L}/u', $t)) {
+            return $text;
+        }
+        if (! preg_match('/\p{Lu}/u', $t)) {
+            return $text;
+        }
+
+        $lower = mb_strtolower($t, 'UTF-8');
+        $first = mb_strtoupper(mb_substr($lower, 0, 1, 'UTF-8'), 'UTF-8');
+        $rest = mb_substr($lower, 1, null, 'UTF-8');
+
+        return $first.$rest;
+    }
+
+    /**
+     * Tipo de ficha para textura de encabezado: agenda (asuntos) | pre_gira | gira.
+     */
+    private function cardKindForFicha(Agenda $agenda): string
+    {
+        if ($agenda->tipo === 'gira') {
+            return strtolower((string) ($agenda->subtipo ?? '')) === 'pre-gira' ? 'pre_gira' : 'gira';
+        }
+
+        return 'agenda';
+    }
+
+    /**
+     * Fichas para PDF: incluye contenido completo salvo líneas de encargado/creador (sanitizado).
+     *
+     * @param  array{clasificacion?: string, buscar?: string}  $filters
+     * @param  list<array{0: int, 1: int}>|null  $customMonths  pares [año, mes]
+     * @return list<array<string, mixed>>
+     */
+    public function buildCardsForFichasPdf(User $viewer, array $filters, string $scope, ?int $year = null, ?int $month = null, ?array $customMonths = null): array
+    {
+        $tz = config('app.timezone', 'UTC');
+
+        if ($scope === 'all') {
+            $agendas = $this->queryAgendasAllForPdf($viewer, $filters);
+            $cards = [];
+            foreach ($agendas as $agenda) {
+                $fi = $agenda->fecha_inicio instanceof Carbon
+                    ? $agenda->fecha_inicio->copy()->timezone($tz)->startOfDay()
+                    : Carbon::parse($agenda->fecha_inicio, $tz)->startOfDay();
+                $cards[] = $this->pdfCardFromAgenda($agenda, $fi->copy()->locale('es'));
+            }
+            usort($cards, fn ($a, $b) => strcmp((string) $a['sort_key'], (string) $b['sort_key']));
+
+            return $cards;
+        }
+
+        if ($scope === 'current_month' && $year !== null && $month !== null) {
+            $monthStart = Carbon::create($year, $month, 1, 0, 0, 0, $tz)->startOfMonth();
+            $monthEnd = $monthStart->copy()->endOfMonth();
+            $agendas = $this->queryAgendasForMonth($viewer, $monthStart, $monthEnd, $filters);
+            $cards = [];
+            foreach ($agendas as $agenda) {
+                $occs = $this->homeAgendaCalendar->occurrencesInCalendarMonth($agenda, $year, $month);
+                if (count($occs) === 0) {
+                    continue;
+                }
+                $cards[] = $this->pdfCardFromAgenda($agenda, $occs[0]['date']->copy()->locale('es'));
+            }
+            usort($cards, fn ($a, $b) => strcmp((string) $a['sort_key'], (string) $b['sort_key']));
+
+            return $cards;
+        }
+
+        if ($scope === 'custom_months' && is_array($customMonths) && $customMonths !== []) {
+            $merged = [];
+            foreach ($customMonths as $pair) {
+                $y = (int) ($pair[0] ?? 0);
+                $m = (int) ($pair[1] ?? 0);
+                if ($y < 2000 || $y > 2100 || $m < 1 || $m > 12) {
+                    continue;
+                }
+                $monthStart = Carbon::create($y, $m, 1, 0, 0, 0, $tz)->startOfMonth();
+                $monthEnd = $monthStart->copy()->endOfMonth();
+                $agendas = $this->queryAgendasForMonth($viewer, $monthStart, $monthEnd, $filters);
+                foreach ($agendas as $agenda) {
+                    $occs = $this->homeAgendaCalendar->occurrencesInCalendarMonth($agenda, $y, $m);
+                    if (count($occs) === 0) {
+                        continue;
+                    }
+                    $card = $this->pdfCardFromAgenda($agenda, $occs[0]['date']->copy()->locale('es'));
+                    $id = $card['agenda_id'];
+                    if (! isset($merged[$id]) || strcmp((string) $card['sort_key'], (string) $merged[$id]['sort_key']) < 0) {
+                        $merged[$id] = $card;
+                    }
+                }
+            }
+            $cards = array_values($merged);
+            usort($cards, fn ($a, $b) => strcmp((string) $a['sort_key'], (string) $b['sort_key']));
+
+            return $cards;
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  array{clasificacion?: string, buscar?: string}  $filters
+     * @return Collection<int, Agenda>
+     */
+    private function queryAgendasAllForPdf(User $viewer, array $filters): Collection
+    {
+        $tz = config('app.timezone', 'UTC');
+        $wideStart = Carbon::create(2000, 1, 1, 0, 0, 0, $tz)->startOfMonth();
+        $wideEnd = Carbon::create(2100, 12, 31, 0, 0, 0, $tz)->endOfMonth();
+
+        return $this->queryAgendasForMonth($viewer, $wideStart, $wideEnd, $filters);
+    }
+
+    /**
+     * @param  \Carbon\Carbon  $anchor  fecha de referencia para día y mes/año en la ficha
+     * @return array<string, mixed>
+     */
+    private function pdfCardFromAgenda(Agenda $agenda, Carbon $anchor): array
+    {
+        $monthYearLabel = mb_convert_case($anchor->translatedFormat('F Y'), MB_CASE_TITLE, 'UTF-8');
+
+        $descBody = trim(Agenda::textoParaPdfSinMetaUsuarios($agenda->descripcionSinLineaAforo()));
+        $desc = $descBody !== '' ? Str::limit($descBody, 4000) : '';
+
+        $asunto = trim((string) ($agenda->asunto ?? ''));
+        $titleRaw = $asunto !== '' ? $asunto : ($agenda->tipo === 'gira' ? 'Sin título' : 'Asunto');
+        $titleFicha = $this->sentenceCaseIfAllCaps($titleRaw);
+
+        $lugarClean = trim(Agenda::textoParaPdfSinMetaUsuarios(trim((string) ($agenda->lugar ?? ''))));
+        $lugarCard = $lugarClean !== '' ? $this->sentenceCaseIfAllCaps($lugarClean) : '';
+
+        return [
+            'agenda_id' => $agenda->id,
+            'month_year_label' => $monthYearLabel,
+            'badge_day' => $anchor->day,
+            'title' => $titleFicha,
+            'lugar' => $lugarCard,
+            'descripcion' => $desc,
+            'aforo_label' => $agenda->aforoEtiquetaTarjeta(),
+            'kind' => $this->cardKindForFicha($agenda),
+            'sort_key' => $anchor->format('Y-m-d'),
+        ];
     }
 }

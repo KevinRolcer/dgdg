@@ -27,7 +27,12 @@
 @endphp
 
 @section('content')
-<section class="agenda-page agenda-shell agenda-cal-page app-density-compact" id="agendaCalPage" data-agenda-cal-base-url="{{ url('/agenda/calendario') }}">
+<section
+    class="agenda-page agenda-shell agenda-cal-page app-density-compact"
+    id="agendaCalPage"
+    data-agenda-cal-base-url="{{ url('/agenda/calendario') }}"
+    data-agenda-cal-fichas-pdf-url="{{ route('agenda.calendar.fichas-pdf') }}"
+>
     <div class="agenda-shell-main">
         <header class="agenda-cal-top">
             <div class="agenda-cal-top-text">
@@ -59,6 +64,66 @@
         </div>
     </div>
 </section>
+
+{{-- Modal fuera del bloque AJAX para que no se pierda al cambiar de mes --}}
+<div id="agendaCalFichasPrintModal" class="agenda-cal-print-modal" hidden aria-hidden="true">
+    <div class="agenda-cal-print-modal__backdrop" data-agenda-cal-print-close tabindex="-1"></div>
+    <div
+        class="agenda-cal-print-modal__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="agendaCalFichasPrintModalTitle"
+    >
+        <header class="agenda-cal-print-modal__head">
+            <h2 id="agendaCalFichasPrintModalTitle" class="agenda-cal-print-modal__title">Exportar fichas a PDF</h2>
+            <button type="button" class="agenda-cal-print-modal__x" data-agenda-cal-print-close aria-label="Cerrar">&times;</button>
+        </header>
+        <form id="agendaCalFichasPrintForm" class="agenda-cal-print-modal__form">
+            <fieldset class="agenda-cal-print-fieldset">
+                <legend class="agenda-cal-print-legend">Eventos a incluir</legend>
+                <p class="agenda-cal-print-hint">Mismos filtros que la vista (tipo y búsqueda). El PDF incluye el contenido completo de cada ficha, sin líneas de encargado ni de quien registró el evento.</p>
+                <label class="agenda-cal-print-radio"><input type="radio" name="scope" value="all"> Todos los eventos cargados (según filtros y permisos)</label>
+                <label class="agenda-cal-print-radio"><input type="radio" name="scope" value="current_month" checked> Solo el mes que estoy viendo en el calendario</label>
+                <label class="agenda-cal-print-radio"><input type="radio" name="scope" value="custom_months"> Varios meses</label>
+            </fieldset>
+
+            <div id="agendaCalPrintCustomMonthsBox" class="agenda-cal-print-custom-box" hidden>
+                <span class="agenda-cal-print-legend agenda-cal-print-legend--inline">Meses elegidos</span>
+                <p class="agenda-cal-print-hint">Selecciona mes y año, pulsa Agregar. Puedes quitar entradas si te equivocas.</p>
+                <div class="agenda-cal-print-month-row">
+                    <input type="month" id="agendaCalPrintMonthInput" class="agenda-cal-print-month-input" aria-label="Mes y año a agregar">
+                    <button type="button" class="agenda-btn agenda-btn-secondary agenda-cal-print-mini" id="agendaCalPrintMonthAdd">Agregar</button>
+                </div>
+                <ul id="agendaCalPrintMonthList" class="agenda-cal-print-month-list" aria-label="Lista de meses"></ul>
+                <input type="hidden" name="custom_months_json" id="agendaCalCustomMonthsJson" value="[]">
+            </div>
+
+            <div class="agenda-cal-print-kinds-box">
+                <span class="agenda-cal-print-legend agenda-cal-print-legend--inline">Incluir tipos</span>
+                <p class="agenda-cal-print-hint">Puedes elegir una o varias categorías.</p>
+                <label class="agenda-cal-print-check"><input type="checkbox" name="kind_gira" value="1" checked> Gira</label>
+                <label class="agenda-cal-print-check"><input type="checkbox" name="kind_pre_gira" value="1" checked> Pre-gira</label>
+                <label class="agenda-cal-print-check"><input type="checkbox" name="kind_agenda" value="1" checked> Agenda</label>
+            </div>
+
+            <fieldset class="agenda-cal-print-fieldset">
+                <legend class="agenda-cal-print-legend">Orientación (A4)</legend>
+                <label class="agenda-cal-print-radio"><input type="radio" name="orientation" value="portrait" checked> Vertical (retrato)</label>
+                <label class="agenda-cal-print-radio"><input type="radio" name="orientation" value="landscape"> Horizontal (paisaje)</label>
+            </fieldset>
+
+            <p class="agenda-cal-print-error" id="agendaCalPrintError" hidden role="alert"></p>
+
+            <footer class="agenda-cal-print-modal__foot">
+                <button type="button" class="agenda-btn agenda-btn-secondary" data-agenda-cal-print-close>Cancelar</button>
+                <button type="submit" class="agenda-btn agenda-btn-primary" id="agendaCalPrintSubmit">
+                    <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
+                    Generar PDF
+                </button>
+            </footer>
+        </form>
+    </div>
+</div>
 @endsection
 
 @push('scripts')

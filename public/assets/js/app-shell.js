@@ -165,6 +165,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function refreshNotifications() {
         if (window.__segobRefreshingNotifications) {
+            window.__segobPendingNotificationRefresh = true;
             return;
         }
 
@@ -182,10 +183,20 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.disabled = true;
         });
 
-        var requestUrl = window.location.href.split('#')[0];
+        var pageUrl = window.location.href.split('#')[0];
+        var requestUrl;
+        try {
+            var ru = new URL(pageUrl, window.location.origin);
+            ru.searchParams.set('_nc', String(Date.now()));
+            requestUrl = ru.toString();
+        } catch (eUrl) {
+            requestUrl = pageUrl + (pageUrl.indexOf('?') === -1 ? '?' : '&') + '_nc=' + Date.now();
+        }
 
         fetch(requestUrl, {
             method: 'GET',
+            credentials: 'same-origin',
+            cache: 'no-store',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
             }
@@ -237,8 +248,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     btn.classList.remove('is-loading');
                     btn.disabled = false;
                 });
+                if (window.__segobPendingNotificationRefresh) {
+                    window.__segobPendingNotificationRefresh = false;
+                    setTimeout(function () {
+                        refreshNotifications();
+                    }, 0);
+                }
             });
     }
+
+    window.refreshSegobNotifications = refreshNotifications;
 
     if (document.body.getAttribute('data-export-status-url')) {
         startExportStatusPolling();

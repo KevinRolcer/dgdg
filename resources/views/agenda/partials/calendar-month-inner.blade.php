@@ -1,5 +1,14 @@
 {{-- Bloque completo que se sustituye vía AJAX al cambiar de mes: toolbar (mes + pestañas), filtros, 3 vistas. --}}
 {{-- Variables: $p, $clasificacion, $buscar, $prevUrl, $nextUrl, $previewReturn --}}
+<div
+    class="agenda-cal-state-meta"
+    hidden
+    aria-hidden="true"
+    data-agenda-cal-year="{{ (int) $p['year'] }}"
+    data-agenda-cal-month="{{ (int) $p['month'] }}"
+    data-agenda-cal-clasificacion="{{ e($clasificacion) }}"
+    data-agenda-cal-buscar="{{ e($buscar) }}"
+></div>
 <div class="agenda-cal-toolbar agenda-cal-toolbar-dynamic">
     <div class="agenda-cal-month-nav" role="group" aria-label="Mes">
         <a href="{{ $prevUrl }}" class="agenda-cal-nav-btn agenda-cal-nav-ajax" title="Mes anterior" aria-label="Mes anterior" data-agenda-cal-nav="1">
@@ -47,7 +56,11 @@
                             <div class="agenda-cal-day-num">{{ $cell['in_month'] ? $cell['day'] : '' }}</div>
                             <div class="agenda-cal-day-events">
                                 @foreach ($cell['events'] as $ev)
-                                    <div class="agenda-cal-event-chip" title="{{ e($ev['title']) }}">
+                                    @php
+                                        $evKind = $ev['kind'] ?? 'agenda';
+                                        $evKind = in_array($evKind, ['agenda', 'gira', 'pre_gira'], true) ? $evKind : 'agenda';
+                                    @endphp
+                                    <div class="agenda-cal-event-chip agenda-cal-event-chip--{{ $evKind }}" title="{{ e($ev['title']) }}">
                                         <a href="{{ route('agenda.show', ['agenda' => $ev['agenda_id'], 'return' => $previewReturn]) }}" class="agenda-cal-event-link">{{ e(\Illuminate\Support\Str::limit($ev['title'], 28)) }}</a>
                                         <span class="agenda-cal-event-time">{{ e($ev['time']) }}</span>
                                     </div>
@@ -95,42 +108,18 @@
     </div>
 
     <div class="agenda-cal-panel" role="tabpanel" aria-labelledby="agendaCalTabFichas" data-agenda-cal-panel="fichas" hidden>
-        <div class="agenda-cal-cards">
-            @forelse ($p['cards'] as $card)
-                <article class="agenda-cal-card">
-                    <div class="agenda-cal-card-head">
-                        <span class="agenda-cal-card-range">{{ e($card['range_label']) }}</span>
-                        <span class="agenda-cal-card-badge" aria-hidden="true">{{ $card['badge_day'] }}</span>
-                    </div>
-                    <div class="agenda-cal-card-body">
-                        <a href="{{ route('agenda.show', ['agenda' => $card['agenda_id'], 'return' => $previewReturn]) }}" class="agenda-cal-card-title">• {{ e($card['title']) }}</a>
-                        @if(!empty($card['descripcion']))
-                            <div class="agenda-cal-card-desc-wrap">
-                                <div
-                                    class="agenda-cal-card-desc-inner"
-                                    data-agenda-cal-desc-inner
-                                    tabindex="0"
-                                    role="region"
-                                    aria-label="Detalle del evento"
-                                >
-                                    <p class="agenda-cal-card-desc">{{ e($card['descripcion']) }}</p>
-                                </div>
-                                <button
-                                    type="button"
-                                    class="agenda-cal-card-more"
-                                    data-agenda-cal-desc-more
-                                    hidden
-                                    aria-expanded="false"
-                                >
-                                    • Ver más
-                                </button>
-                            </div>
-                        @endif
-                    </div>
-                </article>
-            @empty
-                <p class="agenda-cal-empty">No hay eventos en este mes con los filtros actuales.</p>
-            @endforelse
+        <div
+            class="agenda-cal-fichas-mount"
+            data-agenda-cal-fichas-mount
+            data-loaded="{{ ! empty($p['fichas_cards_included']) ? '1' : '0' }}"
+        >
+            @if(! empty($p['fichas_cards_included']))
+                @include('agenda.partials.calendar-fichas-content', ['cards' => $p['cards'], 'previewReturn' => $previewReturn])
+            @else
+                <div class="agenda-cal-fichas-placeholder" role="status">
+                    <p class="agenda-cal-empty">Cargando fichas…</p>
+                </div>
+            @endif
         </div>
     </div>
 </div>

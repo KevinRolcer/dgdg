@@ -1,7 +1,4 @@
-/* =========================================================
-   Eventos temporales — UI limpia (como Ajustes/Agenda):
-   shell sin caja exterior, cabecera + bloques con borde
-   ========================================================= */
+
 .tm-shell {
     width: 100%;
     max-width: 100%;
@@ -27,6 +24,36 @@
     margin-bottom: 0.75rem;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--clr-border);
+}
+
+.tm-shell-head--with-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px 20px;
+}
+
+.tm-shell-head-text {
+    flex: 1;
+    min-width: min(100%, 200px);
+}
+
+.tm-shell-head--with-tabs .tm-section-switch {
+    margin-bottom: 0;
+    flex-shrink: 0;
+    align-self: center;
+}
+
+@media (max-width: 640px) {
+    .tm-shell-head--with-tabs {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .tm-shell-head--with-tabs .tm-section-switch {
+        align-self: flex-end;
+    }
 }
 
 .tm-shell-title {
@@ -56,14 +83,18 @@
     border-bottom: none;
 }
 
-/* Tarjetas de la grid “Subir información” sin caja extra dentro del shell */
 .tm-shell .tm-module-grid .tm-card {
     background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    border-bottom: 1px solid var(--clr-border);
-    padding-bottom: 1rem;
+    border: 1px solid var(--clr-border) !important;
+    border-radius: 14px;
+    padding: 20px 18px;
     margin-bottom: 0;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.tm-shell .tm-module-grid .tm-card:hover {
+    border-color: var(--clr-accent) !important;
+    transform: translateY(-2px);
 }
 .tm-shell .tm-module-grid .tm-card:last-child {
     border-bottom: none;
@@ -283,7 +314,6 @@
 }
 
 .tm-module-card .tm-btn.tm-btn-sm {
-    /* Evita que el botón compacto herede el min-width grande del card */
     min-width: 0;
     max-width: none;
 }
@@ -338,11 +368,11 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     cursor: pointer;
 }
 
 .tm-btn-sm {
-    /* Botón compacto para tarjetas de eventos temporales */
     min-height: 30px;
     padding: 5px 10px;
     font-size: 0.76rem;
@@ -470,7 +500,6 @@
     display: none !important;
 }
 
-/* ——— Módulo desde Excel (wizard + paleta) ——— */
 .tm-btn-ghost {
     background: transparent;
     color: var(--clr-primary-dark);
@@ -483,7 +512,6 @@
     color: var(--clr-primary);
 }
 
-/* Misma lectura visual que .tm-target-box / módulos */
 .tm-seed-panel {
     border: 1px solid var(--clr-border);
     border-radius: 12px;
@@ -1209,7 +1237,6 @@ html.theme-dark .tm-target-box h3 {
 }
 
 .tm-excel-map-table-wrap {
-    /* Mantiene scroll solo dentro de la tabla de mapeo (paso 2) */
     max-height: 260px;
     overflow-y: auto;
     overflow-x: auto;
@@ -1217,10 +1244,7 @@ html.theme-dark .tm-target-box h3 {
     border-radius: 10px;
 }
 
-.tm-table-wrap.tm-table-wrap-scroll {
-    /* max-height: min(62vh, 620px); */
-    /* overflow: auto; */
-}
+
 
 .tm-table-wrap.tm-table-wrap-admin-preview {
     overflow-x: auto;
@@ -1365,15 +1389,164 @@ html.theme-dark .tm-target-box h3 {
     max-width: 100%;
 }
 
+.tm-module-filters-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    margin-bottom: 4px;
+}
+
+.tm-module-filters-track {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding: 2px 0 4px;
+}
+
+.tm-module-filters-track::-webkit-scrollbar {
+    display: none;
+    height: 0;
+    width: 0;
+}
+
+.tm-module-filters-nav {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid var(--clr-border);
+    border-radius: 10px;
+    background: var(--clr-card, #fff);
+    color: var(--clr-text-main);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+.tm-module-filters-nav:hover:not(:disabled) {
+    border-color: var(--clr-accent, #c79b66);
+    color: var(--clr-accent, #c79b66);
+    background: rgba(199, 155, 102, 0.08);
+}
+
+.tm-module-filters-nav:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
 .tm-module-filters {
     display: flex;
     flex-wrap: nowrap;
     gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 2px;
+    width: max-content;
+    min-width: min(100%, 320px);
 }
 
-/* Paginación módulos temporales (misma línea que tablas .tm-table) */
+.tm-records-filters {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+.tm-records-filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px 12px;
+}
+
+.tm-records-filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--clr-text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.tm-records-filter-field span {
+    line-height: 1.2;
+}
+
+.tm-records-filter-input,
+.tm-records-filter-select {
+    min-height: 36px;
+    padding: 6px 10px;
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+    background: var(--clr-card, #fff);
+    color: var(--clr-text-main);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+    min-width: 160px;
+    max-width: 100%;
+}
+
+.tm-records-filter-input {
+    width: min(280px, 100%);
+}
+
+.tm-records-filter-field--search .tm-records-search-wrap {
+    width: min(280px, 100%);
+}
+
+.tm-records-search-wrap {
+    position: relative;
+    display: block;
+    max-width: 100%;
+}
+
+.tm-records-search-wrap .tm-records-filter-input {
+    width: 100%;
+    padding-right: 2.25rem;
+    box-sizing: border-box;
+}
+
+.tm-records-search-clear {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 30px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--clr-text-light);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.tm-records-search-clear:hover {
+    color: var(--clr-text-main);
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.tm-records-search-clear[hidden] {
+    display: none !important;
+}
+
+.tm-records-filter-select {
+    min-width: 200px;
+}
+
 .tm-module-grid .tm-pagination--footer {
     grid-column: 1 / -1;
     width: 100%;
@@ -1718,7 +1891,6 @@ a.tm-paginator-btn:hover {
     cursor: pointer;
 }
 
-/* Contenedor cargar imagen: estilo evidencia mesas de paz (más chico) */
 .tm-upload-evidence {
     display: flex;
     flex-direction: column;
@@ -1761,7 +1933,6 @@ a.tm-paginator-btn:hover {
     position: relative;
 }
 
-/* Ocultar input file nativo (no depender de Bootstrap .d-none) */
 .tm-upload-evidence-dropzone input[type="file"] {
     position: absolute !important;
     width: 1px !important;
@@ -1823,7 +1994,6 @@ a.tm-paginator-btn:hover {
     max-width: 140px;
 }
 
-/* Variante compacta cuando hay 2 o más campos de imagen en la misma fila */
 .tm-entry-grid.tm-grid-2 .tm-entry-field.is-media,
 .tm-entry-grid.tm-grid-3 .tm-entry-field.is-media {
     min-width: 0;
@@ -1930,7 +2100,6 @@ a.tm-paginator-btn:hover {
     font-size: 0.76rem;
 }
 
-/* Modal: misma estructura que Agenda Directiva */
 .tm-modal {
     position: fixed;
     top: 0;
@@ -1960,10 +2129,11 @@ a.tm-paginator-btn:hover {
     width: 95%;
     max-width: 650px;
     max-height: 85vh;
-    min-height: 0; /* flex: permite que el cuerpo haga scroll dentro del tope */
+    min-height: 0; 
     border-radius: 12px;
     background: var(--clr-card);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--clr-border);
+    box-shadow: none;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -1975,7 +2145,35 @@ a.tm-paginator-btn:hover {
     max-height: 85vh;
 }
 
-/* Vista previa de registros (admin): ancho amplio + cuerpo con scroll estable */
+.tm-modal-dialog-entry:not(.tm-excel-modal-dialog) .tm-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.tm-modal-dialog-entry:not(.tm-excel-modal-dialog) .tm-entry-subtitle {
+    flex-shrink: 0;
+}
+
+.tm-modal-dialog-entry:not(.tm-excel-modal-dialog) .tm-entry-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.tm-modal-dialog-entry:not(.tm-excel-modal-dialog) .tm-entry-form > .tm-entry-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    align-content: start;
+}
+
 .tm-modal-dialog-admin-preview {
     max-width: min(96vw, 1120px);
     width: 95%;
@@ -2071,15 +2269,14 @@ a.tm-paginator-btn:hover {
     color: var(--clr-text-muted);
 }
 
-.tm-entry-form .tm-actions {
-    position: sticky;
-    bottom: -10px;
-    padding-top: 4px;
-    padding-bottom: 2px;
-    margin-top: 4px;
+.tm-modal-dialog-entry:not(.tm-excel-modal-dialog) .tm-entry-form .tm-actions {
+    flex-shrink: 0;
+    position: static;
+    margin-top: 0;
+    padding: 0.75rem 0 0;
     background: var(--clr-card);
     border-top: 1px solid var(--clr-border);
-    box-shadow: 0 -8px 16px rgba(0, 0, 0, 0.06);
+    box-shadow: none;
 }
 
 .tm-modal-head {
@@ -2130,8 +2327,8 @@ a.tm-paginator-btn:hover {
     overflow-y: auto;
     overflow-x: auto;
     flex: 1 1 auto;
-    min-height: 0; /* clave: sin esto flex no recorta y no aparece scroll */
-    max-height: calc(85vh - 100px); /* vista previa y modales estándar: siempre scroll si hay mucho contenido */
+    min-height: 0;
+    max-height: calc(85vh - 100px);
     display: grid;
     gap: 10px;
     min-width: 0;
@@ -2420,8 +2617,13 @@ a.tm-paginator-btn:hover {
         width: 100%;
     }
 
-    .tm-modal-dialog-entry .tm-modal-body {
-        /* Evita que el scroll desaparezca en pantallas <= 900px */
+    .tm-modal-dialog-entry:not(.tm-excel-modal-dialog) .tm-modal-body {
+        max-height: calc(100vh - 180px);
+        overflow: hidden;
+        padding-right: 0;
+    }
+
+    .tm-modal-dialog-entry.tm-excel-modal-dialog .tm-modal-body {
         max-height: calc(100vh - 180px);
         overflow-y: auto;
         padding-right: 0;
@@ -2433,10 +2635,8 @@ a.tm-paginator-btn:hover {
         width: 100%;
     }
 
-    .tm-entry-form .tm-actions {
-        position: static;
-        border-top: 0;
-        padding-top: 0;
+    .tm-modal-dialog-entry:not(.tm-excel-modal-dialog) .tm-entry-form .tm-actions {
+        padding-top: 0.65rem;
     }
 
     .tm-records-mobile {
@@ -2448,7 +2648,6 @@ a.tm-paginator-btn:hover {
     }
 }
 
-/* Export personalize modal */
 .tm-export-actions {
     display: flex;
     flex-wrap: wrap;
@@ -2526,7 +2725,6 @@ a.tm-paginator-btn:hover {
     border-right: 1px solid var(--clr-border);
 }
 
-/* Slim green scrollbars for personalize modal */
 .tm-export-personalize-form,
 .tm-export-preview-a4 {
     scrollbar-width: thin;
@@ -3334,7 +3532,6 @@ a.tm-paginator-btn:hover {
     }
 }
 
-/* Log filas descartadas (módulo desde Excel, tras exportar) */
 .tm-seed-log-dialog {
     max-width: min(960px, 96vw);
 }

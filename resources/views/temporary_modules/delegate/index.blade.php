@@ -11,9 +11,21 @@
 @section('content')
 <section class="tm-page tm-shell app-density-compact">
     <div class="tm-shell-main">
-        <header class="tm-shell-head">
-            <h1 class="tm-shell-title">Eventos temporales</h1>
-            <p class="tm-shell-desc">Sube información a los módulos asignados y consulta tus registros y evidencias.</p>
+        @php
+            $activeSection = $activeSection ?? 'upload';
+            $isUploadSection = $activeSection !== 'records';
+            $microsAsignadas = ($microrregionesAsignadas ?? collect())->values();
+            $mostrarSelectorMicrorregion = $microsAsignadas->count() > 1;
+        @endphp
+        <header class="tm-shell-head tm-shell-head--with-tabs">
+            <div class="tm-shell-head-text">
+                <h1 class="tm-shell-title">Eventos temporales</h1>
+                <p class="tm-shell-desc">Sube información a los módulos asignados y consulta tus registros y evidencias.</p>
+            </div>
+            <div class="tm-section-switch" role="tablist" aria-label="Cambiar vista de captura temporal">
+                <button type="button" class="tm-section-tab {{ $isUploadSection ? 'is-active' : '' }}" data-section-tab data-section-target="tmUploadView" role="tab" aria-selected="{{ $isUploadSection ? 'true' : 'false' }}">Subir informacion</button>
+                <button type="button" class="tm-section-tab {{ !$isUploadSection ? 'is-active' : '' }}" data-section-tab data-section-target="tmRecordsView" role="tab" aria-selected="{{ !$isUploadSection ? 'true' : 'false' }}">Ver mis registros</button>
+            </div>
         </header>
 
         @if (session('status'))
@@ -23,18 +35,6 @@
         @if ($errors->any())
             <div class="inline-alert inline-alert-error" role="alert">{{ $errors->first() }}</div>
         @endif
-
-        @php
-            $activeSection = $activeSection ?? 'upload';
-            $isUploadSection = $activeSection !== 'records';
-            $microsAsignadas = ($microrregionesAsignadas ?? collect())->values();
-            $mostrarSelectorMicrorregion = $microsAsignadas->count() > 1;
-        @endphp
-
-        <div class="tm-section-switch" role="tablist" aria-label="Cambiar vista de captura temporal">
-        <button type="button" class="tm-section-tab {{ $isUploadSection ? 'is-active' : '' }}" data-section-tab data-section-target="tmUploadView" role="tab" aria-selected="{{ $isUploadSection ? 'true' : 'false' }}">Subir informacion</button>
-        <button type="button" class="tm-section-tab {{ !$isUploadSection ? 'is-active' : '' }}" data-section-tab data-section-target="tmRecordsView" role="tab" aria-selected="{{ !$isUploadSection ? 'true' : 'false' }}">Ver mis registros</button>
-    </div>
 
     <section class="tm-section-panel {{ $isUploadSection ? 'is-active' : '' }}" id="tmUploadView" role="tabpanel" aria-hidden="{{ $isUploadSection ? 'false' : 'true' }}">
         @include('temporary_modules.delegate.partials.upload_modules', ['modules' => $modules, 'fragmentUploadUrl' => $fragmentUploadUrl ?? '#'])
@@ -54,6 +54,11 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:10px;">
                         @if ($tmImportable->isNotEmpty())
+                            <a href="{{ route('temporary-modules.download-template', $module->id) }}"
+                               class="tm-btn tm-btn-outline"
+                               aria-label="Descargar plantilla Excel">
+                                <i class="fa-solid fa-download" aria-hidden="true"></i> Plantilla
+                            </a>
                             <button type="button"
                                     class="tm-btn tm-btn-outline"
                                     data-open-excel-import="tmImportarExcelModal-{{ $module->id }}"
@@ -327,6 +332,11 @@
                         </div>
                         <div style="display:flex;align-items:center;gap:10px;">
                             @if ($tmImportable->isNotEmpty())
+                                <a href="{{ route('temporary-modules.download-template', $module->id) }}"
+                                   class="tm-btn tm-btn-outline"
+                                   aria-label="Descargar plantilla Excel">
+                                    <i class="fa-solid fa-download" aria-hidden="true"></i> Plantilla
+                                </a>
                                 <button type="button"
                                         class="tm-btn tm-btn-outline"
                                         data-open-excel-import="tmImportarExcelModal-{{ $module->id }}"
@@ -506,22 +516,30 @@
     <section class="tm-section-panel {{ !$isUploadSection ? 'is-active' : '' }}" id="tmRecordsView" role="tabpanel" aria-hidden="{{ !$isUploadSection ? 'false' : 'true' }}" data-records-url="{{ route('temporary-modules.records') }}" data-fragment-records-url="{{ $fragmentRecordsUrl ?? '' }}">
     @if ($modules->isNotEmpty())
         <article class="content-card tm-card tm-card-in-shell tm-records-container">
-            <h2 class="tm-panel-title">Mis registros</h2>
-
-            <div class="tm-module-filters" role="tablist" aria-label="Filtrar por modulo temporal">
-                @foreach ($modules as $module)
-                    @php $isModuleActive = (int) ($activeModuleId ?? 0) === (int) $module->id || ((int) ($activeModuleId ?? 0) === 0 && $loop->first); @endphp
-                    <button
-                        type="button"
-                        class="tm-module-chip {{ $isModuleActive ? 'is-active' : '' }}"
-                        data-module-filter
-                        data-module-target="module-records-{{ $module->id }}"
-                        role="tab"
-                        aria-selected="{{ $isModuleActive ? 'true' : 'false' }}"
-                    >
-                        {{ $module->name }}
-                    </button>
-                @endforeach
+            <div class="tm-module-filters-row" data-tm-module-chips-row>
+                <button type="button" class="tm-module-filters-nav tm-module-filters-nav--prev" data-tm-module-chips-prev aria-label="Módulos anteriores" disabled>
+                    <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                </button>
+                <div class="tm-module-filters-track" data-tm-module-chips-track>
+                    <div class="tm-module-filters" role="tablist" aria-label="Filtrar por modulo temporal">
+                        @foreach ($modules as $module)
+                            @php $isModuleActive = (int) ($activeModuleId ?? 0) === (int) $module->id || ((int) ($activeModuleId ?? 0) === 0 && $loop->first); @endphp
+                            <button
+                                type="button"
+                                class="tm-module-chip {{ $isModuleActive ? 'is-active' : '' }}"
+                                data-module-filter
+                                data-module-target="module-records-{{ $module->id }}"
+                                role="tab"
+                                aria-selected="{{ $isModuleActive ? 'true' : 'false' }}"
+                            >
+                                {{ $module->name }}
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+                <button type="button" class="tm-module-filters-nav tm-module-filters-nav--next" data-tm-module-chips-next aria-label="Módulos siguientes">
+                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                </button>
             </div>
 
             <div class="tm-module-records-panels">
@@ -537,6 +555,37 @@
                         role="tabpanel"
                         aria-hidden="{{ $isModuleActive ? 'false' : 'true' }}"
                     >
+                        <div class="tm-records-filters" data-tm-records-filters>
+                            <div class="tm-records-filters-row">
+                                <label class="tm-records-filter-field tm-records-filter-field--search">
+                                    <span>Buscar</span>
+                                    <span class="tm-records-search-wrap">
+                                        <input
+                                            type="search"
+                                            class="tm-records-filter-input"
+                                            data-tm-filter-buscar
+                                            value="{{ $isModuleActive ? e(request('buscar', '')) : '' }}"
+                                            placeholder="Texto en los datos del registro…"
+                                            autocomplete="off"
+                                        >
+                                        <button type="button" class="tm-records-search-clear" data-tm-filter-buscar-clear aria-label="Quitar texto" @if (! $isModuleActive || trim((string) request('buscar', '')) === '') hidden @endif>
+                                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                        </button>
+                                    </span>
+                                </label>
+                                <label class="tm-records-filter-field">
+                                    <span>Microregión</span>
+                                    <select class="tm-records-filter-select" data-tm-filter-microrregion>
+                                        <option value="">Todos</option>
+                                        @foreach ($microrregionesAsignadas ?? [] as $micro)
+                                            <option value="{{ $micro->id }}" @selected($isModuleActive && (int) request('microrregion_id') === (int) $micro->id)>
+                                                MR {{ $micro->microrregion }} — {{ $micro->cabecera }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
                         @php
                             $recordsLoaded = $isModuleActive && isset($myEntries);
                         @endphp
@@ -1172,6 +1221,32 @@
             });
         });
 
+        const buildRecordsQueryFromPanel = function (panel, entriesPage) {
+            if (!panel) {
+                return '';
+            }
+            const host = panel.querySelector('.tm-records-fragment-host');
+            const moduleId = String(host && host.getAttribute('data-module-id') || '').replace(/[^\d]/g, '');
+            if (!moduleId) {
+                return '';
+            }
+            const filters = panel.querySelector('[data-tm-records-filters]');
+            let qs = 'module=' + encodeURIComponent(moduleId) + '&entries_page=' + encodeURIComponent(String(entriesPage || '1'));
+            if (filters) {
+                const buscarEl = filters.querySelector('[data-tm-filter-buscar]');
+                const mrEl = filters.querySelector('[data-tm-filter-microrregion]');
+                const buscar = (buscarEl && buscarEl.value ? String(buscarEl.value) : '').trim();
+                const mr = (mrEl && mrEl.value ? String(mrEl.value) : '').trim();
+                if (buscar) {
+                    qs += '&buscar=' + encodeURIComponent(buscar);
+                }
+                if (mr) {
+                    qs += '&microrregion_id=' + encodeURIComponent(mr);
+                }
+            }
+            return qs;
+        };
+
         const loadRecordsFragment = function (host, moduleId, queryString) {
             if (!host || !fragmentRecordsBase || !moduleId) {
                 return Promise.resolve();
@@ -1195,6 +1270,37 @@
             });
         };
 
+        const syncTmBuscarClearVisibility = function (input) {
+            if (!input) {
+                return;
+            }
+            const wrap = input.closest('.tm-records-search-wrap');
+            const clearBtn = wrap && wrap.querySelector('[data-tm-filter-buscar-clear]');
+            if (clearBtn) {
+                clearBtn.hidden = !String(input.value || '').trim();
+            }
+        };
+
+        const reloadRecordsPanelFromFilters = function (panel, opts) {
+            opts = opts || {};
+            if (!panel || !fragmentRecordsBase) {
+                return;
+            }
+            if (opts.requireActive !== false && !panel.classList.contains('is-active')) {
+                return;
+            }
+            const host = panel.querySelector('.tm-records-fragment-host');
+            const moduleId = String(host && host.getAttribute('data-module-id') || '').replace(/[^\d]/g, '');
+            if (!host || !moduleId) {
+                return;
+            }
+            const placeholder = panel.querySelector('.tm-records-panel-placeholder');
+            if (placeholder) {
+                placeholder.hidden = true;
+            }
+            loadRecordsFragment(host, moduleId, buildRecordsQueryFromPanel(panel, '1'));
+        };
+
         moduleFilterButtons.forEach(function (button) {
             button.addEventListener('click', function () {
                 const targetId = button.getAttribute('data-module-target') || '';
@@ -1202,6 +1308,10 @@
                 const panel = targetId ? document.getElementById(targetId) : null;
                 if (!panel || !fragmentRecordsBase) {
                     return;
+                }
+                const buscarInput = panel.querySelector('[data-tm-filter-buscar]');
+                if (buscarInput) {
+                    syncTmBuscarClearVisibility(buscarInput);
                 }
                 const host = panel.querySelector('.tm-records-fragment-host');
                 const placeholder = panel.querySelector('.tm-records-panel-placeholder');
@@ -1220,7 +1330,7 @@
                 if (placeholder) {
                     placeholder.hidden = true;
                 }
-                loadRecordsFragment(host, moduleId, 'module=' + encodeURIComponent(moduleId) + '&entries_page=1').then(function () {
+                loadRecordsFragment(host, moduleId, buildRecordsQueryFromPanel(panel, '1')).then(function () {
                     if (placeholder) {
                         placeholder.hidden = true;
                     }
@@ -1229,7 +1339,52 @@
         });
 
         if (recordsViewPanel && fragmentRecordsBase) {
+            recordsViewPanel.querySelectorAll('[data-tm-filter-buscar]').forEach(function (el) {
+                syncTmBuscarClearVisibility(el);
+            });
+
+            recordsViewPanel.addEventListener('input', function (event) {
+                const input = event.target.closest('[data-tm-filter-buscar]');
+                if (!input || !recordsViewPanel.contains(input)) {
+                    return;
+                }
+                syncTmBuscarClearVisibility(input);
+                const panel = input.closest('.tm-module-records-panel');
+                if (!panel) {
+                    return;
+                }
+                if (input._tmBuscarTimer) {
+                    clearTimeout(input._tmBuscarTimer);
+                }
+                input._tmBuscarTimer = setTimeout(function () {
+                    input._tmBuscarTimer = null;
+                    reloadRecordsPanelFromFilters(panel, { requireActive: true });
+                }, 380);
+            });
+
+            recordsViewPanel.addEventListener('change', function (event) {
+                if (!event.target.matches('[data-tm-filter-microrregion]')) {
+                    return;
+                }
+                const panel = event.target.closest('.tm-module-records-panel');
+                reloadRecordsPanelFromFilters(panel, { requireActive: true });
+            });
+
             recordsViewPanel.addEventListener('click', function (event) {
+                const buscarClear = event.target.closest('[data-tm-filter-buscar-clear]');
+                if (buscarClear && recordsViewPanel.contains(buscarClear)) {
+                    event.preventDefault();
+                    const wrap = buscarClear.closest('.tm-records-search-wrap');
+                    const input = wrap && wrap.querySelector('[data-tm-filter-buscar]');
+                    if (input) {
+                        input.value = '';
+                        syncTmBuscarClearVisibility(input);
+                        const panel = input.closest('.tm-module-records-panel');
+                        reloadRecordsPanelFromFilters(panel, { requireActive: false });
+                    }
+                    return;
+                }
+
                 const anchor = event.target.closest('a.tm-paginator-btn[href]');
                 if (!anchor || !anchor.getAttribute('href')) {
                     return;
@@ -1242,10 +1397,73 @@
                 const url = new URL(anchor.href, window.location.origin);
                 const moduleId = host.getAttribute('data-module-id') || url.searchParams.get('module');
                 const entriesPage = url.searchParams.get('entries_page') || '1';
-                const qs = 'module=' + encodeURIComponent(moduleId) + '&entries_page=' + encodeURIComponent(entriesPage);
+                const panel = host.closest('.tm-module-records-panel');
+                const qs = panel
+                    ? buildRecordsQueryFromPanel(panel, entriesPage)
+                    : ('module=' + encodeURIComponent(moduleId) + '&entries_page=' + encodeURIComponent(entriesPage));
                 loadRecordsFragment(host, moduleId, qs);
             });
         }
+
+        let syncTmModuleChipsNav = function () {};
+
+        (function initTmModuleChipsNav() {
+            const row = document.querySelector('[data-tm-module-chips-row]');
+            if (!row) {
+                return;
+            }
+            const track = row.querySelector('[data-tm-module-chips-track]');
+            const prev = row.querySelector('[data-tm-module-chips-prev]');
+            const next = row.querySelector('[data-tm-module-chips-next]');
+            if (!track || !prev || !next) {
+                return;
+            }
+            const step = function () {
+                const w = track.clientWidth;
+                return Math.max(120, w > 8 ? Math.floor(w * 0.72) : 160);
+            };
+            const syncNav = function () {
+                const cw = track.clientWidth;
+                const sw = track.scrollWidth;
+                if (cw < 8) {
+                    prev.disabled = true;
+                    next.disabled = true;
+                    return;
+                }
+                const maxScroll = sw - cw;
+                if (maxScroll <= 2) {
+                    prev.disabled = true;
+                    next.disabled = true;
+                    return;
+                }
+                prev.disabled = track.scrollLeft <= 2;
+                next.disabled = track.scrollLeft >= maxScroll - 2;
+            };
+            syncTmModuleChipsNav = syncNav;
+            prev.addEventListener('click', function () {
+                track.scrollBy({ left: -step(), behavior: 'smooth' });
+            });
+            next.addEventListener('click', function () {
+                track.scrollBy({ left: step(), behavior: 'smooth' });
+            });
+            track.addEventListener('scroll', syncNav, { passive: true });
+            window.addEventListener('resize', syncNav);
+            if (typeof ResizeObserver !== 'undefined') {
+                new ResizeObserver(syncNav).observe(track);
+            }
+            const recordsSection = document.getElementById('tmRecordsView');
+            if (recordsSection && typeof MutationObserver !== 'undefined') {
+                new MutationObserver(function () {
+                    if (!recordsSection.classList.contains('is-active')) {
+                        return;
+                    }
+                    requestAnimationFrame(function () {
+                        requestAnimationFrame(syncNav);
+                    });
+                }).observe(recordsSection, { attributes: true, attributeFilter: ['class'] });
+            }
+            syncNav();
+        })();
 
         document.addEventListener('click', function (event) {
             const imgBtn = event.target.closest('[data-open-image-preview]');
@@ -1283,6 +1501,11 @@
             button.addEventListener('click', function () {
                 const targetId = button.getAttribute('data-section-target') || '';
                 activateSectionPanel(targetId);
+                if (targetId === 'tmRecordsView') {
+                    requestAnimationFrame(function () {
+                        requestAnimationFrame(syncTmModuleChipsNav);
+                    });
+                }
             });
         });
 

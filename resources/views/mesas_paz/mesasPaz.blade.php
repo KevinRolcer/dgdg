@@ -90,12 +90,20 @@
                                 </i>
                                 <input type="date" id="fechaSelectorMesas" class="mesa-date-input-hidden" value="{{ $fechaHoyIso }}" max="{{ \Carbon\Carbon::today()->toDateString() }}">
                             </div>
-                            <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#importarExcelModal">
-                                Cargar Excel
-                            </button>
-                            <button type="button" class="btn btn-sm btn-primary" id="btnVaciarMicrorregion">
-                                Vaciar registros
-                            </button>
+                            <div class="d-inline-flex align-items-center gap-1 flex-shrink-0 mesa-excel-actions">
+                                <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#importarExcelModal">
+                                    Cargar Excel
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-danger mesa-btn-vaciar-registros"
+                                    id="btnVaciarMicrorregion"
+                                    title="Vaciar registros de esta fecha en tu microrregión"
+                                    aria-label="Vaciar registros"
+                                >
+                                    <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                                </button>
+                            </div>
                         </div>
                     @else
                         <span class="mesa-heading-date">{{ ucfirst($fechaSolo) }}</span>

@@ -50,8 +50,8 @@ class WhatsAppChatArchiveController extends Controller
             'hidePageHeader' => true,
             'pageTitle' => 'Autenticación — Chats WhatsApp',
             'pageDescription' => $needsSetup
-                ? 'Configura Google Authenticator con el QR o la clave manual. Luego introduce el código de 6 dígitos. Solo una vez por sesión.'
-                : 'Introduce el código de 6 dígitos de Google Authenticator. Solo una vez por sesión.',
+                ? 'Configura Google Authenticator con el QR o la clave manual para comenzar.'
+                : '',
             'redirect' => $request->query('redirect'),
             'needsSetup' => $needsSetup,
             'qrSvg' => $qrSvg,

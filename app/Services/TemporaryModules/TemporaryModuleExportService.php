@@ -3,6 +3,7 @@
 namespace App\Services\TemporaryModules;
 
 use App\Models\TemporaryModule;
+use App\Services\TemporaryModules\TemporaryModuleExcelImportService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -210,6 +211,54 @@ class TemporaryModuleExportService
         return [
             'name' => $fileName,
             'url' => route('temporary-modules.admin.exports.download', ['file' => $fileName]),
+        ];
+    }
+
+    public function generateTemplate(TemporaryModule $module): array
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Plantilla');
+
+        $importableTypes = TemporaryModuleExcelImportService::IMPORTABLE_TYPES;
+        $fields = $module->fields()
+            ->whereIn('type', $importableTypes)
+            ->orderBy('sort_order')
+            ->get();
+
+        $col = 1;
+        foreach ($fields as $field) {
+            $letter = Coordinate::stringFromColumnIndex($col);
+            $sheet->setCellValue($letter.'1', $field->label);
+
+            $style = $sheet->getStyle($letter.'1');
+            $style->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
+            $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::HEADER_FILL_COLOR);
+
+            $sheet->getColumnDimension($letter)->setAutoSize(true);
+            $col++;
+        }
+
+        $baseName = Str::slug((string) $module->name, '_');
+        if ($baseName === '') {
+            $baseName = 'plantilla_modulo_'.$module->id;
+        }
+        $fileName = 'plantilla_'.$baseName.'.xlsx';
+        $exportDir = storage_path('app/public/temporary-exports');
+        $tempFilePath = $exportDir.'/'.$fileName;
+
+        if (!is_dir($exportDir)) {
+            mkdir($exportDir, 0755, true);
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($tempFilePath);
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet);
+
+        return [
+            'name' => $fileName,
+            'url' => route('temporary-modules.plantilla.download', ['file' => $fileName]),
         ];
     }
 

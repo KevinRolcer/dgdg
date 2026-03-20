@@ -28,6 +28,18 @@
             hidden.value = gather();
         }
 
+        function checkAndSubmit() {
+            var code = gather();
+            if (code.length === 6) {
+                // Usamos requestSubmit si está disponible para disparar el evento 'submit' y validaciones
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            }
+        }
+
         function setFromString(str) {
             var d = digitsOnly(str);
             for (var i = 0; i < inputs.length; i++) {
@@ -39,6 +51,7 @@
                 focusIndex = inputs.length - 1;
             }
             inputs[focusIndex].focus();
+            checkAndSubmit();
         }
 
         inputs.forEach(function (el, idx) {
@@ -53,6 +66,7 @@
                 if (raw && idx < inputs.length - 1) {
                     inputs[idx + 1].focus();
                 }
+                checkAndSubmit();
             });
 
             el.addEventListener('keydown', function (e) {
@@ -113,6 +127,16 @@
         }
 
         syncHidden();
+
+        // Auto-focus al cargar si está vacío
+        if (gather().length === 0) {
+            inputs[0].focus();
+        } else {
+            // Si ya hay algo (ej. old value), posicionar en el siguiente o último
+            var current = gather();
+            var nextIdx = Math.min(current.length, inputs.length - 1);
+            inputs[nextIdx].focus();
+        }
     }
 
     if (document.readyState === 'loading') {

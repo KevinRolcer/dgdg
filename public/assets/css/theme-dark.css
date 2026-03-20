@@ -1,19 +1,13 @@
-/**
- * Modo oscuro: activado con clase html.theme-dark (preferencia en localStorage).
- */
-/**
- * Variantes: añadir theme-dark--deep | theme-dark--soft | theme-dark--slate en <html>.
- * Por defecto, solo theme-dark equivale a profundo (misma paleta que --deep).
- */
+
 html.theme-dark,
 html.theme-dark.theme-dark--deep {
     --clr-bg: #0e1015;
     --clr-card: #161920;
+    --clr-surface: #1c2028;
     --clr-text-main: #e8e9ed;
     --clr-text-light: #9aa3b2;
     --clr-border: rgba(255, 255, 255, 0.08);
     --shadow-soft: 0 8px 28px rgba(0, 0, 0, 0.45);
-    /* Misma identidad que app-shell (:root) — botones y marca */
     --clr-accent: #c79b66;
     --clr-primary-dark: #5f1b2d;
     --clr-primary: #861e34;
@@ -22,10 +16,10 @@ html.theme-dark.theme-dark--deep {
     color-scheme: dark;
 }
 
-/* Gris tenue: menos contraste, fondos más claros */
 html.theme-dark.theme-dark--soft {
     --clr-bg: #3d424b;
     --clr-card: #484e59;
+    --clr-surface: #50565f;
     --clr-text-main: #f0f1f4;
     --clr-text-light: #b8bec8;
     --clr-border: rgba(255, 255, 255, 0.14);
@@ -34,10 +28,10 @@ html.theme-dark.theme-dark--soft {
     color-scheme: dark;
 }
 
-/* Pizarra: tono azulado */
 html.theme-dark.theme-dark--slate {
     --clr-bg: #121922;
     --clr-card: #1a2330;
+    --clr-surface: #222c3a;
     --clr-text-main: #e6eaf0;
     --clr-text-light: #8e9aaf;
     --clr-border: rgba(130, 160, 200, 0.14);
@@ -51,7 +45,6 @@ html.theme-dark body {
     color: var(--clr-text-main);
 }
 
-/* Botones: misma plantilla que :root (primary / secondary) en todo el oscuro */
 html.theme-dark .btn-primary {
     background-color: var(--clr-primary) !important;
     border-color: var(--clr-primary) !important;
@@ -90,7 +83,6 @@ html.theme-dark .btn-outline-primary:hover {
     color: #fff !important;
 }
 
-/* Superficies que en claro usan #fff fijo */
 html.theme-dark .app-sidebar,
 html.theme-dark .sidebar-header,
 html.theme-dark .sidebar-collapse-btn {
@@ -166,7 +158,6 @@ html.theme-dark .content-card {
     border-color: var(--clr-border);
 }
 
-/* Card/tabla en shell: mismo fondo que app-main (UI más limpia), sin borde */
 html.theme-dark .um-page .content-card.tm-card.um-card-wrap,
 html.theme-dark .um-page .um-card-wrap {
     background: var(--clr-bg) !important;
@@ -200,7 +191,6 @@ html.theme-dark .menu-group.is-active > .menu-link-toggle {
     color: var(--clr-accent);
 }
 
-/* Tema pizarra: textos y bordes rojos → acento (#c79b66) en todos los módulos */
 html.theme-dark.theme-dark--slate .topbar-menu-link-danger {
     color: var(--clr-accent);
 }
@@ -222,7 +212,6 @@ html.theme-dark.theme-dark--slate .text-primary {
     color: var(--clr-accent) !important;
 }
 
-/* Login (misma clase en html) */
 html.theme-dark.auth-page body {
     background: var(--clr-bg);
 }
@@ -264,7 +253,6 @@ html.theme-dark.auth-page .auth-alert {
     color: var(--clr-text-main);
 }
 
-/* Logos: claro = logo-gobierno / ícono Puebla; oscuro = Gobierno de Puebla_2-Versión horizontal */
 .auth-logo-dark,
 .sidebar-logo-dark,
 .sidebar-logo-collapsed-dark {
@@ -324,8 +312,7 @@ html.theme-dark body.sidebar-collapsed .sidebar-logo-collapsed-dark {
     opacity: 1 !important;
 }
 
-/* ---------- Calendario Inicio: colores por tema oscuro ---------- */
-/* Profundo (deep): celdas sin caja, fondo solo en hover/hoy */
+
 html.theme-dark .home-shell-aside,
 html.theme-dark.theme-dark--deep .home-shell-aside {
     --cal-cell-bg: transparent;
@@ -346,7 +333,6 @@ html.theme-dark.theme-dark--deep .home-shell-aside {
     --cal-dot-past: #a84d62;
 }
 
-/* Gris tenue (soft): celdas sin caja, hover sutil */
 html.theme-dark.theme-dark--soft .home-shell-aside {
     --cal-cell-bg: transparent;
     --cal-cell-hover-bg: rgba(255, 255, 255, 0.1);
@@ -366,7 +352,6 @@ html.theme-dark.theme-dark--soft .home-shell-aside {
     --cal-dot-past: #a84d62;
 }
 
-/* Pizarra (slate): celdas sin caja, hover azulado */
 html.theme-dark.theme-dark--slate .home-shell-aside {
     --cal-cell-bg: transparent;
     --cal-cell-hover-bg: rgba(130, 160, 200, 0.08);

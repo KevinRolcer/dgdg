@@ -1,7 +1,3 @@
-/* =========================================================
-   Ajustes — un solo plano (como UI tipo “Script”): sin caja exterior;
-   solo división suave nav | contenido (1px), mismo fondo que .app-content
-   ========================================================= */
 
 .settings-shell {
     display: grid;
@@ -19,6 +15,53 @@
     overflow: visible;
     font-size: 0.8125rem;
     line-height: 1.45;
+}
+
+@media (min-width: 769px) {
+    .settings-shell {
+        max-width: min(1180px, calc(100% - 16px));
+        margin-inline: auto;
+        box-sizing: border-box;
+        padding-inline: clamp(8px, 2vw, 20px);
+    }
+
+    .settings-shell-main-head {
+        max-width: min(42rem, 100%);
+    }
+
+    .settings-appearance-panel {
+        max-width: min(40rem, 100%);
+    }
+}
+
+@media (min-width: 1200px) {
+    .settings-shell {
+        max-width: min(1280px, calc(100% - 24px));
+    }
+}
+
+@media (min-width: 1400px) {
+    .settings-shell {
+        max-width: min(1420px, calc(100% - 32px));
+    }
+}
+
+@media (min-width: 1600px) {
+    .settings-shell {
+        max-width: min(1560px, calc(100% - 40px));
+    }
+}
+
+@media (min-width: 1920px) {
+    .settings-shell {
+        max-width: min(1680px, calc(100% - 48px));
+    }
+}
+
+@media (min-width: 2400px) {
+    .settings-shell {
+        max-width: min(1820px, calc(100% - 56px));
+    }
 }
 
 .settings-shell-nav-toggle {
@@ -91,7 +134,6 @@
     }
 }
 
-/* Nav — misma superficie; única separación = línea derecha */
 .settings-shell-nav {
     background: var(--clr-bg);
     border-right: 1px solid var(--clr-border);
@@ -180,7 +222,6 @@ html.theme-dark .settings-shell-item.is-active .settings-shell-badge {
     color: #1a1a1a;
 }
 
-/* Restablecer TOTP (Chats WhatsApp) — Ajustes */
 .settings-totp-reset-block {
     max-width: 36rem;
 }
@@ -252,7 +293,6 @@ html.theme-dark .settings-totp-reset-error {
     gap: 0.4rem;
 }
 
-/* Área principal — continúa el mismo fondo; sin segundo “panel” */
 .settings-shell-main {
     padding: 0.85rem 1.25rem 1.25rem;
     min-width: 0;
@@ -274,13 +314,8 @@ html.theme-dark .settings-shell-main {
     .settings-shell {
         grid-template-columns: 240px 1fr;
     }
-    .settings-shell-main {
-        max-width: var(--content-max-width);
-        margin: 0 auto;
-    }
 }
 
-/* Título de sección: solo línea suave, no bloque nuevo */
 .settings-shell-main-head {
     margin-bottom: 0.5rem;
     padding-bottom: 0.5rem;
@@ -416,7 +451,6 @@ html.theme-dark .settings-help-popover-close:hover {
     line-height: 1.35;
 }
 
-/* Fila tipo lista: sin caja extra (evita div-card dentro de main-card) */
 .settings-field-row,
 .settings-row {
     display: flex;
@@ -451,7 +485,6 @@ html.theme-dark .settings-row {
     margin-top: 0.15rem;
 }
 
-/* Interruptor tipo pill (referencia Filters) */
 .settings-toggle {
     position: relative;
     display: inline-flex;
@@ -512,7 +545,6 @@ html.theme-dark .settings-toggle input:checked + .settings-toggle-track {
     outline-offset: 2px;
 }
 
-/* Gama: mismos controles, menos “tarjetas” — solo borde fino en cada opción */
 .settings-dark-variants {
     margin-top: 0.2rem;
     padding-top: 0.28rem;
@@ -576,7 +608,6 @@ html.theme-dark .settings-variant-btn.is-active {
     background: rgba(199, 155, 102, 0.08);
 }
 
-/* Círculos de color: sólidos, sin brillo ni gradiente */
 .settings-variant-swatch {
     width: 28px;
     height: 28px;
@@ -620,7 +651,6 @@ html.theme-dark .settings-variant-btn.is-active .settings-variant-name {
     margin-top: 0.25rem;
 }
 
-/* Formulario migración: una franja, no bloque gris dentro del panel */
 .settings-form-block {
     display: flex;
     flex-direction: column;
@@ -648,7 +678,6 @@ html.theme-dark .settings-variant-btn.is-active .settings-variant-name {
     border-radius: 6px !important;
 }
 
-/* Campo archivo (Distribuir municipios) */
 .settings-field-row .settings-field-label {
     font-size: var(--fs-small, 0.8125rem);
     font-weight: 600;
@@ -660,7 +689,6 @@ html.theme-dark .settings-variant-btn.is-active .settings-variant-name {
     font-size: var(--fs-small);
 }
 
-/* Bloque Microrregiones: todo en una línea */
 .settings-micro-block {
     max-width: 42rem;
 }
@@ -778,7 +806,6 @@ html.theme-dark .settings-micro-btn-secondary:hover {
     color: var(--clr-accent);
 }
 
-/* Botones de sección más compactos */
 .settings-panel-block .tm-btn,
 .settings-panel-block .settings-submit-btn {
     padding: 0.28rem 0.55rem !important;
@@ -789,7 +816,6 @@ html.theme-dark .settings-micro-btn-secondary:hover {
     font-size: 0.72rem;
 }
 
-/* Bloque Migración de imágenes: misma línea que Microrregiones */
 .settings-migrate-form {
     margin-top: 0.35rem;
     padding-top: 0;
@@ -827,7 +853,6 @@ html.theme-dark .settings-micro-btn-secondary:hover {
     font-size: 0.7rem;
 }
 
-/* Modal lista microrregiones y municipios */
 .settings-modal-microrregiones .tm-modal-head h3 {
     color: var(--clr-accent);
 }
@@ -881,7 +906,6 @@ html.theme-dark .settings-microrregiones-nombre {
     font-size: var(--fs-body);
 }
 
-/* Alerta con botón Ver logs */
 .settings-alert-with-log {
     display: flex;
     flex-wrap: wrap;
@@ -911,7 +935,6 @@ html.theme-dark .settings-microrregiones-nombre {
     border-color: rgba(255, 255, 255, 0.35);
 }
 
-/* Tema oscuro: alerta y botón Ver logs con acento */
 html.theme-dark .settings-alert-with-log.inline-alert-success {
     background: rgba(199, 155, 102, 0.12);
     border-color: rgba(199, 155, 102, 0.35);
@@ -935,7 +958,6 @@ html.theme-dark .inline-alert-error .settings-log-btn:hover {
     border-color: var(--clr-accent);
 }
 
-/* Modal logs distribución */
 .settings-modal-dialog-log .settings-log-body {
     max-height: 70vh;
     overflow-y: auto;

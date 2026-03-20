@@ -76,6 +76,25 @@ class TemporaryModuleController extends Controller
         ]);
     }
 
+    public function downloadTemplate(int $module): RedirectResponse
+    {
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+        $result = $this->exportService->generateTemplate($temporaryModule);
+
+        return redirect($result['url']);
+    }
+
+    public function downloadTemplateFile(Request $request, string $file): BinaryFileResponse
+    {
+        $file = trim($file);
+        abort_unless(preg_match('/\Aplantilla_[A-Za-z0-9_\-]+\.xlsx\z/', $file) === 1, 404);
+
+        $path = storage_path('app/public/temporary-exports/'.$file);
+        abort_unless(is_file($path), 404);
+
+        return response()->download($path, $file);
+    }
+
     public function adminRecords(): View
     {
         // Evita 500 si en producción no corrió la migración de exported_at / seed_discard_log
@@ -657,6 +676,52 @@ class TemporaryModuleController extends Controller
         return Carbon::parse($date)->endOfDay();
     }
 
+    /**
+     * Filtros del delegado en listados de registros (fragmento AJAX y vista índice).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder  $query
+     */
+    private function applyDelegateMyRecordsFilters($query, Request $request, array $allowedMicrorregionIds): void
+    {
+        if ($request->filled('microrregion_id')) {
+            $mrId = (int) $request->query('microrregion_id');
+            if ($mrId > 0 && $allowedMicrorregionIds !== [] && in_array($mrId, $allowedMicrorregionIds, true)) {
+                $query->where('microrregion_id', $mrId);
+            }
+        }
+
+        $buscar = trim((string) $request->query('buscar', ''));
+        if ($buscar === '') {
+            return;
+        }
+
+        $like = '%'.addcslashes($buscar, '%_\\').'%';
+        $driver = $query->getConnection()->getDriverName();
+
+        match ($driver) {
+            'sqlite' => $query->where('data', 'like', $like),
+            'pgsql' => $query->whereRaw('CAST(data AS TEXT) ILIKE ?', [$like]),
+            default => $query->whereRaw('LOWER(CAST(data AS CHAR(10000))) LIKE LOWER(?)', [$like]),
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function delegateRecordsAppends(Request $request, int $moduleId): array
+    {
+        $appends = ['module' => $moduleId];
+        $buscar = trim((string) $request->query('buscar', ''));
+        if ($buscar !== '') {
+            $appends['buscar'] = $buscar;
+        }
+        if ($request->filled('microrregion_id')) {
+            $appends['microrregion_id'] = (int) $request->query('microrregion_id');
+        }
+
+        return $appends;
+    }
+
     public function delegateIndex(Request $request): View|RedirectResponse
     {
         $user = $request->user();
@@ -746,11 +811,12 @@ class TemporaryModuleController extends Controller
                     fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
                     fn ($q) => $q->whereRaw('1 = 0')
                 )
+                ->tap(fn ($q) => $this->applyDelegateMyRecordsFilters($q, $request, $microrregionIdsUsuario))
                 ->with('microrregion:id,microrregion,cabecera')
                 ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
                 ->latest('submitted_at')
                 ->paginate(10, ['*'], 'entries_page')
-                ->appends(array_merge($request->except('entries_page'), ['module' => $activeModuleId]))
+                ->appends(array_merge($request->except('entries_page'), $this->delegateRecordsAppends($request, $activeModuleId)))
                 ->withQueryString();
         }
 
@@ -828,11 +894,12 @@ class TemporaryModuleController extends Controller
                 fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
                 fn ($q) => $q->whereRaw('1 = 0')
             )
+            ->tap(fn ($q) => $this->applyDelegateMyRecordsFilters($q, $request, $microrregionIdsUsuario))
             ->with('microrregion:id,microrregion,cabecera')
             ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
             ->latest('submitted_at')
             ->paginate(10, ['*'], 'entries_page')
-            ->appends(['module' => $moduleId])
+            ->appends($this->delegateRecordsAppends($request, $moduleId))
             ->withQueryString();
         $municipioField = $temporaryModule->fields->firstWhere('type', 'municipio');
 
