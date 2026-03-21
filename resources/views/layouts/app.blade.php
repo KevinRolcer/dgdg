@@ -101,7 +101,7 @@
                                             <small>{{ $notification['time'] ?? 'Reciente' }}</small>
                                         </div>
                                         @if(!empty($notification['id']))
-                                            <form method="POST" action="{{ route('notifications.destroy', $notification['id']) }}" style="display:inline;">
+                                            <form method="POST" action="{{ route('notifications.destroy', $notification['id']) }}">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="topbar-notify-item-delete" title="Eliminar notificación">
@@ -244,7 +244,7 @@
                                 <small>{{ $notification['time'] ?? 'Reciente' }}</small>
                             </div>
                             @if(!empty($notification['id']))
-                                <form method="POST" action="{{ route('notifications.destroy', $notification['id']) }}" style="display:inline;">
+                                <form method="POST" action="{{ route('notifications.destroy', $notification['id']) }}">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="topbar-notify-item-delete" title="Eliminar notificación">

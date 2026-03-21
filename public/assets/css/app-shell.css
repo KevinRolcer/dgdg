@@ -680,8 +680,20 @@ body.sidebar-collapsed .sidebar-logout-btn {
     border: 1px solid transparent;
 }
 
+.topbar-notify-list li > .topbar-notify-icon {
+    grid-column: 1;
+}
+
 .topbar-notify-list li > div {
+    grid-column: 2;
     min-width: 0;
+}
+
+.topbar-notify-list li > form {
+    grid-column: 3;
+    justify-self: end;
+    align-self: center;
+    display: flex;
 }
 
 .topbar-notify-list li.is-active {
