@@ -86,7 +86,7 @@
                                             }
                                         }
                                     @endphp
-                                    <li class="{{ $loop->first ? 'is-active' : '' }}" @if(!empty($notification['export_request_id'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif>
+                                    <li class="{{ $loop->first ? 'is-active' : '' }}" style="position:relative; padding-right:42px;" @if(!empty($notification['export_request_id'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif>
                                         <span class="topbar-notify-icon">
                                             <i class="{{ $notification['icon'] ?? 'fa-regular fa-bell' }}" aria-hidden="true"></i>
                                         </span>
@@ -101,7 +101,7 @@
                                             <small>{{ $notification['time'] ?? 'Reciente' }}</small>
                                         </div>
                                         @if(!empty($notification['id']))
-                                            <form method="POST" action="{{ route('notifications.destroy', $notification['id']) }}">
+                                            <form method="POST" action="{{ route('notifications.destroy', $notification['id']) }}" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); margin:0; display:flex;">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="topbar-notify-item-delete" title="Eliminar notificación">
@@ -229,7 +229,7 @@
                                 }
                             }
                         @endphp
-                        <li @if(!empty($notification['export_request_id'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif>
+                        <li style="position:relative; padding-right:42px;" @if(!empty($notification['export_request_id'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif>
                             <span class="topbar-notify-icon">
                                 <i class="{{ $notification['icon'] ?? 'fa-regular fa-bell' }}" aria-hidden="true"></i>
                             </span>
@@ -244,7 +244,7 @@
                                 <small>{{ $notification['time'] ?? 'Reciente' }}</small>
                             </div>
                             @if(!empty($notification['id']))
-                                <form method="POST" action="{{ route('notifications.destroy', $notification['id']) }}">
+                                <form method="POST" action="{{ route('notifications.destroy', $notification['id']) }}" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); margin:0; display:flex;">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="topbar-notify-item-delete" title="Eliminar notificación">
