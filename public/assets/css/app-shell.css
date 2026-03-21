@@ -751,7 +751,7 @@ body.sidebar-collapsed .sidebar-logout-btn {
 .topbar-notify-item-delete {
     border: 0;
     background: transparent;
-    color: var(--clr-text-light);
+    color: var(--clr-primary);
     cursor: pointer;
     padding: 6px;
     font-size: 0.8rem;
@@ -768,7 +768,7 @@ body.sidebar-collapsed .sidebar-logout-btn {
 }
 
 .topbar-notify-item-delete:hover {
-    background: rgba(134, 30, 52, 0.08);
+    background: transparent;
     color: var(--clr-primary);
 }
 
