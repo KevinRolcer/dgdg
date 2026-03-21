@@ -375,6 +375,40 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    // Delegación para eliminar notificación individual
+    document.addEventListener('click', function (event) {
+        var deleteBtn = event.target.closest('.topbar-notify-item-delete');
+        if (deleteBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            var form = deleteBtn.closest('form');
+            if (!form) return;
+
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>';
+
+            var formData = new FormData(form);
+            fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            })
+                .then(function () {
+                    refreshNotifications();
+                })
+                .catch(function () {
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
+                    if (typeof window.swal === 'function') {
+                        window.swal('Error', 'No se pudo eliminar la notificación.', 'error');
+                    }
+                });
+        }
+    });
+
     if (notificationsDrawerBackdrop) {
         notificationsDrawerBackdrop.addEventListener('click', function () {
             closeNotificationsDrawer();

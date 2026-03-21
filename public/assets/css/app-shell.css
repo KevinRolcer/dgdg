@@ -672,9 +672,9 @@ body.sidebar-collapsed .sidebar-logout-btn {
 
 .topbar-notify-list li {
     display: grid;
-    grid-template-columns: 30px 1fr;
+    grid-template-columns: 30px 1fr auto;
     gap: 10px;
-    align-items: flex-start;
+    align-items: center;
     border-radius: 10px;
     padding: 7px 6px;
     border: 1px solid transparent;
@@ -717,6 +717,30 @@ body.sidebar-collapsed .sidebar-logout-btn {
     font-size: 0.68rem;
     color: var(--clr-text-light);
     line-height: 1.25;
+}
+
+.topbar-notify-item-delete {
+    border: 0;
+    background: transparent;
+    color: var(--clr-text-light);
+    cursor: pointer;
+    padding: 6px;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    opacity: 0.4;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.topbar-notify-list li:hover .topbar-notify-item-delete {
+    opacity: 1;
+}
+
+.topbar-notify-item-delete:hover {
+    background: rgba(134, 30, 52, 0.08);
+    color: var(--clr-primary);
 }
 
 .topbar-notify-empty {

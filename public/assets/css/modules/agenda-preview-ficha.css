@@ -271,7 +271,7 @@
 
 .agenda-ficha-logo img {
     display: block;
-    max-height: 20mm; /* Igual que en el PDF */
+    max-height: 28mm; /* Se amplia de 20mm a 28mm para mayor impacto visual */
     width: auto;
     margin: 0 auto;
 }

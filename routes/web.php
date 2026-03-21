@@ -76,6 +76,15 @@ Route::middleware('auth')->group(function () {
         return back();
     })->name('notifications.clear');
 
+    Route::delete('/notificaciones/{id}', function (\Illuminate\Http\Request $request, string $id) {
+        $user = $request->user();
+        if ($user) {
+            $user->notifications()->where('id', $id)->delete();
+        }
+
+        return back();
+    })->name('notifications.destroy');
+
     Route::prefix('modulos-temporales')->group(function () {
         Route::prefix('admin')->group(function () {
             Route::get('/', [TemporaryModuleController::class, 'adminIndex'])->name('temporary-modules.admin.index')->middleware('can:modulos-temporales-admin-ver');

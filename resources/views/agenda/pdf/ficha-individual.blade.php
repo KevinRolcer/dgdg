@@ -90,7 +90,8 @@
 
         .ficha__logo img {
             display: block;
-            max-height: 20mm;
+            /* Se amplia de 20mm a 28mm para mayor impacto visual */
+            max-height: 28mm;
             width: auto;
             margin: 0 auto;
         }

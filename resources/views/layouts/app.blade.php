@@ -100,6 +100,15 @@
                                             @endif
                                             <small>{{ $notification['time'] ?? 'Reciente' }}</small>
                                         </div>
+                                        @if(!empty($notification['id']))
+                                            <form method="POST" action="{{ route('notifications.destroy', $notification['id']) }}" style="display:inline;">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="topbar-notify-item-delete" title="Eliminar notificación">
+                                                    <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                                                </button>
+                                            </form>
+                                        @endif
                                     </li>
                                 @empty
                                     <li class="topbar-notify-empty">No hay notificaciones por ahora.</li>
@@ -234,6 +243,15 @@
                                 @endif
                                 <small>{{ $notification['time'] ?? 'Reciente' }}</small>
                             </div>
+                            @if(!empty($notification['id']))
+                                <form method="POST" action="{{ route('notifications.destroy', $notification['id']) }}" style="display:inline;">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="topbar-notify-item-delete" title="Eliminar notificación">
+                                        <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                                    </button>
+                                </form>
+                            @endif
                         </li>
                     @endforeach
                 </ul>
