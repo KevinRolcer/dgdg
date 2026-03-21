@@ -15,16 +15,16 @@
             <input type="hidden" name="subtipo" id="modalSubtipo" value="gira">
 
             <div class="modal-body-scroll">
-                <div class="agenda-type-switch" id="agendaTipoSelector" style="display: flex !important; flex-direction: row !important; justify-content: space-between !important; align-items: flex-end !important; width: 100%; margin-bottom: 12px;">
-                    <div style="flex: 0 0 auto;">
-                        <label class="form-label-agenda" style="display: block; margin-bottom: 8px;">Tipo de evento</label>
+                <div class="agenda-type-switch" id="agendaTipoSelector">
+                    <div class="agenda-type-switch-main">
+                        <label class="form-label-agenda agenda-type-switch-label">Tipo de evento</label>
                         <div class="agenda-type-pills">
                             <button type="button" class="agenda-type-pill" data-subtipo="pre-gira">Pre-Gira</button>
                             <button type="button" class="agenda-type-pill is-active" data-subtipo="gira">Gira</button>
                         </div>
                     </div>
-                    <div style="flex: 1 1 auto; display: flex; align-items: flex-end; justify-content: flex-end;">
-                        <button type="button" id="btnOpenDescModal" style="background: var(--cal-cell-hover-bg, rgba(255,255,255,0.05)); border: 1px solid var(--cal-cell-hover-border, var(--clr-border, #4b5563)); color: var(--clr-text-main, #e2e8f0); border-radius: 6px; padding: 0 12px; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; height: 32px; transition: all 0.2s;">
+                    <div class="agenda-type-switch-actions">
+                        <button type="button" id="btnOpenDescModal" class="agenda-desc-trigger">
                             <i class="fa-solid fa-align-left" style="color: var(--clr-accent, #c79b66);"></i> Añadir Descripción
                         </button>
                     </div>
@@ -37,7 +37,7 @@
 
                 <div class="form-group-agenda" id="rowDescripcion">
                     <label class="form-label-agenda">Descripción</label>
-                    <textarea name="descripcion" id="modalDescripcion" rows="1" class="form-control-agenda" placeholder="Detalles..." style="min-height: 38px;"></textarea>
+                    <textarea name="descripcion" id="modalDescripcion" rows="1" class="form-control-agenda agenda-descripcion-textarea" placeholder="Detalles..."></textarea>
                 </div>
 
                 <!-- Fields for Gira only -->
@@ -82,32 +82,32 @@
                 </div>
 
                 <!-- Common temporal row -->
-                <div class="agenda-fecha-hora-row" style="display: flex !important; flex-direction: row !important; gap: 12px; align-items: flex-end; width: 100%; margin-bottom: 0.5rem;">
-                    <div style="flex: 1; min-width: 120px;">
+                <div class="agenda-fecha-hora-row">
+                    <div class="agenda-fecha-col">
                         <label class="form-label-agenda">Fecha <span class="text-red-500">*</span></label>
                         <input type="date" name="fecha_inicio" id="modalFecha" class="form-control-agenda" required>
                     </div>
-                    <div style="width: auto; flex-shrink: 0;">
+                    <div class="agenda-hora-col">
                         <label class="form-label-agenda">Hora</label>
-                        <div style="display: flex; align-items: center; gap: 8px; height: 34px;">
+                        <div class="agenda-time-control">
                             <label class="toggle-switch-mini">
                                 <input type="checkbox" name="habilitar_hora" id="modalHabilitarHora" value="1">
                                 <span class="slider-mini"></span>
                             </label>
-                            <input type="time" name="hora" id="modalHora" class="form-control-agenda" style="display: none; width: 95px; padding: 2px 4px; font-size: 11px;">
+                            <input type="time" name="hora" id="modalHora" class="form-control-agenda agenda-time-input" style="display: none;">
                         </div>
                     </div>
-                    <div style="flex: 1; min-width: 140px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                            <label class="form-label-agenda" style="margin-bottom: 0; font-size: 10px;">Recordatorio</label>
+                    <div class="agenda-recordatorio-col">
+                        <div class="agenda-reminder-head">
+                            <label class="form-label-agenda agenda-reminder-label">Recordatorio</label>
                             {{-- Número telefónico desactivado de momento
                             <button type="button" id="btnAddAddress" class="btn-add-mini" style="font-size: 10px; padding: 0;">
                                 <i class="fa-solid fa-plus"></i> Teléfono
                             </button>
                             --}}
                         </div>
-                        <div style="display: flex; align-items: center; gap: 4px; height: 34px;">
-                            <select name="recordatorio_minutos" id="modalRecordatorio" class="form-control-agenda" style="min-width: 120px;">
+                        <div class="agenda-reminder-control">
+                            <select name="recordatorio_minutos" id="modalRecordatorio" class="form-control-agenda agenda-reminder-select">
                                 <option value="30" selected>30 min</option>
                                 <option value="60">1 h</option>
                                 <option value="90">1 h 30 min</option>
@@ -118,12 +118,12 @@
                                 <option value="300">5 h</option>
                                 <option value="360">6 h</option>
                             </select>
-                            <span style="font-size: 10px; color: #64748b; white-space: nowrap;">antes</span>
+                            <span class="agenda-reminder-before">antes</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="agenda-gira-delegado-aforo-row" style="margin-top: 0.75rem;">
+                <div class="agenda-gira-delegado-aforo-row">
                     {{-- Solo Gira/Pre-Gira: delegado de la MR --}}
                     <div class="agenda-col-40" id="agendaDelegadoLabelWrap" style="display: none;">
                         <p id="agendaDelegadoLabel" class="agenda-delegado-label">

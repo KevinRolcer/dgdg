@@ -308,8 +308,13 @@ class TemporaryModuleController extends Controller
 
     public function edit(int $module): View
     {
+        $select = ['id', 'name', 'description', 'expires_at', 'applies_to_all', 'is_active'];
+        if (Schema::hasColumn('temporary_modules', 'seed_discard_log')) {
+            $select[] = 'seed_discard_log';
+        }
+
         $temporaryModule = TemporaryModule::query()
-            ->select(['id', 'name', 'description', 'expires_at', 'applies_to_all', 'is_active', 'seed_discard_log'])
+            ->select($select)
             ->with(['fields', 'targetUsers:id'])
             ->findOrFail($module);
         $fieldUsage = $this->fieldService->countFieldDataUsage((int) $temporaryModule->id);

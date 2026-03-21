@@ -617,7 +617,7 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     background: white;
     width: 100%;
     max-width: 650px;
-    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
     min-height: 0;
     border-radius: 12px;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
@@ -632,7 +632,7 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     .modal-agenda-content {
         max-width: 850px;
     }
-    
+
     .agenda-row-two-cols {
         gap: 20px;
     }
@@ -642,7 +642,7 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     .modal-agenda-content {
         max-width: 850px;
     }
-    
+
     .agenda-row-two-cols {
         gap: 20px;
     }
@@ -682,7 +682,7 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     overflow-y: auto !important;
     overflow-x: hidden !important;
     flex: 1 1 auto;
-    min-height: 0; 
+    min-height: 0;
 }
 
 #agendaModal .modal-agenda-content {
@@ -823,8 +823,30 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
 
 .agenda-type-switch {
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 0.75rem 1rem;
+    width: 100%;
+    margin-bottom: 0.75rem;
+}
+
+.agenda-type-switch-main {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.agenda-type-switch-label {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.agenda-type-switch-actions {
+    flex: 1 1 220px;
+    min-width: 0;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-end;
 }
 
 .agenda-type-pills {
@@ -851,10 +873,107 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     color: #fff;
 }
 
+.agenda-desc-trigger {
+    background: var(--cal-cell-hover-bg, rgba(255,255,255,0.05));
+    border: 1px solid var(--cal-cell-hover-border, var(--clr-border, #4b5563));
+    color: var(--clr-text-main, #e2e8f0);
+    border-radius: 6px;
+    padding: 0 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    min-height: 32px;
+    transition: all 0.2s;
+    max-width: 100%;
+}
+
+.agenda-desc-trigger:hover {
+    border-color: var(--clr-primary);
+    background: rgba(134, 30, 52, 0.05);
+}
+
+.agenda-descripcion-textarea {
+    min-height: 38px;
+}
+
 .agenda-row-two-cols {
     display: flex;
     gap: 10px;
     align-items: flex-end;
+}
+
+.agenda-fecha-hora-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(170px, 1fr);
+    gap: 12px;
+    align-items: flex-end;
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+
+.agenda-fecha-col,
+.agenda-recordatorio-col {
+    min-width: 0;
+}
+
+.agenda-fecha-col {
+    min-width: 120px;
+}
+
+.agenda-hora-col {
+    width: auto;
+    min-width: 108px;
+    flex-shrink: 0;
+}
+
+.agenda-time-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+}
+
+.agenda-time-input {
+    width: 95px;
+    padding: 2px 4px;
+    font-size: 11px;
+}
+
+.agenda-recordatorio-col {
+    min-width: 140px;
+}
+
+.agenda-reminder-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.agenda-reminder-label {
+    margin-bottom: 0;
+    font-size: 10px;
+}
+
+.agenda-reminder-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 34px;
+}
+
+.agenda-reminder-select {
+    min-width: 120px;
+}
+
+.agenda-reminder-before {
+    font-size: 10px;
+    color: #64748b;
+    white-space: nowrap;
 }
 
 .agenda-col-40 {
@@ -884,6 +1003,7 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     align-items: flex-end;
     gap: 12px 16px;
     width: 100%;
+    margin-top: 0.75rem;
 }
 .agenda-assign-aforo-wrap {
     display: flex;
@@ -937,14 +1057,103 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
 }
 
 @media (max-width: 640px) {
+    .modal-agenda-overlay {
+        padding: 0.5rem;
+    }
+
+    .modal-agenda-content {
+        max-height: calc(100dvh - 1rem);
+        border-radius: 10px;
+    }
+
+    #agendaModal .modal-agenda-header,
+    #agendaModal .modal-body-scroll,
+    #agendaModal .modal-agenda-footer {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+
+    #agendaModal .modal-agenda-header h3 {
+        font-size: 1rem;
+        line-height: 1.25;
+    }
+
+    .agenda-type-switch {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .agenda-type-switch-actions {
+        justify-content: stretch;
+    }
+
+    .agenda-desc-trigger {
+        width: 100%;
+    }
+
     .agenda-row-two-cols {
         flex-direction: column;
     }
+
+    .agenda-fecha-hora-row {
+        grid-template-columns: 1fr;
+    }
+
+    .agenda-hora-col,
+    .agenda-recordatorio-col,
+    .agenda-fecha-col {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .agenda-time-input,
+    .agenda-reminder-select {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .agenda-reminder-control {
+        flex-wrap: wrap;
+    }
+
+    .agenda-gira-delegado-aforo-row,
+    .agenda-assign-aforo-wrap {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .agenda-aforo-field {
+        width: 100%;
+    }
+
+    .agenda-aforo-input {
+        width: 100%;
+    }
+
     .agenda-col-40,
     .agenda-col-municipio,
     .agenda-col-semaforo {
         flex: 1 1 auto;
         max-width: 100%;
+    }
+
+    .modal-agenda-footer {
+        flex-wrap: wrap;
+    }
+
+    .modal-agenda-footer .btn-agenda {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 920px) {
+    .agenda-fecha-hora-row {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .agenda-recordatorio-col {
+        grid-column: 1 / -1;
     }
 }
 
