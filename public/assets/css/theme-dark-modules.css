@@ -84,7 +84,6 @@ html.theme-dark .tm-record-card,
 html.theme-dark .tm-paginator-btn:not(.is-active):not(.tm-btn-primary),
 html.theme-dark .tm-module-chip,
 html.theme-dark .tm-modal-dialog,
-html.theme-dark .tm-swal-cancel,
 html.theme-dark .tm-paginator-btn.is-disabled,
 html.theme-dark .tm-upload-evidence-dropzone,
 html.theme-dark .tm-upload-evidence-placeholder,
@@ -657,20 +656,6 @@ html.theme-dark #mesasPazApp .mesa-date-btn-wrapper {
     border-color: var(--clr-border);
 }
 
-html.theme-dark .swal-modal {
-    background: var(--clr-card) !important;
-    border: 1px solid var(--clr-border);
-}
-
-html.theme-dark .swal-title,
-html.theme-dark .swal-text {
-    color: var(--clr-text-main) !important;
-}
-
-html.theme-dark .swal-button--cancel {
-    background: var(--tm-surface) !important;
-    color: var(--clr-text-main) !important;
-}
 
 html.theme-dark .supervision-layout .card,
 html.theme-dark .supervision-layout table thead th {
@@ -735,15 +720,6 @@ html.theme-dark .settings-toggle-track::after {
     background: var(--clr-card);
 }
 
-html.theme-dark .swal2-popup {
-    background: var(--clr-card) !important;
-    color: var(--clr-text-main) !important;
-}
-
-html.theme-dark .swal2-html-container,
-html.theme-dark .swal2-title {
-    color: var(--clr-text-main) !important;
-}
 
 html.theme-dark .tm-export-preview-a4 {
     background: var(--tm-preview-desk) !important;

@@ -227,14 +227,12 @@ function toggleUnfold(id) {
     setUnfoldState(id, !isShowing);
 }
 
-// Funciones para el Mini Modal de Descripción
 function openDescModal() {
     const modal = document.getElementById('agendaDescModal');
     const miniDesc = document.getElementById('modalMiniDescripcion');
     const mainDesc = document.getElementById('modalDescripcion');
 
     if (modal && miniDesc && mainDesc) {
-        // Cargar lo que ya tenga el mainDesc (quitando aforos por si acaso)
         miniDesc.value = agendaStripAforoLines(mainDesc.value);
         modal.style.display = 'flex';
         setTimeout(() => miniDesc.focus(), 100);
@@ -248,12 +246,10 @@ function closeDescModal() {
     }
 }
 
-// Exponer estas dos globalmente por los onClick del Blade
 window.closeDescModal = closeDescModal;
 
 function addAddressRow(value = '') {
     const container = document.getElementById('extraAddressesContainer');
-    // Quitar el hint si es el primer número (para que no se duplique)
     const hint = container.querySelector('.agenda-phones-hint');
     if (hint && container.querySelectorAll('.agenda-phone-row').length === 0) {
         hint.remove();
@@ -285,7 +281,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (tipo && tipo.value === 'gira') {
                 var aforo = document.getElementById('modalAforo');
                 desc.value = agendaMergeAforoIntoDescripcion(desc.value, aforo ? aforo.value : '');
-                // Extraer el nombre del delegado del label y ponerlo en el input hidden
                 if (delegadoLabel && delegadoInput) {
                     var txt = delegadoLabel.textContent || '';
                     var match = txt.match(/Delegad@ encargado: (.+)/);
@@ -296,7 +291,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
-    // Backdrop click close
     const modal = document.getElementById('agendaModal');
     if (modal) {
         modal.addEventListener('click', (e) => {
@@ -304,7 +298,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Toggle Time logic
     const toggleHora = document.getElementById('modalHabilitarHora');
     if (toggleHora) {
         toggleHora.addEventListener('change', function() {
@@ -312,19 +305,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Toggle Unfold Asignar
     const btnAsignar = document.getElementById('btnToggleAsignar');
     if (btnAsignar) {
         btnAsignar.addEventListener('click', () => toggleUnfold('unfoldAsignar'));
     }
 
-    // Número telefónico desactivado de momento
-    // const btnAddAddr = document.getElementById('btnAddAddress');
-    // if (btnAddAddr) {
-    //     btnAddAddr.addEventListener('click', () => addAddressRow());
-    // }
 
-    // Modal User Search
     const userSearch = document.getElementById('modalUserSearch');
     if (userSearch) {
         userSearch.addEventListener('input', function() {
@@ -337,7 +323,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Mini Modal de Descripción (Eventos de botones)
     const btnOpenDesc = document.getElementById('btnOpenDescModal');
     if (btnOpenDesc) {
         btnOpenDesc.addEventListener('click', openDescModal);
@@ -351,10 +336,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const btnOpenDescRef = document.getElementById('btnOpenDescModal');
 
             if (miniDesc && mainDesc) {
-                // Al presionar guardar, transferimos la info al input original oculto
                 mainDesc.value = miniDesc.value;
 
-                // Actualizar el texto del botón si hay contenido
                 if (btnOpenDescRef) {
                     if (miniDesc.value.trim().length > 0) {
                         btnOpenDescRef.innerHTML = '<i class="fa-solid fa-align-left" style="color: var(--clr-accent, #c79b66);"></i> Ver o Editar Descripción';
@@ -369,7 +352,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Filter Municipios by Microrregion
     const microrregionSelect = document.getElementById('modalMicrorregion');
     const municipioSelect = document.getElementById('modalMunicipio');
     if (microrregionSelect && municipioSelect) {
@@ -394,8 +376,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
 
-            // Si queremos conservar el municipio (caso: se eligió primero municipio),
-            // re-asignamos el valor solo si sigue visible.
             if (keepMunicipioValue && currentMunicipio) {
                 const candidate = Array.from(municipioOptions).find(
                     opt => opt.value === currentMunicipio && opt.style.display !== 'none'
@@ -416,7 +396,6 @@ document.addEventListener('DOMContentLoaded', function () {
             updateFromSelectedMicrorregion(this);
         });
 
-        // Al seleccionar un municipio, marcar la microrregión que le corresponde
         municipioSelect.addEventListener('change', function() {
             const opt = this.options[this.selectedIndex];
             const microCodigo = opt ? (opt.dataset.microCodigo || '') : '';
@@ -426,11 +405,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // Inicializar al cargar modal si ya hay microrregión seleccionada (editar)
         updateFromSelectedMicrorregion(microrregionSelect);
     }
 
-    // Selector de tipo (Gira / Pre-Gira)
     const tipoSelector = document.getElementById('agendaTipoSelector');
     if (tipoSelector) {
         tipoSelector.addEventListener('click', function (e) {
@@ -446,7 +423,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Abrir/cerrar modal de asignación
     const btnOpenAssign = document.getElementById('btnOpenAssignModal');
     const assignModal = document.getElementById('agendaAssignModal');
     if (btnOpenAssign && assignModal) {
@@ -463,15 +439,12 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    // Global Confirm Delete
     window.confirmDelete = function(id) {
         Swal.fire({
             title: '¿Estás seguro?',
             text: "No podrás revertir esto",
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#ef4444',
-            cancelButtonColor: '#64748b',
             confirmButtonText: 'Sí, eliminar',
             cancelButtonText: 'Cancelar',
             reverseButtons: true
@@ -663,7 +636,6 @@ window.agendaVerUsuariosAsignados = function(btn) {
     }
 };
 
-/** Cierra el modal de ver usuarios asignados. */
 window.agendaCerrarVerUsuariosAsignados = function() {
     var modal = document.getElementById('agendaVerUsuariosModal');
     if (modal) {

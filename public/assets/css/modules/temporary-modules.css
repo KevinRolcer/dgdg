@@ -252,6 +252,11 @@
     color: var(--clr-accent);
 }
 
+.tm-section-tab.tm-section-tab-errors {
+    min-height: 34px;
+    padding: 6px 10px;
+}
+
 .tm-section-panel {
     display: none;
 }
@@ -283,6 +288,61 @@
     font-size: var(--tm-fs-card-subtitle);
     line-height: 1.32;
 }
+
+/* Title row: h2 + refresh button side by side */
+.tm-card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: space-between;
+}
+
+.tm-card-title-row h2 {
+    margin: 0;
+    flex: 1;
+    font-size: var(--tm-fs-card-title);
+    line-height: 1.3;
+}
+
+.tm-btn-refresh {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--clr-text-light);
+    cursor: pointer;
+    padding: 0;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.tm-btn-refresh:hover {
+    border-color: var(--clr-accent);
+    color: var(--clr-accent);
+    background: rgba(199, 155, 102, 0.1);
+}
+
+.tm-btn-refresh:active {
+    transform: scale(0.92);
+}
+
+.tm-btn-refresh.is-loading {
+    pointer-events: none;
+    color: var(--clr-accent);
+}
+
+@keyframes tm-spin {
+    to { transform: rotate(360deg); }
+}
+
+.tm-btn-refresh.is-loading i {
+    animation: tm-spin 0.6s linear infinite;
+}
+
 
 .tm-upload-meta-row {
     display: flex;
@@ -2109,7 +2169,7 @@ a.tm-paginator-btn:hover {
     display: none;
     justify-content: center;
     align-items: center;
-    z-index: 9999;
+    z-index: 9000;
 }
 
 .tm-modal.is-open {
@@ -2129,7 +2189,7 @@ a.tm-paginator-btn:hover {
     width: 95%;
     max-width: 650px;
     max-height: 85vh;
-    min-height: 0; 
+    min-height: 0;
     border-radius: 12px;
     background: var(--clr-card);
     border: 1px solid var(--clr-border);
@@ -2500,11 +2560,21 @@ a.tm-paginator-btn:hover {
     min-height: 36px;
     border-radius: 10px;
     border: 1px solid var(--clr-border);
-    padding: 7px 12px;
+    padding: 7px 16px;
     font-family: inherit;
     font-size: 0.82rem;
     font-weight: 700;
     cursor: pointer;
+    margin: 0 6px;
+    transition: all 0.2s;
+}
+
+.swal2-actions {
+    gap: 8px !important;
+}
+
+.swal2-container {
+    z-index: 100000 !important;
 }
 
 .tm-swal-confirm {
@@ -3581,3 +3651,687 @@ a.tm-paginator-btn:hover {
     padding: 6px 8px;
     font-size: 0.8rem;
 }
+
+/* Excel Import Preview - Premium Document Look */
+.tm-excel-modal-dialog {
+    max-width: 95vw !important;
+    width: 1400px !important;
+    max-height: 96vh !important; /* Allow it to be taller */
+}
+
+/* Base side-by-side flex */
+.tm-excel-preview-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    flex: 1; /* Fill the step container */
+    min-height: 0;
+}
+
+.tm-excel-controls-side {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding-bottom: 3rem; /* Still keep some padding for breathing room */
+    overflow-y: auto;
+    min-height: 0;
+    flex-shrink: 0;
+}
+
+/* Delete Error Button Styles */
+.tm-btn-delete-error {
+    transition: color 0.2s ease, text-shadow 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tm-btn-delete-error:hover {
+    color: var(--clr-primary-dark);
+    text-shadow: 0 0 4px rgba(199, 155, 102, 0.3);
+}
+
+.tm-btn-delete-error:active {
+    transform: scale(0.95);
+}
+
+/* Clear All Errors Button */
+.tm-btn-danger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--clr-primary);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--clr-primary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.tm-btn-danger:hover {
+    background: rgba(134, 30, 52, 0.1);
+    border-color: var(--clr-primary-dark);
+    color: var(--clr-primary-dark);
+}
+
+.tm-btn-danger:active {
+    transform: scale(0.98);
+}
+
+.tm-btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.tm-btn-danger i {
+    font-size: 0.85em;
+}
+
+/* Dark theme adjustments for delete buttons */
+html.theme-dark .tm-btn-delete-error {
+    color: #f05454;
+}
+
+html.theme-dark .tm-btn-delete-error:hover {
+    color: #ff6b6b;
+    text-shadow: 0 0 4px rgba(240, 84, 84, 0.3);
+}
+
+html.theme-dark .tm-btn-danger {
+    color: #f05454;
+    border-color: #f05454;
+}
+
+html.theme-dark .tm-btn-danger:hover {
+    background: rgba(240, 84, 84, 0.15);
+    border-color: #ff6b6b;
+    color: #ff6b6b;
+}
+
+@media (min-width: 1100px) {
+    .tm-excel-preview-container {
+        flex-direction: row-reverse;
+        align-items: stretch;
+        overflow: hidden; /* Desktop: don't scroll here */
+    }
+    .tm-excel-preview-side {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        background: #f0f0f0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        overflow: hidden;
+        border: 1px solid var(--clr-border);
+    }
+    .tm-excel-controls-side {
+        width: 420px; /* Increased to fit mapping table */
+        flex-shrink: 0;
+        background: var(--clr-card);
+        padding-right: 1.5rem;
+        overflow-y: auto; /* Independent scroll on desktop */
+    }
+}
+
+/* Excel Mapping UI Refinement */
+.tm-excel-step-title {
+    margin-bottom: 20px !important;
+    font-size: 1.15rem !important;
+    font-weight: 800 !important;
+    color: var(--clr-primary) !important;
+    display: block;
+    border-bottom: 2px solid var(--clr-border);
+    padding-bottom: 8px;
+}
+
+.theme-dark .tm-excel-step-title {
+    color: #ffffff !important;
+    border-bottom-color: rgba(255,255,255,0.1);
+}
+
+.tm-excel-map-table {
+    border: none !important;
+    background: transparent !important;
+}
+
+.tm-excel-map-table thead th {
+    background: rgba(0,0,0,0.04) !important;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--clr-text-light);
+}
+
+.theme-dark .tm-excel-map-table thead th {
+    background: rgba(255,255,255,0.05) !important;
+    color: rgba(255,255,255,0.7);
+}
+
+.tm-excel-map-table tbody tr td {
+    padding: 14px 10px !important;
+    border-bottom: 1px solid var(--clr-border);
+}
+
+.tm-excel-map-select {
+    font-size: 0.825rem !important;
+    height: 38px !important;
+    border-radius: 8px !important;
+    border: 1.5px solid var(--clr-border) !important;
+    padding: 0 10px !important;
+    width: 100% !important;
+    background: var(--clr-card) !important;
+    color: var(--clr-text-main) !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tm-excel-map-select:hover {
+    border-color: var(--clr-primary) !important;
+}
+
+.tm-excel-map-select:focus {
+    border-color: var(--clr-primary) !important;
+    box-shadow: 0 0 0 3px rgba(134, 30, 52, 0.1) !important;
+    outline: none;
+}
+
+/* A4/Sheet Wrapper */
+.tm-excel-sheet-wrapper {
+    background: white;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    position: relative;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.tm-excel-sheet-inner {
+    transform-origin: top left;
+    transition: transform 0.2s ease-out;
+    min-width: min-content;
+}
+
+.tm-excel-preview-table {
+    border-collapse: collapse;
+    font-size: 11px;
+    font-family: var(--font-main);
+    table-layout: auto;
+    min-width: 100%;
+    background: white;
+}
+
+/* Excel-style Headers (A, B, C...) */
+.tm-excel-preview-table thead th {
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    color: #555;
+    padding: 4px 10px;
+    font-weight: 600;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+/* Excel-style Row Numbers (1, 2, 3...) */
+.tm-excel-preview-table td.row-num {
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    color: #888;
+    text-align: center;
+    width: 40px;
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    font-weight: 600;
+    user-select: none;
+}
+
+.tm-excel-preview-table td {
+    border: 1px solid #eee;
+    padding: 6px 10px;
+    white-space: nowrap;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #333 !important; /* Force dark text on light cells for visibility in dark theme */
+}
+
+.tm-excel-preview-table td.row-num {
+    color: #666 !important;
+}
+
+/* Selection Highlights */
+.tm-excel-preview-table tr {
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.tm-excel-preview-table tr:hover:not(.is-header-row):not(.is-data-row) {
+    background: rgba(134, 30, 52, 0.04);
+}
+
+.tm-excel-preview-table tr.is-header-row {
+    background: rgba(134, 30, 52, 0.12) !important;
+}
+.tm-excel-preview-table tr.is-header-row td:not(.row-num) {
+    color: var(--clr-primary-dark);
+    font-weight: 700;
+    border-bottom: 2px solid var(--clr-primary);
+}
+
+.tm-excel-preview-table tr.is-data-row {
+    background: rgba(36, 98, 87, 0.08) !important;
+}
+.tm-excel-preview-table tr.is-data-row td:not(.row-num) {
+    color: var(--clr-secondary);
+    border-left: 2px solid var(--clr-secondary);
+}
+
+.tm-excel-selection-info {
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--clr-text-main);
+    padding: 12px;
+    background: var(--clr-bg);
+    border-radius: 8px;
+    border: 1px solid var(--clr-border);
+    margin-bottom: 1rem;
+}
+
+.tm-excel-selection-info i {
+    color: var(--clr-primary);
+    margin-right: 6px;
+}
+
+.tm-excel-selection-status {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0,0,0,0.05);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tm-excel-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.badge-header { background: var(--clr-primary); color: white; }
+.badge-data { background: var(--clr-secondary); color: white; }
+
+/* Grid for manual inputs */
+.tm-excel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.tm-excel-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--clr-text-light);
+}
+
+.tm-excel-grid input {
+    font-weight: 400;
+}
+
+/* Modal utility override */
+@media (min-width: 1100px) {
+    .tm-excel-modal-body {
+        padding: 1.5rem;
+        overflow: hidden; /* Independent scrolls inside */
+        max-height: calc(96vh - 80px) !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #tmExcelStep1, #tmExcelStep2, .tm-excel-step1, .tm-excel-step2 {
+        flex: 1; /* Take all available space in modal body */
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+}
+
+@media (max-width: 1099px) {
+    .tm-excel-modal-body {
+        max-height: 85vh;
+        overflow-y: auto;
+    }
+}
+
+.tm-excel-preview-container {
+    display: flex;
+    flex-direction: row-reverse; /* Controls on left, Preview on right */
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    background: var(--clr-bg);
+}
+
+.tm-excel-preview-side {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative; /* Keep zoom bar inside */
+    background: var(--tm-muted-bg, var(--clr-bg));
+    border-left: 1px solid var(--clr-border);
+    overflow: hidden; /* Ensure zoom bar doesn't spill out */
+}
+
+.tm-excel-controls-side {
+    width: 420px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: transparent; /* Inherit from modal-body/container */
+    padding: 1.25rem;
+    overflow-y: auto;
+}
+
+/* Custom Soft Scrollbar for Controls */
+.tm-excel-controls-side::-webkit-scrollbar {
+    width: 4px;
+}
+.tm-excel-controls-side::-webkit-scrollbar-track {
+    background: transparent;
+}
+.tm-excel-controls-side::-webkit-scrollbar-thumb {
+    background: rgba(199, 155, 102, 0.12); /* Even softer */
+    border-radius: 10px;
+    transition: background 0.2s;
+}
+.tm-excel-controls-side::-webkit-scrollbar-thumb:hover {
+    background: rgba(199, 155, 102, 0.45); /* Soft accent on hover */
+}
+
+/* Custom Soft Scrollbar for Preview Sheet */
+.tm-excel-sheet-wrapper::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+.tm-excel-sheet-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+}
+.tm-excel-sheet-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(199, 155, 102, 0.25);
+    border-radius: 10px;
+    transition: background 0.2s;
+}
+.tm-excel-sheet-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--clr-accent);
+}
+
+@media (max-width: 1099px) {
+    .tm-excel-preview-container {
+        flex-direction: column;
+        height: auto;
+        overflow: visible;
+    }
+    .tm-excel-controls-side {
+        width: 100%;
+        padding-bottom: 4rem;
+        overflow-y: visible;
+        flex: none;
+        border-right: none;
+        border-bottom: 1px solid var(--clr-border);
+    }
+    .tm-excel-preview-side {
+        border-left: none;
+    }
+}
+
+/* Mapped Column Highlighting */
+.tm-excel-preview-table th.is-mapped-column {
+    background-color: var(--clr-accent) !important;
+    color: #fff !important;
+    border-color: var(--clr-accent) !important;
+}
+
+.tm-excel-preview-table td.is-mapped-column {
+    background-color: rgba(199, 155, 102, 0.08) !important;
+}
+
+/* Excel Dropzone */
+.tm-excel-dropzone {
+    border: 2px dashed var(--clr-border);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    background: var(--clr-bg);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.tm-excel-dropzone:hover, .tm-excel-dropzone.is-dragover {
+    border-color: var(--clr-primary);
+    background: rgba(134, 30, 52, 0.04);
+}
+
+.tm-excel-dropzone i {
+    font-size: 2rem;
+    color: var(--clr-primary);
+    opacity: 0.6;
+}
+
+.tm-excel-dropzone p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--clr-text-main);
+    font-weight: 500;
+}
+
+.tm-excel-dropzone small {
+    font-size: 11px;
+    color: var(--clr-text-light);
+}
+
+/* Zoom Bar */
+.tm-excel-zoom-bar {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(8px);
+    padding: 6px;
+    border-radius: 30px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    z-index: 1000;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    cursor: move;
+    user-select: none;
+    transition: transform 0.1s ease-out; /* Slight lag for feel */
+}
+
+.tm-excel-zoom-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: #333; /* Darker icons for better visibility */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tm-excel-zoom-btn:hover {
+    background: var(--clr-primary);
+    color: white;
+}
+
+.tm-excel-zoom-btn i {
+    font-size: 12px;
+}
+
+.tm-excel-zoom-info {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 0 10px;
+    color: var(--clr-text-main);
+    min-width: 50px;
+    text-align: center;
+    user-select: none;
+}
+
+/* Search All Municipios toggle */
+.tm-excel-search-all-wrap {
+    margin: 4px 0 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.03);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border: 1px solid transparent;
+}
+.tm-excel-search-all-wrap:hover {
+    background: rgba(0,0,0,0.06);
+    border-color: var(--clr-border);
+}
+.tm-excel-search-all-wrap input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--clr-primary);
+    cursor: pointer;
+    margin: 0;
+}
+.tm-excel-search-all-wrap span {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--clr-text-main);
+    user-select: none;
+}
+
+/* Final Contrast & Usability Refinements for Excel Preview */
+.tm-excel-preview-table td {
+    color: #333 !important; /* Force dark text on light background */
+}
+.tm-excel-preview-table td.row-num {
+    color: #666 !important;
+}
+.tm-excel-zoom-info {
+    color: #111 !important;
+    font-weight: 800 !important;
+}
+.tm-excel-zoom-btn {
+    color: #333 !important;
+}
+.tm-excel-zoom-btn i {
+    font-weight: 900 !important;
+}
+.tm-excel-zoom-btn:hover {
+    color: #fff !important;
+}
+.tm-excel-preview-table tr.is-header-row,
+.tm-excel-preview-table tr.is-data-row {
+    cursor: grab !important;
+}
+.tm-excel-preview-table tr.is-header-row:active,
+.tm-excel-preview-table tr.is-data-row:active {
+    cursor: grabbing !important;
+}
+
+/* Mapping Table Fixes */
+.tm-excel-map-table-wrap {
+    overflow-x: hidden !important;
+}
+.tm-excel-map-table {
+    table-layout: fixed !important;
+    width: 100% !important;
+    min-width: 0 !important; /* CRITICAL FIX: override global 700px */
+}
+.tm-excel-map-table th:first-child,
+.tm-excel-map-table td:first-child {
+    width: 45% !important;
+}
+.tm-excel-map-table th:last-child,
+.tm-excel-map-table td:last-child {
+    width: 55% !important;
+}
+.tm-excel-map-table td {
+    white-space: normal !important;
+    word-break: break-word !important;
+    padding: 10px 8px !important; /* Slightly more space */
+    vertical-align: middle !important;
+    border-bottom: 1px solid var(--clr-border) !important;
+}
+.tm-excel-map-table select.tm-input {
+    width: 100% !important;
+    padding: 6px 8px !important;
+    font-size: 11px !important;
+}
+.tm-excel-map-table th {
+    white-space: nowrap;
+    text-align: left;
+}
+
+/* Session Error Log Button */
+.tm-btn-session-errors {
+    color: var(--clr-primary) !important;
+    border-color: var(--clr-primary) !important;
+    display: flex !important;
+    align-items: center;
+    gap: 6px;
+    background: rgba(134, 30, 52, 0.05) !important;
+    transition: all 0.2s ease;
+}
+
+.tm-btn-session-errors.tm-hidden {
+    display: none !important;
+}
+
+.tm-btn-session-errors:hover {
+    background: var(--clr-primary) !important;
+    color: #fff !important;
+}
+
+.tm-btn-session-errors .tm-error-count {
+    background: var(--clr-primary);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+}
+
+.tm-btn-session-errors:hover .tm-error-count {
+    background: #fff;
+    color: var(--clr-primary);
+}
+

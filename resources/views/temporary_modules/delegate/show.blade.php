@@ -28,6 +28,13 @@
                     <button type="button" class="tm-btn tm-btn-primary" id="tmBtnImportarExcel" aria-haspopup="dialog">
                         Cargar Excel
                     </button>
+                    <button type="button" class="tm-btn tm-btn-outline tm-btn-session-errors tm-hidden"
+                            id="tmBtnSessionErrors-{{ $temporaryModule->id }}"
+                            data-session-errors-module="{{ $temporaryModule->id }}"
+                            title="Errores pendientes de importación">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span class="tm-error-count">0</span>
+                    </button>
                 @endif
                 <a href="{{ route('temporary-modules.index') }}" class="tm-btn">Volver</a>
             </div>
@@ -195,44 +202,110 @@
     @if ($tmImportable->isNotEmpty())
     <div class="tm-modal" id="tmImportarExcelModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="tmImportarExcelModalLabel">
         <div class="tm-modal-backdrop" data-tm-excel-close></div>
-        <div class="tm-modal-dialog tm-excel-modal-dialog" style="max-width:720px;">
+        <div class="tm-modal-dialog tm-excel-modal-dialog">
             <div class="tm-modal-head">
                 <h3 id="tmImportarExcelModalLabel">Importar desde Excel</h3>
                 <button type="button" class="tm-modal-close" data-tm-excel-close aria-label="Cerrar"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             </div>
             <div class="tm-modal-body tm-excel-modal-body">
-                <p class="tm-field-help" style="margin-bottom:12px;">Si el archivo trae totales o títulos arriba, al leer columnas se <strong>detecta</strong> la fila de la tabla (MUNICIPIO, MICROREGION, ACCION…) y la primera fila de ítems. Luego asocia cada campo del módulo con una columna.</p>
-                <div id="tmExcelStep1">
-                    <div class="tm-excel-grid">
-                        <label>Fila encabezados <input type="number" id="tmExcelHeaderRow" value="1" min="1" max="500"></label>
-                        <label>Primera fila datos <input type="number" id="tmExcelDataStartRow" value="2" min="2" max="50000"></label>
-                        <label>Microregión
-                            <select id="tmExcelMicrorregionId">
-                                @foreach (($microrregionesAsignadas ?? collect()) as $micro)
-                                    <option value="{{ $micro->id }}" @selected((int) $microrregionId === (int) $micro->id)>MR {{ $micro->microrregion }} — {{ $micro->cabecera }}</option>
-                                @endforeach
-                            </select>
-                        </label>
+                <div class="tm-excel-preview-container">
+                    <!-- Lado Derecho (Desktop) / Superior (Mobile): Vista Previa -->
+                    <div class="tm-excel-preview-side">
+                        <div class="tm-excel-selection-info" id="tmExcelSelectionInfo">
+                            <div><i class="fa-solid fa-info-circle"></i> <span id="tmExcelStepNote">Haz clic en una fila para marcar <strong>Encabezado</strong> y <strong>Datos</strong>.</span></div>
+                            <div id="tmExcelSelectionStatus" class="tm-excel-selection-status">
+                                <span class="tm-excel-badge badge-header" id="badgeHeaderRow" style="display:none;">Fila 1 (H)</span>
+                                <span class="tm-excel-badge badge-data" id="badgeDataRow" style="display:none;">Desde Fila 2 (D)</span>
+                            </div>
+                        </div>
+                        <div class="tm-excel-zoom-bar" id="tmExcelZoomBar" style="display:none;">
+                            <button type="button" class="tm-excel-zoom-btn" id="tmExcelZoomOut" title="Alejar (Ctrl + Rueda abajo)"><i class="fa-solid fa-minus"></i></button>
+                            <span class="tm-excel-zoom-info" id="tmExcelZoomVal">100%</span>
+                            <button type="button" class="tm-excel-zoom-btn" id="tmExcelZoomIn" title="Acercar (Ctrl + Rueda arriba)"><i class="fa-solid fa-plus"></i></button>
+                            <button type="button" class="tm-excel-zoom-btn" id="tmExcelZoomReset" title="Restablecer"><i class="fa-solid fa-rotate-left"></i></button>
+                        </div>
+                        <div class="tm-excel-sheet-wrapper" id="tmExcelPreviewTableWrap">
+                            <div class="tm-excel-sheet-inner" id="tmExcelSheetInner">
+                                <div style="padding:60px; text-align:center; color:var(--clr-text-light);">
+                                    <i class="fa-solid fa-file-excel" style="font-size:4rem; margin-bottom:16px; opacity:0.2;"></i>
+                                    <p style="font-weight:600;">Vista previa del documento</p>
+                                    <p style="font-size:0.85rem; opacity:0.7;">Carga un archivo Excel para comenzar a marcar las columnas.</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <label class="tm-col-full" style="margin-top:10px;">Archivo <input type="file" id="tmExcelFile" accept=".xlsx,.xls"></label>
-                    <div id="tmExcelPreviewErr" class="inline-alert inline-alert-error tm-hidden" role="alert"></div>
-                    <div id="tmExcelDetectNote" class="inline-alert inline-alert-success tm-hidden" style="margin-top:8px;" role="status"></div>
-                    <div class="tm-actions" style="margin-top:10px;">
-                        <button type="button" class="tm-btn tm-btn-primary" id="tmExcelLeerColumnas">Leer columnas</button>
-                    </div>
-                </div>
-                <div id="tmExcelStep2" class="tm-hidden">
-                    <div class="tm-table-wrap" style="max-height:240px; overflow:auto;">
-                        <table class="tm-table tm-table-sm">
-                            <thead><tr><th>Campo del módulo</th><th>Tipo</th><th>Columna Excel</th></tr></thead>
-                            <tbody id="tmExcelMapBody"></tbody>
-                        </table>
-                    </div>
-                    <div id="tmExcelImportErr" class="inline-alert inline-alert-error tm-hidden" role="alert"></div>
-                    <div id="tmExcelImportOk" class="inline-alert inline-alert-success tm-hidden" role="alert"></div>
-                    <div class="tm-actions" style="margin-top:10px;">
-                        <button type="button" class="tm-btn" id="tmExcelVolver">Volver</button>
-                        <button type="button" class="tm-btn tm-btn-primary" id="tmExcelImportar">Importar filas</button>
+
+                    <!-- Lado Izquierdo (Desktop) / Inferior (Mobile): Controles -->
+                    <div class="tm-excel-controls-side">
+                        <!-- PASO 1: Selección de filas -->
+                        <div id="tmExcelStep1" class="tm-form">
+                            <div class="tm-excel-dropzone" id="tmExcelDropzone">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <p>Arrastra tu archivo aquí o haz clic para buscar</p>
+                                <small>Formatos aceptados: .xlsx, .xls</small>
+                                <input type="file" id="tmExcelFile" accept=".xlsx,.xls" hidden>
+                            </div>
+                            <div id="tmExcelFileName" class="tm-excel-badge badge-header tm-hidden" style="margin-bottom:10px; padding:6px 12px; border-radius:8px;"></div>
+
+                            <div class="tm-excel-grid">
+                                <label>Encabezados (Fila)
+                                    <input type="number" id="tmExcelHeaderRow" value="1" min="1" class="tm-input">
+                                </label>
+                                <label>Datos (Desde fila)
+                                    <input type="number" id="tmExcelDataStartRow" value="2" min="2" class="tm-input">
+                                </label>
+                            </div>
+
+                            <label class="tm-excel-search-all-wrap" id="tmExcelSearchAllWrap">
+                                <input type="checkbox" id="tmExcelSearchAll">
+                                <span>Buscar en todos los municipios de mis microrregiones</span>
+                            </label>
+
+                            <label id="tmExcelMicrorregionLabel" style="margin-top:8px;">
+                                Microregión de destino
+                                <select id="tmExcelMicrorregionId" class="tm-input">
+                                    @foreach (($microrregionesAsignadas ?? collect()) as $micro)
+                                        <option value="{{ $micro->id }}" @selected((int) $microrregionId === (int) $micro->id)>MR {{ $micro->microrregion }} — {{ $micro->cabecera }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+
+                            <div id="tmExcelPreviewErr" class="inline-alert inline-alert-error tm-hidden" role="alert" style="margin-top:10px;"></div>
+                            <div id="tmExcelDetectNote" class="inline-alert inline-alert-success tm-hidden" style="margin-top:10px;" role="status"></div>
+
+                            <div class="tm-actions" style="margin-top:20px; flex-direction:column; align-items:stretch; gap:10px;">
+                                <button type="button" class="tm-btn tm-btn-primary" id="tmExcelLeerColumnas">
+                                    <i class="fa-solid fa-table-columns"></i> Leer secciones y mapear
+                                </button>
+                                <button type="button" class="tm-btn tm-btn-outline" id="tmExcelAutoDetect" style="display:none;">
+                                    <i class="fa-solid fa-magic"></i> Marcar todo el documento
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- PASO 2: Mapeo de columnas (Integrado) -->
+                        <div id="tmExcelStep2" class="tm-hidden" style="display:flex; flex-direction:column; padding-top:20px; border-top: 1px dashed var(--clr-border); margin-top:20px;">
+                            <h4 class="tm-excel-step-title">Relacionar columnas</h4>
+                            <div class="tm-table-wrap" style="margin-bottom:12px; border:1px solid var(--clr-border); border-radius:8px; background: rgba(0,0,0,0.02);">
+                                <table class="tm-table tm-table-sm tm-excel-map-table" style="font-size:12px; width:100%;">
+                                    <thead><tr><th style="padding:10px 8px;">Campo del módulo</th><th style="padding:10px 8px;">Columna del Excel</th></tr></thead>
+                                    <tbody id="tmExcelMapBody" class="tm-excel-map-body"></tbody>
+                                </table>
+                            </div>
+                            <div id="tmExcelImportErr" class="inline-alert inline-alert-error tm-hidden" role="alert"></div>
+                            <div id="tmExcelImportOk" class="inline-alert inline-alert-success tm-hidden" role="alert"></div>
+
+                            <!-- SECCIÓN DE ERRORES (Logs) -->
+                            <div id="tmExcelErrorsSection" class="tm-hidden" style="margin-top:20px; padding-top:20px; border-top:1px solid var(--clr-border);">
+                                <h4 class="tm-excel-step-title" style="color:var(--clr-primary); border-bottom-color:var(--clr-primary);">Errores de Importación</h4>
+                                <p style="font-size:0.85rem; color:var(--clr-text-light); margin-bottom:15px;">Las siguientes filas no se pudieron importar. Puedes corregirlas seleccionando una sugerencia:</p>
+                                <div id="tmExcelErrorsList" style="display:grid; gap:12px;"></div>
+                            </div>
+                            <div class="tm-actions" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                <button type="button" class="tm-btn" id="tmExcelVolver">Restablecer</button>
+                                <button type="button" class="tm-btn tm-btn-primary" id="tmExcelImportar">Importar filas</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -315,6 +388,136 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // --- Persistent Error Log Helpers ---
+        const saveImportErrors = (moduleId, errors, singleUrl) => {
+            if (!errors || errors.length === 0) {
+                sessionStorage.removeItem(`tm_errors_${moduleId}`);
+            } else {
+                sessionStorage.setItem(`tm_errors_${moduleId}`, JSON.stringify({
+                    errors: errors,
+                    singleUrl: singleUrl,
+                    timestamp: Date.now()
+                }));
+            }
+            updateErrorIndicator(moduleId);
+        };
+
+        const updateErrorIndicator = (moduleId) => {
+            const data = sessionStorage.getItem(`tm_errors_${moduleId}`);
+            const btn = document.getElementById(`tmBtnSessionErrors-${moduleId}`);
+            if (!btn) return;
+
+            if (data) {
+                const parsed = JSON.parse(data);
+                const count = (parsed.errors || []).length;
+                if (count > 0) {
+                    btn.querySelector('.tm-error-count').textContent = count;
+                    btn.classList.remove('tm-hidden');
+                } else {
+                    btn.classList.add('tm-hidden');
+                }
+            } else {
+                btn.classList.add('tm-hidden');
+            }
+        };
+
+        // Initialize indicators on load
+        document.querySelectorAll('[data-session-errors-module]').forEach(btn => {
+            updateErrorIndicator(btn.getAttribute('data-session-errors-module'));
+        });
+
+        const renderSessionErrors = (modal, moduleId) => {
+            const data = sessionStorage.getItem(`tm_errors_${moduleId}`);
+            if (!data) return;
+            const parsed = JSON.parse(data);
+            const errors = parsed.errors || [];
+            const singleUrl = parsed.singleUrl;
+
+            const errSection = modal.querySelector('.tm-excel-errors-section');
+            const errList = modal.querySelector('.tm-excel-errors-list');
+            if (!errSection || !errList) return;
+
+            errSection.classList.remove('tm-hidden');
+            errList.innerHTML = '';
+            errors.forEach((err, idx) => {
+                const card = document.createElement('div');
+                card.className = 'tm-error-log-card';
+                card.style = 'padding:12px; border:1px solid var(--clr-border); border-radius:10px; background:var(--clr-bg); font-size:0.85rem;';
+
+                // Renderizar campos con fallo
+                const failedFields = Array.isArray(err?.failed_fields) && err.failed_fields.length > 0 ? err.failed_fields : [];
+                let failedFieldsHtml = '';
+                if (failedFields.length > 0) {
+                    failedFieldsHtml = '<div style="margin-top:8px;"><strong style="font-size:0.75rem;">Campos con fallo:</strong><ul style="margin:6px 0 0 16px; padding:0; font-size:0.8rem; color:var(--clr-text-light);">' +
+                        failedFields.map((f) => {
+                            const escapeHtml = (value) => String(value ?? '')
+                                .replace(/&/g, '&amp;')
+                                .replace(/</g, '&lt;')
+                                .replace(/>/g, '&gt;')
+                                .replace(/"/g, '&quot;')
+                                .replace(/'/g, '&#039;');
+                            return `<li><strong>${escapeHtml(f.label || f.key || 'Campo')}</strong>: ${escapeHtml(f.reason || 'No válido')}${f.received ? ` <span style="color:var(--clr-primary); font-weight:600;">(ingresó: "${escapeHtml(f.received)}")</span>` : ''}</li>`;
+                        }).join('') +
+                    '</ul></div>';
+                }
+
+                let suggHtml = '';
+                if (err.suggestions && err.suggestions.length > 0) {
+                    const cardId = `tmErrRow_${moduleId}_${idx}`;
+                    suggHtml = '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">' +
+                        '<span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">¿Quisiste decir?</span>' +
+                        err.suggestions.map(s => `
+                            <button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
+                                onclick="retryImportRow(${idx}, ${s.microrregion_id}, '${s.municipio.replace(/'/g, "\\'")}', '${singleUrl}', ${moduleId}, '${cardId}', this, ${err.row || 0})"
+                                style="font-size:0.7rem; padding:4px 8px;">
+                                ${s.municipio}
+                            </button>
+                        `).join('') +
+                    '</div>';
+                }
+
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div style="color:var(--clr-primary); font-weight:700;">Fila ${err.row}</div>
+                        <div style="font-size:0.75rem; color:var(--clr-text-light); text-align:right;">${err.message}</div>
+                    </div>
+                    ${failedFieldsHtml}
+                    ${suggHtml}
+                `;
+                card.dataset.rowData = JSON.stringify(err.data);
+                card.id = 'tmErrRow_' + idx;
+                errList.appendChild(card);
+            });
+        };
+
+        // Global check for session error clicks
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-session-errors-module]');
+            if (!btn) return;
+            const moduleId = btn.getAttribute('data-session-errors-module');
+            const modal = document.querySelector('.tm-excel-import-modal'); // ONLY ONE MODAL in show view
+            if (!modal) return;
+
+            // Open modal and show errors
+            if (typeof openModal === 'function') openModal(modal, btn);
+            else {
+                modal.classList.add('is-open');
+                const overlay = document.getElementById('appOverlay');
+                if (overlay) overlay.classList.add('is-active');
+            }
+            renderSessionErrors(modal, moduleId);
+
+            // Scroll to errors
+            const controlsSide = modal.querySelector('.tm-excel-controls-side');
+            const errSection = modal.querySelector('.tm-excel-errors-section');
+            if (controlsSide && errSection) {
+                setTimeout(() => {
+                    controlsSide.scrollTo({ top: errSection.offsetTop, behavior: 'smooth' });
+                }, 200);
+            }
+        });
+        // ------------------------------------
+
         const pasteButtons = Array.from(document.querySelectorAll('[data-paste-image-button]'));
         const pasteInputs = Array.from(document.querySelectorAll('[data-paste-upload-input]'));
         const pasteUploadAreas = Array.from(document.querySelectorAll('[data-paste-upload-wrap]'));
@@ -695,147 +898,661 @@
             }
         });
 
-        /* Importar Excel */
-        const excelModal = document.getElementById('tmImportarExcelModal');
-        const excelPreviewUrl = @json(route('temporary-modules.import-excel-preview', $temporaryModule->id));
-        const excelImportUrl = @json(route('temporary-modules.import-excel', $temporaryModule->id));
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json(csrf_token());
-        let excelHeaders = [];
-        let excelFields = [];
-        let excelSuggested = {};
+    /* Importar Excel - Premium Logic */
+    const excelModal = document.getElementById('tmImportarExcelModal');
+    const excelPreviewUrl = @json(route('temporary-modules.import-excel-preview', $temporaryModule->id));
+    const excelImportUrl = @json(route('temporary-modules.import-excel', $temporaryModule->id));
+    const excelImportSingleUrl = @json(route('temporary-modules.import-single-row', $temporaryModule->id));
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json(csrf_token());
 
-        const openExcelModal = function () {
-            if (!excelModal) return;
-            excelModal.classList.add('is-open');
-            excelModal.setAttribute('aria-hidden', 'false');
-            document.body.style.overflow = 'hidden';
-            document.getElementById('tmExcelStep1')?.classList.remove('tm-hidden');
-            document.getElementById('tmExcelStep2')?.classList.add('tm-hidden');
-            ['tmExcelPreviewErr', 'tmExcelImportErr', 'tmExcelImportOk'].forEach(function (id) {
-                const el = document.getElementById(id);
-                if (el) { el.textContent = ''; el.classList.add('tm-hidden'); }
-            });
-        };
-        const closeExcelModal = function () {
-            if (!excelModal) return;
-            excelModal.classList.remove('is-open');
-            excelModal.setAttribute('aria-hidden', 'true');
-            document.body.style.overflow = '';
-        };
-        document.getElementById('tmBtnImportarExcel')?.addEventListener('click', openExcelModal);
-        excelModal?.querySelectorAll('[data-tm-excel-close]').forEach(function (el) {
-            el.addEventListener('click', closeExcelModal);
-        });
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && excelModal && excelModal.classList.contains('is-open')) closeExcelModal();
+    let excelHeaders = [];
+    let excelFields = [];
+    let excelSuggested = {};
+    let workbookData = null;
+
+    if (typeof XLSX === 'undefined') {
+        const script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+        document.head.appendChild(script);
+    }
+
+    const openExcelModal = function () {
+        if (!excelModal) return;
+        excelModal.classList.add('is-open');
+        excelModal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        document.getElementById('tmExcelStep1')?.classList.remove('tm-hidden');
+        document.getElementById('tmExcelStep2')?.classList.add('tm-hidden');
+    };
+
+    const closeExcelModal = function () {
+        if (!excelModal) return;
+        excelModal.classList.remove('is-open');
+        excelModal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    };
+
+    document.getElementById('tmBtnImportarExcel')?.addEventListener('click', openExcelModal);
+    excelModal?.querySelectorAll('[data-tm-excel-close]').forEach(function (el) {
+        el.addEventListener('click', closeExcelModal);
+    });
+
+    // Helper: Excel Column Letter
+    const getColLetter = (n) => {
+        let s = "";
+        while (n >= 0) {
+            s = String.fromCharCode((n % 26) + 65) + s;
+            n = Math.floor(n / 26) - 1;
+        }
+        return s;
+    };
+
+    let currentZoom = 1;
+    const updateZoomUI = () => {
+        const inner = document.getElementById('tmExcelSheetInner');
+        const val = document.getElementById('tmExcelZoomVal');
+        if (inner) inner.style.transform = `scale(${currentZoom})`;
+        if (val) val.textContent = Math.round(currentZoom * 100) + '%';
+    };
+
+    document.getElementById('tmExcelZoomIn')?.addEventListener('click', () => {
+        currentZoom = Math.min(currentZoom + 0.1, 3);
+        updateZoomUI();
+    });
+    document.getElementById('tmExcelZoomOut')?.addEventListener('click', () => {
+        currentZoom = Math.max(currentZoom - 0.1, 0.2);
+        updateZoomUI();
+    });
+    document.getElementById('tmExcelZoomReset')?.addEventListener('click', () => {
+        currentZoom = 1;
+        updateZoomUI();
+    });
+
+    (() => {
+        const zoomBar = document.getElementById('tmExcelZoomBar');
+        if (!zoomBar) return;
+
+        let isDraggingZoom = false;
+        let offsetX, offsetY;
+
+        zoomBar.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button')) return;
+            isDraggingZoom = true;
+
+            const rect = zoomBar.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+
+            zoomBar.style.bottom = 'auto';
+            zoomBar.style.transition = 'none';
+            zoomBar.style.cursor = 'grabbing';
         });
 
-        document.getElementById('tmExcelLeerColumnas')?.addEventListener('click', function () {
-            const fileInput = document.getElementById('tmExcelFile');
-            const file = fileInput && fileInput.files && fileInput.files[0];
-            const err = document.getElementById('tmExcelPreviewErr');
-            if (!file) {
-                if (err) { err.textContent = 'Selecciona un archivo Excel.'; err.classList.remove('tm-hidden'); }
-                return;
+        window.addEventListener('mousemove', (e) => {
+            if (!isDraggingZoom) return;
+
+            const parentRect = zoomBar.parentElement.getBoundingClientRect();
+            const barRect = zoomBar.getBoundingClientRect();
+
+            let newLeft = e.clientX - parentRect.left - offsetX;
+            let newTop = e.clientY - parentRect.top - offsetY;
+
+            // Bounding
+            newLeft = Math.max(10, Math.min(newLeft, parentRect.width - barRect.width - 10));
+            newTop = Math.max(10, Math.min(newTop, parentRect.height - barRect.height - 10));
+
+            zoomBar.style.left = newLeft + 'px';
+            zoomBar.style.top = newTop + 'px';
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isDraggingZoom) {
+                isDraggingZoom = false;
+                zoomBar.style.transition = 'transform 0.1s ease-out';
+                zoomBar.style.cursor = 'move';
             }
-            const fd = new FormData();
-            fd.append('archivo_excel', file);
-            fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
-            fd.append('auto_detect', '1');
-            fd.append('_token', csrfToken);
-            if (err) err.classList.add('tm-hidden');
-            const noteEl = document.getElementById('tmExcelDetectNote');
-            if (noteEl) { noteEl.classList.add('tm-hidden'); }
-            fetch(excelPreviewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, credentials: 'same-origin' })
-                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-                .then(function (_ref) {
-                    if (!_ref.ok || !_ref.j.success) {
-                        if (err) { err.textContent = _ref.j.message || 'Error al leer el archivo.'; err.classList.remove('tm-hidden'); }
-                        return;
-                    }
-                    const hr = document.getElementById('tmExcelHeaderRow');
-                    const dataStart = document.getElementById('tmExcelDataStartRow');
-                    if (typeof _ref.j.header_row === 'number' && hr) hr.value = String(_ref.j.header_row);
-                    if (typeof _ref.j.data_start_row === 'number' && dataStart) dataStart.value = String(_ref.j.data_start_row);
-                    if (_ref.j.detection_note && noteEl) {
-                        noteEl.textContent = _ref.j.detection_note;
-                        noteEl.classList.remove('tm-hidden');
-                    }
-                    excelHeaders = _ref.j.headers || [];
-                    excelFields = _ref.j.fields || [];
-                    excelSuggested = _ref.j.suggested_map || {};
-                    const tbody = document.getElementById('tmExcelMapBody');
-                    if (tbody) {
-                        tbody.innerHTML = '';
-                        excelFields.forEach(function (f) {
-                            const tr = document.createElement('tr');
-                            const sug = excelSuggested[f.key];
-                            let opts = '<option value="">— No importar —</option>';
-                            excelHeaders.forEach(function (h) {
-                                const sel = (sug === h.index) ? ' selected' : '';
-                                const lab = (h.letter + ': ' + (h.label || '(vacío)')).replace(/</g, '');
-                                opts += '<option value="' + h.index + '"' + sel + '>' + lab + '</option>';
-                            });
-                            tr.innerHTML = '<td>' + String(f.label).replace(/</g, '') + (f.is_required ? ' *' : '') + '</td><td>' + String(f.type).replace(/</g, '') + '</td><td><select class="tm-excel-map-select" data-field-key="' + String(f.key).replace(/"/g, '') + '">' + opts + '</select></td>';
-                            tbody.appendChild(tr);
+        });
+
+        // Touch support
+        zoomBar.addEventListener('touchstart', (e) => {
+            if (e.target.closest('button')) return;
+            const touch = e.touches[0];
+            isDraggingZoom = true;
+
+            const rect = zoomBar.getBoundingClientRect();
+            offsetX = touch.clientX - rect.left;
+            offsetY = touch.clientY - rect.top;
+
+            zoomBar.style.bottom = 'auto';
+            zoomBar.style.transition = 'none';
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!isDraggingZoom) return;
+            const touch = e.touches[0];
+            const parentRect = zoomBar.parentElement.getBoundingClientRect();
+            const barRect = zoomBar.getBoundingClientRect();
+
+            let newLeft = touch.clientX - parentRect.left - offsetX;
+            let newTop = touch.clientY - parentRect.top - offsetY;
+
+            newLeft = Math.max(10, Math.min(newLeft, parentRect.width - barRect.width - 10));
+            newTop = Math.max(10, Math.min(newTop, parentRect.height - barRect.height - 10));
+
+            zoomBar.style.left = newLeft + 'px';
+            zoomBar.style.top = newTop + 'px';
+        }, { passive: false });
+
+        window.addEventListener('touchend', () => {
+            if (isDraggingZoom) {
+                isDraggingZoom = false;
+                zoomBar.style.transition = 'transform 0.1s ease-out';
+            }
+        });
+    })();
+
+    document.getElementById('tmExcelPreviewTableWrap')?.addEventListener('wheel', (e) => {
+        if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            if (e.deltaY < 0) currentZoom = Math.min(currentZoom + 0.05, 3);
+            else currentZoom = Math.max(currentZoom - 0.05, 0.2);
+            updateZoomUI();
+        }
+    }, { passive: false });
+
+    const renderExcelPreview = function(data) {
+        const container = document.getElementById('tmExcelPreviewTableWrap');
+        if (!container) return;
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="padding:60px; text-align:center;">Archivo vacío o no legible.</div>';
+            return;
+        }
+
+        let maxCols = 0;
+        data.slice(0, 50).forEach(row => { if (row && row.length > maxCols) maxCols = row.length; });
+
+        let html = '<table class="tm-excel-preview-table" id="tmExcelPreviewTable"><thead><tr><th class="row-num"></th>';
+        for (let i = 0; i < maxCols; i++) {
+            html += '<th>' + getColLetter(i) + '</th>';
+        }
+        html += '</tr></thead><tbody>';
+
+        data.slice(0, 100).forEach((row, rowIndex) => {
+            const displayRowIndex = rowIndex + 1;
+            html += '<tr data-row-index="' + displayRowIndex + '"><td class="row-num">' + displayRowIndex + '</td>';
+            for (let i = 0; i < maxCols; i++) {
+                const cell = row[i] !== undefined && row[i] !== null ? row[i] : '';
+                html += '<td>' + String(cell).substring(0, 120) + '</td>';
+            }
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        const inner = document.getElementById('tmExcelSheetInner');
+        if (inner) {
+            inner.innerHTML = html;
+            document.getElementById('tmExcelZoomBar').style.display = 'flex';
+            currentZoom = 1;
+            updateZoomUI();
+        }
+        bindPreviewEvents();
+        updateRowHighlights();
+    };
+
+    let isDraggingRow = null;
+
+    const bindPreviewEvents = function() {
+        const table = document.getElementById('tmExcelPreviewTable');
+        const tbody = table?.querySelector('tbody');
+        if (!tbody) return;
+
+        const handleRowInteraction = (row, isDrag = false) => {
+            const idx = parseInt(row.getAttribute('data-row-index'));
+            const hInput = document.getElementById('tmExcelHeaderRow');
+            const dInput = document.getElementById('tmExcelDataStartRow');
+            const currH = parseInt(hInput.value);
+            const currD = parseInt(dInput.value);
+
+            if (!isDrag) {
+                // Click logic (toggle/set)
+                if (currH === idx) {
+                    hInput.value = '';
+                    if (currD === idx + 1) dInput.value = '';
+                } else if (!hInput.value || idx < currH) {
+                    hInput.value = idx;
+                    dInput.value = idx + 1;
+                } else {
+                    dInput.value = idx;
+                }
+            } else {
+                // Drag logic (direct set)
+                if (isDraggingRow === 'header') {
+                    hInput.value = idx;
+                } else if (isDraggingRow === 'data') {
+                    dInput.value = idx;
+                }
+            }
+            updateRowHighlights();
+        };
+
+        tbody.querySelectorAll('tr').forEach(row => {
+            row.addEventListener('mousedown', function(e) {
+                const idx = parseInt(this.getAttribute('data-row-index'));
+                const hIdx = parseInt(document.getElementById('tmExcelHeaderRow').value);
+                const dIdx = parseInt(document.getElementById('tmExcelDataStartRow').value);
+
+                if (idx === hIdx) isDraggingRow = 'header';
+                else if (idx === dIdx) isDraggingRow = 'data';
+                else isDraggingRow = null;
+
+                if (isDraggingRow) {
+                    e.preventDefault();
+                    this.style.cursor = 'grabbing';
+                }
+            });
+
+            row.addEventListener('mouseover', function() {
+                if (isDraggingRow) {
+                    handleRowInteraction(this, true);
+                }
+            });
+
+            row.addEventListener('click', function() {
+                if (!isDraggingRow) {
+                    handleRowInteraction(this, false);
+                }
+            });
+
+            // Touch support
+            row.addEventListener('touchstart', function(e) {
+                const idx = parseInt(this.getAttribute('data-row-index'));
+                const hIdx = parseInt(document.getElementById('tmExcelHeaderRow').value);
+                const dIdx = parseInt(document.getElementById('tmExcelDataStartRow').value);
+
+                if (idx === hIdx) isDraggingRow = 'header';
+                else if (idx === dIdx) isDraggingRow = 'data';
+
+                if (isDraggingRow) {
+                    // Prevent scroll while dragging highlight
+                    e.preventDefault();
+                }
+            }, { passive: false });
+        });
+
+        const stopDragging = () => {
+            isDraggingRow = null;
+            tbody.querySelectorAll('tr').forEach(r => r.style.cursor = 'pointer');
+        };
+
+        window.addEventListener('mouseup', stopDragging);
+
+        table.addEventListener('touchmove', function(e) {
+            if (isDraggingRow) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                const row = target?.closest('tr');
+                if (row && row.getAttribute('data-row-index')) {
+                    handleRowInteraction(row, true);
+                }
+            }
+        }, { passive: false });
+
+        table.addEventListener('touchend', stopDragging);
+    };
+
+    const updateRowHighlights = function() {
+        const hIdx = parseInt(document.getElementById('tmExcelHeaderRow').value);
+        const dIdx = parseInt(document.getElementById('tmExcelDataStartRow').value);
+
+        document.querySelectorAll('#tmExcelPreviewTable tbody tr').forEach(row => {
+            const idx = parseInt(row.getAttribute('data-row-index'));
+            row.classList.remove('is-header-row', 'is-data-row');
+            if (idx === hIdx) row.classList.add('is-header-row');
+            if (idx === dIdx) row.classList.add('is-data-row');
+        });
+
+        const badgeH = document.getElementById('badgeHeaderRow');
+        const badgeD = document.getElementById('badgeDataRow');
+        if (badgeH) {
+            if (hIdx) { badgeH.textContent = 'Encabezado: Fila ' + hIdx; badgeH.style.display = 'inline-flex'; }
+            else { badgeH.style.display = 'none'; }
+        }
+        if (badgeD) {
+            if (dIdx) { badgeD.textContent = 'Datos: Fila ' + dIdx; badgeD.style.display = 'inline-flex'; }
+            else { badgeD.style.display = 'none'; }
+        }
+    };
+
+    const handleExcelFile = (file) => {
+        if (!file) return;
+        const nameEl = document.getElementById('tmExcelFileName');
+        if (nameEl) {
+            nameEl.textContent = 'Archivo: ' + file.name;
+            nameEl.classList.remove('tm-hidden');
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                workbookData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                renderExcelPreview(workbookData);
+                document.getElementById('tmExcelAutoDetect').style.display = 'inline-flex';
+            } catch (err) {
+                const errEl = document.getElementById('tmExcelPreviewErr');
+                if (errEl) { errEl.textContent = 'Error al procesar el Excel.'; errEl.classList.remove('tm-hidden'); }
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
+    const dropzone = document.getElementById('tmExcelDropzone');
+    const fileInput = document.getElementById('tmExcelFile');
+
+    dropzone?.addEventListener('click', () => fileInput?.click());
+    fileInput?.addEventListener('change', (e) => handleExcelFile(e.target.files[0]));
+
+    ['dragover', 'dragleave', 'drop'].forEach(evt => {
+        dropzone?.addEventListener(evt, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (evt === 'dragover') dropzone.classList.add('is-dragover');
+            else dropzone.classList.remove('is-dragover');
+            if (evt === 'drop') handleExcelFile(e.dataTransfer.files[0]);
+        });
+    });
+
+    const hInput = document.getElementById('tmExcelHeaderRow');
+    const dInput = document.getElementById('tmExcelDataStartRow');
+    const searchAllCheck = document.getElementById('tmExcelSearchAll');
+    const mrLabel = document.getElementById('tmExcelMicrorregionLabel');
+
+    hInput?.addEventListener('input', updateRowHighlights);
+    dInput?.addEventListener('input', updateRowHighlights);
+
+    searchAllCheck?.addEventListener('change', function() {
+        if (mrLabel) mrLabel.style.display = this.checked ? 'none' : 'block';
+    });
+
+    document.getElementById('tmExcelAutoDetect')?.addEventListener('click', function() {
+        if (!workbookData) return;
+        let found = 1;
+        for (let i = 0; i < workbookData.length; i++) {
+            if ((workbookData[i] || []).filter(c => c !== null && c !== '').length >= 3) {
+                found = i + 1; break;
+            }
+        }
+        document.getElementById('tmExcelHeaderRow').value = found;
+        document.getElementById('tmExcelDataStartRow').value = found + 1;
+        updateRowHighlights();
+    });
+
+    document.getElementById('tmExcelLeerColumnas')?.addEventListener('click', function () {
+        const file = document.getElementById('tmExcelFile')?.files[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('archivo_excel', file);
+        fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
+        fd.append('_token', csrfToken);
+
+        fetch(excelPreviewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
+            .then(r => r.json())
+            .then(j => {
+                if (!j.success) throw new Error(j.message);
+                excelHeaders = j.headers || [];
+                excelFields = j.fields || [];
+                excelSuggested = j.suggested_map || {};
+
+                const updateMappedColumns = () => {
+                    document.querySelectorAll('.is-mapped-column').forEach(el => el.classList.remove('is-mapped-column'));
+                    document.querySelectorAll('.tm-excel-map-select').forEach(sel => {
+                        if (sel.value === '') return;
+                        const idx = parseInt(sel.value, 10);
+                        const th = document.querySelector(`.tm-excel-preview-table thead th:nth-child(${idx + 2})`);
+                        if (th) th.classList.add('is-mapped-column');
+                        document.querySelectorAll(`.tm-excel-preview-table tbody tr`).forEach(tr => {
+                            const td = tr.querySelector(`td:nth-child(${idx + 2})`);
+                            if (td) td.classList.add('is-mapped-column');
                         });
-                    }
-                    document.getElementById('tmExcelStep1')?.classList.add('tm-hidden');
-                    document.getElementById('tmExcelStep2')?.classList.remove('tm-hidden');
-                })
-                .catch(function () {
-                    if (err) { err.textContent = 'Error de red al subir el archivo.'; err.classList.remove('tm-hidden'); }
-                });
-        });
+                    });
+                };
 
-        document.getElementById('tmExcelVolver')?.addEventListener('click', function () {
-            document.getElementById('tmExcelStep2')?.classList.add('tm-hidden');
-            document.getElementById('tmExcelStep1')?.classList.remove('tm-hidden');
-        });
+                const friendlyTypes = {
+                    'text': 'Texto',
+                    'image': 'Imagen/Foto',
+                    'select': 'Lista de opciones',
+                    'geopoint': 'Ubicación (GPS)',
+                    'date': 'Fecha',
+                    'number': 'Número',
+                    'url': 'Enlace web',
+                    'textarea': 'Texto largo'
+                };
 
-        document.getElementById('tmExcelImportar')?.addEventListener('click', function () {
-            const fileInput = document.getElementById('tmExcelFile');
-            const file = fileInput && fileInput.files && fileInput.files[0];
-            const errEl = document.getElementById('tmExcelImportErr');
-            const okEl = document.getElementById('tmExcelImportOk');
-            if (!file) {
-                if (errEl) { errEl.textContent = 'Vuelve al paso 1 y selecciona el archivo.'; errEl.classList.remove('tm-hidden'); }
-                return;
-            }
-            const mapping = {};
-            document.querySelectorAll('.tm-excel-map-select').forEach(function (sel) {
-                const key = sel.getAttribute('data-field-key');
-                if (!key) return;
-                const v = sel.value;
-                mapping[key] = v === '' ? null : parseInt(v, 10);
+                const tbody = document.getElementById('tmExcelMapBody');
+                if (tbody) {
+                    tbody.innerHTML = '';
+                    excelFields.forEach(f => {
+                        const tr = document.createElement('tr');
+                        const sug = excelSuggested[f.key];
+                        const friendly = friendlyTypes[f.type] || f.type;
+                        let opts = '<option value="">— No importar —</option>';
+                        excelHeaders.forEach(h => {
+                            const sel = (sug === h.index) ? ' selected' : '';
+                            opts += '<option value="' + h.index + '"' + sel + '>' + (h.letter + ': ' + (h.label || '(vacío)')).replace(/</g, '') + '</option>';
+                        });
+                        tr.innerHTML = '<td title="Tipo: ' + friendly + '" style="cursor:help; font-weight:600;">' + String(f.label).replace(/</g, '') + (f.is_required ? ' *' : '') + '</td><td><select class="tm-excel-map-select" data-field-key="' + String(f.key).replace(/"/g, '') + '">' + opts + '</select></td>';
+                        tbody.appendChild(tr);
+                    });
+
+                    document.querySelectorAll('.tm-excel-map-select').forEach(sel => {
+                        sel.addEventListener('change', updateMappedColumns);
+                    });
+                    updateMappedColumns();
+                }
+                document.getElementById('tmExcelStep2')?.classList.remove('tm-hidden');
+
+                // Desplazar suavemente hacia abajo dentro del contenedor lateral
+                const controlsSide = document.querySelector('.tm-excel-controls-side');
+                if (controlsSide) {
+                    setTimeout(() => {
+                        controlsSide.scrollTo({
+                            top: controlsSide.scrollHeight,
+                            behavior: 'smooth'
+                        });
+                    }, 100);
+                }
+
+                const stepNote = document.getElementById('tmExcelStepNote');
+                if (stepNote) stepNote.textContent = 'Relaciona cada campo del módulo con una columna de tu Excel.';
+            }).catch(e => {
+                const err = document.getElementById('tmExcelPreviewErr');
+                if (err) { err.textContent = e.message; err.classList.remove('tm-hidden'); }
             });
-            const fd = new FormData();
-            fd.append('archivo_excel', file);
-            fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
-            fd.append('data_start_row', document.getElementById('tmExcelDataStartRow')?.value || '2');
-            fd.append('mapping', JSON.stringify(mapping));
-            fd.append('selected_microrregion_id', document.getElementById('tmExcelMicrorregionId')?.value || '');
-            fd.append('_token', csrfToken);
-            if (errEl) errEl.classList.add('tm-hidden');
-            if (okEl) okEl.classList.add('tm-hidden');
-            fetch(excelImportUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, credentials: 'same-origin' })
-                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-                .then(function (_ref) {
-                    if (!_ref.ok || !_ref.j.success) {
-                        if (errEl) { errEl.textContent = _ref.j.message || 'Error al importar.'; errEl.classList.remove('tm-hidden'); }
-                        return;
-                    }
-                    let msg = _ref.j.message || 'Listo.';
-                    if (_ref.j.row_errors && _ref.j.row_errors.length) {
-                        msg += ' Avisos: ' + _ref.j.row_errors.slice(0, 5).map(function (e) { return 'fila ' + e.row; }).join(', ');
-                    }
-                    if (okEl) { okEl.textContent = msg; okEl.classList.remove('tm-hidden'); }
-                    if (_ref.j.imported > 0) setTimeout(function () { window.location.reload(); }, 1200);
-                })
-                .catch(function () {
-                    if (errEl) { errEl.textContent = 'Error de red.'; errEl.classList.remove('tm-hidden'); }
-                });
+    });
+
+    document.getElementById('tmExcelVolver')?.addEventListener('click', () => {
+        document.getElementById('tmExcelStep2')?.classList.add('tm-hidden');
+        const controlsSide = document.querySelector('.tm-excel-controls-side');
+        if (controlsSide) controlsSide.scrollTo({ top: 0, behavior: 'smooth' });
+
+        const stepNote = document.getElementById('tmExcelStepNote');
+        if (stepNote) stepNote.innerHTML = 'Haz clic en una fila para marcar <strong>Encabezado</strong> y <strong>Datos</strong>.';
+    });
+
+    document.getElementById('tmExcelImportar')?.addEventListener('click', function () {
+        const file = document.getElementById('tmExcelFile')?.files[0];
+        if (!file) return;
+        const mapping = {};
+        document.querySelectorAll('.tm-excel-map-select').forEach(sel => {
+            const key = sel.getAttribute('data-field-key');
+            if (key) mapping[key] = sel.value === '' ? null : parseInt(sel.value, 10);
         });
+        const fd = new FormData();
+        fd.append('archivo_excel', file);
+        fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
+        fd.append('data_start_row', document.getElementById('tmExcelDataStartRow')?.value || '2');
+        fd.append('mapping', JSON.stringify(mapping));
+        fd.append('all_microrregions', document.getElementById('tmExcelSearchAll')?.checked ? '1' : '0');
+        fd.append('selected_microrregion_id', document.getElementById('tmExcelMicrorregionId')?.value || '');
+        fd.append('_token', csrfToken);
+
+        fetch(excelImportUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
+            .then(r => r.json())
+            .then(j => {
+                const okEl = document.getElementById('tmExcelImportOk');
+                const errEl = document.getElementById('tmExcelImportErr');
+                if (okEl) okEl.classList.add('tm-hidden');
+                if (errEl) errEl.classList.add('tm-hidden');
+
+                if (!j.success) throw new Error(j.message);
+
+                // Mostrar errores detallados si existen
+                const errSection = document.getElementById('tmExcelErrorsSection');
+                const errList = document.getElementById('tmExcelErrorsList');
+                if (j.row_errors && j.row_errors.length > 0) {
+                    errSection?.classList.remove('tm-hidden');
+                    if (errList) {
+                        errList.innerHTML = '';
+                        j.row_errors.forEach((err, idx) => {
+                            const card = document.createElement('div');
+                            card.className = 'tm-error-log-card';
+                            card.style = 'padding:12px; border:1px solid var(--clr-border); border-radius:10px; background:var(--clr-bg); font-size:0.85rem;';
+
+                            // Renderizar campos con fallo
+                            const failedFields = Array.isArray(err?.failed_fields) && err.failed_fields.length > 0 ? err.failed_fields : [];
+                            let failedFieldsHtml = '';
+                            if (failedFields.length > 0) {
+                                failedFieldsHtml = '<div style="margin-top:8px;"><strong style="font-size:0.75rem;">Campos con fallo:</strong><ul style="margin:6px 0 0 16px; padding:0; font-size:0.8rem; color:var(--clr-text-light);">' +
+                                    failedFields.map((f) => {
+                                        const escapeHtml = (value) => String(value ?? '')
+                                            .replace(/&/g, '&amp;')
+                                            .replace(/</g, '&lt;')
+                                            .replace(/>/g, '&gt;')
+                                            .replace(/"/g, '&quot;')
+                                            .replace(/'/g, '&#039;');
+                                        return `<li><strong>${escapeHtml(f.label || f.key || 'Campo')}</strong>: ${escapeHtml(f.reason || 'No válido')}${f.received ? ` <span style="color:var(--clr-primary); font-weight:600;">(ingresó: "${escapeHtml(f.received)}")</span>` : ''}</li>`;
+                                    }).join('') +
+                                '</ul></div>';
+                            }
+
+                            let suggHtml = '';
+                            if (err.suggestions && err.suggestions.length > 0) {
+                                const cardId = 'tmErrRow_' + idx;
+                                const moduleId = '{{ $temporaryModule->id }}';
+                                suggHtml = '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">' +
+                                    '<span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">¿Quisiste decir?</span>' +
+                                    err.suggestions.map(s => `
+                                        <button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
+                                            onclick="retryImportRow(${idx}, ${s.microrregion_id}, '${s.municipio.replace(/'/g, "\\'")}'  , null, ${moduleId}, '${cardId}', this, ${err.row || 0})"
+                                            style="font-size:0.7rem; padding:4px 8px;">
+                                            ${s.municipio}
+                                        </button>
+                                    `).join('') +
+                                '</div>';
+                            }
+
+                            card.innerHTML = `
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                                    <div style="color:var(--clr-primary); font-weight:700;">Fila ${err.row}</div>
+                                    <div style="font-size:0.75rem; color:var(--clr-text-light); text-align:right;">${err.message}</div>
+                                </div>
+                                ${failedFieldsHtml}
+                                ${suggHtml}
+                            `;
+                            card.dataset.rowData = JSON.stringify(err.data);
+                            card.id = 'tmErrRow_' + idx;
+                            errList.appendChild(card);
+                        });
+
+                        // Scroll suave a la zona de errores dentro del contenedor lateral
+                        const controlsSide = document.querySelector('.tm-excel-controls-side');
+                        if (controlsSide) {
+                            setTimeout(() => {
+                                controlsSide.scrollTo({ top: errSection.offsetTop, behavior: 'smooth' });
+                            }, 100);
+                        }
+                    }
+                }
+
+                const msg = j.message + (j.skipped > 0 ? ` (${j.skipped} fallidos).` : '');
+
+                // Persistir errores en sesión
+                if (j.row_errors && j.row_errors.length > 0) {
+                    const moduleId = '{{ $temporaryModule->id }}';
+                    saveImportErrors(moduleId, j.row_errors, excelImportSingleUrl);
+                }
+
+                Swal.fire({ title: '¡Completado!', text: msg, icon: 'success', confirmButtonText: 'Aceptar' })
+                    .then(() => {
+                        if (j.skipped === 0) {
+                            const moduleId = '{{ $temporaryModule->id }}';
+                            saveImportErrors(moduleId, [], ''); // Limpiar si todo fue ok
+                            location.reload();
+                        }
+                    });
+            }).catch(e => {
+                const err = document.getElementById('tmExcelImportErr');
+                if (err) { err.textContent = e.message; err.classList.remove('tm-hidden'); }
+            });
+    });
+
+    window.retryImportRow = function(errIdx, microrregionId, correctedMunicipio, singleUrl, moduleId, cardId, buttonEl, rowNumber) {
+        const card = document.getElementById(cardId || ('tmErrRow_' + errIdx));
+        if (!card) return;
+
+        const rowData = JSON.parse(card.dataset.rowData);
+        rowData.municipio = correctedMunicipio;
+
+        const btn = buttonEl || event.target;
+        const oldText = btn.innerText;
+        btn.disabled = true;
+        btn.innerText = 'Cargando...';
+
+        fetch(singleUrl || excelImportSingleUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                data: rowData,
+                microrregion_id: microrregionId
+            })
+        })
+        .then(r => r.json())
+        .then(j => {
+            if (j.success) {
+                card.style.opacity = '0.5';
+                card.style.pointerEvents = 'none';
+                btn.innerText = '✓ Importado';
+                btn.style.background = 'var(--clr-secondary)';
+                btn.style.color = '#fff';
+
+                // Si se pasó moduleId y rowNumber, remover este error de la sesión usando el número de fila (identificador único)
+                if (moduleId && rowNumber) {
+                    const data = sessionStorage.getItem(`tm_errors_${moduleId}`);
+                    if (data) {
+                        const parsed = JSON.parse(data);
+                        // Usar el número de fila como identificador único, no el índice
+                        parsed.errors = (parsed.errors || []).filter((e) => e.row !== rowNumber);
+                        saveImportErrors(moduleId, parsed.errors, parsed.singleUrl);
+                    }
+                }
+            } else {
+                throw new Error(j.message || 'Error al reintentar');
+            }
+        })
+        .catch(e => {
+            btn.disabled = false;
+            btn.innerText = oldText;
+            Swal.fire('Error', e.message, 'error');
+        });
+    };
+
     });
 </script>
 @endpush

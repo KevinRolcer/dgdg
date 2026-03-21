@@ -25,6 +25,17 @@
             <div class="tm-section-switch" role="tablist" aria-label="Cambiar vista de captura temporal">
                 <button type="button" class="tm-section-tab {{ $isUploadSection ? 'is-active' : '' }}" data-section-tab data-section-target="tmUploadView" role="tab" aria-selected="{{ $isUploadSection ? 'true' : 'false' }}">Subir informacion</button>
                 <button type="button" class="tm-section-tab {{ !$isUploadSection ? 'is-active' : '' }}" data-section-tab data-section-target="tmRecordsView" role="tab" aria-selected="{{ !$isUploadSection ? 'true' : 'false' }}">Ver mis registros</button>
+                <button
+                    type="button"
+                    class="tm-section-tab tm-section-tab-errors tm-btn-session-errors tm-hidden"
+                    id="tmBtnHeaderSessionErrors"
+                    data-session-errors-open
+                    title="Errores pendientes de importación"
+                >
+                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                    Errores
+                    <span class="tm-error-count">0</span>
+                </button>
             </div>
         </header>
 
@@ -234,7 +245,8 @@
             <div class="tm-modal tm-excel-import-modal" id="tmImportarExcelModal-{{ $module->id }}" aria-hidden="true" role="dialog" aria-modal="true"
                  aria-labelledby="tmImportarExcelModalLabel-{{ $module->id }}"
                  data-excel-preview-url="{{ route('temporary-modules.import-excel-preview', $module->id) }}"
-                 data-excel-import-url="{{ route('temporary-modules.import-excel', $module->id) }}">
+                 data-excel-import-url="{{ route('temporary-modules.import-excel', $module->id) }}"
+                 data-excel-import-single-url="{{ route('temporary-modules.import-single-row', $module->id) }}">
                 <div class="tm-modal-backdrop" data-close-module-preview></div>
                 <div class="tm-modal-dialog tm-modal-dialog-entry tm-excel-modal-dialog">
                     <div class="tm-modal-head">
@@ -245,71 +257,126 @@
                     </div>
 
                     <div class="tm-modal-body tm-excel-modal-body">
-                        <p class="tm-field-help" style="margin-bottom:12px;">
-                            Si el archivo trae totales o títulos arriba, al leer columnas se <strong>detecta</strong> la fila de la tabla (MUNICIPIO, MICROREGION, ACCION…).
-                            Luego asocia cada campo del módulo con una columna.
-                        </p>
-
-                        <div class="tm-excel-step1">
-                            <div class="tm-excel-grid">
-                                <label>Fila encabezados
-                                    <input type="number" class="tm-excel-header-row" value="1" min="1" max="500">
-                                </label>
-                                <label>Primera fila datos
-                                    <input type="number" class="tm-excel-data-start-row" value="2" min="2" max="50000">
-                                </label>
-                                @if ($microsAsignadas->count() > 1)
-                                    <label>Microregión
-                                        <select class="tm-excel-mr-input tm-input" name="selected_microrregion_id">
-                                            @foreach ($microsAsignadas as $micro)
-                                                <option value="{{ $micro->id }}" @selected($loop->first)>
-                                                    MR {{ $micro->microrregion }} — {{ $micro->cabecera }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                    </label>
-                                @else
-                                    @if ($microsAsignadas->count() === 1)
-                                        <input type="hidden" class="tm-excel-mr-input" name="selected_microrregion_id" value="{{ $microsAsignadas->first()->id }}">
-                                    @endif
-                                @endif
+                        <div class="tm-excel-preview-container">
+                            <!-- Lado Derecho: Vista Previa -->
+                            <div class="tm-excel-preview-side">
+                                <div class="tm-excel-selection-info">
+                                    <div><i class="fa-solid fa-info-circle"></i> <span class="tm-excel-step-note">Haz clic en una fila para marcar <strong>Encabezado</strong> y <strong>Datos</strong>.</span></div>
+                                    <div class="tm-excel-selection-status">
+                                        <span class="tm-excel-badge badge-header tm-excel-badge-header" style="display:none;">Fila 1 (H)</span>
+                                        <span class="tm-excel-badge badge-data tm-excel-badge-data" style="display:none;">Desde Fila 2 (D)</span>
+                                    </div>
+                                </div>
+                                <div class="tm-excel-zoom-bar tm-excel-zoom-bar-el" style="display:none;">
+                                    <button type="button" class="tm-excel-zoom-btn tm-excel-zoom-out" title="Alejar (Ctrl + Rueda abajo)"><i class="fa-solid fa-minus"></i></button>
+                                    <span class="tm-excel-zoom-info tm-excel-zoom-val">100%</span>
+                                    <button type="button" class="tm-excel-zoom-btn tm-excel-zoom-in" title="Acercar (Ctrl + Rueda arriba)"><i class="fa-solid fa-plus"></i></button>
+                                    <button type="button" class="tm-excel-zoom-btn tm-excel-zoom-reset" title="Restablecer"><i class="fa-solid fa-rotate-left"></i></button>
+                                </div>
+                                <div class="tm-excel-sheet-wrapper tm-excel-preview-table-wrap">
+                                    <div class="tm-excel-sheet-inner tm-excel-sheet-inner-el">
+                                        <div style="padding:60px; text-align:center; color:var(--clr-text-light);">
+                                            <i class="fa-solid fa-file-excel" style="font-size:4rem; margin-bottom:16px; opacity:0.2;"></i>
+                                            <p style="font-weight:600;">Vista previa del documento</p>
+                                            <p style="font-size:0.85rem; opacity:0.7;">Carga un archivo Excel para comenzar a marcar las columnas.</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <label class="tm-col-full" style="margin-top:10px;">Archivo
-                                <input type="file" class="tm-excel-file-input" accept=".xlsx,.xls">
-                            </label>
+                            <!-- Lado Izquierdo: Controles -->
+                            <div class="tm-excel-controls-side">
+                                <!-- PASO 1 -->
+                                <div class="tm-excel-step1-inner">
+                                    <div class="tm-form">
+                                        <div class="tm-excel-dropzone tm-excel-dropzone-el">
+                                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                                            <p>Arrastra tu archivo aquí o haz clic para buscar</p>
+                                            <small>Formatos aceptados: .xlsx, .xls</small>
+                                            <input type="file" class="tm-excel-file-input tm-input" accept=".xlsx,.xls" hidden>
+                                        </div>
+                                        <div class="tm-excel-badge badge-header tm-excel-file-name tm-hidden" style="margin-bottom:10px; padding:6px 12px; border-radius:8px;"></div>
 
-                            <div class="inline-alert inline-alert-error tm-hidden tm-excel-preview-err" role="alert"></div>
-                            <div class="inline-alert inline-alert-success tm-hidden tm-excel-detect-note" style="margin-top:8px;" role="status"></div>
+                                        <div class="tm-excel-grid">
+                                            <label>Encabezados (Fila)
+                                                <input type="number" class="tm-excel-header-row" value="1" min="1" max="500" class="tm-input">
+                                            </label>
+                                            <label>Datos (Desde fila)
+                                                <input type="number" class="tm-excel-data-start-row" value="2" min="2" max="50000" class="tm-input">
+                                            </label>
+                                        </div>
 
-                            <div class="tm-actions" style="margin-top:10px;">
-                                <button type="button" class="tm-btn tm-btn-primary tm-excel-read-columns">
-                                    Leer columnas
-                                </button>
-                            </div>
-                        </div>
+                                        @if ($microsAsignadas->count() > 0)
+                                            <label class="tm-excel-search-all-wrap tm-excel-search-all-wrap-el">
+                                                <input type="checkbox" class="tm-excel-search-all">
+                                                <span>Buscar en todos los municipios de mis microrregiones</span>
+                                            </label>
+                                        @endif
 
-                        <div class="tm-excel-step2 tm-hidden">
-                            <div class="tm-table-wrap tm-excel-map-table-wrap">
-                                <table class="tm-table tm-table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>Encabezado (Excel)</th>
-                                            <th>Asignar a campo del módulo</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="tm-excel-map-body"></tbody>
-                                </table>
-                            </div>
+                                        @if ($microsAsignadas->count() > 1)
+                                            <div class="tm-excel-mr-select-container-el">
+                                                <label style="margin-top:8px;">Microregión
+                                                    <select class="tm-excel-mr-input tm-input" name="selected_microrregion_id">
+                                                        @foreach ($microsAsignadas as $micro)
+                                                            <option value="{{ $micro->id }}" @selected($loop->first)>
+                                                                MR {{ $micro->microrregion }} — {{ $micro->cabecera }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                </label>
+                                            </div>
+                                        @else
+                                            @if ($microsAsignadas->count() === 1)
+                                                <input type="hidden" class="tm-excel-mr-input" name="selected_microrregion_id" value="{{ $microsAsignadas->first()->id }}">
+                                            @endif
+                                        @endif
 
-                            <div class="inline-alert inline-alert-error tm-hidden tm-excel-import-err" role="alert"></div>
-                            <div class="inline-alert inline-alert-success tm-hidden tm-excel-import-ok" role="alert"></div>
+                                        <div class="inline-alert inline-alert-error tm-hidden tm-excel-preview-err" role="alert" style="margin-top:10px;"></div>
+                                        <div class="inline-alert inline-alert-success tm-hidden tm-excel-detect-note" style="margin-top:10px;" role="status"></div>
 
-                            <div class="tm-actions" style="margin-top:10px;">
-                                <button type="button" class="tm-btn tm-excel-back">Volver</button>
-                                <button type="button" class="tm-btn tm-btn-primary tm-excel-importar" style="margin-left:8px;">
-                                    Importar filas
-                                </button>
+                                        <div class="tm-actions" style="margin-top:20px; flex-direction:column; align-items:stretch; gap:10px;">
+                                            <button type="button" class="tm-btn tm-btn-primary tm-excel-read-columns">
+                                                <i class="fa-solid fa-table-columns"></i> Leer secciones y mapear
+                                            </button>
+                                            <button type="button" class="tm-btn tm-btn-outline tm-excel-auto-detect" style="display:none;">
+                                                <i class="fa-solid fa-magic"></i> Marcar todo el documento
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- PASO 2 -->
+                                <div class="tm-excel-step2-inner tm-hidden" style="display:flex; flex-direction:column; padding-top:20px; border-top: 1px dashed var(--clr-border); margin-top:20px;">
+                                    <h4 class="tm-excel-step-title">Relacionar columnas</h4>
+                                    <div class="tm-table-wrap tm-excel-map-table-wrap" style="margin-bottom:12px; border:1px solid var(--clr-border); border-radius:8px; background: rgba(0,0,0,0.02);">
+                                        <table class="tm-table tm-table-sm tm-excel-map-table" style="font-size:12px; width:100%;">
+                                            <thead>
+                                                <tr>
+                                                    <th style="padding:10px 8px;">Campo del módulo</th>
+                                                    <th style="padding:10px 8px;">Columna del Excel</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="tm-excel-map-body"></tbody>
+                                        </table>
+                                    </div>
+
+                                    <div class="inline-alert inline-alert-error tm-hidden tm-excel-import-err" role="alert"></div>
+                                    <div class="inline-alert inline-alert-success tm-hidden tm-excel-import-ok" role="alert"></div>
+
+                                    <!-- SECCIÓN DE ERRORES (Logs) -->
+                                    <div class="tm-excel-errors-section tm-hidden" style="margin-top:20px; padding-top:20px; border-top:1px solid var(--clr-border);">
+                                        <h4 class="tm-excel-step-title" style="color:var(--clr-primary); border-bottom-color:var(--clr-primary);">Errores de Importación</h4>
+                                        <p style="font-size:0.85rem; color:var(--clr-text-light); margin-bottom:15px;">Las siguientes filas no se pudieron importar. Puedes corregirlas seleccionando una sugerencia:</p>
+                                        <div class="tm-excel-errors-list" style="display:grid; gap:12px;"></div>
+                                    </div>
+
+                                    <div class="tm-actions" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                        <button type="button" class="tm-btn tm-excel-back">Restablecer</button>
+                                        <button type="button" class="tm-btn tm-btn-primary tm-excel-importar">
+                                            Importar filas
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -485,9 +552,9 @@
                                                         <i class="fa-solid fa-images" aria-hidden="true"></i>
                                                         <p>Suelta la imagen aquí</p>
                                                     </div>
-                                                    <div class="tm-image-preview" data-image-preview {{ is_string($value) && $value !== '' ? '' : 'hidden' }}>
+                                                    <div class="tm-image-preview" data-image-preview {{ is_string($value) && $value !== '' && str_contains($value, '/') ? '' : 'hidden' }}>
                                                         <img
-                                                            src="{{ is_string($value) && $value !== '' ? route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) : '' }}"
+                                                            src="{{ is_string($value) && $value !== '' && str_contains($value, '/') ? route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) : '' }}"
                                                             alt="{{ $field->label }}"
                                                             data-image-preview-img
                                                         >
@@ -636,6 +703,33 @@
             </div>
         </div>
     </div>
+
+    <div class="tm-modal" id="tmImportErrorsModal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="tm-modal-backdrop" data-close-module-preview></div>
+        <div class="tm-modal-dialog tm-modal-dialog-entry">
+            <div class="tm-modal-head">
+                <div class="tm-modal-head-stack">
+                    <h3>Registros no importados</h3>
+                    <p class="tm-modal-subtitle">Lista de filas fallidas, motivo y sugerencias de municipio.</p>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button type="button" class="tm-btn tm-btn-sm tm-btn-danger" id="tmBtnClearAllErrors" style="display:none;" aria-label="Vaciar todos los errores" title="Vaciar todos los errores">
+                        <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                        <span>Vaciar todo</span>
+                    </button>
+                    <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="tm-modal-body" style="max-height:70vh; overflow:auto;">
+                <div data-errors-log-empty class="tm-hidden" style="padding:10px; border:1px dashed var(--clr-border); border-radius:10px; color:var(--clr-text-light);">
+                    No hay errores pendientes en sesión.
+                </div>
+                <div data-errors-log-list style="display:grid; gap:10px;"></div>
+            </div>
+        </div>
+    </div>
 </section>
 @endsection
 
@@ -643,6 +737,445 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // --- Persistent Error Log Helpers ---
+        const saveImportErrors = (moduleId, errors, singleUrl) => {
+            if (!errors || errors.length === 0) {
+                sessionStorage.removeItem(`tm_errors_${moduleId}`);
+            } else {
+                sessionStorage.setItem(`tm_errors_${moduleId}`, JSON.stringify({
+                    errors: errors,
+                    singleUrl: singleUrl,
+                    timestamp: Date.now()
+                }));
+            }
+            updateErrorIndicator(moduleId);
+            updateHeaderErrorIndicator();
+
+            if (typeof window.__tmRefreshImportErrorsModal === 'function') {
+                window.__tmRefreshImportErrorsModal();
+            }
+        };
+
+        const parseStoredErrors = (moduleId) => {
+            const data = sessionStorage.getItem(`tm_errors_${moduleId}`);
+            if (!data) {
+                return null;
+            }
+
+            try {
+                return JSON.parse(data);
+            } catch (e) {
+                sessionStorage.removeItem(`tm_errors_${moduleId}`);
+                return null;
+            }
+        };
+
+        const getModulesWithSessionErrors = () => {
+            const modules = [];
+            document.querySelectorAll('[data-session-errors-module]').forEach((btn) => {
+                const moduleId = String(btn.getAttribute('data-session-errors-module') || '').trim();
+                if (!moduleId) {
+                    return;
+                }
+
+                const parsed = parseStoredErrors(moduleId);
+                const count = (parsed?.errors || []).length;
+                if (count > 0) {
+                    modules.push({
+                        moduleId,
+                        count,
+                        timestamp: Number(parsed.timestamp || 0)
+                    });
+                }
+            });
+
+            return modules;
+        };
+
+        const updateHeaderErrorIndicator = () => {
+            const headerBtn = document.getElementById('tmBtnHeaderSessionErrors');
+            if (!headerBtn) {
+                return;
+            }
+
+            const total = getModulesWithSessionErrors().reduce((sum, item) => sum + item.count, 0);
+            const countEl = headerBtn.querySelector('.tm-error-count');
+            if (countEl) {
+                countEl.textContent = String(total);
+            }
+
+            headerBtn.classList.toggle('tm-hidden', total === 0);
+        };
+
+        const normalizeRowErrorMessage = (err) => {
+            const raw = String(err?.message || '').trim();
+            if (!raw) {
+                return 'No se pudo importar esta fila.';
+            }
+
+            const cleaned = raw.replace(/^fila\s+\d+\s*:\s*/i, '').trim();
+            return cleaned || raw;
+        };
+
+        const escapeHtml = (value) => String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+
+        const getModuleNameById = (moduleId) => {
+            const subtitle = document.querySelector(`#delegate-preview-${moduleId} .tm-modal-subtitle`);
+            if (subtitle && subtitle.textContent) {
+                return subtitle.textContent.trim();
+            }
+
+            return `Módulo ${moduleId}`;
+        };
+
+        const getFailedFields = (err) => {
+            if (Array.isArray(err?.failed_fields) && err.failed_fields.length > 0) {
+                return err.failed_fields;
+            }
+
+            const normalizedMessage = normalizeRowErrorMessage(err);
+            const match = normalizedMessage.match(/\(([^)]+)\)/);
+            if (match && match[1]) {
+                return [{
+                    key: '',
+                    label: match[1].trim(),
+                    reason: normalizedMessage,
+                    received: '',
+                }];
+            }
+
+            return [];
+        };
+
+        window.__tmSaveImportErrors = saveImportErrors;
+
+        const renderErrorsLogModal = (filterModuleId = null) => {
+            const modal = document.getElementById('tmImportErrorsModal');
+            if (!modal) {
+                return;
+            }
+
+            const emptyEl = modal.querySelector('[data-errors-log-empty]');
+            const listEl = modal.querySelector('[data-errors-log-list]');
+            if (!listEl || !emptyEl) {
+                return;
+            }
+
+            const moduleFilter = filterModuleId ? String(filterModuleId) : null;
+            const modulesWithErrors = getModulesWithSessionErrors().sort((a, b) => b.timestamp - a.timestamp);
+            const filtered = moduleFilter
+                ? modulesWithErrors.filter((m) => String(m.moduleId) === moduleFilter)
+                : modulesWithErrors;
+
+            listEl.innerHTML = '';
+            if (filtered.length === 0) {
+                emptyEl.classList.remove('tm-hidden');
+
+                return;
+            }
+
+            emptyEl.classList.add('tm-hidden');
+
+            filtered.forEach(({ moduleId }) => {
+                const parsed = parseStoredErrors(moduleId);
+                const errors = Array.isArray(parsed?.errors) ? parsed.errors : [];
+                const singleUrl = String(parsed?.singleUrl || '');
+                const moduleName = getModuleNameById(moduleId);
+
+                errors.forEach((err, idx) => {
+                    const cardId = `tmErrLogRow_${moduleId}_${idx}`;
+                    const failedFields = getFailedFields(err);
+
+                    const failedFieldsHtml = failedFields.length > 0
+                        ? `<div style="margin-top:8px;"><strong style="font-size:0.75rem;">Campos con fallo:</strong><ul style="margin:6px 0 0 16px; padding:0; font-size:0.8rem; color:var(--clr-text-light);">${failedFields.map((f) => `<li><strong>${escapeHtml(f.label || f.key || 'Campo')}</strong>: ${escapeHtml(f.reason || 'No válido')}${f.received ? ` <span style="color:var(--clr-primary); font-weight:600;">(ingresó: "${escapeHtml(f.received)}")</span>` : ''}</li>`).join('')}</ul></div>`
+                        : '';
+
+                    const suggestions = Array.isArray(err?.suggestions) ? err.suggestions : [];
+                    const suggestionsHtml = suggestions.length > 0
+                        ? `<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;"><span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">Sugerencias de municipio</span>${suggestions.map((s) => `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline" onclick="retryImportRow(${idx}, ${Number(s.microrregion_id || 0)}, '${String(s.municipio || '').replace(/'/g, "\\'")}', '${singleUrl.replace(/'/g, "\\'")}', '${moduleId}', '${cardId}', this, ${err?.row || 0})" style="font-size:0.72rem; padding:4px 8px;">${escapeHtml(s.municipio)}</button>`).join('')}</div>`
+                        : '<div style="margin-top:8px; font-size:0.78rem; color:var(--clr-text-light);">Sin sugerencias automáticas para esta fila.</div>';
+
+                    const card = document.createElement('div');
+                    card.className = 'tm-error-log-card';
+                    card.id = cardId;
+                    card.dataset.rowData = JSON.stringify(err?.data || {});
+                    card.dataset.municipioKey = String(err?.municipio_key || 'municipio');
+                    card.dataset.moduleId = moduleId;
+                    card.dataset.errorIndex = idx;
+                    card.style = 'padding:12px; border:1px solid var(--clr-border); border-radius:10px; background:var(--clr-bg); font-size:0.85rem;';
+                    card.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
+                            <div style="flex:1;">
+                                <div style="color:var(--clr-primary); font-weight:700; display:flex; align-items:center; gap:8px;">
+                                    ${escapeHtml(moduleName)} · Fila ${escapeHtml(err?.row || '-')}
+                                    <button type="button" class="tm-btn-delete-error" data-card-id="${cardId}" title="Eliminar este error" style="border:0; background:transparent; color:var(--clr-primary); cursor:pointer; padding:0; font-size:0.85em; line-height:1;">
+                                        <i class="fa-solid fa-trash-alt"></i>
+                                    </button>
+                                </div>
+                                <div style="margin-top:4px; font-size:0.8rem; color:var(--clr-text-light);">${escapeHtml(normalizeRowErrorMessage(err))}</div>
+                            </div>
+                            <span class="tm-upload-meta-pill" style="white-space:nowrap;">No importado</span>
+                        </div>
+                        ${failedFieldsHtml}
+                        ${suggestionsHtml}
+                    `;
+                    listEl.appendChild(card);
+                });
+            });
+        };
+
+        const deleteErrorFromSession = (moduleId, errorIndex) => {
+            const data = parseStoredErrors(moduleId);
+            if (data && Array.isArray(data.errors)) {
+                data.errors.splice(errorIndex, 1);
+                saveImportErrors(moduleId, data.errors, data.singleUrl);
+            }
+        };
+
+        const clearAllErrorsFromSession = () => {
+            const modulesWithErrors = getModulesWithSessionErrors();
+            modulesWithErrors.forEach(({ moduleId }) => {
+                sessionStorage.removeItem(`tm_errors_${moduleId}`);
+                updateErrorIndicator(moduleId);
+            });
+            updateHeaderErrorIndicator();
+
+            if (typeof window.__tmRefreshImportErrorsModal === 'function') {
+                window.__tmRefreshImportErrorsModal();
+            }
+        };
+
+        const openErrorsLogModal = (opener, filterModuleId = null) => {
+            const modal = document.getElementById('tmImportErrorsModal');
+            if (!modal) {
+                return;
+            }
+
+            if (filterModuleId) {
+                modal.setAttribute('data-filter-module', String(filterModuleId));
+            } else {
+                modal.removeAttribute('data-filter-module');
+            }
+
+            renderErrorsLogModal(filterModuleId);
+            updateClearButtonVisibility();
+            openModal(modal, opener || null);
+        };
+
+        window.__tmRefreshImportErrorsModal = () => {
+            const modal = document.getElementById('tmImportErrorsModal');
+            if (!modal || modal.getAttribute('aria-hidden') !== 'false') {
+                return;
+            }
+
+            const filterModuleId = modal.getAttribute('data-filter-module');
+            renderErrorsLogModal(filterModuleId || null);
+            updateClearButtonVisibility();
+        };
+
+        const updateClearButtonVisibility = () => {
+            const modal = document.getElementById('tmImportErrorsModal');
+            const clearBtn = document.getElementById('tmBtnClearAllErrors');
+            if (!modal || !clearBtn) {
+                return;
+            }
+
+            const modulesWithErrors = getModulesWithSessionErrors();
+            const hasErrors = modulesWithErrors.length > 0;
+            clearBtn.style.display = hasErrors ? '' : 'none';
+        };
+
+        const updateErrorIndicator = (moduleId) => {
+            const data = parseStoredErrors(moduleId);
+            const btn = document.getElementById(`tmBtnSessionErrors-${moduleId}`);
+            if (!btn) return;
+
+            if (data) {
+                const count = (data.errors || []).length;
+                if (count > 0) {
+                    btn.querySelector('.tm-error-count').textContent = count;
+                    btn.classList.remove('tm-hidden');
+                } else {
+                    btn.classList.add('tm-hidden');
+                }
+            } else {
+                btn.classList.add('tm-hidden');
+            }
+        };
+
+        // Initialize indicators on load
+        document.querySelectorAll('[data-session-errors-module]').forEach(btn => {
+            updateErrorIndicator(btn.getAttribute('data-session-errors-module'));
+        });
+        updateHeaderErrorIndicator();
+
+        const renderSessionErrors = (modal, moduleId) => {
+            const parsed = parseStoredErrors(moduleId);
+            const errSection = modal.querySelector('.tm-excel-errors-section');
+            const errList = modal.querySelector('.tm-excel-errors-list');
+            if (!errSection || !errList) return;
+
+            if (!parsed || !Array.isArray(parsed.errors) || parsed.errors.length === 0) {
+                errList.innerHTML = '';
+                errSection.classList.add('tm-hidden');
+                return;
+            }
+
+            const errors = parsed.errors || [];
+            const singleUrl = parsed.singleUrl;
+
+            errSection.classList.remove('tm-hidden');
+            errList.innerHTML = '';
+            errors.forEach((err, idx) => {
+                const card = document.createElement('div');
+                card.className = 'tm-error-log-card';
+                card.style = 'padding:12px; border:1px solid var(--clr-border); border-radius:10px; background:var(--clr-bg); font-size:0.85rem;';
+
+                // Renderizar campos con fallo
+                const failedFields = Array.isArray(err?.failed_fields) && err.failed_fields.length > 0 ? err.failed_fields : [];
+                let failedFieldsHtml = '';
+                if (failedFields.length > 0) {
+                    failedFieldsHtml = '<div style="margin-top:8px;"><strong style="font-size:0.75rem;">Campos con fallo:</strong><ul style="margin:6px 0 0 16px; padding:0; font-size:0.8rem; color:var(--clr-text-light);">' +
+                        failedFields.map((f) => `<li><strong>${escapeHtml(f.label || f.key || 'Campo')}</strong>: ${escapeHtml(f.reason || 'No válido')}${f.received ? ` <span style="color:var(--clr-primary); font-weight:600;">(ingresó: "${escapeHtml(f.received)}")</span>` : ''}</li>`).join('') +
+                    '</ul></div>';
+                }
+
+                let suggHtml = '';
+                if (err.suggestions && err.suggestions.length > 0) {
+                    const cardId = `tmErrRow_${moduleId}_${idx}`;
+                    suggHtml = '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">' +
+                        '<span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">¿Quisiste decir?</span>' +
+                        err.suggestions.map(s => `
+                            <button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
+                                onclick="retryImportRow(${idx}, ${s.microrregion_id}, '${s.municipio.replace(/'/g, "\\'")}', '${singleUrl}', '${moduleId}', '${cardId}', this, ${err.row || 0})"
+                                style="font-size:0.7rem; padding:4px 8px;">
+                                ${s.municipio}
+                            </button>
+                        `).join('') +
+                    '</div>';
+                }
+
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div style="color:var(--clr-primary); font-weight:700;">Fila ${err.row}</div>
+                        <div style="font-size:0.75rem; color:var(--clr-text-light); text-align:right;">${normalizeRowErrorMessage(err)}</div>
+                    </div>
+                    ${failedFieldsHtml}
+                    ${suggHtml}
+                `;
+                card.dataset.rowData = JSON.stringify(err.data);
+                card.dataset.municipioKey = String(err.municipio_key || 'municipio');
+                card.id = `tmErrRow_${moduleId}_${idx}`;
+                errList.appendChild(card);
+            });
+        };
+
+        // Global check for session error clicks
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-session-errors-module]');
+            if (!btn) return;
+            const moduleId = btn.getAttribute('data-session-errors-module');
+            if (!moduleId) {
+                return;
+            }
+
+            openErrorsLogModal(btn, moduleId);
+        });
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-session-errors-open]');
+            if (!btn) {
+                return;
+            }
+
+            const modulesWithErrors = getModulesWithSessionErrors().sort((a, b) => b.timestamp - a.timestamp);
+            if (modulesWithErrors.length === 0) {
+                return;
+            }
+
+            openErrorsLogModal(btn, null);
+        });
+
+        // Delete single error
+        document.addEventListener('click', (e) => {
+            const deleteBtn = e.target.closest('.tm-btn-delete-error');
+            if (!deleteBtn) {
+                return;
+            }
+
+            const card = deleteBtn.closest('.tm-error-log-card');
+            if (!card) {
+                return;
+            }
+
+            const moduleId = String(card.dataset.moduleId || '').trim();
+            const errorIndex = Number(card.dataset.errorIndex || 0);
+
+            if (!moduleId) {
+                return;
+            }
+
+            deleteErrorFromSession(moduleId, errorIndex);
+        });
+
+        // Clear all errors
+        document.getElementById('tmBtnClearAllErrors')?.addEventListener('click', () => {
+            clearAllErrorsFromSession();
+        });
+        // ------------------------------------
+
+        // --- Refresh module status (entry count) ---
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-refresh-module]');
+            if (!btn) return;
+
+            const moduleId = String(btn.getAttribute('data-refresh-module') || '').trim();
+            const url = String(btn.getAttribute('data-refresh-url') || '').trim();
+            if (!moduleId || !url) return;
+
+            // Spin the icon
+            btn.classList.add('is-loading');
+
+            fetch(url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                credentials: 'same-origin'
+            })
+                .then(function (res) { return res.ok ? res.json() : Promise.reject(res); })
+                .then(function (data) {
+                    const count = typeof data.my_entries_count === 'number' ? data.my_entries_count : null;
+                    if (count === null) return;
+
+                    // Find the card that contains this refresh button
+                    const card = btn.closest('article');
+                    if (!card) return;
+
+                    // Update the "Mis registros" pill
+                    const pills = card.querySelectorAll('.tm-upload-meta-pill');
+                    pills.forEach(function (pill) {
+                        const strong = pill.querySelector('strong');
+                        if (strong && strong.textContent.trim() === 'Mis registros:') {
+                            pill.innerHTML = '<strong>Mis registros:</strong> ' + count;
+                        }
+                    });
+
+                    // Re-evaluate the session-errors indicator for this card
+                    updateErrorIndicator(moduleId);
+                    updateHeaderErrorIndicator();
+                })
+                .catch(function () {
+                    // silently ignore errors
+                })
+                .finally(function () {
+                    btn.classList.remove('is-loading');
+                });
+        });
+        // ------------------------------------
+
         document.addEventListener('submit', function (e) {
             const form = e.target;
             if (!form || !form.matches || !form.matches('form[data-confirm-delete]')) {
@@ -1084,6 +1617,17 @@
         const closeModal = function (modal) {
             if (!modal) {
                 return;
+            }
+
+            // Si se cierra el modal de errores, actualizar los registros
+            if (modal.id === 'tmImportErrorsModal') {
+                const filterModuleId = modal.getAttribute('data-filter-module');
+                if (filterModuleId) {
+                    // Recargar la página para actualizar los registros
+                    setTimeout(() => {
+                        location.reload();
+                    }, 300);
+                }
             }
 
             const activeElement = document.activeElement;
@@ -1566,348 +2110,559 @@
             });
         });
 
-        /* Importar Excel (eventos temporales) */
+        /* Importar Excel (eventos temporales) - Premium Logic */
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json(csrf_token());
 
-        const stripAccents = function (value) {
-            try {
-                return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-            } catch (e) {
-                return String(value || '');
+        if (typeof XLSX === 'undefined') {
+            const script = document.createElement('script');
+            script.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+            document.head.appendChild(script);
+        }
+
+        const getColLetter = (n) => {
+            let s = "";
+            while (n >= 0) {
+                s = String.fromCharCode((n % 26) + 65) + s;
+                n = Math.floor(n / 26) - 1;
             }
-        };
-
-        const escapeHtml = function (value) {
-            return String(value ?? '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
-        };
-
-        const findMunicipioHeaderIndex = function (headers) {
-            if (!Array.isArray(headers) || !headers.length) return null;
-            const exact = headers.find(function (h) {
-                const label = stripAccents(h && h.label ? h.label : '').toUpperCase();
-                return /MUNICIPIO/.test(label);
-            });
-            if (exact && typeof exact.index !== 'undefined') return exact.index;
-
-            const munLike = headers.find(function (h) {
-                const label = stripAccents(h && h.label ? h.label : '').toUpperCase();
-                // Fallback: MUNICIP, MUN, MUNICIPOS, etc.
-                return /\bMUN\b/.test(label) || /MUNICIP/.test(label);
-            });
-            if (munLike && typeof munLike.index !== 'undefined') return munLike.index;
-
-            return null;
+            return s;
         };
 
         const excelModals = Array.from(document.querySelectorAll('.tm-excel-import-modal'));
         excelModals.forEach(function (modal) {
+            const currentModuleId = String(modal.id || '').replace(/^tmImportarExcelModal-/, '');
             const previewUrl = String(modal.getAttribute('data-excel-preview-url') || '');
             const importUrl = String(modal.getAttribute('data-excel-import-url') || '');
+            const importSingleUrl = String(modal.getAttribute('data-excel-import-single-url') || '');
 
-            const step1 = modal.querySelector('.tm-excel-step1');
-            const step2 = modal.querySelector('.tm-excel-step2');
+            const step1 = modal.querySelector('.tm-excel-step1-inner');
+            const step2 = modal.querySelector('.tm-excel-step2-inner');
             const fileInput = modal.querySelector('.tm-excel-file-input');
             const headerRowInput = modal.querySelector('.tm-excel-header-row');
             const dataStartRowInput = modal.querySelector('.tm-excel-data-start-row');
             const mrInput = modal.querySelector('.tm-excel-mr-input');
             const mapBody = modal.querySelector('.tm-excel-map-body');
+            const previewTableWrap = modal.querySelector('.tm-excel-preview-table-wrap');
+
+            const badgeH = modal.querySelector('.tm-excel-badge-header');
+            const badgeD = modal.querySelector('.tm-excel-badge-data');
 
             const errPreviewEl = modal.querySelector('.tm-excel-preview-err');
             const detectNoteEl = modal.querySelector('.tm-excel-detect-note');
             const errImportEl = modal.querySelector('.tm-excel-import-err');
             const okImportEl = modal.querySelector('.tm-excel-import-ok');
 
-            const resetModal = function () {
-                excelModals.forEach(function (m) {
-                    if (m === modal) return;
+            let workbookData = null;
+
+            const updateRowHighlights = function() {
+                const hIdx = parseInt(headerRowInput.value);
+                const dIdx = parseInt(dataStartRowInput.value);
+                modal.querySelectorAll('.tm-excel-preview-table tbody tr').forEach(row => {
+                    const idx = parseInt(row.getAttribute('data-row-index'));
+                    row.classList.toggle('is-header-row', idx === hIdx);
+                    row.classList.toggle('is-data-row', idx === dIdx);
                 });
-
-                if (step1) step1.classList.remove('tm-hidden');
-                if (step2) step2.classList.add('tm-hidden');
-
-                if (mapBody) mapBody.innerHTML = '';
-                modal.__excelHeaderToFieldState = null;
-
-                ['.tm-excel-preview-err', '.tm-excel-detect-note', '.tm-excel-import-err', '.tm-excel-import-ok'].forEach(function (sel) {
-                    const el = modal.querySelector(sel);
-                    if (!el) return;
-                    el.textContent = '';
-                    el.classList.add('tm-hidden');
-                });
+                if (badgeH) {
+                    if (hIdx) { badgeH.textContent = 'Encabezado: Fila ' + hIdx; badgeH.style.display = 'inline-flex'; }
+                    else badgeH.style.display = 'none';
+                }
+                if (badgeD) {
+                    if (dIdx) { badgeD.textContent = 'Datos: Fila ' + dIdx; badgeD.style.display = 'inline-flex'; }
+                    else badgeD.style.display = 'none';
+                }
             };
 
-            modal.__excelReset = resetModal;
-
-            const readColumnsBtn = modal.querySelector('.tm-excel-read-columns');
-            readColumnsBtn?.addEventListener('click', function () {
-                const file = fileInput && fileInput.files && fileInput.files[0];
-                if (!file) {
-                    if (errPreviewEl) {
-                        errPreviewEl.textContent = 'Selecciona un archivo Excel.';
-                        errPreviewEl.classList.remove('tm-hidden');
-                    }
+            const renderExcelPreview = function(data) {
+                if (!previewTableWrap) return;
+                if (!data || data.length === 0) {
+                    previewTableWrap.innerHTML = '<div style="padding:60px; text-align:center;">Archivo vacío.</div>';
                     return;
                 }
+                let maxCols = 0;
+                data.slice(0, 50).forEach(row => { if (row && row.length > maxCols) maxCols = row.length; });
 
+                let html = '<table class="tm-excel-preview-table"><thead><tr><th class="row-num"></th>';
+                for (let i = 0; i < maxCols; i++) html += '<th>' + getColLetter(i) + '</th>';
+                html += '</tr></thead><tbody>';
+
+                data.slice(0, 100).forEach((row, rowIndex) => {
+                    const displayRowIndex = rowIndex + 1;
+                    html += '<tr data-row-index="' + displayRowIndex + '"><td class="row-num">' + displayRowIndex + '</td>';
+                    for (let i = 0; i < maxCols; i++) {
+                        const cell = row[i] !== undefined && row[i] !== null ? row[i] : '';
+                        html += '<td>' + String(cell).substring(0, 120) + '</td>';
+                    }
+                    html += '</tr>';
+                });
+                html += '</tbody></table>';
+                const inner = modal.querySelector('.tm-excel-sheet-inner-el');
+                if (inner) {
+                    inner.innerHTML = html;
+                    const zoomBar = modal.querySelector('.tm-excel-zoom-bar-el');
+                    if (zoomBar) zoomBar.style.display = 'flex';
+                    currentZoom = 1;
+                    updateZoomUI();
+                }
+
+                let isDraggingRow = null;
+                const tbody = modal.querySelector('.tm-excel-preview-table tbody');
+
+                const handleRowInteraction = (row, isDrag = false) => {
+                    const idx = parseInt(row.getAttribute('data-row-index'));
+                    const currH = parseInt(headerRowInput.value);
+                    const currD = parseInt(dataStartRowInput.value);
+
+                    if (!isDrag) {
+                        if (currH === idx) {
+                            headerRowInput.value = '';
+                            if (currD === idx + 1) dataStartRowInput.value = '';
+                        } else if (!headerRowInput.value || idx < currH) {
+                            headerRowInput.value = idx;
+                            dataStartRowInput.value = idx + 1;
+                        } else {
+                            dataStartRowInput.value = idx;
+                        }
+                    } else {
+                        if (isDraggingRow === 'header') {
+                            headerRowInput.value = idx;
+                        } else if (isDraggingRow === 'data') {
+                            dataStartRowInput.value = idx;
+                        }
+                    }
+                    updateRowHighlights();
+                };
+
+                tbody?.querySelectorAll('tr').forEach(row => {
+                    row.addEventListener('mousedown', function(e) {
+                        const idx = parseInt(this.getAttribute('data-row-index'));
+                        const hIdx = parseInt(headerRowInput.value);
+                        const dIdx = parseInt(dataStartRowInput.value);
+
+                        if (idx === hIdx) isDraggingRow = 'header';
+                        else if (idx === dIdx) isDraggingRow = 'data';
+                        else isDraggingRow = null;
+
+                        if (isDraggingRow) {
+                            e.preventDefault();
+                            this.style.cursor = 'grabbing';
+                        }
+                    });
+
+                    row.addEventListener('mouseover', function() {
+                        if (isDraggingRow) {
+                            handleRowInteraction(this, true);
+                        }
+                    });
+
+                    row.addEventListener('click', function() {
+                        if (!isDraggingRow) {
+                            handleRowInteraction(this, false);
+                        }
+                    });
+
+                    // Touch support
+                    row.addEventListener('touchstart', function(e) {
+                        const idx = parseInt(this.getAttribute('data-row-index'));
+                        const hIdx = parseInt(headerRowInput.value);
+                        const dIdx = parseInt(dataStartRowInput.value);
+
+                        if (idx === hIdx) isDraggingRow = 'header';
+                        else if (idx === dIdx) isDraggingRow = 'data';
+
+                        if (isDraggingRow) {
+                            e.preventDefault();
+                        }
+                    }, { passive: false });
+                });
+
+                const stopDragging = () => {
+                    isDraggingRow = null;
+                    tbody?.querySelectorAll('tr').forEach(r => r.style.cursor = 'pointer');
+                };
+
+                window.addEventListener('mouseup', stopDragging);
+
+                const table = modal.querySelector('.tm-excel-preview-table');
+                table?.addEventListener('touchmove', function(e) {
+                    if (isDraggingRow) {
+                        e.preventDefault();
+                        const touch = e.touches[0];
+                        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                        const row = target?.closest('tr');
+                        if (row && row.getAttribute('data-row-index')) {
+                            handleRowInteraction(row, true);
+                        }
+                    }
+                }, { passive: false });
+
+                table?.addEventListener('touchend', stopDragging);
+
+                updateRowHighlights();
+            };
+
+            let currentZoom = 1;
+            const updateZoomUI = () => {
+                const inner = modal.querySelector('.tm-excel-sheet-inner-el');
+                const val = modal.querySelector('.tm-excel-zoom-val');
+                if (inner) inner.style.transform = `scale(${currentZoom})`;
+                if (val) val.textContent = Math.round(currentZoom * 100) + '%';
+            };
+
+            modal.querySelector('.tm-excel-zoom-in')?.addEventListener('click', () => {
+                currentZoom = Math.min(currentZoom + 0.1, 3);
+                updateZoomUI();
+            });
+            modal.querySelector('.tm-excel-zoom-out')?.addEventListener('click', () => {
+                currentZoom = Math.max(currentZoom - 0.1, 0.2);
+                updateZoomUI();
+            });
+            modal.querySelector('.tm-excel-zoom-reset')?.addEventListener('click', () => {
+                currentZoom = 1;
+                updateZoomUI();
+            });
+
+            (() => {
+                const zoomBar = modal.querySelector('.tm-excel-zoom-bar-el');
+                if (!zoomBar) return;
+
+                let isDraggingZoom = false;
+                let offsetX, offsetY;
+
+                zoomBar.addEventListener('mousedown', (e) => {
+                    if (e.target.closest('button')) return;
+                    isDraggingZoom = true;
+
+                    const rect = zoomBar.getBoundingClientRect();
+                    offsetX = e.clientX - rect.left;
+                    offsetY = e.clientY - rect.top;
+
+                    zoomBar.style.bottom = 'auto';
+                    zoomBar.style.transition = 'none';
+                    zoomBar.style.cursor = 'grabbing';
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    if (!isDraggingZoom) return;
+
+                    const parentRect = zoomBar.parentElement.getBoundingClientRect();
+                    const barRect = zoomBar.getBoundingClientRect();
+
+                    let newLeft = e.clientX - parentRect.left - offsetX;
+                    let newTop = e.clientY - parentRect.top - offsetY;
+
+                    // Bounding
+                    newLeft = Math.max(10, Math.min(newLeft, parentRect.width - barRect.width - 10));
+                    newTop = Math.max(10, Math.min(newTop, parentRect.height - barRect.height - 10));
+
+                    zoomBar.style.left = newLeft + 'px';
+                    zoomBar.style.top = newTop + 'px';
+                });
+
+                window.addEventListener('mouseup', () => {
+                    if (isDraggingZoom) {
+                        isDraggingZoom = false;
+                        zoomBar.style.transition = 'transform 0.1s ease-out';
+                        zoomBar.style.cursor = 'move';
+                    }
+                });
+
+                // Touch support
+                zoomBar.addEventListener('touchstart', (e) => {
+                    if (e.target.closest('button')) return;
+                    const touch = e.touches[0];
+                    isDraggingZoom = true;
+
+                    const rect = zoomBar.getBoundingClientRect();
+                    offsetX = touch.clientX - rect.left;
+                    offsetY = touch.clientY - rect.top;
+
+                    zoomBar.style.bottom = 'auto';
+                    zoomBar.style.transition = 'none';
+                }, { passive: false });
+
+                window.addEventListener('touchmove', (e) => {
+                    if (!isDraggingZoom) return;
+                    const touch = e.touches[0];
+                    const parentRect = zoomBar.parentElement.getBoundingClientRect();
+                    const barRect = zoomBar.getBoundingClientRect();
+
+                    let newLeft = touch.clientX - parentRect.left - offsetX;
+                    let newTop = touch.clientY - parentRect.top - offsetY;
+
+                    newLeft = Math.max(10, Math.min(newLeft, parentRect.width - barRect.width - 10));
+                    newTop = Math.max(10, Math.min(newTop, parentRect.height - barRect.height - 10));
+
+                    zoomBar.style.left = newLeft + 'px';
+                    zoomBar.style.top = newTop + 'px';
+                }, { passive: false });
+
+                window.addEventListener('touchend', () => {
+                    if (isDraggingZoom) {
+                        isDraggingZoom = false;
+                        zoomBar.style.transition = 'transform 0.1s ease-out';
+                    }
+                });
+            })();
+
+            previewTableWrap?.addEventListener('wheel', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    if (e.deltaY < 0) currentZoom = Math.min(currentZoom + 0.05, 3);
+                    else currentZoom = Math.max(currentZoom - 0.05, 0.2);
+                    updateZoomUI();
+                }
+            }, { passive: false });
+
+            const handleExcelFile = (file) => {
+                if (!file) return;
+                const nameEl = modal.querySelector('.tm-excel-file-name');
+                if (nameEl) {
+                    nameEl.textContent = 'Archivo: ' + file.name;
+                    nameEl.classList.remove('tm-hidden');
+                }
+                const reader = new FileReader();
+                reader.onload = (re) => {
+                    try {
+                        const data = new Uint8Array(re.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        workbookData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                        renderExcelPreview(workbookData);
+                        modal.querySelector('.tm-excel-auto-detect').style.display = 'inline-flex';
+                    } catch (err) {
+                        if (errPreviewEl) { errPreviewEl.textContent = 'Error al procesar el Excel.'; errPreviewEl.classList.remove('tm-hidden'); }
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            };
+
+            const dropzone = modal.querySelector('.tm-excel-dropzone-el');
+            dropzone?.addEventListener('click', () => fileInput?.click());
+            fileInput?.addEventListener('change', (e) => handleExcelFile(e.target.files[0]));
+
+            ['dragover', 'dragleave', 'drop'].forEach(evt => {
+                dropzone?.addEventListener(evt, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (evt === 'dragover') dropzone.classList.add('is-dragover');
+                    else dropzone.classList.remove('is-dragover');
+                    if (evt === 'drop') handleExcelFile(e.dataTransfer.files[0]);
+                });
+            });
+
+            const searchAllCheck = modal.querySelector('.tm-excel-search-all');
+            const mrSelectContainer = modal.querySelector('.tm-excel-mr-select-container-el');
+
+            headerRowInput?.addEventListener('input', updateRowHighlights);
+            dataStartRowInput?.addEventListener('input', updateRowHighlights);
+
+            searchAllCheck?.addEventListener('change', function() {
+                if (mrSelectContainer) mrSelectContainer.style.display = this.checked ? 'none' : 'block';
+            });
+
+            modal.querySelector('.tm-excel-auto-detect')?.addEventListener('click', () => {
+                if (!workbookData) return;
+                let found = 1;
+                for (let i = 0; i < workbookData.length; i++) {
+                    if ((workbookData[i] || []).filter(c => c !== null && c !== '').length >= 3) {
+                        found = i + 1; break;
+                    }
+                }
+                headerRowInput.value = found;
+                dataStartRowInput.value = found + 1;
+                updateRowHighlights();
+            });
+
+            modal.querySelector('.tm-excel-read-columns')?.addEventListener('click', function () {
+                const file = fileInput?.files[0];
+                if (!file) {
+                    if (errPreviewEl) { errPreviewEl.textContent = 'Selecciona un archivo Excel.'; errPreviewEl.classList.remove('tm-hidden'); }
+                    return;
+                }
                 const fd = new FormData();
                 fd.append('archivo_excel', file);
-                fd.append('header_row', (headerRowInput ? headerRowInput.value : '1') || '1');
-                fd.append('auto_detect', '1');
+                fd.append('header_row', headerRowInput.value || '1');
                 fd.append('_token', csrfToken);
 
-                if (errPreviewEl) errPreviewEl.classList.add('tm-hidden');
-                if (detectNoteEl) detectNoteEl.classList.add('tm-hidden');
-                if (errImportEl) errImportEl.classList.add('tm-hidden');
-                if (okImportEl) okImportEl.classList.add('tm-hidden');
+                fetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
+                .then(r => r.json())
+                .then(j => {
+                    if (!j.success) throw new Error(j.message);
 
-                fetch(previewUrl, {
-                    method: 'POST',
-                    body: fd,
-                    headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-                    credentials: 'same-origin'
-                })
-                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-                .then(function (_ref) {
-                    if (!_ref.ok || !_ref.j.success) {
-                        if (errPreviewEl) {
-                            errPreviewEl.textContent = _ref.j.message || 'Error al leer el archivo.';
-                            errPreviewEl.classList.remove('tm-hidden');
-                        }
-                        return;
-                    }
+                    const updateMappedColumns = () => {
+                        modal.querySelectorAll('.is-mapped-column').forEach(el => el.classList.remove('is-mapped-column'));
+                        modal.querySelectorAll('.tm-excel-map-select').forEach(sel => {
+                            if (sel.value === '') return;
+                            const idx = parseInt(sel.value, 10);
+                            const th = modal.querySelector(`.tm-excel-preview-table thead th:nth-child(${idx + 2})`);
+                            if (th) th.classList.add('is-mapped-column');
+                            modal.querySelectorAll(`.tm-excel-preview-table tbody tr`).forEach(tr => {
+                                const td = tr.querySelector(`td:nth-child(${idx + 2})`);
+                                if (td) td.classList.add('is-mapped-column');
+                            });
+                        });
+                    };
 
-                    if (typeof _ref.j.header_row === 'number' && headerRowInput) headerRowInput.value = String(_ref.j.header_row);
-                    if (typeof _ref.j.data_start_row === 'number' && dataStartRowInput) dataStartRowInput.value = String(_ref.j.data_start_row);
-
-                    if (_ref.j.detection_note && detectNoteEl) {
-                        detectNoteEl.textContent = _ref.j.detection_note;
-                        detectNoteEl.classList.remove('tm-hidden');
-                    }
-
-                    const excelHeaders = _ref.j.headers || [];
-                    const excelFields = _ref.j.fields || [];
-                    const excelSuggested = _ref.j.suggested_map || {};
-
-                    const municipioHeaderIndex = findMunicipioHeaderIndex(excelHeaders);
+                    const friendlyTypes = {
+                        'text': 'Texto',
+                        'image': 'Imagen/Foto',
+                        'select': 'Lista de opciones',
+                        'geopoint': 'Ubicación (GPS)',
+                        'date': 'Fecha',
+                        'number': 'Número',
+                        'url': 'Enlace web',
+                        'textarea': 'Texto largo'
+                    };
 
                     if (mapBody) {
                         mapBody.innerHTML = '';
-
-                        // Estado 1-1: un encabezado -> un campo (y un campo no se repite).
-                        // fieldToHeader: fieldKey => headerIndex
-                        // headerToField: headerIndex => fieldKey
-                        const state = {
-                            fieldToHeader: {},
-                            headerToField: {}
-                        };
-
-                        const municipioField = (Array.isArray(excelFields) ? excelFields : []).find(function (f) {
-                            return String(f && f.type || '') === 'municipio';
-                        });
-
-                        // Preasignar MUNICIPIO si existe encabezado MUNICIPIO
-                        if (municipioField && municipioHeaderIndex !== null) {
-                            state.fieldToHeader[String(municipioField.key)] = municipioHeaderIndex;
-                            state.headerToField[String(municipioHeaderIndex)] = String(municipioField.key);
-                        }
-
-                        // Usar sugerencias del backend para preasignar
-                        Object.keys(excelSuggested || {}).forEach(function (fieldKey) {
-                            const idx = excelSuggested[fieldKey];
-                            if (idx === null || typeof idx === 'undefined') return;
-                            if (typeof idx !== 'number') return;
-                            if (!Number.isFinite(idx)) return;
-
-                            // No sobreescribir si ya está asignado (por MUNICIPIO)
-                            if (Object.prototype.hasOwnProperty.call(state.fieldToHeader, fieldKey)) return;
-                            if (Object.prototype.hasOwnProperty.call(state.headerToField, String(idx))) return;
-
-                            state.fieldToHeader[String(fieldKey)] = idx;
-                            state.headerToField[String(idx)] = String(fieldKey);
-                        });
-
-                        // Opciones de campos
-                        const fieldOptionsHtml = (Array.isArray(excelFields) ? excelFields : []).map(function (f) {
-                            const k = String(f.key || '').replace(/"/g, '');
-                            const label = String(f.label || k || '');
-                            const req = f.is_required ? ' *' : '';
-                            const type = String(f.type || '');
-                            const optLabel = label !== '' ? label + req : k + req;
-                            const typeSuffix = type ? ' (' + type + ')' : '';
-                            return '<option value="' + escapeHtml(k) + '">' + escapeHtml(optLabel) + escapeHtml(typeSuffix) + '</option>';
-                        }).join('');
-
-                        excelHeaders.forEach(function (h) {
-                            const headerIdx = h && typeof h.index !== 'undefined' ? h.index : null;
-                            if (headerIdx === null) return;
-
-                            const assignedFieldKey = state.headerToField[String(headerIdx)] || '';
-
-                            const lab = (h.letter + ': ' + (h.label || '(vacío)')).replace(/</g, '');
+                        (j.fields || []).forEach(f => {
                             const tr = document.createElement('tr');
-
-                            // select de campo asignado a este encabezado
-                            tr.innerHTML =
-                                '<td>' + escapeHtml(lab) + '</td>' +
-                                '<td>' +
-                                    '<select class="tm-excel-header-map-select" data-header-index="' + escapeHtml(headerIdx) + '">' +
-                                        '<option value="">— No importar —</option>' +
-                                        fieldOptionsHtml +
-                                    '</select>' +
-                                '</td>';
-
-                            mapBody.appendChild(tr);
-
-                            const sel = tr.querySelector('select.tm-excel-header-map-select');
-                            if (sel) {
-                                sel.value = assignedFieldKey;
-                            }
-                        });
-
-                        // listeners para mantener 1-1 (un campo asignado solo a un encabezado)
-                        const headerSelects = Array.from(mapBody.querySelectorAll('select.tm-excel-header-map-select'));
-                        headerSelects.forEach(function (sel) {
-                            sel.addEventListener('change', function () {
-                                const headerIdx = String(sel.getAttribute('data-header-index') || '');
-                                const newFieldKey = String(sel.value || '');
-
-                                // quitar asignación previa de este encabezado
-                                const prevFieldKey = state.headerToField[headerIdx] || '';
-                                if (prevFieldKey) {
-                                    delete state.fieldToHeader[prevFieldKey];
-                                }
-                                delete state.headerToField[headerIdx];
-
-                                // si no se seleccionó campo, ya terminamos
-                                if (!newFieldKey) {
-                                    return;
-                                }
-
-                                // si el campo ya estaba asignado a otro encabezado, limpiar ese otro
-                                const oldHeader = state.fieldToHeader[newFieldKey];
-                                if (typeof oldHeader !== 'undefined') {
-                                    const oldHeaderKey = String(oldHeader);
-                                    state.headerToField[oldHeaderKey] = '';
-                                    delete state.fieldToHeader[newFieldKey];
-
-                                    // limpiar UI en el select del encabezado anterior
-                                    const oldSel = mapBody.querySelector('select.tm-excel-header-map-select[data-header-index="' + oldHeaderKey + '"]');
-                                    if (oldSel instanceof HTMLSelectElement) {
-                                        oldSel.value = '';
-                                    }
-                                }
-
-                                // asignar
-                                state.fieldToHeader[newFieldKey] = parseInt(headerIdx, 10);
-                                state.headerToField[headerIdx] = newFieldKey;
+                            const sug = (j.suggested_map || {})[f.key];
+                            const friendly = friendlyTypes[f.type] || f.type;
+                            let opts = '<option value="">— No importar —</option>';
+                            (j.headers || []).forEach(h => {
+                                const sel = (sug === h.index) ? ' selected' : '';
+                                opts += '<option value="' + h.index + '"' + sel + '>' + (h.letter + ': ' + (h.label || '(vacío)')).replace(/</g, '') + '</option>';
                             });
+                            tr.innerHTML = '<td title="Tipo: ' + friendly + '" style="cursor:help; font-weight:600;">' + String(f.label).replace(/</g, '') + (f.is_required ? ' *' : '') + '</td><td><select class="tm-excel-map-select" data-field-key="' + String(f.key).replace(/"/g, '') + '">' + opts + '</select></td>';
+                            mapBody.appendChild(tr);
                         });
 
-                        // guardar el state dentro del modal para usarlo en el import
-                        modal.__excelHeaderToFieldState = state;
+                        modal.querySelectorAll('.tm-excel-map-select').forEach(sel => {
+                            sel.addEventListener('change', updateMappedColumns);
+                        });
+                        updateMappedColumns();
                     }
-
-                    if (step1) step1.classList.add('tm-hidden');
                     if (step2) step2.classList.remove('tm-hidden');
-                })
-                .catch(function () {
-                    if (errPreviewEl) {
-                        errPreviewEl.textContent = 'Error de red al subir el archivo.';
-                        errPreviewEl.classList.remove('tm-hidden');
+                    const controlsSide = modal.querySelector('.tm-excel-controls-side');
+                    if (controlsSide) {
+                        setTimeout(() => {
+                            controlsSide.scrollTo({ top: controlsSide.scrollHeight, behavior: 'smooth' });
+                        }, 100);
                     }
+                    const stepNote = modal.querySelector('.tm-excel-step-note');
+                    if (stepNote) stepNote.textContent = 'Relaciona cada campo del módulo con una columna de tu Excel.';
+                }).catch(e => {
+                    if (errPreviewEl) { errPreviewEl.textContent = e.message; errPreviewEl.classList.remove('tm-hidden'); }
                 });
             });
 
-            const backBtn = modal.querySelector('.tm-excel-back');
-            backBtn?.addEventListener('click', function () {
+            modal.querySelector('.tm-excel-back')?.addEventListener('click', () => {
                 if (step2) step2.classList.add('tm-hidden');
-                if (step1) step1.classList.remove('tm-hidden');
+                const controlsSide = modal.querySelector('.tm-excel-controls-side');
+                if (controlsSide) controlsSide.scrollTo({ top: 0, behavior: 'smooth' });
+                const stepNote = modal.querySelector('.tm-excel-step-note');
+                if (stepNote) stepNote.innerHTML = 'Haz clic en una fila para marcar <strong>Encabezado</strong> y <strong>Datos</strong>.';
             });
 
-            const importBtn = modal.querySelector('.tm-excel-importar');
-            importBtn?.addEventListener('click', function () {
-                const file = fileInput && fileInput.files && fileInput.files[0];
-                if (!file) {
-                    if (errImportEl) {
-                        errImportEl.textContent = 'Vuelve al paso 1 y selecciona el archivo.';
-                        errImportEl.classList.remove('tm-hidden');
-                    }
-                    return;
-                }
-
+            modal.querySelector('.tm-excel-importar')?.addEventListener('click', () => {
+                const file = fileInput?.files[0];
+                if (!file) return;
                 const mapping = {};
-                const state = modal.__excelHeaderToFieldState;
-                if (state && state.fieldToHeader && typeof state.fieldToHeader === 'object') {
-                    Object.keys(state.fieldToHeader).forEach(function (fieldKey) {
-                        const idx = state.fieldToHeader[fieldKey];
-                        if (typeof idx === 'number' && Number.isFinite(idx)) {
-                            mapping[fieldKey] = idx;
-                        }
-                    });
-                } else {
-                    // fallback (si el estado no se inicializó bien)
-                    Array.from(modal.querySelectorAll('select.tm-excel-header-map-select')).forEach(function (sel) {
-                        const headerIdx = sel.getAttribute('data-header-index');
-                        const fieldKey = sel.value;
-                        if (!headerIdx || !fieldKey) return;
-                        const idx = parseInt(String(headerIdx), 10);
-                        if (Number.isFinite(idx)) mapping[String(fieldKey)] = idx;
-                    });
-                }
-
+                modal.querySelectorAll('.tm-excel-map-select').forEach(sel => {
+                    const key = sel.getAttribute('data-field-key');
+                    if (key) mapping[key] = sel.value === '' ? null : parseInt(sel.value, 10);
+                });
                 const fd = new FormData();
                 fd.append('archivo_excel', file);
-                fd.append('header_row', (headerRowInput ? headerRowInput.value : '1') || '1');
-                fd.append('data_start_row', (dataStartRowInput ? dataStartRowInput.value : '2') || '2');
+                fd.append('header_row', headerRowInput.value || '1');
+                fd.append('data_start_row', dataStartRowInput.value || '2');
                 fd.append('mapping', JSON.stringify(mapping));
-                fd.append('selected_microrregion_id', mrInput ? String(mrInput.value || '') : '');
+                fd.append('all_microrregions', searchAllCheck?.checked ? '1' : '0');
+                fd.append('selected_microrregion_id', mrInput ? mrInput.value : '');
                 fd.append('_token', csrfToken);
 
-                if (errImportEl) errImportEl.classList.add('tm-hidden');
-                if (okImportEl) okImportEl.classList.add('tm-hidden');
+                fetch(importUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
+                .then(r => r.json())
+                .then(j => {
+                    const okEl = modal.querySelector('.tm-excel-import-ok');
+                    const errEl = modal.querySelector('.tm-excel-import-err');
+                    if (okEl) okEl.classList.add('tm-hidden');
+                    if (errEl) errEl.classList.add('tm-hidden');
 
-                fetch(importUrl, {
-                    method: 'POST',
-                    body: fd,
-                    headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-                    credentials: 'same-origin'
-                })
-                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-                .then(function (_ref) {
-                    if (!_ref.ok || !_ref.j.success) {
-                        if (errImportEl) {
-                            errImportEl.textContent = _ref.j.message || 'Error al importar.';
-                            errImportEl.classList.remove('tm-hidden');
+                    if (!j.success) throw new Error(j.message);
+
+                    // Mostrar errores detallados
+                    const errSection = modal.querySelector('.tm-excel-errors-section');
+                    const errList = modal.querySelector('.tm-excel-errors-list');
+                    if (j.row_errors && j.row_errors.length > 0) {
+                        errSection?.classList.remove('tm-hidden');
+                        if (errList) {
+                            errList.innerHTML = '';
+                            j.row_errors.forEach((err, idx) => {
+                                const card = document.createElement('div');
+                                card.className = 'tm-error-log-card';
+                                card.style = 'padding:12px; border:1px solid var(--clr-border); border-radius:10px; background:var(--clr-bg); font-size:0.85rem;';
+
+                                // Renderizar campos con fallo
+                                const failedFields = Array.isArray(err?.failed_fields) && err.failed_fields.length > 0 ? err.failed_fields : [];
+                                let failedFieldsHtml = '';
+                                if (failedFields.length > 0) {
+                                    failedFieldsHtml = '<div style="margin-top:8px;"><strong style="font-size:0.75rem;">Campos con fallo:</strong><ul style="margin:6px 0 0 16px; padding:0; font-size:0.8rem; color:var(--clr-text-light);">' +
+                                        failedFields.map((f) => `<li><strong>${escapeHtml(f.label || f.key || 'Campo')}</strong>: ${escapeHtml(f.reason || 'No válido')}${f.received ? ` <span style="color:var(--clr-primary); font-weight:600;">(ingresó: "${escapeHtml(f.received)}")</span>` : ''}</li>`).join('') +
+                                    '</ul></div>';
+                                }
+
+                                let suggHtml = '';
+                                if (err.suggestions && err.suggestions.length > 0) {
+                                    const cardId = `tmErrRow_${currentModuleId}_${idx}`;
+                                    suggHtml = '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">' +
+                                        '<span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">¿Quisiste decir?</span>' +
+                                        err.suggestions.map(s => `
+                                            <button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
+                                                onclick="retryImportRow(${idx}, ${s.microrregion_id}, '${s.municipio.replace(/'/g, "\\'")}', '${importSingleUrl}', '${currentModuleId}', '${cardId}', this, ${err.row || 0})"
+                                                style="font-size:0.7rem; padding:4px 8px;">
+                                                ${s.municipio}
+                                            </button>
+                                        `).join('') +
+                                    '</div>';
+                                }
+
+                                card.innerHTML = `
+                                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                                        <div style="color:var(--clr-primary); font-weight:700;">Fila ${err.row}</div>
+                                        <div style="font-size:0.75rem; color:var(--clr-text-light); text-align:right;">${normalizeRowErrorMessage(err)}</div>
+                                    </div>
+                                    ${failedFieldsHtml}
+                                    ${suggHtml}
+                                `;
+                                card.dataset.rowData = JSON.stringify(err.data);
+                                card.dataset.municipioKey = String(err.municipio_key || 'municipio');
+                                card.id = `tmErrRow_${currentModuleId}_${idx}`;
+                                errList.appendChild(card);
+                            });
+
+                            const controlsSide = modal.querySelector('.tm-excel-controls-side');
+                            if (controlsSide) {
+                                setTimeout(() => {
+                                    controlsSide.scrollTo({ top: errSection.offsetTop, behavior: 'smooth' });
+                                }, 100);
+                            }
                         }
-                        return;
                     }
 
-                    let msg = _ref.j.message || 'Listo.';
-                    if (_ref.j.row_errors && _ref.j.row_errors.length) {
-                        msg += ' Avisos: ' + _ref.j.row_errors.slice(0, 5).map(function (e) { return 'fila ' + e.row; }).join(', ');
-                    }
-                    if (okImportEl) {
-                        okImportEl.textContent = msg;
-                        okImportEl.classList.remove('tm-hidden');
+                    const msg = j.message + (j.skipped > 0 ? ` (${j.skipped} fallidos).` : '');
+
+                    // Persistir errores en sesión
+                    if (j.row_errors && j.row_errors.length > 0) {
+                        saveImportErrors(currentModuleId, j.row_errors, importSingleUrl);
                     }
 
-                    if (_ref.j.imported > 0) {
-                        setTimeout(function () { window.location.reload(); }, 1200);
-                    }
-                })
-                .catch(function () {
-                    if (errImportEl) {
-                        errImportEl.textContent = 'Error de red.';
-                        errImportEl.classList.remove('tm-hidden');
-                    }
+                    Swal.fire({ title: '¡Completado!', text: msg, icon: 'success', confirmButtonText: 'Aceptar' })
+                        .then(() => {
+                            if (j.skipped === 0) {
+                                saveImportErrors(currentModuleId, [], ''); // Limpiar si todo fue ok
+                                location.reload();
+                            }
+                        });
+                }).catch(e => {
+                    const errEl = modal.querySelector('.tm-excel-import-err');
+                    if (errEl) { errEl.textContent = e.message; errEl.classList.remove('tm-hidden'); }
                 });
             });
         });
+
 
         document.addEventListener('click', function (event) {
             const btn = event.target.closest('[data-open-excel-import]');
@@ -1942,5 +2697,70 @@
             setSelectedFileOnInput(targetInput, imageFile);
         });
     });
+
+    window.retryImportRow = function(errIdx, microrregionId, correctedMunicipio, singleUrl, moduleId, cardId, buttonEl, rowNumber) {
+        const card = document.getElementById(cardId || ('tmErrRow_' + errIdx));
+        if (!card) return;
+
+        const rowData = JSON.parse(card.dataset.rowData);
+        const municipioKey = String(card.dataset.municipioKey || 'municipio');
+        rowData[municipioKey] = correctedMunicipio;
+
+        const btn = buttonEl || null;
+        if (!btn) {
+            return;
+        }
+        const oldText = btn.innerText;
+        btn.disabled = true;
+        btn.innerText = 'Cargando...';
+
+        fetch(singleUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                data: rowData,
+                microrregion_id: microrregionId
+            })
+        })
+        .then(r => r.json())
+        .then(j => {
+            if (j.success) {
+                card.style.opacity = '0.5';
+                card.style.pointerEvents = 'none';
+                btn.innerText = '✓ Importado';
+                btn.style.background = 'var(--clr-secondary)';
+                btn.style.color = '#fff';
+
+                // Si se pasó moduleId y rowNumber, remover este error de la sesión usando el número de fila (identificador único)
+                if (moduleId && rowNumber) {
+                    const data = sessionStorage.getItem(`tm_errors_${moduleId}`);
+                    if (data) {
+                        const parsed = JSON.parse(data);
+                        // Usar el número de fila como identificador único, no el índice
+                        parsed.errors = (parsed.errors || []).filter((e) => e.row !== rowNumber);
+                        if (typeof window.__tmSaveImportErrors === 'function') {
+                            window.__tmSaveImportErrors(moduleId, parsed.errors, parsed.singleUrl);
+                        }
+                    }
+                }
+
+                if (typeof window.__tmRefreshImportErrorsModal === 'function') {
+                    window.__tmRefreshImportErrorsModal();
+                }
+            } else {
+                throw new Error(j.message || 'Error al reintentar');
+            }
+        })
+        .catch(e => {
+            btn.disabled = false;
+            btn.innerText = oldText;
+            Swal.fire('Error', e.message, 'error');
+        });
+    };
 </script>
 @endpush

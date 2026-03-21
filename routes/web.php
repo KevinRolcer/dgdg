@@ -163,6 +163,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/fragmento/registros', [TemporaryModuleController::class, 'delegatePartialRecords'])
             ->middleware('can:modulos-temporales-ver')
             ->name('temporary-modules.fragment.records');
+        Route::get('/{module}/estado', [TemporaryModuleController::class, 'moduleStatus'])
+            ->middleware('can:modulos-temporales-ver')
+            ->whereNumber('module')
+            ->name('temporary-modules.module-status');
         Route::post('/{module}/importar-excel-preview', [TemporaryModuleController::class, 'importExcelPreview'])
             ->middleware('can:Modulos-Temporales')
             ->whereNumber('module')
@@ -171,6 +175,10 @@ Route::middleware('auth')->group(function () {
             ->middleware('can:Modulos-Temporales')
             ->whereNumber('module')
             ->name('temporary-modules.import-excel');
+        Route::post('/{module}/importar-fila', [TemporaryModuleController::class, 'importSingleRow'])
+            ->middleware('can:Modulos-Temporales')
+            ->whereNumber('module')
+            ->name('temporary-modules.import-single-row');
         Route::get('/{module}', [TemporaryModuleController::class, 'show'])
             ->middleware('can:modulos-temporales-ver')
             ->whereNumber('module')

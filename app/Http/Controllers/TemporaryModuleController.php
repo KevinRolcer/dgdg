@@ -60,6 +60,32 @@ class TemporaryModuleController extends Controller
         'image' => 'Imagen',
     ];
 
+    private function findDuplicateEntryId(TemporaryModule $temporaryModule, int $microrregionId, array $values, ?int $excludeEntryId = null): ?int
+    {
+        $targetSignature = $this->excelImportService->buildDuplicateSignature($values);
+        $duplicateId = null;
+
+        $temporaryModule->entries()
+            ->select(['id', 'data'])
+            ->where('microrregion_id', $microrregionId)
+            ->when($excludeEntryId !== null, fn ($q) => $q->where('id', '!=', $excludeEntryId))
+            ->orderBy('id')
+            ->chunk(500, function ($entries) use ($targetSignature, &$duplicateId) {
+                foreach ($entries as $entry) {
+                    $entrySignature = $this->excelImportService->buildDuplicateSignature((array) ($entry->data ?? []));
+                    if (hash_equals($targetSignature, $entrySignature)) {
+                        $duplicateId = (int) $entry->id;
+
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+        return $duplicateId;
+    }
+
     public function adminIndex(): View
     {
         $modules = TemporaryModule::query()
@@ -845,6 +871,32 @@ class TemporaryModuleController extends Controller
         ]);
     }
 
+    /** Devuelve el conteo de registros del usuario para un módulo (AJAX). */
+    public function moduleStatus(Request $request, int $module): JsonResponse
+    {
+        $user = $request->user();
+        abort_if($user->can('Modulos-Temporales-Admin'), 404);
+
+        $temporaryModule = TemporaryModule::query()
+            ->select(['id', 'is_active', 'applies_to_all', 'expires_at'])
+            ->findOrFail($module);
+
+        abort_unless($temporaryModule->isAvailable(), 404);
+        abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $user->id), 403);
+
+        $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
+
+        $count = $temporaryModule->entries()
+            ->when(
+                $microrregionIdsUsuario !== [],
+                fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
+                fn ($q) => $q->whereRaw('1 = 0')
+            )
+            ->count();
+
+        return response()->json(['my_entries_count' => $count]);
+    }
+
     /** HTML parcial: grid de módulos + paginación (AJAX). */
     public function delegatePartialUpload(Request $request): View
     {
@@ -1080,6 +1132,18 @@ class TemporaryModuleController extends Controller
             $values[$field->key] = $value;
         }
 
+        $duplicateEntryId = $this->findDuplicateEntryId(
+            $temporaryModule,
+            (int) $microrregionId,
+            $values,
+            $existingEntry ? (int) $existingEntry->id : null
+        );
+        if ($duplicateEntryId !== null) {
+            throw ValidationException::withMessages([
+                'values' => 'No se guardó el registro: ya existe uno idéntico en este módulo para la misma microrregión.',
+            ]);
+        }
+
         if ($existingEntry) {
             $existingEntry->update([
                 'microrregion_id' => $microrregionId,
@@ -1216,6 +1280,7 @@ class TemporaryModuleController extends Controller
             'data_start_row' => ['nullable', 'integer', 'min:2', 'max:1000'],
             'mapping' => ['required', 'string'],
             'selected_microrregion_id' => ['nullable', 'integer'],
+            'all_microrregions' => ['nullable', 'boolean'],
         ]);
 
         $mapping = json_decode((string) $request->input('mapping'), true);
@@ -1231,16 +1296,35 @@ class TemporaryModuleController extends Controller
             }
         }
 
-        $requestedMicrorregionId = $request->filled('selected_microrregion_id')
-            ? (int) $request->input('selected_microrregion_id')
-            : null;
-        $microrregionIdsPermitidos = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
-        if ($requestedMicrorregionId !== null && ! in_array($requestedMicrorregionId, $microrregionIdsPermitidos, true)) {
-            return response()->json(['success' => false, 'message' => 'Microrregión no permitida.'], 403);
-        }
+        $allMicrorregions = $request->boolean('all_microrregions', false);
+        $municipioToMrMap = [];
+        $allowedMunicipioNames = [];
+        $suggestionMunicipioNames = [];
+        $microrregionId = null;
 
-        [$microrregionId, $municipios] = $this->accessService->delegadoMunicipios($request->user()->id, $requestedMicrorregionId);
-        $allowedMunicipios = array_values($municipios);
+        $microrregionesInfo = $this->accessService->microrregionesConMunicipiosPorUsuario((int) $request->user()->id);
+        foreach ($microrregionesInfo as $micro) {
+            foreach ($micro->municipios as $m) {
+                $suggestionMunicipioNames[] = $m;
+                $municipioToMrMap[$this->excelImportService->normalizeLabel($m)] = (int) $micro->id;
+            }
+        }
+        $suggestionMunicipioNames = array_values(array_unique($suggestionMunicipioNames));
+
+        if ($allMicrorregions) {
+            $allowedMunicipioNames = $suggestionMunicipioNames;
+        } else {
+            $requestedMicrorregionId = $request->filled('selected_microrregion_id')
+                ? (int) $request->input('selected_microrregion_id')
+                : null;
+            $microrregionIdsPermitidos = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
+            if ($requestedMicrorregionId !== null && ! in_array($requestedMicrorregionId, $microrregionIdsPermitidos, true)) {
+                return response()->json(['success' => false, 'message' => 'Microrregión no permitida.'], 403);
+            }
+
+            [$microrregionId, $municipios] = $this->accessService->delegadoMunicipios($request->user()->id, $requestedMicrorregionId);
+            $allowedMunicipioNames = array_values($municipios);
+        }
 
         $headerRow = (int) ($request->input('header_row') ?: 1);
         $dataStartRow = (int) ($request->input('data_start_row') ?: $headerRow + 1);
@@ -1250,13 +1334,15 @@ class TemporaryModuleController extends Controller
             $result = $this->excelImportService->importRows(
                 $temporaryModule,
                 (int) $request->user()->id,
-                (int) $microrregionId,
+                $microrregionId ? (int) $microrregionId : null,
                 $request->file('archivo_excel'),
                 $headerRow,
-                $dataStartRow,
+                $dataStart_row = (int) ($request->input('data_start_row') ?: $headerRow + 1),
                 $normalizedMap,
                 $fieldsByKey,
-                $allowedMunicipios,
+                $allowedMunicipioNames,
+                $municipioToMrMap,
+                $suggestionMunicipioNames,
             );
         } catch (\Throwable $e) {
             return response()->json([
@@ -1274,6 +1360,44 @@ class TemporaryModuleController extends Controller
                 ? "Se importaron {$result['imported']} registro(s)."
                 : 'No se importó ninguna fila (revisa mapeo y datos).',
         ]);
+    }
+
+    /**
+     * Importación manual de una sola fila desde el log de errores.
+     */
+    public function importSingleRow(Request $request, int $module): JsonResponse
+    {
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+        abort_unless($temporaryModule->isAvailable(), 404);
+        abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
+
+        $validated = $request->validate([
+            'data' => ['required', 'array'],
+            'microrregion_id' => ['required', 'integer'],
+        ]);
+
+        $microrregionId = (int) $validated['microrregion_id'];
+        abort_unless(
+            $this->accessService->userCanAccessEntryByMicrorregion((int) $request->user()->id, $microrregionId),
+            403
+        );
+
+        $duplicateEntryId = $this->findDuplicateEntryId($temporaryModule, $microrregionId, (array) $validated['data']);
+        if ($duplicateEntryId !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Registro duplicado: ya existe una captura con los mismos datos.',
+            ], 422);
+        }
+
+        $temporaryModule->entries()->create([
+            'user_id' => $request->user()->id,
+            'microrregion_id' => $microrregionId,
+            'data' => $validated['data'],
+            'submitted_at' => Carbon::now(),
+        ]);
+
+        return response()->json(['success' => true]);
     }
 
     public function destroy(int $module): RedirectResponse

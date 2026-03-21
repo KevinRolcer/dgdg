@@ -88,6 +88,8 @@ class TemporaryModuleExcelImportService
                 $score = 0;
                 if ($hn === $normLabel || $hn === $normKey) {
                     $score = 100;
+                } elseif ($key === 'municipio' && in_array($hn, ['MUNICIPIO', 'MUN', 'MUNICIP', 'NOM_MUN', 'NOMBRE_MUNICIPIO', 'NOMBRE_MUN', 'NOMMUN'], true)) {
+                    $score = 95;
                 } elseif (str_contains($hn, $normLabel) && strlen($normLabel) >= 3) {
                     $score = 80;
                 } elseif (str_contains($normLabel, $hn) && strlen($hn) >= 3) {
@@ -108,19 +110,22 @@ class TemporaryModuleExcelImportService
 
     /**
      * @param  array<string,int|null>  $mapping  field_key => 0-based column index; null = omit
-     * @param  list<int>  $allowedMunicipioNames  nombres permitidos para microrregión actual
-     * @return array{imported:int, skipped:int, row_errors:list<array{row:int,message:string}>}
+    * @param  list<string>  $allowedMunicipioNames  nombres permitidos para microrregión actual
+    * @param  list<string>  $suggestionMunicipioNames  nombres para sugerencias de coincidencia
+     * @return array{imported:int, skipped:int, row_errors:list<array{row:int,message:string,data:array,suggestions:array}>}
      */
     public function importRows(
         TemporaryModule $module,
         int $userId,
-        int $microrregionId,
+        ?int $microrregionId,
         UploadedFile $file,
         int $headerRow,
         int $dataStartRow,
         array $mapping,
         Collection $fieldsByKey,
         array $allowedMunicipioNames,
+        array $municipioToMrMap = [],
+        array $suggestionMunicipioNames = [],
     ): array {
         $headerRow = max(1, $headerRow);
         $dataStartRow = max($headerRow + 1, $dataStartRow);
@@ -132,13 +137,31 @@ class TemporaryModuleExcelImportService
 
         $importable = $this->importableFields($fieldsByKey->values());
         $requiredKeys = $importable->where('is_required', true)->pluck('key')->all();
+        $municipioField = $fieldsByKey->firstWhere('type', 'municipio');
+        $municipioKey = $municipioField ? $municipioField->key : null;
+        $suggestionBaseMunicipios = !empty($suggestionMunicipioNames) ? $suggestionMunicipioNames : $allowedMunicipioNames;
 
         $imported = 0;
         $skipped = 0;
         $rowErrors = [];
+        $existingSignaturesByMicro = [];
+
+        $module->entries()
+            ->select(['id', 'microrregion_id', 'data'])
+            ->orderBy('id')
+            ->chunk(500, function ($entries) use (&$existingSignaturesByMicro) {
+                foreach ($entries as $entry) {
+                    $microId = (int) ($entry->microrregion_id ?? 0);
+                    $signature = $this->buildDuplicateSignature((array) ($entry->data ?? []));
+                    $existingSignaturesByMicro[$microId][$signature] = true;
+                }
+            });
+
+        $pendingSignaturesByMicro = [];
 
         for ($row = $dataStartRow; $row <= $highestRow; $row++) {
             $values = [];
+            $rawValues = [];
             $hasAny = false;
             foreach ($mapping as $fieldKey => $colIndex) {
                 if ($colIndex === null || !isset($fieldsByKey[$fieldKey])) {
@@ -157,6 +180,7 @@ class TemporaryModuleExcelImportService
                 $raw = $cell->getValue();
                 $calculated = $cell->getCalculatedValue();
                 $str = $this->stringifyCell($calculated !== null ? $calculated : $raw);
+                $rawValues[$fieldKey] = $str;
                 if (trim($str) !== '') {
                     $hasAny = true;
                 }
@@ -173,11 +197,64 @@ class TemporaryModuleExcelImportService
                 $v = $values[$rk] ?? null;
                 $empty = $v === null || $v === '' || (is_string($v) && trim($v) === '');
                 if ($empty) {
-                    $rowErrors[] = ['row' => $row, 'message' => "Fila {$row}: falta campo obligatorio ({$rk})."];
+                    $suggestions = [];
+                    if ($municipioKey !== null && $rk === $municipioKey) {
+                        $rawMunicipio = trim((string) ($rawValues[$rk] ?? ''));
+                        if ($rawMunicipio !== '') {
+                            $suggestions = $this->suggestMunicipios($rawMunicipio, $suggestionBaseMunicipios, $municipioToMrMap);
+                        }
+                    }
+
+                    $rowErrors[] = [
+                        'row' => $row,
+                        'message' => "Fila {$row}: falta campo obligatorio ({$fieldsByKey[$rk]->label}).",
+                        'data' => $values,
+                        'municipio_key' => $rk === $municipioKey ? $rk : null,
+                        'failed_fields' => [[
+                            'key' => $rk,
+                            'label' => (string) ($fieldsByKey[$rk]->label ?? $rk),
+                            'reason' => 'Campo obligatorio vacío o no reconocido.',
+                            'received' => (string) ($rawValues[$rk] ?? ''),
+                        ]],
+                        'suggestions' => $suggestions,
+                    ];
                     $skipped++;
 
                     continue 2;
                 }
+            }
+
+            $rowMrId = $microrregionId;
+            if ($rowMrId === null && $municipioKey) {
+                $munVal = $values[$municipioKey] ?? null;
+                if ($munVal) {
+                    $rowMrId = $municipioToMrMap[$this->normalizeLabel($munVal)] ?? null;
+                }
+            }
+
+            if ($rowMrId === null || $rowMrId <= 0) {
+                $munVal = $municipioKey ? ($values[$municipioKey] ?? '') : '';
+                $suggestions = [];
+                if ($munVal !== '') {
+                    $suggestions = $this->suggestMunicipios($munVal, $suggestionBaseMunicipios, $municipioToMrMap);
+                }
+
+                $rowErrors[] = [
+                    'row' => $row,
+                    'message' => "Fila {$row}: No se pudo determinar la microrregión para el municipio '{$munVal}'.",
+                    'data' => $values,
+                    'municipio_key' => $municipioKey,
+                    'failed_fields' => $municipioKey ? [[
+                        'key' => $municipioKey,
+                        'label' => (string) ($fieldsByKey[$municipioKey]->label ?? $municipioKey),
+                        'reason' => 'El municipio no coincide con una microrregión asignada.',
+                        'received' => (string) $munVal,
+                    ]] : [],
+                    'suggestions' => $suggestions,
+                ];
+                $skipped++;
+
+                continue;
             }
 
             // Defaults para campos no mapeados (evitar nulls en JSON)
@@ -187,13 +264,37 @@ class TemporaryModuleExcelImportService
                 }
             }
 
+            $rowSignature = $this->buildDuplicateSignature($values);
+            $microKey = (int) $rowMrId;
+            $isDuplicate = isset($existingSignaturesByMicro[$microKey][$rowSignature])
+                || isset($pendingSignaturesByMicro[$microKey][$rowSignature]);
+
+            if ($isDuplicate) {
+                $rowErrors[] = [
+                    'row' => $row,
+                    'message' => "Fila {$row}: registro duplicado (todos los campos iguales).",
+                    'data' => $values,
+                    'failed_fields' => [[
+                        'key' => '__duplicate__',
+                        'label' => 'Registro completo',
+                        'reason' => 'Ya existe un registro igual en el módulo para la misma microrregión.',
+                        'received' => '',
+                    ]],
+                    'suggestions' => [],
+                ];
+                $skipped++;
+
+                continue;
+            }
+
             $module->entries()->create([
                 'user_id' => $userId,
-                'microrregion_id' => $microrregionId,
+                'microrregion_id' => $rowMrId,
                 'data' => $values,
                 'main_image_field_key' => null,
                 'submitted_at' => Carbon::now(),
             ]);
+            $pendingSignaturesByMicro[$microKey][$rowSignature] = true;
             $imported++;
         }
 
@@ -209,7 +310,7 @@ class TemporaryModuleExcelImportService
         return IOFactory::load($file->getRealPath());
     }
 
-    private function normalizeLabel(string $s): string
+    public function normalizeLabel(string $s): string
     {
         $s = mb_strtoupper(trim($s), 'UTF-8');
         $s = preg_replace('/\s+/', ' ', $s) ?? $s;
@@ -368,5 +469,91 @@ class TemporaryModuleExcelImportService
         }
 
         return $str === '' ? null : $str;
+    }
+
+    /**
+     * Sugerencias de municipio basadas en similitud de texto.
+     */
+    public function suggestMunicipios(string $search, array $allowedNames, array $municipioToMrMap): array
+    {
+        $normSearch = $this->normalizeLabel($search);
+        if ($normSearch === '') {
+            return [];
+        }
+
+        $compactSearch = $this->compactAlnum($normSearch);
+        $best = [];
+
+        foreach ($allowedNames as $name) {
+            $normName = $this->normalizeLabel($name);
+            $compactName = $this->compactAlnum($normName);
+            $score = 0;
+
+            if ($normName === $normSearch) {
+                $score = 100;
+            } elseif ($compactName !== '' && $compactName === $compactSearch) {
+                $score = 95;
+            } elseif (str_contains($normName, $normSearch) && mb_strlen($normSearch) >= 4) {
+                $score = 85;
+            } elseif (str_contains($normSearch, $normName) && mb_strlen($normName) >= 4) {
+                $score = 80;
+            } else {
+                similar_text($compactSearch, $compactName, $pct);
+                if ($pct >= 45) {
+                    $score = (int) $pct;
+                }
+            }
+
+            if ($score >= 45) {
+                $best[] = [
+                    'score' => $score,
+                    'municipio' => $name,
+                    'microrregion_id' => $municipioToMrMap[$normName] ?? null,
+                ];
+            }
+        }
+
+        usort($best, fn ($a, $b) => $b['score'] <=> $a['score']);
+
+        return array_slice($best, 0, 5);
+    }
+
+    private function compactAlnum(string $s): string
+    {
+        return preg_replace('/[^A-Z0-9]/', '', $s) ?? '';
+    }
+
+    public function buildDuplicateSignature(array $values): string
+    {
+        $normalized = $this->normalizeDataForSignature($values);
+
+        return md5(json_encode($normalized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function normalizeDataForSignature(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            $normalized = [];
+            foreach ($value as $k => $v) {
+                $normalized[(string) $k] = $this->normalizeDataForSignature($v);
+            }
+            ksort($normalized);
+
+            return $normalized;
+        }
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return (string) (0 + $value);
+        }
+
+        return trim((string) $value);
     }
 }
