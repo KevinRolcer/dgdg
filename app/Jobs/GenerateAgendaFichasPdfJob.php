@@ -72,7 +72,7 @@ class GenerateAgendaFichasPdfJob implements ShouldQueue
                 'data' => [
                     'export_request_id' => $this->exportRequestId,
                     'icon' => 'fa-solid fa-file-pdf',
-                    'title' => 'PDF de fichas listo',
+                    'title' => 'Fichas PDF',
                     'url' => $downloadUrl,
                     'file_name' => $fileName,
                     'export_status' => 'completed',
