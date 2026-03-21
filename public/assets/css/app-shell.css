@@ -680,6 +680,10 @@ body.sidebar-collapsed .sidebar-logout-btn {
     border: 1px solid transparent;
 }
 
+.topbar-notify-list li > div {
+    min-width: 0;
+}
+
 .topbar-notify-list li.is-active {
     background: rgba(72, 71, 71, 0.06);
 }
@@ -702,6 +706,12 @@ body.sidebar-collapsed .sidebar-logout-btn {
     color: var(--clr-text-main);
     margin-bottom: 2px;
     line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.topbar-notify-list a {
+    display: block;
+    min-width: 0;
 }
 
 .topbar-notify-panel .topbar-notify-list strong {
@@ -709,6 +719,7 @@ body.sidebar-collapsed .sidebar-logout-btn {
     word-break: break-word;
     overflow: hidden;
     display: -webkit-box;
+    line-clamp: 2;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
 }
@@ -917,6 +928,23 @@ body.sidebar-collapsed .sidebar-logout-btn {
 
 .notifications-drawer-list {
     gap: 8px;
+}
+
+.notifications-drawer-list li {
+    align-items: start;
+}
+
+.notifications-drawer-list .topbar-notify-icon {
+    margin-top: 2px;
+}
+
+.notifications-drawer-list strong {
+    display: -webkit-box;
+    line-clamp: 3;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
 }
 
 .notifications-drawer-list li {

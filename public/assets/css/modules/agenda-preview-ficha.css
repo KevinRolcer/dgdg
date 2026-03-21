@@ -1,26 +1,26 @@
 @font-face {
     font-family: 'Gilroy';
-    src: url('/fonts/agenda-pdf/Gilroy-Regular.ttf') format('truetype');
+    src: url('../../../fonts/agenda-pdf/Gilroy-Regular.ttf') format('truetype');
     font-weight: 400;
 }
 @font-face {
     font-family: 'Gilroy';
-    src: url('/fonts/agenda-pdf/Gilroy-Medium.ttf') format('truetype');
+    src: url('../../../fonts/agenda-pdf/Gilroy-Medium.ttf') format('truetype');
     font-weight: 500;
 }
 @font-face {
     font-family: 'Gilroy';
-    src: url('/fonts/agenda-pdf/Gilroy-SemiBold.ttf') format('truetype');
+    src: url('../../../fonts/agenda-pdf/Gilroy-SemiBold.ttf') format('truetype');
     font-weight: 600;
 }
 @font-face {
     font-family: 'Gilroy';
-    src: url('/fonts/agenda-pdf/Gilroy-Bold.ttf') format('truetype');
+    src: url('../../../fonts/agenda-pdf/Gilroy-Bold.ttf') format('truetype');
     font-weight: 700;
 }
 @font-face {
     font-family: 'Gilroy';
-    src: url('/fonts/agenda-pdf/Gilroy-ExtraBold.ttf') format('truetype');
+    src: url('../../../fonts/agenda-pdf/Gilroy-ExtraBold.ttf') format('truetype');
     font-weight: 800;
 }
 
@@ -104,19 +104,19 @@
 
 .agenda-ficha-card--pre_gira {
     background-color: #f8f8f8;
-    background-image: url('/images/Texturas_1C-Tlaloc_blanco.png');
+    background-image: url('../../../images/Texturas_1C-Tlaloc_blanco.png');
     color: #444;
 }
 
 .agenda-ficha-card--gira {
     background-color: #0a4a41;
-    background-image: url('/images/Texturas_1C-Tlaloc_verde.png');
+    background-image: url('../../../images/Texturas_1C-Tlaloc_verde.png');
     color: #fff;
 }
 
 .agenda-ficha-card--agenda {
     background-color: #6a1f35;
-    background-image: url('/images/Texturas_1C-Tlaloc_rojo.png');
+    background-image: url('../../../images/Texturas_1C-Tlaloc_rojo.png');
     color: #fff;
 }
 

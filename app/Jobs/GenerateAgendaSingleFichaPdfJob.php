@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class GenerateAgendaSingleFichaPdfJob implements ShouldQueue
 {
@@ -72,7 +73,7 @@ class GenerateAgendaSingleFichaPdfJob implements ShouldQueue
                 'data' => [
                     'export_request_id' => $this->exportRequestId,
                     'icon' => 'fa-solid fa-file-pdf',
-                    'title' => 'Ficha lista: '.$fileName,
+                    'title' => 'Ficha lista: '.Str::limit($fileName, 72),
                     'url' => $downloadUrl,
                     'file_name' => $fileName,
                     'export_status' => 'completed',

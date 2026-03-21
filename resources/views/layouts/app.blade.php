@@ -92,11 +92,11 @@
                                         </span>
                                         <div>
                                             @if(!empty($targetUrl))
-                                                <a href="{{ $targetUrl }}" style="text-decoration:none; color:inherit;">
-                                                    <strong>{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                                <a href="{{ $targetUrl }}" style="text-decoration:none; color:inherit;" title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">
+                                                    <strong title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">{{ $notification['title'] ?? 'Notificación' }}</strong>
                                                 </a>
                                             @else
-                                                <strong>{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                                <strong title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">{{ $notification['title'] ?? 'Notificación' }}</strong>
                                             @endif
                                             <small>{{ $notification['time'] ?? 'Reciente' }}</small>
                                         </div>
@@ -235,11 +235,11 @@
                             </span>
                             <div>
                                 @if(!empty($targetUrl))
-                                    <a href="{{ $targetUrl }}" style="text-decoration:none; color:inherit;">
-                                        <strong>{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                    <a href="{{ $targetUrl }}" style="text-decoration:none; color:inherit;" title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">
+                                        <strong title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">{{ $notification['title'] ?? 'Notificación' }}</strong>
                                     </a>
                                 @else
-                                    <strong>{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                    <strong title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">{{ $notification['title'] ?? 'Notificación' }}</strong>
                                 @endif
                                 <small>{{ $notification['time'] ?? 'Reciente' }}</small>
                             </div>
