@@ -192,16 +192,16 @@
                                     foreach ($field->options as $cat) {
                                         $nm = $cat['name'] ?? '';
                                         $subs = $cat['sub'] ?? [];
-                                        $lines[] = $nm . (count($subs) ? ': ' . implode(', ', $subs) : '');
+                                        $lines[] = $nm . (count($subs) ? ': ' . implode(', ', array_filter($subs, 'is_string')) : '');
                                     }
                                     $existingOptionsValue = implode("\n", $lines);
                                 } elseif ($field->type === 'select' && is_array($field->options)) {
-                                    $existingOptionsValue = implode(", ", $field->options);
+                                    $existingOptionsValue = implode(", ", array_filter($field->options, 'is_string'));
                                 } else {
-                                    $existingOptionsValue = (string) ($oldRow['options'] ?? (is_array($field->options) ? implode(', ', $field->options) : ($field->options ?? '')));
+                                    $existingOptionsValue = (string) ($oldRow['options'] ?? (is_array($field->options) ? implode(', ', array_filter($field->options, 'is_string')) : ($field->options ?? '')));
                                 }
                                 $existingSeccionTitle = (string) ($oldRow['options_title'] ?? (is_array($field->options) && isset($field->options['title']) ? $field->options['title'] : ''));
-                                $existingSeccionSubs = (string) ($oldRow['options_subsections'] ?? (is_array($field->options) && !empty($field->options['subsections']) ? implode("\n", $field->options['subsections']) : ''));
+                                $existingSeccionSubs = (string) ($oldRow['options_subsections'] ?? (is_array($field->options) && !empty($field->options['subsections']) ? implode("\n", array_filter($field->options['subsections'], 'is_string')) : ''));
                             @endphp
 
                             <label class="tm-inline-check" data-existing-required-wrap>
@@ -211,7 +211,7 @@
 
                             <label class="tm-options-field" data-existing-options-wrap {{ $rowTypeForInput === 'select' ? '' : 'hidden' }}>
                                 Opciones (separadas por coma o salto de línea)
-                                <textarea name="existing_fields[{{ $index }}][options]" rows="2" {{ $rowTypeForInput === 'select' ? '' : 'disabled' }} {{ $oldDelete ? 'disabled' : '' }}>{{ $rowTypeForInput === 'select' ? ($oldRow['options'] ?? (is_array($field->options) ? implode(', ', $field->options) : '')) : '' }}</textarea>
+                                <textarea name="existing_fields[{{ $index }}][options]" rows="2" {{ $rowTypeForInput === 'select' ? '' : 'disabled' }} {{ $oldDelete ? 'disabled' : '' }}>{{ $rowTypeForInput === 'select' ? ($oldRow['options'] ?? (is_array($field->options) ? implode(', ', array_filter($field->options, 'is_string')) : '')) : '' }}</textarea>
                             </label>
 
                             <label class="tm-options-field" data-existing-categoria-wrap {{ $rowTypeForInput === 'categoria' ? '' : 'hidden' }}>
