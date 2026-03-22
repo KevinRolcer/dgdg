@@ -19,6 +19,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -43,6 +44,41 @@ class TemporaryModuleController extends Controller
     private function analysisWordService(): TemporaryModuleAnalysisWordService
     {
         return app(TemporaryModuleAnalysisWordService::class);
+    }
+
+    /**
+     * Decodifica cfg de exportación: GET trae JSON en query; POST puede traer Base64 (UTF-8) para evitar corrupción en campos largos.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function decodeTemporaryModuleExportConfig(Request $request): ?array
+    {
+        $raw = $request->input('cfg', $request->query('cfg'));
+        if (! is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        $trim = ltrim($raw);
+        $jsonString = $raw;
+        if ($trim !== '' && $trim[0] !== '{' && $trim[0] !== '[') {
+            $binary = base64_decode($raw, true);
+            if ($binary !== false && $binary !== '') {
+                $jsonString = $binary;
+            }
+        }
+
+        try {
+            $data = json_decode($jsonString, true, 1024, JSON_THROW_ON_ERROR);
+
+            return is_array($data) ? $data : null;
+        } catch (\Throwable $e) {
+            Log::warning('temporary_module.export.cfg_decode_failed', [
+                'message' => $e->getMessage(),
+                'prefix' => substr($raw, 0, 120),
+            ]);
+
+            return null;
+        }
     }
 
     private const FIELD_TYPES = [
@@ -1214,7 +1250,7 @@ class TemporaryModuleController extends Controller
                 $primaryEmpty = $primaryRaw === null || $primaryRaw === '' || (is_array($primaryRaw) && empty($primaryRaw));
                 $secondaryLabel = (string) ($opts['secondary_label'] ?? 'Secundario');
                 $value = [
-                    'primary'   => $primaryEmpty ? null : $primaryRaw,
+                    'primary' => $primaryEmpty ? null : $primaryRaw,
                     'secondary' => $primaryEmpty ? ('Sin '.$primaryLabel) : $secondaryRaw,
                 ];
             }
@@ -1574,29 +1610,19 @@ class TemporaryModuleController extends Controller
 
     public function exportExcel(Request $request, int $module)
     {
-        $format = (string) $request->query('format', 'excel');
+        // POST: format/cfg en cuerpo (personalizar envía JSON grande; en GET la URL puede truncarse y perder format=pdf → cae en excel).
+        $format = (string) $request->input('format', $request->query('format', 'excel'));
         if (! in_array($format, ['excel', 'word', 'pdf'], true)) {
             $format = 'excel';
         }
 
-        $mode = (string) $request->query('mode', 'single');
+        $mode = (string) $request->input('mode', $request->query('mode', 'single'));
         if (! in_array($mode, ['single', 'mr'], true)) {
             $mode = 'single';
         }
         $includeAnalysis = false;
 
-        $rawConfig = $request->query('cfg');
-        $exportConfig = null;
-        if (is_string($rawConfig) && $rawConfig !== '') {
-            try {
-                $decoded = json_decode($rawConfig, true, 512, JSON_THROW_ON_ERROR);
-                if (is_array($decoded)) {
-                    $exportConfig = $decoded;
-                }
-            } catch (\Throwable $e) {
-                $exportConfig = null;
-            }
-        }
+        $exportConfig = $this->decodeTemporaryModuleExportConfig($request);
 
         $temporaryModule = TemporaryModule::query()->findOrFail($module);
         $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$module;

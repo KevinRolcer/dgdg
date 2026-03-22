@@ -1463,6 +1463,41 @@
             document.body.style.overflow = '';
         };
 
+        /** Base64 UTF-8: evita que caracteres no Latin-1 rompan btoa y reduce corrupción del JSON en POST largos. */
+        function b64EncodeUtf8(str) {
+            return btoa(unescape(encodeURIComponent(str)));
+        }
+
+        /** Exportar con cfg grande: GET trunca la URL; POST usa Base64 para que el JSON llegue intacto al servidor. */
+        function submitTemporaryModuleExportPost(actionUrl, format, mode, cfgObject) {
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = actionUrl;
+            form.style.display = 'none';
+            form.setAttribute('accept-charset', 'UTF-8');
+            var csrf = document.querySelector('meta[name="csrf-token"]');
+            if (csrf && csrf.getAttribute('content')) {
+                var tok = document.createElement('input');
+                tok.type = 'hidden';
+                tok.name = '_token';
+                tok.value = csrf.getAttribute('content');
+                form.appendChild(tok);
+            }
+            function add(name, value) {
+                var inp = document.createElement('input');
+                inp.type = 'hidden';
+                inp.name = name;
+                inp.value = value;
+                form.appendChild(inp);
+            }
+            add('format', format || 'excel');
+            add('mode', mode || 'single');
+            add('cfg', b64EncodeUtf8(JSON.stringify(cfgObject)));
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+        }
+
         Array.from(document.querySelectorAll('[data-close-export-personalize]')).forEach(function (el) {
             el.addEventListener('click', closePersonalizeModal);
         });
@@ -1638,14 +1673,17 @@
         }
 
         function getPersonalizeState() {
-            var container = document.getElementById('tmExportPersonalizeColumns');
+            var modal = document.getElementById('tmExportPersonalizeModal');
+            var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', columns: [], sampleRow: {} };
+                return { title: '', titleAlign: 'center', columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12 };
             }
-            const titleEl = document.getElementById('tmExportPersonalizeTitle');
-            const alignBtn = document.querySelector('.tm-export-align-btn.is-active');
+            const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
+            const alignBtn = modal ? modal.querySelector('.tm-export-title-align .tm-export-align-btn.is-active') : null;
             const titleAlign = (alignBtn && alignBtn.getAttribute('data-title-align')) || 'center';
-            const items = Array.from(container.querySelectorAll('.tm-export-personalize-col'));
+            const items = Array.from(container.children).filter(function (el) {
+                return el.classList && el.classList.contains('tm-export-personalize-col');
+            });
             const columns = items.map(function (item) {
                 const key = item.dataset.key || '';
                 const colorTrigger = item.querySelector('.tm-export-color-trigger');
@@ -1660,7 +1698,7 @@
                 return { key, color, imageWidth, imageHeight };
             });
             var countTableColors = {};
-            var countColorList = document.getElementById('tmExportCountTableColorList');
+            var countColorList = modal ? modal.querySelector('#tmExportCountTableColorList') : document.getElementById('tmExportCountTableColorList');
             if (countColorList) {
                 countColorList.querySelectorAll('.tm-export-count-table-color-item').forEach(function (row) {
                     var k = row.getAttribute('data-key');
@@ -1683,7 +1721,7 @@
                     countTableColors[k] = obj;
                 });
             }
-            var countTableCellWidthEl = document.getElementById('tmExportCountTableCellWidth');
+            var countTableCellWidthEl = modal ? modal.querySelector('#tmExportCountTableCellWidth') : document.getElementById('tmExportCountTableCellWidth');
             var countTableCellWidth = (countTableCellWidthEl && countTableCellWidthEl.value) ? (parseInt(countTableCellWidthEl.value, 10) || 12) : 12;
             return { title: titleEl ? titleEl.value : '', titleAlign: titleAlign, columns: columns, countTableColors: countTableColors, countTableCellWidth: countTableCellWidth };
         }
@@ -1916,7 +1954,8 @@
             const map = {};
             columns.forEach(function (c) { if (c && c.key) { map[c.key] = c; } });
             const ordered = [];
-            Array.from(container.querySelectorAll('.tm-export-personalize-col')).forEach(function (item) {
+            Array.from(container.children).forEach(function (item) {
+                if (!item.classList || !item.classList.contains('tm-export-personalize-col')) { return; }
                 const key = item.dataset.key || '';
                 const base = map[key];
                 if (!base) { return; }
@@ -1937,7 +1976,9 @@
 
         function updateRestoreVisibility(columnsEl, originalColumns, restoreWrap) {
             if (!restoreWrap) { return; }
-            const current = columnsEl.querySelectorAll('.tm-export-personalize-col').length;
+            const current = Array.from(columnsEl.children).filter(function (el) {
+                return el.classList && el.classList.contains('tm-export-personalize-col');
+            }).length;
             restoreWrap.hidden = current >= originalColumns.length;
         }
 
@@ -2237,6 +2278,7 @@
                                 title: state.title || '',
                                 title_align: state.titleAlign || 'center',
                                 orientation: orientation,
+                                table_align: 'left',
                                 include_count_table: includeCountTable,
                                 count_by_fields: countByFields,
                                 count_table_colors: state.countTableColors || {},
@@ -2245,6 +2287,7 @@
                                     const colState = state.columns.find(function (c) { return c.key === col.key; }) || {};
                                     return {
                                         key: col.key,
+                                        label: (col.label != null && String(col.label).trim() !== '') ? String(col.label) : col.key,
                                         color: colState.color || 'var(--clr-primary)',
                                         image_width: colState.imageWidth || null,
                                         image_height: colState.imageHeight || null,
@@ -2253,11 +2296,9 @@
                                 })
                             };
 
-                            const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
-                            const cfgParam = encodeURIComponent(JSON.stringify(cfg));
                             const fmt = format || 'excel';
                             closePersonalizeModal();
-                            window.location.href = exportUrl + separator + 'mode=single&analysis=0&format=' + encodeURIComponent(fmt) + '&cfg=' + cfgParam;
+                            submitTemporaryModuleExportPost(exportUrl, fmt, 'single', cfg);
                     }
 
                     if (applyExcelBtn && exportUrl) {

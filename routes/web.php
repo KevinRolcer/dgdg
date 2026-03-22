@@ -118,7 +118,7 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.update');
-            Route::get('/{module}/exportar-excel', [TemporaryModuleController::class, 'exportExcel'])
+            Route::match(['get', 'post'], '/{module}/exportar-excel', [TemporaryModuleController::class, 'exportExcel'])
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.export');
