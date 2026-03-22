@@ -1283,7 +1283,17 @@ html.theme-dark .tm-target-box h3 {
     display: none !important;
 }
 
-.tm-options-field[hidden] {
+.tm-options-field[hidden],
+[data-linked-primary-options-wrap][hidden],
+[data-linked-secondary-options-wrap][hidden] {
+    display: none !important;
+}
+
+.tm-linked-container {
+    grid-column: 1 / -2;
+}
+
+.tm-linked-container[hidden] {
     display: none !important;
 }
 

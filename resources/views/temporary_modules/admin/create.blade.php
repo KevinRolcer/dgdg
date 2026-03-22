@@ -172,53 +172,61 @@
         </label>
 
         {{-- linked: two sub-field definitions --}}
-        <fieldset class="tm-linked-wrap" data-linked-wrap hidden style="border:1px solid var(--clr-divider,#ddd);border-radius:6px;padding:10px 14px;display:flex;flex-direction:column;gap:8px;">
-            <legend style="font-size:.8rem;font-weight:600;color:var(--clr-primary,#861e34);padding:0 4px;">Campo principal</legend>
-            <div class="tm-grid tm-grid-2" style="gap:8px;">
-                <label>
-                    Etiqueta del principal
-                    <input type="text" data-name="linked_primary_label" placeholder="ej. Problemática">
-                </label>
-                <label>
-                    Tipo del principal
-                    <select data-name="linked_primary_type" data-linked-primary-type>
-                        <option value="text">Texto</option>
-                        <option value="textarea">Texto largo</option>
-                        <option value="number">Número</option>
-                        <option value="date">Fecha</option>
-                        <option value="select">Lista de opciones</option>
-                        <option value="boolean">Sí / No</option>
-                    </select>
-                </label>
-            </div>
-            <label data-linked-primary-options-wrap hidden>
-                Opciones del principal (separadas por coma o salto de línea)
-                <textarea data-name="linked_primary_options" rows="2" placeholder="Opción 1, Opción 2"></textarea>
-            </label>
+        <div class="tm-linked-container" data-linked-wrap hidden>
+            <div class="tm-linked-wrap tm-grid tm-grid-2" style="border:1px solid var(--clr-divider,#ddd);border-radius:6px;padding:12px 16px;gap:24px;margin-top:8px;background:var(--tm-muted-bg, rgba(0,0,0,0.02));">
+                
+                {{-- Principal --}}
+                <div style="display:flex;flex-direction:column;gap:8px;border-right:1px solid var(--clr-divider,#ddd);padding-right:16px;">
+                    <h6 style="margin:0;font-size:.85rem;font-weight:700;color:var(--clr-primary,#861e34);">1. Campo principal</h6>
+                    <div class="tm-grid tm-grid-2" style="gap:8px;">
+                        <label>
+                            Etiqueta
+                            <input type="text" data-name="linked_primary_label" placeholder="ej. Problemática">
+                        </label>
+                        <label>
+                            Tipo
+                            <select data-name="linked_primary_type" data-linked-primary-type>
+                                @foreach ($fieldTypes as $value => $label)
+                                    @if (!in_array($value, ['linked', 'seccion']))
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endif
+                                @endforeach
+                            </select>
+                        </label>
+                    </div>
+                    <label data-linked-primary-options-wrap hidden>
+                        Opciones (coma o salto de línea)
+                        <textarea data-name="linked_primary_options" rows="1" placeholder="Opción 1, Opción 2"></textarea>
+                    </label>
+                </div>
 
-            <legend style="font-size:.8rem;font-weight:600;color:var(--clr-secondary,#246257);padding:4px 0 0;">Campo dependiente</legend>
-            <div class="tm-grid tm-grid-2" style="gap:8px;">
-                <label>
-                    Etiqueta del dependiente
-                    <input type="text" data-name="linked_secondary_label" placeholder="ej. Semáforo de riesgo">
-                </label>
-                <label>
-                    Tipo del dependiente
-                    <select data-name="linked_secondary_type" data-linked-secondary-type>
-                        <option value="text">Texto</option>
-                        <option value="textarea">Texto largo</option>
-                        <option value="number">Número</option>
-                        <option value="date">Fecha</option>
-                        <option value="select">Lista de opciones</option>
-                        <option value="boolean">Sí / No</option>
-                    </select>
-                </label>
+                {{-- Dependiente --}}
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    <h6 style="margin:0;font-size:.85rem;font-weight:700;color:var(--clr-secondary,#246257);">2. Campo dependiente</h6>
+                    <div class="tm-grid tm-grid-2" style="gap:8px;">
+                        <label>
+                            Etiqueta
+                            <input type="text" data-name="linked_secondary_label" placeholder="ej. Semáforo">
+                        </label>
+                        <label>
+                            Tipo
+                            <select data-name="linked_secondary_type" data-linked-secondary-type>
+                                @foreach ($fieldTypes as $value => $label)
+                                    @if (!in_array($value, ['linked', 'seccion']))
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endif
+                                @endforeach
+                            </select>
+                        </label>
+                    </div>
+                    <label data-linked-secondary-options-wrap hidden>
+                        Opciones (coma o salto de línea)
+                        <textarea data-name="linked_secondary_options" rows="1" placeholder="Rojo, Amarillo, Verde"></textarea>
+                    </label>
+                </div>
+
             </div>
-            <label data-linked-secondary-options-wrap hidden>
-                Opciones del dependiente (separadas por coma o salto de línea)
-                <textarea data-name="linked_secondary_options" rows="2" placeholder="Rojo, Amarillo, Verde"></textarea>
-            </label>
-        </fieldset>
+        </div>
 
         <button type="button" class="tm-btn tm-btn-danger" data-remove-field>Quitar</button>
     </div>
@@ -348,7 +356,7 @@
                     if (linkedWrap) {
                         const toggleLinkedOpts = function (typeEl, optsWrapEl) {
                             if (!typeEl || !optsWrapEl) return;
-                            const needsOpts = typeEl.value === 'select';
+                            const needsOpts = ['select', 'multiselect', 'categoria'].includes(typeEl.value);
                             optsWrapEl.hidden = !needsOpts;
                             const ta = optsWrapEl.querySelector('textarea');
                             if (ta) { ta.disabled = !needsOpts || !isLinked; }
