@@ -736,67 +736,81 @@ html.theme-dark .tm-export-personalize-preview {
     background: transparent !important;
 }
 
+/* Paneles más oscuros: mezcla fuerte del matiz de marca sobre base casi negra */
+html.theme-dark .tm-export-format-section {
+    background: color-mix(in srgb, var(--tm-surface) 88%, #080a0c) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-left-width: 4px;
+}
+
 html.theme-dark .tm-export-format-section--excel {
-    border-color: rgba(46, 204, 113, 0.42) !important;
-    background: rgba(46, 204, 113, 0.1) !important;
+    background: color-mix(in srgb, var(--clr-secondary) 32%, #0a0e0d) !important;
+    border-color: color-mix(in srgb, var(--clr-secondary) 45%, transparent) !important;
+    border-left-color: #2a5c52 !important;
 }
 
 html.theme-dark .tm-export-format-section--word {
-    border-color: rgba(88, 156, 255, 0.45) !important;
-    background: rgba(88, 156, 255, 0.1) !important;
+    background: color-mix(in srgb, var(--clr-accent) 22%, #0c0b0a) !important;
+    border-color: color-mix(in srgb, var(--clr-accent) 35%, transparent) !important;
+    border-left-color: #7a5f3d !important;
 }
 
 html.theme-dark .tm-export-format-section--pdf {
-    border-color: rgba(255, 107, 107, 0.42) !important;
-    background: rgba(255, 107, 107, 0.08) !important;
+    background: color-mix(in srgb, var(--clr-primary) 26%, #0a0809) !important;
+    border-color: color-mix(in srgb, var(--clr-primary) 38%, transparent) !important;
+    border-left-color: #6b2838 !important;
+}
+
+html.theme-dark .tm-modal-body h4.tm-export-format-section__title {
+    color: var(--clr-accent) !important;
 }
 
 html.theme-dark .tm-export-cta-excel {
-    background: #2ecc71 !important;
-    border-color: #2ecc71 !important;
-    color: #0d1b12 !important;
+    background: #1a3f38 !important;
+    border-color: #0f2e29 !important;
+    color: #dcebe8 !important;
 }
 
 html.theme-dark .tm-export-cta-excel:hover,
 html.theme-dark .tm-export-cta-excel:focus {
-    filter: brightness(1.1) !important;
-    color: #0d1b12 !important;
+    filter: brightness(1.18) !important;
+    color: #fff !important;
 }
 
 html.theme-dark .tm-export-cta-excel--secondary {
-    background: transparent !important;
-    color: #6ee7a8 !important;
-    border-color: #6ee7a8 !important;
+    background: rgba(26, 63, 56, 0.35) !important;
+    color: #8ebfb4 !important;
+    border-color: #2a5c52 !important;
 }
 
 html.theme-dark .tm-export-cta-excel--secondary:hover,
 html.theme-dark .tm-export-cta-excel--secondary:focus {
-    background: rgba(110, 231, 168, 0.14) !important;
-    color: #a8f5c8 !important;
+    background: rgba(26, 63, 56, 0.5) !important;
+    color: #c5e4dc !important;
 }
 
 html.theme-dark .tm-export-format-section .tm-btn.tm-btn-word.tm-export-format-cta {
-    background: #3d7dd9 !important;
-    border-color: #6aa7ff !important;
-    color: #fff !important;
+    background: #1e2a36 !important;
+    border-color: #141d26 !important;
+    color: #dde3ea !important;
 }
 
 html.theme-dark .tm-export-format-section .tm-btn.tm-btn-word.tm-export-format-cta:hover,
 html.theme-dark .tm-export-format-section .tm-btn.tm-btn-word.tm-export-format-cta:focus {
-    background: #5290e6 !important;
-    border-color: #8fc0ff !important;
+    background: #283848 !important;
+    border-color: #1e2a36 !important;
     color: #fff !important;
 }
 
 html.theme-dark .tm-export-cta-pdf {
-    background: #e53935 !important;
-    border-color: #ff7b72 !important;
-    color: #fff !important;
+    background: #4a1f2c !important;
+    border-color: #361722 !important;
+    color: #f2e8eb !important;
 }
 
 html.theme-dark .tm-export-cta-pdf:hover,
 html.theme-dark .tm-export-cta-pdf:focus {
-    filter: brightness(1.08) !important;
+    filter: brightness(1.15) !important;
     color: #fff !important;
 }
 

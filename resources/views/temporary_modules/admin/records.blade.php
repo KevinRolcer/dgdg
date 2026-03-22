@@ -462,6 +462,7 @@
             </div>
             <div class="tm-modal-foot tm-export-modal-foot tm-export-modal-foot--personalize">
                 <button type="button" class="tm-btn tm-btn-outline" data-close-export-personalize>Cancelar</button>
+                <button type="button" class="tm-btn tm-btn-primary" id="tmExportSaveConfig">Guardar configuración</button>
             </div>
         </div>
     </div>
@@ -1589,9 +1590,49 @@
             });
         }
 
-        function buildCountTableColorList(container, countByFieldsEl, previewEntries) {
+        function tmExportDraftStorageKey(exportUrl) {
+            return 'tm_export_draft_v1:' + (exportUrl || '');
+        }
+
+        function applyColumnDraftVisuals(columnsEl, cfgColumns) {
+            if (!columnsEl || !cfgColumns || !cfgColumns.length) { return; }
+            cfgColumns.forEach(function (sc) {
+                if (!sc || !sc.key) { return; }
+                var item = null;
+                columnsEl.querySelectorAll('.tm-export-personalize-col').forEach(function (el) {
+                    if (el.dataset.key === sc.key) { item = el; }
+                });
+                if (!item) { return; }
+                var tr = item.querySelector('.tm-export-color-trigger');
+                if (tr && sc.color) {
+                    tr.setAttribute('data-color', sc.color);
+                    var sw = tr.querySelector('.tm-export-color-swatch');
+                    if (sw) { sw.style.backgroundColor = sc.color; }
+                    item.querySelectorAll('.tm-export-color-option').forEach(function (opt) {
+                        opt.classList.toggle('is-active', (opt.getAttribute('data-color') || '') === sc.color);
+                    });
+                }
+                var iw = item.querySelector('.tm-export-image-width');
+                var ih = item.querySelector('.tm-export-image-height');
+                if (iw && sc.image_width != null) { iw.value = String(sc.image_width); }
+                if (ih && sc.image_height != null) { ih.value = String(sc.image_height); }
+                var winp = item.querySelector('.tm-export-col-width-input');
+                if (winp && sc.max_width_chars != null) {
+                    var n = parseInt(sc.max_width_chars, 10);
+                    if (!Number.isNaN(n)) { winp.value = String(Math.max(2, Math.min(60, n))); }
+                }
+            });
+        }
+
+        function buildCountTableColorList(container, countByFieldsEl, previewEntries, externalPreset) {
             if (!container) { return; }
             var savedColors = {};
+            if (externalPreset && typeof externalPreset === 'object') {
+                Object.keys(externalPreset).forEach(function (k) {
+                    var o = externalPreset[k];
+                    savedColors[k] = o && typeof o === 'object' ? Object.assign({}, o) : {};
+                });
+            } else {
             container.querySelectorAll('.tm-export-count-table-color-item').forEach(function (row) {
                 var k = row.getAttribute('data-key');
                 if (!k) { return; }
@@ -1610,6 +1651,7 @@
                     if (v && vt) { savedColors[k].row2Values[v] = vt.getAttribute('data-color') || 'var(--clr-secondary)'; }
                 });
             });
+            }
             var colorMenuHtml = TEMPLATE_COLORS.map(function (c, i) {
                 return '<button type="button" class="tm-export-color-option' + (i === 0 ? ' is-active' : '') + '" data-color="' + escapeHtml(c.value) + '">' +
                     '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c.value) + '"></span>' +
@@ -2171,7 +2213,6 @@
                         return k !== 'item' && k !== 'microrregion' && !c.is_image;
                     });
                     if (personalizeModal) { personalizeModal._countableColumns = countableColumns; }
-                    if (titleEl) { titleEl.value = data.title || ''; }
                     if (countByFieldsEl) {
                         countByFieldsEl.innerHTML = '';
                         countableColumns.forEach(function (col) {
@@ -2208,8 +2249,67 @@
                             buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
                         });
                     }
-                    buildPersonalizeColumnsList(columns, columnsEl);
-                    buildCountTableColorList(countTableColorListEl, countByFieldsEl, personalizeModal._previewEntries);
+                    var draftCfg = null;
+                    try {
+                        var rawDraft = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
+                        if (rawDraft) {
+                            var parsedDraft = JSON.parse(rawDraft);
+                            if (parsedDraft && parsedDraft.v === 1 && parsedDraft.cfg && parsedDraft.cfg.columns && parsedDraft.cfg.columns.length) {
+                                draftCfg = parsedDraft.cfg;
+                            }
+                        }
+                    } catch (eDraft) {}
+
+                    if (draftCfg) {
+                        if (titleEl) { titleEl.value = draftCfg.title != null ? String(draftCfg.title) : (data.title || ''); }
+                        personalizeModal.querySelectorAll('.tm-export-title-align .tm-export-align-btn').forEach(function (b) {
+                            b.classList.toggle('is-active', (b.getAttribute('data-title-align') || '') === (draftCfg.title_align || 'center'));
+                        });
+                        var dOrient = draftCfg.orientation || 'portrait';
+                        personalizeModal.querySelectorAll('.tm-export-orient-btn').forEach(function (b) {
+                            b.classList.toggle('is-active', (b.getAttribute('data-orientation') || '') === dOrient);
+                        });
+                        var previewPage = document.getElementById('tmExportPreviewPage');
+                        if (previewPage) { previewPage.classList.toggle('is-landscape', dOrient === 'landscape'); }
+                        if (includeCountTableEl) {
+                            includeCountTableEl.checked = !!draftCfg.include_count_table;
+                            if (countByWrapEl) { countByWrapEl.hidden = !includeCountTableEl.checked; }
+                        }
+                        if (countByFieldsEl && Array.isArray(draftCfg.count_by_fields)) {
+                            countByFieldsEl.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+                                var ck = cb.getAttribute('data-count-key') || cb.value;
+                                cb.checked = draftCfg.count_by_fields.indexOf(ck) !== -1;
+                            });
+                        }
+                        var cwEl = document.getElementById('tmExportCountTableCellWidth');
+                        if (cwEl && draftCfg.count_table_cell_width != null) {
+                            var cwn = parseInt(draftCfg.count_table_cell_width, 10);
+                            if (!Number.isNaN(cwn)) { cwEl.value = String(Math.max(6, Math.min(40, cwn))); }
+                        }
+                        var orderedMerged = [];
+                        draftCfg.columns.forEach(function (sc) {
+                            var b = columns.find(function (c) { return c.key === sc.key; });
+                            if (b) {
+                                orderedMerged.push(Object.assign({}, b, {
+                                    label: (sc.label != null && String(sc.label).trim() !== '') ? String(sc.label) : (b.label || b.key),
+                                    max_width_chars: sc.max_width_chars != null ? sc.max_width_chars : b.max_width_chars,
+                                    image_height: sc.image_height != null ? sc.image_height : b.image_height,
+                                    image_width: sc.image_width != null ? sc.image_width : b.image_width
+                                }));
+                            }
+                        });
+                        if (orderedMerged.length) {
+                            buildPersonalizeColumnsList(orderedMerged, columnsEl);
+                            applyColumnDraftVisuals(columnsEl, draftCfg.columns);
+                        } else {
+                            if (titleEl) { titleEl.value = data.title || ''; }
+                            buildPersonalizeColumnsList(columns, columnsEl);
+                        }
+                    } else {
+                        if (titleEl) { titleEl.value = data.title || ''; }
+                        buildPersonalizeColumnsList(columns, columnsEl);
+                    }
+                    buildCountTableColorList(countTableColorListEl, countByFieldsEl, personalizeModal._previewEntries, draftCfg ? draftCfg.count_table_colors : null);
                     if (personalizeModal && !personalizeModal._countTableColorListenersBound) {
                         personalizeModal._countTableColorListenersBound = true;
                         personalizeModal.addEventListener('click', function (e) {
@@ -2280,46 +2380,62 @@
                         };
                     }
 
+                    function collectPersonalizeCfgObject() {
+                        const orderedCols = reorderColumnsList(columnsEl, columns);
+                        const state = getPersonalizeState();
+                        const orientBtn = personalizeModal.querySelector('.tm-export-orient-btn.is-active');
+                        const orientation = orientBtn ? (orientBtn.getAttribute('data-orientation') || 'portrait') : 'portrait';
+                        var includeCountTable = !!(includeCountTableEl && includeCountTableEl.checked);
+                        var countByFields = [];
+                        if (includeCountTable && countByFieldsEl) {
+                            countByFieldsEl.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
+                                var k = cb.getAttribute('data-count-key') || cb.value;
+                                if (k) { countByFields.push(k); }
+                            });
+                        }
+                        return {
+                            title: state.title || '',
+                            title_align: state.titleAlign || 'center',
+                            orientation: orientation,
+                            table_align: 'left',
+                            include_count_table: includeCountTable,
+                            count_by_fields: countByFields,
+                            count_table_colors: state.countTableColors || {},
+                            count_table_cell_width: state.countTableCellWidth || 12,
+                            columns: orderedCols.map(function (col) {
+                                const colState = state.columns.find(function (c) { return c.key === col.key; }) || {};
+                                return {
+                                    key: col.key,
+                                    label: (col.label != null && String(col.label).trim() !== '') ? String(col.label) : col.key,
+                                    color: colState.color || 'var(--clr-primary)',
+                                    image_width: colState.imageWidth || null,
+                                    image_height: colState.imageHeight || null,
+                                    max_width_chars: col.max_width_chars || null
+                                };
+                            })
+                        };
+                    }
+
                     function applyExport(format, mode) {
-                            const orderedCols = reorderColumnsList(columnsEl, columns);
-                            const state = getPersonalizeState();
-                            const orientBtn = personalizeModal.querySelector('.tm-export-orient-btn.is-active');
-                            const orientation = orientBtn ? (orientBtn.getAttribute('data-orientation') || 'portrait') : 'portrait';
+                        const cfg = collectPersonalizeCfgObject();
+                        const fmt = format || 'excel';
+                        const exportMode = (fmt === 'excel') ? (mode || 'single') : 'single';
+                        closePersonalizeModal();
+                        submitTemporaryModuleExportPost(exportUrl, fmt, exportMode, cfg);
+                    }
 
-                            var includeCountTable = !!(includeCountTableEl && includeCountTableEl.checked);
-                            var countByFields = [];
-                            if (includeCountTable && countByFieldsEl) {
-                                countByFieldsEl.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
-                                    var k = cb.getAttribute('data-count-key') || cb.value;
-                                    if (k) { countByFields.push(k); }
-                                });
-                            }
-                            const cfg = {
-                                title: state.title || '',
-                                title_align: state.titleAlign || 'center',
-                                orientation: orientation,
-                                table_align: 'left',
-                                include_count_table: includeCountTable,
-                                count_by_fields: countByFields,
-                                count_table_colors: state.countTableColors || {},
-                                count_table_cell_width: state.countTableCellWidth || 12,
-                                columns: orderedCols.map(function (col) {
-                                    const colState = state.columns.find(function (c) { return c.key === col.key; }) || {};
-                                    return {
-                                        key: col.key,
-                                        label: (col.label != null && String(col.label).trim() !== '') ? String(col.label) : col.key,
-                                        color: colState.color || 'var(--clr-primary)',
-                                        image_width: colState.imageWidth || null,
-                                        image_height: colState.imageHeight || null,
-                                        max_width_chars: col.max_width_chars || null
-                                    };
-                                })
-                            };
-
-                            const fmt = format || 'excel';
-                            const exportMode = (fmt === 'excel') ? (mode || 'single') : 'single';
+                    var saveCfgBtn = document.getElementById('tmExportSaveConfig');
+                    if (saveCfgBtn && exportUrl) {
+                        saveCfgBtn.onclick = function () {
+                            var cfg = collectPersonalizeCfgObject();
+                            var swalChoice = personalizeModal._swalChoice || 'single';
+                            try {
+                                localStorage.setItem(tmExportDraftStorageKey(exportUrl), JSON.stringify({ v: 1, swal_choice: swalChoice, cfg: cfg, savedAt: Date.now() }));
+                            } catch (eSave) {}
                             closePersonalizeModal();
-                            submitTemporaryModuleExportPost(exportUrl, fmt, exportMode, cfg);
+                            var ref = personalizeModal._exportButtonRef;
+                            if (ref) { openTemporaryModuleExportTypeDialog(ref); }
+                        };
                     }
 
                     if (applyExcelSingleBtn && exportUrl) {
@@ -2344,103 +2460,125 @@
                 });
         }
 
+        function openTemporaryModuleExportTypeDialog(exportBtnRef) {
+            const exportUrl = exportBtnRef.getAttribute('data-export-url');
+            if (!exportUrl || !templateSwal) { return; }
+            var savedChoice = null;
+            var choiceAllow = { single: 1, mr: 1, word_table: 1, pdf_table: 1, analysis_word: 1 };
+            try {
+                var dr = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
+                if (dr) {
+                    var po = JSON.parse(dr);
+                    if (po && po.swal_choice && choiceAllow[po.swal_choice]) { savedChoice = po.swal_choice; }
+                }
+            } catch (e) {}
+            templateSwal.fire({
+                title: 'Tipo de exportación',
+                html: '<div class="tm-swal-export-options" style="text-align:left">'
+                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
+                    + '<input type="radio" name="tm-export-choice" value="single" checked style="margin-top:.2rem;"> '
+                    + '<span><strong>Excel — Una sola hoja</strong><br><small style="color:#64748b">Todos los registros en una hoja.</small></span>'
+                    + '</label>'
+                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
+                    + '<input type="radio" name="tm-export-choice" value="mr" style="margin-top:.2rem;"> '
+                    + '<span><strong>Excel — 1 hoja por microregión</strong><br><small style="color:#64748b">Una página por microregión.</small></span>'
+                    + '</label>'
+                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
+                    + '<input type="radio" name="tm-export-choice" value="word_table" style="margin-top:.2rem;"> '
+                    + '<span><strong>Word — Tabla de registros</strong><br><small style="color:#64748b">.docx con los mismos datos que el Excel (una tabla).</small></span>'
+                    + '</label>'
+                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
+                    + '<input type="radio" name="tm-export-choice" value="pdf_table" style="margin-top:.2rem;"> '
+                    + '<span><strong>PDF — Tabla de registros</strong><br><small style="color:#64748b">.pdf con la tabla de registros.</small></span>'
+                    + '</label>'
+                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.65rem;cursor:pointer;">'
+                    + '<input type="radio" name="tm-export-choice" value="analysis_word" style="margin-top:.2rem;"> '
+                    + '<span><strong>Informe de análisis (Word)</strong><br><small style="color:#64748b">Documento .docx con resumen y tablas de análisis (distinto a la tabla simple).</small></span>'
+                    + '</label>'
+                    + '<hr style="margin:.65rem 0;border:none;border-top:1px solid #e2e8f0;">'
+                    + '<p style="margin:0;"><button type="button" class="tm-btn tm-btn-outline tm-swal-personalize-btn">Personalizar columnas y diseño</button></p>'
+                    + '</div>',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Exportar',
+                cancelButtonText: 'Cancelar',
+                didOpen: function () {
+                    if (savedChoice) {
+                        var inp = document.querySelector('input[name="tm-export-choice"][value="' + savedChoice + '"]');
+                        if (inp) { inp.checked = true; }
+                    }
+                    var personalizeBtn = document.querySelector('.swal2-html-container .tm-swal-personalize-btn');
+                    if (personalizeBtn) {
+                        personalizeBtn.addEventListener('click', function () {
+                            var choice = document.querySelector('input[name="tm-export-choice"]:checked');
+                            var val = choice ? choice.value : 'single';
+                            Swal.close();
+                            if (val === 'analysis_word') {
+                                var previewUrl = exportBtnRef.getAttribute('data-analysis-preview-url');
+                                var wordUrl = exportBtnRef.getAttribute('data-analysis-word-url');
+                                if (previewUrl && wordUrl) {
+                                    window._tmAnalysisPreviewUrl = previewUrl;
+                                    window._tmAnalysisWordUrl = wordUrl;
+                                    var wpf = document.getElementById('tmAnalysisWordPersonalizeForm');
+                                    if (wpf) { wpf.setAttribute('action', wordUrl); }
+                                    document.body.style.overflow = 'hidden';
+                                    openWordPersonalizeModal();
+                                }
+                                return;
+                            }
+                            var structureUrl = exportBtnRef.getAttribute('data-structure-url');
+                            var expUrl = exportBtnRef.getAttribute('data-export-url');
+                            if (personalizeModal) {
+                                personalizeModal._exportButtonRef = exportBtnRef;
+                                personalizeModal._swalChoice = val;
+                            }
+                            if (structureUrl && expUrl) { openExportPersonalizeModal(structureUrl, expUrl); }
+                        });
+                    }
+                },
+                preConfirm: function () {
+                    const choice = document.querySelector('input[name="tm-export-choice"]:checked');
+                    const v = choice ? choice.value : 'single';
+                    return { choice: v };
+                }
+            }).then(function (result) {
+                if (!result.isConfirmed) { return; }
+                var choice = result.value && result.value.choice;
+                if (choice === 'word_table' || choice === 'pdf_table') {
+                    const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
+                    const fmt = choice === 'pdf_table' ? 'pdf' : 'word';
+                    window.location.href = exportUrl + separator + 'mode=single&analysis=0&format=' + encodeURIComponent(fmt);
+                    return;
+                }
+                if (choice === 'analysis_word') {
+                    var previewUrl = exportBtnRef.getAttribute('data-analysis-preview-url');
+                    var wordUrl = exportBtnRef.getAttribute('data-analysis-word-url');
+                    if (previewUrl && wordUrl) {
+                        window._tmAnalysisPreviewUrl = previewUrl;
+                        window._tmAnalysisWordUrl = wordUrl;
+                        var wpf = document.getElementById('tmAnalysisWordPersonalizeForm');
+                        if (wpf) { wpf.setAttribute('action', wordUrl); }
+                        document.body.style.overflow = 'hidden';
+                        openWordPersonalizeModal();
+                    }
+                    return;
+                }
+                const mode = choice === 'mr' ? 'mr' : 'single';
+                const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
+                window.location.href = exportUrl + separator + 'mode=' + mode + '&analysis=0';
+            });
+        }
+
         exportButtons.forEach(function (exportButton) {
             exportButton.addEventListener('click', function () {
                 const exportUrl = exportButton.getAttribute('data-export-url');
                 if (!exportUrl) { return; }
-                var exportBtnRef = exportButton;
                 if (!templateSwal) {
                     const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
                     window.location.href = exportUrl + separator + 'mode=single&analysis=0';
                     return;
                 }
-                templateSwal.fire({
-                    title: 'Tipo de exportación',
-                    html: '<div class="tm-swal-export-options" style="text-align:left">'
-                        + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
-                        + '<input type="radio" name="tm-export-choice" value="single" checked style="margin-top:.2rem;"> '
-                        + '<span><strong>Excel — Una sola hoja</strong><br><small style="color:#64748b">Todos los registros en una hoja.</small></span>'
-                        + '</label>'
-                        + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
-                        + '<input type="radio" name="tm-export-choice" value="mr" style="margin-top:.2rem;"> '
-                        + '<span><strong>Excel — 1 hoja por microregión</strong><br><small style="color:#64748b">Una página por microregión.</small></span>'
-                        + '</label>'
-                        + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
-                        + '<input type="radio" name="tm-export-choice" value="word_table" style="margin-top:.2rem;"> '
-                        + '<span><strong>Word — Tabla de registros</strong><br><small style="color:#64748b">.docx con los mismos datos que el Excel (una tabla).</small></span>'
-                        + '</label>'
-                        + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
-                        + '<input type="radio" name="tm-export-choice" value="pdf_table" style="margin-top:.2rem;"> '
-                        + '<span><strong>PDF — Tabla de registros</strong><br><small style="color:#64748b">.pdf con la tabla de registros.</small></span>'
-                        + '</label>'
-                        + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.65rem;cursor:pointer;">'
-                        + '<input type="radio" name="tm-export-choice" value="analysis_word" style="margin-top:.2rem;"> '
-                        + '<span><strong>Informe de análisis (Word)</strong><br><small style="color:#64748b">Documento .docx con resumen y tablas de análisis (distinto a la tabla simple).</small></span>'
-                        + '</label>'
-                        + '<hr style="margin:.65rem 0;border:none;border-top:1px solid #e2e8f0;">'
-                        + '<p style="margin:0;"><button type="button" class="tm-btn tm-btn-outline tm-swal-personalize-btn">Personalizar columnas y diseño</button></p>'
-                        + '</div>',
-                    icon: 'question',
-                    showCancelButton: true,
-                    confirmButtonText: 'Exportar',
-                    cancelButtonText: 'Cancelar',
-                    didOpen: function () {
-                        var personalizeBtn = document.querySelector('.swal2-html-container .tm-swal-personalize-btn');
-                        if (personalizeBtn) {
-                            personalizeBtn.addEventListener('click', function () {
-                                var choice = document.querySelector('input[name="tm-export-choice"]:checked');
-                                var val = choice ? choice.value : 'single';
-                                Swal.close();
-                                if (val === 'analysis_word') {
-                                    var previewUrl = exportBtnRef.getAttribute('data-analysis-preview-url');
-                                    var wordUrl = exportBtnRef.getAttribute('data-analysis-word-url');
-                                    if (previewUrl && wordUrl) {
-                                        window._tmAnalysisPreviewUrl = previewUrl;
-                                        window._tmAnalysisWordUrl = wordUrl;
-                                        var wpf = document.getElementById('tmAnalysisWordPersonalizeForm');
-                                        if (wpf) { wpf.setAttribute('action', wordUrl); }
-                                        document.body.style.overflow = 'hidden';
-                                        openWordPersonalizeModal();
-                                    }
-                                    return;
-                                }
-                                var structureUrl = exportBtnRef.getAttribute('data-structure-url');
-                                var expUrl = exportBtnRef.getAttribute('data-export-url');
-                                if (structureUrl && expUrl) { openExportPersonalizeModal(structureUrl, expUrl); }
-                            });
-                        }
-                    },
-                    preConfirm: function () {
-                        const choice = document.querySelector('input[name="tm-export-choice"]:checked');
-                        const v = choice ? choice.value : 'single';
-                        return { choice: v };
-                    }
-                }).then(function (result) {
-                    if (!result.isConfirmed) { return; }
-                    var choice = result.value && result.value.choice;
-                    if (choice === 'word_table' || choice === 'pdf_table') {
-                        const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
-                        const fmt = choice === 'pdf_table' ? 'pdf' : 'word';
-                        window.location.href = exportUrl + separator + 'mode=single&analysis=0&format=' + encodeURIComponent(fmt);
-                        return;
-                    }
-                    if (choice === 'analysis_word') {
-                        var previewUrl = exportBtnRef.getAttribute('data-analysis-preview-url');
-                        var wordUrl = exportBtnRef.getAttribute('data-analysis-word-url');
-                        if (previewUrl && wordUrl) {
-                            window._tmAnalysisPreviewUrl = previewUrl;
-                            window._tmAnalysisWordUrl = wordUrl;
-                            var wpf = document.getElementById('tmAnalysisWordPersonalizeForm');
-                            if (wpf) { wpf.setAttribute('action', wordUrl); }
-                            document.body.style.overflow = 'hidden';
-                            openWordPersonalizeModal();
-                        }
-                        return;
-                    }
-                    const mode = choice === 'mr' ? 'mr' : 'single';
-                    const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
-                    window.location.href = exportUrl + separator + 'mode=' + mode + '&analysis=0';
-                });
+                openTemporaryModuleExportTypeDialog(exportButton);
             });
         });
 

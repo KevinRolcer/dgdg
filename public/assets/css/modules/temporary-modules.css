@@ -2782,7 +2782,10 @@ a.tm-paginator-btn:hover {
 }
 
 .tm-export-modal-foot--personalize {
-    justify-content: flex-start;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .tm-export-format-sections {
@@ -2801,25 +2804,31 @@ a.tm-paginator-btn:hover {
     background: var(--clr-bg);
 }
 
+/* Variantes oscuras de marca (secondary / accent / primary), no solo apagadas */
 .tm-export-format-section--excel {
-    border-color: rgba(33, 115, 70, 0.35);
-    background: rgba(33, 115, 70, 0.06);
+    border-color: rgba(26, 72, 64, 0.55);
+    background: rgba(22, 58, 52, 0.14);
 }
 
 .tm-export-format-section--word {
-    border-color: rgba(24, 90, 189, 0.4);
-    background: rgba(24, 90, 189, 0.07);
+    border-color: rgba(120, 88, 52, 0.45);
+    background: rgba(95, 72, 48, 0.12);
 }
 
 .tm-export-format-section--pdf {
-    border-color: rgba(198, 40, 40, 0.35);
-    background: rgba(198, 40, 40, 0.06);
+    border-color: rgba(95, 22, 38, 0.5);
+    background: rgba(75, 18, 32, 0.12);
 }
 
 .tm-export-format-section__title {
     margin: 0 0 4px;
     font-size: 0.95rem;
     font-weight: 700;
+    color: var(--clr-text-main);
+}
+
+/* Más específico que .tm-modal-body h4 (primary-dark), legible en tema claro y oscuro */
+.tm-modal-body h4.tm-export-format-section__title {
     color: var(--clr-text-main);
 }
 
@@ -2850,38 +2859,38 @@ a.tm-paginator-btn:hover {
 }
 
 .tm-export-cta-excel {
-    background: #1d6f42;
-    border: 1px solid #1d6f42;
-    color: #fff;
+    background: #1e4a42;
+    border: 1px solid #163832;
+    color: #f0f7f5;
 }
 
 .tm-export-cta-excel:hover,
 .tm-export-cta-excel:focus {
-    filter: brightness(1.08);
+    filter: brightness(1.12);
     color: #fff;
 }
 
 .tm-export-cta-excel--secondary {
-    background: transparent;
-    color: #1d6f42;
-    border: 2px solid #1d6f42;
+    background: rgba(22, 58, 52, 0.08);
+    color: #1a4039;
+    border: 2px solid #245248;
 }
 
 .tm-export-cta-excel--secondary:hover,
 .tm-export-cta-excel--secondary:focus {
-    background: rgba(29, 111, 66, 0.1);
-    color: #145a32;
+    background: rgba(22, 58, 52, 0.16);
+    color: #132e29;
 }
 
 .tm-export-cta-pdf {
-    background: #c62828;
-    border: 1px solid #c62828;
-    color: #fff;
+    background: #5c2434;
+    border: 1px solid #4a1d2a;
+    color: #faf5f6;
 }
 
 .tm-export-cta-pdf:hover,
 .tm-export-cta-pdf:focus {
-    filter: brightness(1.08);
+    filter: brightness(1.1);
     color: #fff;
 }
 
@@ -2895,6 +2904,19 @@ a.tm-paginator-btn:hover {
     background-color: #144a9a;
     border-color: #144a9a;
     color: #ffffff;
+}
+
+.tm-export-format-section .tm-btn-word.tm-export-format-cta {
+    background-color: #2c3f52;
+    border-color: #243444;
+    color: #f2f5f8;
+}
+
+.tm-export-format-section .tm-btn-word.tm-export-format-cta:hover,
+.tm-export-format-section .tm-btn-word.tm-export-format-cta:focus {
+    background-color: #243444;
+    border-color: #1c2a38;
+    color: #fff;
 }
 
 .tm-export-personalize-form {
