@@ -2292,7 +2292,7 @@
                 templateSwal.fire({
                     title: 'Tipo de exportación',
                     html: '<div class="tm-swal-export-options" style="text-align:left">'
-                        + '<p style="margin:0 0 .5rem;font-size:.8rem;color:#64748b;">Elige qué generar. «Personalizar» abre el editor según tu elección (Excel o Word).</p>'
+                        + '<p style="margin:0 0 .5rem;font-size:.8rem;color:#64748b;">Elige el formato. «Personalizar» permite columnas y diseño (Excel, Word o PDF de tabla).</p>'
                         + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
                         + '<input type="radio" name="tm-export-choice" value="single" checked style="margin-top:.2rem;"> '
                         + '<span><strong>Excel — Una sola hoja</strong><br><small style="color:#64748b">Todos los registros en una hoja.</small></span>'
@@ -2301,9 +2301,17 @@
                         + '<input type="radio" name="tm-export-choice" value="mr" style="margin-top:.2rem;"> '
                         + '<span><strong>Excel — 1 hoja por microregión</strong><br><small style="color:#64748b">Una página por microregión.</small></span>'
                         + '</label>'
+                        + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
+                        + '<input type="radio" name="tm-export-choice" value="word_table" style="margin-top:.2rem;"> '
+                        + '<span><strong>Word — Tabla de registros</strong><br><small style="color:#64748b">.docx con los mismos datos que el Excel (una tabla).</small></span>'
+                        + '</label>'
+                        + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
+                        + '<input type="radio" name="tm-export-choice" value="pdf_table" style="margin-top:.2rem;"> '
+                        + '<span><strong>PDF — Tabla de registros</strong><br><small style="color:#64748b">.pdf con la tabla de registros.</small></span>'
+                        + '</label>'
                         + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.65rem;cursor:pointer;">'
-                        + '<input type="radio" name="tm-export-choice" value="word" style="margin-top:.2rem;"> '
-                        + '<span><strong>Informe de análisis (Word)</strong><br><small style="color:#64748b">Documento .docx con resumen y tablas (mismo criterio que el antiguo Excel de análisis).</small></span>'
+                        + '<input type="radio" name="tm-export-choice" value="analysis_word" style="margin-top:.2rem;"> '
+                        + '<span><strong>Informe de análisis (Word)</strong><br><small style="color:#64748b">Documento .docx con resumen y tablas de análisis (distinto a la tabla simple).</small></span>'
                         + '</label>'
                         + '<hr style="margin:.65rem 0;border:none;border-top:1px solid #e2e8f0;">'
                         + '<p style="margin:0;"><button type="button" class="tm-btn tm-btn-outline tm-swal-personalize-btn">Personalizar columnas y diseño</button></p>'
@@ -2319,7 +2327,7 @@
                                 var choice = document.querySelector('input[name="tm-export-choice"]:checked');
                                 var val = choice ? choice.value : 'single';
                                 Swal.close();
-                                if (val === 'word') {
+                                if (val === 'analysis_word') {
                                     var previewUrl = exportBtnRef.getAttribute('data-analysis-preview-url');
                                     var wordUrl = exportBtnRef.getAttribute('data-analysis-word-url');
                                     if (previewUrl && wordUrl) {
@@ -2346,7 +2354,13 @@
                 }).then(function (result) {
                     if (!result.isConfirmed) { return; }
                     var choice = result.value && result.value.choice;
-                    if (choice === 'word') {
+                    if (choice === 'word_table' || choice === 'pdf_table') {
+                        const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
+                        const fmt = choice === 'pdf_table' ? 'pdf' : 'word';
+                        window.location.href = exportUrl + separator + 'mode=single&analysis=0&format=' + encodeURIComponent(fmt);
+                        return;
+                    }
+                    if (choice === 'analysis_word') {
                         var previewUrl = exportBtnRef.getAttribute('data-analysis-preview-url');
                         var wordUrl = exportBtnRef.getAttribute('data-analysis-word-url');
                         if (previewUrl && wordUrl) {

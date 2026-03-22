@@ -9,7 +9,7 @@ class ExcelExportPending extends Notification
     public function __construct(
         public string $exportRequestId,
         public string $fileName = 'archivo',
-        /** @var 'excel'|'word'|'pdf_fichas' */
+        /** @var 'excel'|'word'|'pdf'|'pdf_fichas' */
         public string $kind = 'excel',
     ) {}
 
@@ -38,7 +38,11 @@ class ExcelExportPending extends Notification
             ];
         }
 
-        $suffix = $this->kind === 'word' ? ' (Word)' : ' (.xlsx)';
+        $suffix = match ($this->kind) {
+            'word' => ' (Word)',
+            'pdf' => ' (PDF)',
+            default => ' (.xlsx)',
+        };
 
         return [
             'type' => 'excel_export_pending',
