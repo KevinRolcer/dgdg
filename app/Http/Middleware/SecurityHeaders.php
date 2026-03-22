@@ -10,12 +10,16 @@ class SecurityHeaders
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // 301 en POST suele convertirse en GET en el navegador y se pierde el cuerpo (CSRF, format=pdf, cfg).
+        // 308 preserva método y cuerpo; en GET/HEAD seguimos con 301 por caché/SEO.
+        $redirectPermanent = in_array($request->method(), ['GET', 'HEAD'], true) ? 301 : 308;
+
         if ($this->mustRedirectToCanonicalHost($request)) {
-            return redirect()->to($this->buildCanonicalUrl($request), 301);
+            return redirect()->to($this->buildCanonicalUrl($request), $redirectPermanent);
         }
 
         if ($this->mustRedirectToHttps($request)) {
-            return redirect()->to('https://'.$request->getHttpHost().$request->getRequestUri(), 301);
+            return redirect()->to('https://'.$request->getHttpHost().$request->getRequestUri(), $redirectPermanent);
         }
 
         /** @var Response $response */

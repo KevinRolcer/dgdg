@@ -357,7 +357,7 @@
         <div class="tm-modal-backdrop" data-close-export-personalize></div>
         <div class="tm-modal-dialog tm-export-personalize-dialog">
             <div class="tm-modal-head">
-                <h3>Personalizar vista previa del Excel</h3>
+                <h3>Personalizar columnas y diseño</h3>
                 <button type="button" class="tm-modal-close" data-close-export-personalize aria-label="Cerrar">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
@@ -410,6 +410,30 @@
                         <p class="tm-export-restore-wrap" id="tmExportRestoreWrap" hidden>
                             <button type="button" class="tm-export-restore-btn" id="tmExportRestoreBtn">Restaurar todas las columnas</button>
                         </p>
+                        <div class="tm-export-format-sections" id="tmExportFormatSections">
+                            <div class="tm-export-format-section tm-export-format-section--excel">
+                                <h4 class="tm-export-format-section__title">Excel</h4>
+                                <p class="tm-export-format-section__hint">Archivo .xlsx con la tabla de registros.</p>
+                                <div class="tm-export-format-section__actions">
+                                    <button type="button" class="tm-btn tm-export-cta-excel tm-export-format-cta" id="tmExportApplyExcelSingle">Excel — Una sola hoja</button>
+                                    <button type="button" class="tm-btn tm-export-cta-excel tm-export-cta-excel--secondary tm-export-format-cta" id="tmExportApplyExcelMr">Excel — 1 hoja por microregión</button>
+                                </div>
+                            </div>
+                            <div class="tm-export-format-section tm-export-format-section--word">
+                                <h4 class="tm-export-format-section__title">Word — Tabla de registros</h4>
+                                <p class="tm-export-format-section__hint">.docx con los mismos datos que el Excel (una tabla).</p>
+                                <div class="tm-export-format-section__actions">
+                                    <button type="button" class="tm-btn tm-btn-word tm-export-format-cta" id="tmExportApplyWordTable">Word — Tabla de registros</button>
+                                </div>
+                            </div>
+                            <div class="tm-export-format-section tm-export-format-section--pdf">
+                                <h4 class="tm-export-format-section__title">PDF — Tabla de registros</h4>
+                                <p class="tm-export-format-section__hint">.pdf con la tabla de registros.</p>
+                                <div class="tm-export-format-section__actions">
+                                    <button type="button" class="tm-btn tm-export-cta-pdf tm-export-format-cta" id="tmExportApplyPdfTable">PDF — Tabla de registros</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="tm-export-personalize-preview-wrap">
                         <div class="tm-export-preview-toolbar">
@@ -436,13 +460,8 @@
                     </div>
                 </div>
             </div>
-            <div class="tm-modal-foot tm-export-modal-foot">
+            <div class="tm-modal-foot tm-export-modal-foot tm-export-modal-foot--personalize">
                 <button type="button" class="tm-btn tm-btn-outline" data-close-export-personalize>Cancelar</button>
-                <div class="tm-export-foot-actions">
-                    <button type="button" class="tm-btn tm-btn-success" id="tmExportApplyExcel">Excel</button>
-                    <button type="button" class="tm-btn tm-btn-danger" id="tmExportApplyPdf">PDF</button>
-                    <button type="button" class="tm-btn tm-btn-word" id="tmExportApplyWord">Word</button>
-                </div>
             </div>
         </div>
     </div>
@@ -2121,9 +2140,10 @@
             const columnsEl = document.getElementById('tmExportPersonalizeColumns');
             const previewEl = document.getElementById('tmExportPersonalizePreview');
             const titleEl = document.getElementById('tmExportPersonalizeTitle');
-            const applyExcelBtn = document.getElementById('tmExportApplyExcel');
-            const applyPdfBtn = document.getElementById('tmExportApplyPdf');
-            const applyWordBtn = document.getElementById('tmExportApplyWord');
+            const applyExcelSingleBtn = document.getElementById('tmExportApplyExcelSingle');
+            const applyExcelMrBtn = document.getElementById('tmExportApplyExcelMr');
+            const applyWordTableBtn = document.getElementById('tmExportApplyWordTable');
+            const applyPdfTableBtn = document.getElementById('tmExportApplyPdfTable');
             const restoreWrap = document.getElementById('tmExportRestoreWrap');
             const restoreBtn = document.getElementById('tmExportRestoreBtn');
             const includeCountTableEl = document.getElementById('tmExportIncludeCountTable');
@@ -2260,7 +2280,7 @@
                         };
                     }
 
-                    function applyExport(format) {
+                    function applyExport(format, mode) {
                             const orderedCols = reorderColumnsList(columnsEl, columns);
                             const state = getPersonalizeState();
                             const orientBtn = personalizeModal.querySelector('.tm-export-orient-btn.is-active');
@@ -2297,18 +2317,22 @@
                             };
 
                             const fmt = format || 'excel';
+                            const exportMode = (fmt === 'excel') ? (mode || 'single') : 'single';
                             closePersonalizeModal();
-                            submitTemporaryModuleExportPost(exportUrl, fmt, 'single', cfg);
+                            submitTemporaryModuleExportPost(exportUrl, fmt, exportMode, cfg);
                     }
 
-                    if (applyExcelBtn && exportUrl) {
-                        applyExcelBtn.onclick = function () { applyExport('excel'); };
+                    if (applyExcelSingleBtn && exportUrl) {
+                        applyExcelSingleBtn.onclick = function () { applyExport('excel', 'single'); };
                     }
-                    if (applyWordBtn && exportUrl) {
-                        applyWordBtn.onclick = function () { applyExport('word'); };
+                    if (applyExcelMrBtn && exportUrl) {
+                        applyExcelMrBtn.onclick = function () { applyExport('excel', 'mr'); };
                     }
-                    if (applyPdfBtn && exportUrl) {
-                        applyPdfBtn.onclick = function () { applyExport('pdf'); };
+                    if (applyWordTableBtn && exportUrl) {
+                        applyWordTableBtn.onclick = function () { applyExport('word', 'single'); };
+                    }
+                    if (applyPdfTableBtn && exportUrl) {
+                        applyPdfTableBtn.onclick = function () { applyExport('pdf', 'single'); };
                     }
                 })
                 .catch(function () {
@@ -2333,7 +2357,6 @@
                 templateSwal.fire({
                     title: 'Tipo de exportación',
                     html: '<div class="tm-swal-export-options" style="text-align:left">'
-                        + '<p style="margin:0 0 .5rem;font-size:.8rem;color:#64748b;">Elige el formato. «Personalizar» permite columnas y diseño (Excel, Word o PDF de tabla).</p>'
                         + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
                         + '<input type="radio" name="tm-export-choice" value="single" checked style="margin-top:.2rem;"> '
                         + '<span><strong>Excel — Una sola hoja</strong><br><small style="color:#64748b">Todos los registros en una hoja.</small></span>'

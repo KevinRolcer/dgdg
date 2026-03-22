@@ -2781,6 +2781,110 @@ a.tm-paginator-btn:hover {
     flex-wrap: wrap;
 }
 
+.tm-export-modal-foot--personalize {
+    justify-content: flex-start;
+}
+
+.tm-export-format-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--clr-border);
+}
+
+.tm-export-format-section {
+    border-radius: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--clr-border);
+    background: var(--clr-bg);
+}
+
+.tm-export-format-section--excel {
+    border-color: rgba(33, 115, 70, 0.35);
+    background: rgba(33, 115, 70, 0.06);
+}
+
+.tm-export-format-section--word {
+    border-color: rgba(24, 90, 189, 0.4);
+    background: rgba(24, 90, 189, 0.07);
+}
+
+.tm-export-format-section--pdf {
+    border-color: rgba(198, 40, 40, 0.35);
+    background: rgba(198, 40, 40, 0.06);
+}
+
+.tm-export-format-section__title {
+    margin: 0 0 4px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--clr-text-main);
+}
+
+.tm-export-format-section__hint {
+    margin: 0 0 10px;
+    font-size: 0.8rem;
+    color: var(--clr-text-light);
+    line-height: 1.35;
+}
+
+.tm-export-format-section__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tm-export-format-cta {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    min-height: 40px;
+    font-weight: 600;
+    font-size: 0.82rem;
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+}
+
+.tm-export-cta-excel {
+    background: #1d6f42;
+    border: 1px solid #1d6f42;
+    color: #fff;
+}
+
+.tm-export-cta-excel:hover,
+.tm-export-cta-excel:focus {
+    filter: brightness(1.08);
+    color: #fff;
+}
+
+.tm-export-cta-excel--secondary {
+    background: transparent;
+    color: #1d6f42;
+    border: 2px solid #1d6f42;
+}
+
+.tm-export-cta-excel--secondary:hover,
+.tm-export-cta-excel--secondary:focus {
+    background: rgba(29, 111, 66, 0.1);
+    color: #145a32;
+}
+
+.tm-export-cta-pdf {
+    background: #c62828;
+    border: 1px solid #c62828;
+    color: #fff;
+}
+
+.tm-export-cta-pdf:hover,
+.tm-export-cta-pdf:focus {
+    filter: brightness(1.08);
+    color: #fff;
+}
+
 .tm-btn-word {
     background-color: #185abd;
     border-color: #185abd;

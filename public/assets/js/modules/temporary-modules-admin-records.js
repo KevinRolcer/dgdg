@@ -1443,9 +1443,10 @@
             const columnsEl = document.getElementById('tmExportPersonalizeColumns');
             const previewEl = document.getElementById('tmExportPersonalizePreview');
             const titleEl = document.getElementById('tmExportPersonalizeTitle');
-            const applyExcelBtn = document.getElementById('tmExportApplyExcel');
-            const applyPdfBtn = document.getElementById('tmExportApplyPdf');
-            const applyWordBtn = document.getElementById('tmExportApplyWord');
+            const applyExcelSingleBtn = document.getElementById('tmExportApplyExcelSingle');
+            const applyExcelMrBtn = document.getElementById('tmExportApplyExcelMr');
+            const applyWordTableBtn = document.getElementById('tmExportApplyWordTable');
+            const applyPdfTableBtn = document.getElementById('tmExportApplyPdfTable');
             const restoreWrap = document.getElementById('tmExportRestoreWrap');
             const restoreBtn = document.getElementById('tmExportRestoreBtn');
             const includeCountTableEl = document.getElementById('tmExportIncludeCountTable');
@@ -1582,7 +1583,7 @@
                         };
                     }
 
-                    function applyExport(format) {
+                    function applyExport(format, mode) {
                             const orderedCols = reorderColumnsList(columnsEl, columns);
                             const state = getPersonalizeState();
                             const orientBtn = personalizeModal.querySelector('.tm-export-orient-btn.is-active');
@@ -1619,18 +1620,22 @@
                             };
 
                             const fmt = format || 'excel';
+                            const exportMode = (fmt === 'excel') ? (mode || 'single') : 'single';
                             closePersonalizeModal();
-                            submitTemporaryModuleExportPost(exportUrl, fmt, 'single', cfg);
+                            submitTemporaryModuleExportPost(exportUrl, fmt, exportMode, cfg);
                     }
 
-                    if (applyExcelBtn && exportUrl) {
-                        applyExcelBtn.onclick = function () { applyExport('excel'); };
+                    if (applyExcelSingleBtn && exportUrl) {
+                        applyExcelSingleBtn.onclick = function () { applyExport('excel', 'single'); };
                     }
-                    if (applyWordBtn && exportUrl) {
-                        applyWordBtn.onclick = function () { applyExport('word'); };
+                    if (applyExcelMrBtn && exportUrl) {
+                        applyExcelMrBtn.onclick = function () { applyExport('excel', 'mr'); };
                     }
-                    if (applyPdfBtn && exportUrl) {
-                        applyPdfBtn.onclick = function () { applyExport('pdf'); };
+                    if (applyWordTableBtn && exportUrl) {
+                        applyWordTableBtn.onclick = function () { applyExport('word', 'single'); };
+                    }
+                    if (applyPdfTableBtn && exportUrl) {
+                        applyPdfTableBtn.onclick = function () { applyExport('pdf', 'single'); };
                     }
                 })
                 .catch(function () {
@@ -1655,7 +1660,6 @@
                 templateSwal.fire({
                     title: 'Tipo de exportación',
                     html: '<div class="tm-swal-export-options" style="text-align:left">'
-                        + '<p style="margin:0 0 .5rem;font-size:.8rem;color:#64748b;">Elige el formato. «Personalizar» permite columnas y diseño (Excel, Word o PDF de tabla).</p>'
                         + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
                         + '<input type="radio" name="tm-export-choice" value="single" checked style="margin-top:.2rem;"> '
                         + '<span><strong>Excel — Una sola hoja</strong><br><small style="color:#64748b">Todos los registros en una hoja.</small></span>'

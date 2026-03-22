@@ -70,7 +70,7 @@ html.theme-dark .tm-shell .tm-pagination-wrap.tm-pagination--footer {
 
 html.theme-dark .tm-section-switch,
 html.theme-dark .tm-upload-meta-pill,
-html.theme-dark .tm-btn:not(.tm-btn-primary):not(.tm-btn-success),
+html.theme-dark .tm-btn:not(.tm-btn-primary):not(.tm-btn-success):not(.tm-btn-word):not(.tm-export-cta-excel):not(.tm-export-cta-excel--secondary):not(.tm-export-cta-pdf),
 html.theme-dark .tm-btn-outline,
 html.theme-dark .tm-seed-panel,
 html.theme-dark .tm-seed-step-badge,
@@ -734,6 +734,70 @@ html.theme-dark .tm-export-preview-page {
 
 html.theme-dark .tm-export-personalize-preview {
     background: transparent !important;
+}
+
+html.theme-dark .tm-export-format-section--excel {
+    border-color: rgba(46, 204, 113, 0.42) !important;
+    background: rgba(46, 204, 113, 0.1) !important;
+}
+
+html.theme-dark .tm-export-format-section--word {
+    border-color: rgba(88, 156, 255, 0.45) !important;
+    background: rgba(88, 156, 255, 0.1) !important;
+}
+
+html.theme-dark .tm-export-format-section--pdf {
+    border-color: rgba(255, 107, 107, 0.42) !important;
+    background: rgba(255, 107, 107, 0.08) !important;
+}
+
+html.theme-dark .tm-export-cta-excel {
+    background: #2ecc71 !important;
+    border-color: #2ecc71 !important;
+    color: #0d1b12 !important;
+}
+
+html.theme-dark .tm-export-cta-excel:hover,
+html.theme-dark .tm-export-cta-excel:focus {
+    filter: brightness(1.1) !important;
+    color: #0d1b12 !important;
+}
+
+html.theme-dark .tm-export-cta-excel--secondary {
+    background: transparent !important;
+    color: #6ee7a8 !important;
+    border-color: #6ee7a8 !important;
+}
+
+html.theme-dark .tm-export-cta-excel--secondary:hover,
+html.theme-dark .tm-export-cta-excel--secondary:focus {
+    background: rgba(110, 231, 168, 0.14) !important;
+    color: #a8f5c8 !important;
+}
+
+html.theme-dark .tm-export-format-section .tm-btn.tm-btn-word.tm-export-format-cta {
+    background: #3d7dd9 !important;
+    border-color: #6aa7ff !important;
+    color: #fff !important;
+}
+
+html.theme-dark .tm-export-format-section .tm-btn.tm-btn-word.tm-export-format-cta:hover,
+html.theme-dark .tm-export-format-section .tm-btn.tm-btn-word.tm-export-format-cta:focus {
+    background: #5290e6 !important;
+    border-color: #8fc0ff !important;
+    color: #fff !important;
+}
+
+html.theme-dark .tm-export-cta-pdf {
+    background: #e53935 !important;
+    border-color: #ff7b72 !important;
+    color: #fff !important;
+}
+
+html.theme-dark .tm-export-cta-pdf:hover,
+html.theme-dark .tm-export-cta-pdf:focus {
+    filter: brightness(1.08) !important;
+    color: #fff !important;
 }
 
 html.theme-dark .tm-export-preview-data-cell {
