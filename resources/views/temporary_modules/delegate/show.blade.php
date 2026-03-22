@@ -11,7 +11,13 @@
 <section class="tm-page">
     <article class="content-card tm-card">
         @if (session('status'))
-            <div class="inline-alert inline-alert-success" role="alert">{{ session('status') }}</div>
+            @php
+                $tmShowStatus = session('status');
+                $tmShowStatusStr = is_string($tmShowStatus) ? $tmShowStatus : (is_array($tmShowStatus) ? implode(' ', array_filter(array_map(static fn ($v) => is_scalar($v) ? (string) $v : '', $tmShowStatus))) : '');
+            @endphp
+            @if ($tmShowStatusStr !== '')
+                <div class="inline-alert inline-alert-success" role="alert">{{ $tmShowStatusStr }}</div>
+            @endif
         @endif
 
         @if ($errors->any())

@@ -4523,14 +4523,12 @@ html.theme-dark .tm-multiselect-option:hover {
 .tm-multiselect-option:has(input[type="checkbox"]:checked) {
     background: var(--clr-primary-dark, #5f1b2d);
     color: #ffffff;
-    box-shadow: 0 3px 8px rgba(95, 27, 45, 0.35);
     font-weight: 600;
 }
 
 html.theme-dark .tm-multiselect-option:has(input[type="checkbox"]:checked) {
     background: var(--clr-accent, #c79b66);
     color: #111111; /* Dark text for contrast on accent */
-    box-shadow: 0 3px 8px rgba(199, 155, 102, 0.35);
     font-weight: 700;
 }
 
