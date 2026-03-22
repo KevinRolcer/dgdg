@@ -2726,10 +2726,10 @@ a.tm-paginator-btn:hover {
 }
 
 .tm-export-personalize-modal .tm-modal-dialog {
-    width: min(1100px, calc(100vw - 24px));
-    max-width: calc(100vw - 24px);
-    height: min(88vh, 900px);
-    max-height: 90vh;
+    width: min(1500px, 95vw);
+    max-width: 98vw;
+    height: min(92vh, 1100px);
+    max-height: 95vh;
     min-height: 520px;
     display: flex;
     flex-direction: column;
@@ -3535,6 +3535,7 @@ a.tm-paginator-btn:hover {
     gap: 0.75rem;
     background: var(--clr-bg);
     flex-shrink: 0;
+    margin-top: auto;
 }
 
 @media (max-width: 640px) {
@@ -4335,3 +4336,421 @@ html.theme-dark .tm-btn-danger:hover {
     color: var(--clr-primary);
 }
 
+/* ============================================================
+   Multiselect field (Pill Design)
+   ============================================================ */
+.tm-multiselect-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.tm-multiselect-option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 16px;
+    border-radius: 20px;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--clr-text-main);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.25s ease;
+    user-select: none;
+    margin: 0;
+}
+
+html.theme-dark .tm-multiselect-option {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.tm-multiselect-option:hover {
+    background: rgba(95, 27, 45, 0.08); /* --clr-primary-dark tint */
+    color: var(--clr-primary-dark, #5f1b2d);
+}
+
+html.theme-dark .tm-multiselect-option:hover {
+    background: rgba(199, 155, 102, 0.15); /* --clr-accent tint */
+    color: var(--clr-accent, #c79b66);
+}
+
+/* Hide the actual checkbox */
+.tm-multiselect-option input[type="checkbox"] {
+    display: none;
+}
+
+/* Checked state styling using modern :has selector */
+.tm-multiselect-option:has(input[type="checkbox"]:checked) {
+    background: var(--clr-primary-dark, #5f1b2d);
+    color: #ffffff;
+    box-shadow: 0 3px 8px rgba(95, 27, 45, 0.35);
+    font-weight: 600;
+}
+
+html.theme-dark .tm-multiselect-option:has(input[type="checkbox"]:checked) {
+    background: var(--clr-accent, #c79b66);
+    color: #111111; /* Dark text for contrast on accent */
+    box-shadow: 0 3px 8px rgba(199, 155, 102, 0.35);
+    font-weight: 700;
+}
+
+/* ============================================================
+   Linked / dependent field
+   ============================================================ */
+.tm-linked-field-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.tm-linked-primary-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--clr-primary, #861e34);
+    margin-bottom: 2px;
+}
+
+.tm-linked-secondary-wrap {
+    border-left: 3px solid var(--clr-secondary, #246257);
+    padding-left: 12px;
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    animation: tmFadeIn 0.18s ease;
+}
+
+.tm-linked-secondary-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--clr-secondary, #246257);
+    margin-bottom: 2px;
+}
+
+@keyframes tmFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   Admin Preview Accordion Cards
+   ============================================================ */
+.tm-admin-preview-accordion {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+html.theme-dark .tm-admin-section-title {
+    color: var(--clr-accent, #c79b66);
+}
+
+.tm-admin-preview-card {
+    background: var(--clr-card, var(--clr-bg, #ffffff));
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.tm-admin-preview-card[open] {
+    border-color: var(--clr-primary, #861e34);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+html.theme-dark .tm-admin-preview-card[open] {
+    border-color: var(--clr-secondary, #246257);
+}
+
+.tm-admin-preview-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    cursor: pointer;
+    background: rgba(0, 0, 0, 0.02);
+    user-select: none;
+    transition: background 0.2s ease;
+    list-style: none; /* Hide default marker */
+    gap: 12px;
+}
+
+.tm-admin-preview-summary::-webkit-details-marker,
+.tm-admin-preview-summary::marker {
+    display: none;
+}
+
+.tm-admin-preview-summary:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+html.theme-dark .tm-admin-preview-summary {
+    background: rgba(255, 255, 255, 0.02);
+}
+html.theme-dark .tm-admin-preview-summary:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tm-preview-summary-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1 1 auto;
+    min-width: 250px;
+}
+
+.tm-preview-mr-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--clr-text-title);
+    margin: 0;
+}
+
+.tm-preview-summary-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 0.85rem;
+    color: var(--clr-text-muted);
+}
+
+.tm-preview-summary-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tm-preview-summary-meta i {
+    opacity: 0.6;
+}
+
+.tm-preview-summary-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    transition: transform 0.3s ease;
+    color: var(--clr-text-muted);
+}
+
+.tm-admin-preview-card[open] .tm-preview-summary-icon {
+    transform: rotate(180deg);
+}
+
+.tm-admin-preview-detail {
+    padding: 0;
+    border-top: 1px solid var(--clr-border);
+    animation: tmFadeIn 0.3s ease forwards;
+}
+
+.tm-admin-preview-detail .tm-table-wrap-admin-preview {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+}
+
+.tm-admin-preview-table th {
+    white-space: nowrap;
+    padding: 12px 16px;
+}
+
+@keyframes tmFadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   Admin Preview - Municipio & Record Cards
+   ============================================================ */
+.tm-admin-preview-mpio-container {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    background: rgba(0,0,0,0.01);
+}
+
+html.theme-dark .tm-admin-preview-mpio-container {
+    background: rgba(0,0,0,0.15);
+}
+
+.tm-mpio-group-details {
+    background: var(--clr-card, var(--clr-bg, #ffffff));
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.tm-mpio-group-details[open] {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.tm-mpio-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+    background: rgba(0,0,0,0.02);
+    border-bottom: 1px solid transparent;
+    transition: background 0.2s ease;
+}
+
+.tm-mpio-group-details[open] .tm-mpio-summary {
+    border-bottom-color: var(--clr-border);
+    background: rgba(0,0,0,0.04);
+}
+
+html.theme-dark .tm-mpio-summary {
+    background: rgba(255,255,255,0.03);
+}
+
+html.theme-dark .tm-mpio-group-details[open] .tm-mpio-summary {
+    background: rgba(255,255,255,0.06);
+}
+
+.tm-mpio-summary::-webkit-details-marker {
+    display: none;
+}
+
+.tm-mpio-summary-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    color: var(--clr-primary, #861e34);
+}
+
+.tm-mpio-summary-header i {
+    color: var(--clr-primary, #861e34);
+}
+
+html.theme-dark .tm-mpio-summary-header,
+html.theme-dark .tm-mpio-summary-header i {
+    color: var(--clr-accent, #c79b66);
+}
+
+.tm-mpio-chevron {
+    transition: transform 0.3s ease;
+    color: var(--clr-text-muted);
+}
+
+.tm-mpio-group-details[open] .tm-mpio-chevron {
+    transform: rotate(-180deg);
+}
+
+.tm-mpio-detail-content {
+    padding: 16px;
+    background: var(--clr-bg, #ffffff);
+    animation: tmFadeIn 0.3s ease forwards;
+}
+
+.tm-records-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+.tm-record-item {
+    background: var(--clr-card, var(--clr-bg, #ffffff));
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tm-record-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.tm-record-item-header {
+    background: rgba(0,0,0,0.03);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--clr-border);
+    font-size: 0.85rem;
+    color: var(--clr-text-muted);
+}
+
+html.theme-dark .tm-record-item-header {
+    background: rgba(255,255,255,0.02);
+}
+
+.tm-record-user {
+    font-weight: 600;
+    color: var(--clr-text-main);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tm-record-date {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tm-record-item-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tm-record-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tm-record-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--clr-text-light);
+}
+
+.tm-record-value {
+    font-size: 0.95rem;
+    color: var(--clr-text-main);
+    word-break: break-word;
+}
+
+@media (max-width: 600px) {
+    .tm-records-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .tm-admin-preview-summary {
+        flex-direction: column;
+        align-items: flex-start;
+        position: relative;
+    }
+    .tm-preview-summary-header {
+        width: 100%;
+        justify-content: space-between;
+    }
+    .tm-preview-summary-icon {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+    }
+}

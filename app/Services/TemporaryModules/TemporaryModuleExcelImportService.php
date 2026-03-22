@@ -16,7 +16,7 @@ class TemporaryModuleExcelImportService
 {
     /** Tipos que se pueden llenar desde Excel (sin archivo/imagen). */
     public const IMPORTABLE_TYPES = [
-        'text', 'textarea', 'number', 'date', 'datetime', 'select', 'boolean', 'categoria', 'municipio', 'geopoint', 'image',
+        'text', 'textarea', 'number', 'date', 'datetime', 'select', 'multiselect', 'linked', 'boolean', 'categoria', 'municipio', 'geopoint', 'image',
     ];
 
     public function importableFields(Collection $fields): Collection
@@ -415,6 +415,55 @@ class TemporaryModuleExcelImportService
             } catch (\Throwable) {
                 return $str;
             }
+        }
+
+        if ($t === 'multiselect') {
+            if ($str === '') {
+                return null;
+            }
+
+            $validOpts = array_map('strval', $field->options ?? []);
+
+            if (!empty($validOpts)) {
+                // Strategy 1: search for each known option inside the cell text (case-insensitive).
+                // We keep the order of the defined options list and only include those found.
+                $found = [];
+                foreach ($validOpts as $opt) {
+                    if ($opt === '') {
+                        continue;
+                    }
+                    // Match the option as a whole word / token, surrounded by non-word chars or start/end
+                    $pattern = '/(?:^|[\s,;|()\[\]{}\-\/\\\\])'.preg_quote($opt, '/').'(?:$|[\s,;|()\[\]{}\-\/\\\\])/ui';
+                    if (preg_match($pattern, ' '.$str.' ')) {
+                        $found[] = $opt;
+                    }
+                }
+
+                if (!empty($found)) {
+                    return $found;
+                }
+            }
+
+            // Strategy 2 (fallback): split on comma or semicolon
+            $items = collect(preg_split('/[,;]+/', $str))
+                ->map(fn ($s) => trim((string) $s))
+                ->filter(fn ($s) => $s !== '')
+                ->values()
+                ->all();
+
+            return $items === [] ? null : $items;
+        }
+
+        if ($t === 'linked') {
+            if ($str === '') {
+                return null;
+            }
+            // Support "primary | secondary" format in a cell
+            $parts = explode('|', $str, 2);
+            $primary = trim($parts[0]);
+            $secondary = isset($parts[1]) ? trim($parts[1]) : null;
+
+            return ['primary' => $primary !== '' ? $primary : null, 'secondary' => $secondary];
         }
 
         if ($t === 'select') {

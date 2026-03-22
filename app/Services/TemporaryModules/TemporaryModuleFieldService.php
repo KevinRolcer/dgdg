@@ -38,7 +38,7 @@ class TemporaryModuleFieldService
             $usedKeys[] = $key;
 
             $options = null;
-            if ($type === 'select') {
+            if (in_array($type, ['select', 'multiselect'], true)) {
                 $options = collect(preg_split('/\r\n|\r|\n|,/', (string) ($field['options'] ?? '')))
                     ->map(fn ($option) => trim((string) $option))
                     ->filter(fn ($option) => $option !== '')
@@ -48,6 +48,15 @@ class TemporaryModuleFieldService
                 if (empty($options)) {
                     throw ValidationException::withMessages([
                         'fields.'.$index.'.options' => 'Debes agregar opciones para el campo '.$label.'.',
+                    ]);
+                }
+            }
+
+            if ($type === 'linked') {
+                $options = $this->parseLinkedOptions($field);
+                if (empty($options['primary_type'])) {
+                    throw ValidationException::withMessages([
+                        'fields.'.$index.'.options' => 'El campo vinculado requiere definir el campo principal.',
                     ]);
                 }
             }
@@ -108,7 +117,7 @@ class TemporaryModuleFieldService
         $usedKeys[] = $key;
 
         $options = null;
-        if ($type === 'select') {
+        if (in_array($type, ['select', 'multiselect'], true)) {
             $options = collect(preg_split('/\r\n|\r|\n|,/', (string) ($field['options'] ?? '')))
                 ->map(fn ($option) => trim((string) $option))
                 ->filter(fn ($option) => $option !== '')
@@ -118,6 +127,19 @@ class TemporaryModuleFieldService
             if (empty($options)) {
                 throw ValidationException::withMessages([
                     $validationPrefix.'.options' => 'Debes agregar opciones para el campo '.$label.'.',
+                ]);
+            }
+        }
+
+        if ($type === 'linked') {
+            if (is_array($field['options'] ?? null) && isset($field['options']['primary_type'])) {
+                $options = $field['options'];
+            } else {
+                $options = $this->parseLinkedOptions($field);
+            }
+            if (empty($options['primary_type'])) {
+                throw ValidationException::withMessages([
+                    $validationPrefix.'.options' => 'El campo vinculado requiere definir el campo principal.',
                 ]);
             }
         }
@@ -202,6 +224,8 @@ class TemporaryModuleFieldService
             'date' => [...$rules, 'date'],
             'datetime' => [...$rules, 'date'],
             'select' => [...$rules, Rule::in($options)],
+            'multiselect' => [...($required ? ['required'] : ['nullable']), 'array'],
+            'linked' => ['nullable', 'array'], // validado internamente campo por campo
             'categoria' => (function () use ($required, $options, $rules) {
                 $allowed = $this->categoriaAllowedValues($options);
                 // Si el campo NO es obligatorio, permitimos que llegue '' (select vacío)
@@ -220,6 +244,36 @@ class TemporaryModuleFieldService
             'image' => [...$rules, 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
             default => [...$rules, 'string', 'max:255'],
         };
+    }
+
+    /**
+     * Parses the linked field options from the raw field data.
+     * Returns ['primary_type', 'primary_label', 'primary_options', 'secondary_type', 'secondary_label', 'secondary_options', 'secondary_required'].
+     */
+    public function parseLinkedOptions(array $field): array
+    {
+        if (is_array($field['options'] ?? null) && isset($field['options']['primary_type'])) {
+            return $field['options'];
+        }
+
+        // When coming from the form, sub-fields are in 'linked_primary_*' and 'linked_secondary_*' keys
+        $parseOpts = function (string $raw): array {
+            return collect(preg_split('/\r\n|\r|\n|,/', $raw))
+                ->map(fn ($o) => trim((string) $o))
+                ->filter(fn ($o) => $o !== '')
+                ->values()
+                ->all();
+        };
+
+        return [
+            'primary_type'        => (string) ($field['linked_primary_type'] ?? 'text'),
+            'primary_label'       => trim((string) ($field['linked_primary_label'] ?? '')),
+            'primary_options'     => $parseOpts((string) ($field['linked_primary_options'] ?? '')),
+            'secondary_type'      => (string) ($field['linked_secondary_type'] ?? 'text'),
+            'secondary_label'     => trim((string) ($field['linked_secondary_label'] ?? '')),
+            'secondary_options'   => $parseOpts((string) ($field['linked_secondary_options'] ?? '')),
+            'secondary_required'  => (bool) ($field['linked_secondary_required'] ?? true),
+        ];
     }
 
     /** @return list<string> */

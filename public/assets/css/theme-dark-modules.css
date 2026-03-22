@@ -51,7 +51,6 @@ html.theme-dark .tm-shell .tm-shell-desc {
 html.theme-dark .tm-shell .tm-card-in-shell,
 html.theme-dark .tm-shell .tm-module-grid .tm-card {
     background: transparent !important;
-    border: 1px solid var(--clr-border) !important;
     box-shadow: none !important;
 }
 html.theme-dark .tm-shell .tm-module-grid .tm-card:hover {
@@ -61,7 +60,6 @@ html.theme-dark .tm-shell .tm-module-grid .tm-card:hover {
 html.theme-dark .tm-shell .tm-table-wrap,
 html.theme-dark .tm-shell .tm-table-wrap-scroll {
     background: var(--clr-bg) !important;
-    border: 1px solid var(--clr-border);
     border-radius: 8px;
 }
 html.theme-dark .tm-shell .tm-pagination-wrap.tm-pagination--footer {

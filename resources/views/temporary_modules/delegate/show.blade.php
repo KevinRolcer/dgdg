@@ -918,6 +918,44 @@
 
     const openExcelModal = function () {
         if (!excelModal) return;
+        
+        const errPreviewEl = document.getElementById('tmExcelPreviewErr');
+        if (errPreviewEl) { errPreviewEl.textContent = ''; errPreviewEl.classList.add('tm-hidden'); }
+        const errImportEl = document.getElementById('tmExcelImportErr');
+        if (errImportEl) { errImportEl.textContent = ''; errImportEl.classList.add('tm-hidden'); }
+        const okImportEl = document.getElementById('tmExcelImportOk');
+        if (okImportEl) { okImportEl.textContent = ''; okImportEl.classList.add('tm-hidden'); }
+        
+        const errSection = document.getElementById('tmExcelErrorsSection');
+        if (errSection) errSection.classList.add('tm-hidden');
+        const errList = document.getElementById('tmExcelErrorsList');
+        if (errList) errList.innerHTML = '';
+        
+        const fileInput = document.getElementById('tmExcelFile');
+        if (fileInput) fileInput.value = '';
+        const nameEl = document.getElementById('tmExcelFileName');
+        if (nameEl) { nameEl.textContent = ''; nameEl.classList.add('tm-hidden'); }
+        
+        const hInput = document.getElementById('tmExcelHeaderRow');
+        const dInput = document.getElementById('tmExcelDataStartRow');
+        if (hInput) hInput.value = '';
+        if (dInput) dInput.value = '';
+        workbookData = null;
+        
+        const inner = document.getElementById('tmExcelSheetInner');
+        if (inner) inner.innerHTML = '<div style="padding:60px; text-align:center; color:var(--clr-text-light);"><i class="fa-solid fa-file-excel" style="font-size:4rem; margin-bottom:16px; opacity:0.2;"></i><p style="font-weight:600;">Vista previa del documento</p><p style="font-size:0.85rem; opacity:0.7;">Carga un archivo Excel para comenzar a marcar las columnas.</p></div>';
+        
+        const zoomBar = document.getElementById('tmExcelZoomBar');
+        if (zoomBar) zoomBar.style.display = 'none';
+        
+        const badgeH = document.getElementById('badgeHeaderRow');
+        const badgeD = document.getElementById('badgeDataRow');
+        if (badgeH) badgeH.style.display = 'none';
+        if (badgeD) badgeD.style.display = 'none';
+        
+        const controlsSide = document.querySelector('.tm-excel-controls-side');
+        if (controlsSide) controlsSide.scrollTo({ top: 0, behavior: 'auto' });
+        
         excelModal.classList.add('is-open');
         excelModal.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
@@ -1290,6 +1328,11 @@
     });
 
     document.getElementById('tmExcelLeerColumnas')?.addEventListener('click', function () {
+        const errSection = document.getElementById('tmExcelErrorsSection');
+        if (errSection) errSection.classList.add('tm-hidden');
+        const errList = document.getElementById('tmExcelErrorsList');
+        if (errList) errList.innerHTML = '';
+
         const file = document.getElementById('tmExcelFile')?.files[0];
         if (!file) return;
         const fd = new FormData();
@@ -1382,6 +1425,11 @@
     });
 
     document.getElementById('tmExcelImportar')?.addEventListener('click', function () {
+        const errSection = document.getElementById('tmExcelErrorsSection');
+        if (errSection) errSection.classList.add('tm-hidden');
+        const errList = document.getElementById('tmExcelErrorsList');
+        if (errList) errList.innerHTML = '';
+
         const file = document.getElementById('tmExcelFile')?.files[0];
         if (!file) return;
         const mapping = {};
@@ -1476,7 +1524,7 @@
                     }
                 }
 
-                const msg = j.message + (j.skipped > 0 ? ` (${j.skipped} fallidos).` : '');
+                const msg = j.message;
 
                 // Persistir errores en sesión
                 if (j.row_errors && j.row_errors.length > 0) {
@@ -1489,7 +1537,7 @@
                         if (j.skipped === 0) {
                             const moduleId = '{{ $temporaryModule->id }}';
                             saveImportErrors(moduleId, [], ''); // Limpiar si todo fue ok
-                            location.reload();
+                            if (typeof openExcelModal === 'function') openExcelModal();
                         }
                     });
             }).catch(e => {

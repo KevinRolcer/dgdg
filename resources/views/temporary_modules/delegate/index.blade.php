@@ -174,6 +174,93 @@
                                                 @endif
                                             @endforeach
                                         </select>
+                                    @elseif ($field->type === 'multiselect')
+                                        @php
+                                            $msOpts = is_array($field->options) ? $field->options : [];
+                                            $msSelected = is_array($value) ? $value : [];
+                                        @endphp
+                                        <div class="tm-multiselect-wrap" role="group" aria-label="{{ $field->label }}">
+                                            @foreach ($msOpts as $msOpt)
+                                                <label class="tm-multiselect-option">
+                                                    <input type="checkbox"
+                                                           name="{{ $name }}[]"
+                                                           value="{{ $msOpt }}"
+                                                           @checked(in_array($msOpt, $msSelected, true))>
+                                                    <span>{{ $msOpt }}</span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                    @elseif ($field->type === 'linked')
+                                        @php
+                                            $linkedOpts = is_array($field->options) ? $field->options : [];
+                                            $primaryType     = $linkedOpts['primary_type'] ?? 'text';
+                                            $primaryLabel    = $linkedOpts['primary_label'] ?? $field->label.' (principal)';
+                                            $primaryOptions  = $linkedOpts['primary_options'] ?? [];
+                                            $secondaryType   = $linkedOpts['secondary_type'] ?? 'text';
+                                            $secondaryLabel  = $linkedOpts['secondary_label'] ?? $field->label.' (dependiente)';
+                                            $secondaryOptions = $linkedOpts['secondary_options'] ?? [];
+                                            $secondaryRequired = $linkedOpts['secondary_required'] ?? true;
+                                            $existingLinked  = is_array($value) ? $value : [];
+                                            $primaryValue    = $existingLinked['primary'] ?? null;
+                                            $secondaryValue  = $existingLinked['secondary'] ?? null;
+                                            $primaryId       = $id.'__primary';
+                                            $secondaryId     = $id.'__secondary';
+                                            $primaryName     = 'values['.$field->key.'__primary]';
+                                            $secondaryName   = 'values['.$field->key.'__secondary]';
+                                        @endphp
+                                        {{-- Linked compound field --}}
+                                        <div class="tm-linked-field-wrap" data-linked-field-group>
+                                            {{-- Primary sub-field --}}
+                                            <label class="tm-linked-primary-label">{{ $primaryLabel }} {{ $field->is_required ? '*' : '' }}</label>
+                                            @if ($primaryType === 'select')
+                                                <select id="{{ $primaryId }}" name="{{ $primaryName }}"
+                                                        data-linked-primary
+                                                        {{ $field->is_required ? 'required' : '' }}>
+                                                    <option value="">Selecciona una opción</option>
+                                                    @foreach ($primaryOptions as $opt)
+                                                        <option value="{{ $opt }}" @selected($primaryValue === $opt)>{{ $opt }}</option>
+                                                    @endforeach
+                                                </select>
+                                            @elseif ($primaryType === 'textarea')
+                                                <textarea id="{{ $primaryId }}" name="{{ $primaryName }}"
+                                                          rows="2" data-linked-primary
+                                                          {{ $field->is_required ? 'required' : '' }}>{{ $primaryValue }}</textarea>
+                                            @else
+                                                <input id="{{ $primaryId }}"
+                                                       type="{{ $primaryType === 'number' ? 'number' : ($primaryType === 'date' ? 'date' : 'text') }}"
+                                                       name="{{ $primaryName }}"
+                                                       value="{{ $primaryValue }}"
+                                                       data-linked-primary
+                                                       {{ $field->is_required ? 'required' : '' }}>
+                                            @endif
+
+                                            {{-- Secondary sub-field (dependent) --}}
+                                            <div class="tm-linked-secondary-wrap" data-linked-secondary-wrap
+                                                 {{ $primaryValue ? '' : 'hidden' }}>
+                                                <label class="tm-linked-secondary-label">{{ $secondaryLabel }} *</label>
+                                                @if ($secondaryType === 'select')
+                                                    <select id="{{ $secondaryId }}" name="{{ $secondaryName }}"
+                                                            data-linked-secondary
+                                                            {{ $primaryValue ? 'required' : 'disabled' }}>
+                                                        <option value="">Selecciona una opción</option>
+                                                        @foreach ($secondaryOptions as $opt)
+                                                            <option value="{{ $opt }}" @selected($secondaryValue === $opt)>{{ $opt }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                @elseif ($secondaryType === 'textarea')
+                                                    <textarea id="{{ $secondaryId }}" name="{{ $secondaryName }}"
+                                                              rows="2" data-linked-secondary
+                                                              {{ $primaryValue ? 'required' : 'disabled' }}>{{ $secondaryValue }}</textarea>
+                                                @else
+                                                    <input id="{{ $secondaryId }}"
+                                                           type="{{ $secondaryType === 'number' ? 'number' : ($secondaryType === 'date' ? 'date' : 'text') }}"
+                                                           name="{{ $secondaryName }}"
+                                                           value="{{ $secondaryValue }}"
+                                                           data-linked-secondary
+                                                           {{ $primaryValue ? 'required' : 'disabled' }}>
+                                                @endif
+                                            </div>
+                                        </div>
                                     @elseif ($field->type === 'textarea')
                                         <textarea id="{{ $id }}" name="{{ $name }}" rows="3" {{ $field->is_required ? 'required' : '' }}>{{ $value }}</textarea>
                                     @elseif ($field->type === 'number')
@@ -1176,6 +1263,28 @@
         });
         // ------------------------------------
 
+        // --- Linked field: show/hide secondary sub-field based on primary value ---
+        const handleLinkedPrimaryChange = function (primaryEl) {
+            const group = primaryEl.closest('[data-linked-field-group]');
+            if (!group) return;
+            const secondaryWrap = group.querySelector('[data-linked-secondary-wrap]');
+            const secondaryEl = group.querySelector('[data-linked-secondary]');
+            if (!secondaryWrap || !secondaryEl) return;
+            const hasValue = (primaryEl.tagName === 'SELECT' ? primaryEl.value : (primaryEl.value || '').trim()) !== '';
+            secondaryWrap.hidden = !hasValue;
+            secondaryEl.disabled = !hasValue;
+            secondaryEl.required = hasValue;
+        };
+        document.addEventListener('input', function (e) {
+            const primaryEl = e.target.closest('[data-linked-primary]');
+            if (primaryEl) handleLinkedPrimaryChange(primaryEl);
+        });
+        document.addEventListener('change', function (e) {
+            const primaryEl = e.target.closest('[data-linked-primary]');
+            if (primaryEl) handleLinkedPrimaryChange(primaryEl);
+        });
+        // ------------------------------------
+
         document.addEventListener('submit', function (e) {
             const form = e.target;
             if (!form || !form.matches || !form.matches('form[data-confirm-delete]')) {
@@ -2154,6 +2263,41 @@
 
             let workbookData = null;
 
+            modal.__excelReset = function() {
+                if (errPreviewEl) { errPreviewEl.textContent = ''; errPreviewEl.classList.add('tm-hidden'); }
+                if (errImportEl) { errImportEl.textContent = ''; errImportEl.classList.add('tm-hidden'); }
+                if (okImportEl) { okImportEl.textContent = ''; okImportEl.classList.add('tm-hidden'); }
+                if (step2) step2.classList.add('tm-hidden');
+                if (step1) step1.classList.remove('tm-hidden');
+                
+                const errSection = modal.querySelector('.tm-excel-errors-section');
+                if (errSection) errSection.classList.add('tm-hidden');
+                const errList = modal.querySelector('.tm-excel-errors-list');
+                if (errList) errList.innerHTML = '';
+                
+                if (fileInput) fileInput.value = '';
+                const nameEl = modal.querySelector('.tm-excel-file-name');
+                if (nameEl) { nameEl.textContent = ''; nameEl.classList.add('tm-hidden'); }
+                
+                if (headerRowInput) headerRowInput.value = '';
+                if (dataStartRowInput) dataStartRowInput.value = '';
+                workbookData = null;
+                
+                const inner = modal.querySelector('.tm-excel-sheet-inner-el');
+                if (inner) inner.innerHTML = '<div style="padding:60px; text-align:center; color:var(--clr-text-light);"><i class="fa-solid fa-file-excel" style="font-size:4rem; margin-bottom:16px; opacity:0.2;"></i><p style="font-weight:600;">Vista previa del documento</p><p style="font-size:0.85rem; opacity:0.7;">Carga un archivo Excel para comenzar a marcar las columnas.</p></div>';
+                
+                const zoomBar = modal.querySelector('.tm-excel-zoom-bar-el');
+                if (zoomBar) zoomBar.style.display = 'none';
+                
+                const badgeH = modal.querySelector('.tm-excel-badge-header');
+                const badgeD = modal.querySelector('.tm-excel-badge-data');
+                if (badgeH) badgeH.style.display = 'none';
+                if (badgeD) badgeD.style.display = 'none';
+                
+                const controlsSide = modal.querySelector('.tm-excel-controls-side');
+                if (controlsSide) controlsSide.scrollTo({ top: 0, behavior: 'auto' });
+            };
+
             const updateRowHighlights = function() {
                 const hIdx = parseInt(headerRowInput.value);
                 const dIdx = parseInt(dataStartRowInput.value);
@@ -2474,6 +2618,11 @@
             });
 
             modal.querySelector('.tm-excel-read-columns')?.addEventListener('click', function () {
+                const errSection = modal.querySelector('.tm-excel-errors-section');
+                if (errSection) errSection.classList.add('tm-hidden');
+                const errList = modal.querySelector('.tm-excel-errors-list');
+                if (errList) errList.innerHTML = '';
+
                 const file = fileInput?.files[0];
                 if (!file) {
                     if (errPreviewEl) { errPreviewEl.textContent = 'Selecciona un archivo Excel.'; errPreviewEl.classList.remove('tm-hidden'); }
@@ -2557,6 +2706,11 @@
             });
 
             modal.querySelector('.tm-excel-importar')?.addEventListener('click', () => {
+                const errSection = modal.querySelector('.tm-excel-errors-section');
+                if (errSection) errSection.classList.add('tm-hidden');
+                const errList = modal.querySelector('.tm-excel-errors-list');
+                if (errList) errList.innerHTML = '';
+
                 const file = fileInput?.files[0];
                 if (!file) return;
                 const mapping = {};
@@ -2642,7 +2796,7 @@
                         }
                     }
 
-                    const msg = j.message + (j.skipped > 0 ? ` (${j.skipped} fallidos).` : '');
+                    const msg = j.message;
 
                     // Persistir errores en sesión
                     if (j.row_errors && j.row_errors.length > 0) {
@@ -2653,7 +2807,7 @@
                         .then(() => {
                             if (j.skipped === 0) {
                                 saveImportErrors(currentModuleId, [], ''); // Limpiar si todo fue ok
-                                location.reload();
+                                if (typeof modal.__excelReset === 'function') modal.__excelReset();
                             }
                         });
                 }).catch(e => {

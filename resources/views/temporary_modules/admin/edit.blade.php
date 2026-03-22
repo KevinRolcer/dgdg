@@ -214,6 +214,11 @@
                                 <textarea name="existing_fields[{{ $index }}][options]" rows="2" {{ $rowTypeForInput === 'select' ? '' : 'disabled' }} {{ $oldDelete ? 'disabled' : '' }}>{{ $rowTypeForInput === 'select' ? ($oldRow['options'] ?? (is_array($field->options) ? implode(', ', array_filter($field->options, 'is_string')) : '')) : '' }}</textarea>
                             </label>
 
+                            <label class="tm-options-field" data-existing-multiselect-wrap {{ $rowTypeForInput === 'multiselect' ? '' : 'hidden' }}>
+                                Opciones seleccionables (separadas por coma o salto de línea)
+                                <textarea name="existing_fields[{{ $index }}][options]" rows="2" {{ $rowTypeForInput === 'multiselect' ? '' : 'disabled' }} {{ $oldDelete ? 'disabled' : '' }}>{{ $rowTypeForInput === 'multiselect' ? ($oldRow['options'] ?? (is_array($field->options) ? implode(', ', array_filter($field->options, 'is_string')) : '')) : '' }}</textarea>
+                            </label>
+
                             <label class="tm-options-field" data-existing-categoria-wrap {{ $rowTypeForInput === 'categoria' ? '' : 'hidden' }}>
                                 Categorías (una por línea: <code>Categoría: sub1, sub2</code>)
                                 <textarea name="existing_fields[{{ $index }}][options]" rows="3" {{ $rowTypeForInput === 'categoria' ? '' : 'disabled' }} {{ $oldDelete ? 'disabled' : '' }}>{{ $existingOptionsValue }}</textarea>
@@ -307,6 +312,61 @@
             <textarea data-name="options_subsections" rows="2" placeholder="Subsección 1&#10;Subsección 2"></textarea>
         </label>
 
+        {{-- multiselect: same options list as select --}}
+        <label class="tm-options-field" data-multiselect-wrap hidden>
+            Opciones seleccionables (separadas por coma o salto de línea)
+            <textarea data-name="options" rows="2" placeholder="Rojo, Verde, Amarillo"></textarea>
+        </label>
+
+        {{-- linked: two sub-field definitions --}}
+        <fieldset class="tm-linked-wrap" data-linked-wrap hidden style="border:1px solid var(--clr-divider,#ddd);border-radius:6px;padding:10px 14px;display:flex;flex-direction:column;gap:8px;">
+            <legend style="font-size:.8rem;font-weight:600;color:var(--clr-primary,#861e34);padding:0 4px;">Campo principal</legend>
+            <div class="tm-grid tm-grid-2" style="gap:8px;">
+                <label>
+                    Etiqueta del principal
+                    <input type="text" data-name="linked_primary_label" placeholder="ej. Problemática">
+                </label>
+                <label>
+                    Tipo del principal
+                    <select data-name="linked_primary_type" data-linked-primary-type>
+                        <option value="text">Texto</option>
+                        <option value="textarea">Texto largo</option>
+                        <option value="number">Número</option>
+                        <option value="date">Fecha</option>
+                        <option value="select">Lista de opciones</option>
+                        <option value="boolean">Sí / No</option>
+                    </select>
+                </label>
+            </div>
+            <label data-linked-primary-options-wrap hidden>
+                Opciones del principal (separadas por coma o salto de línea)
+                <textarea data-name="linked_primary_options" rows="2" placeholder="Opción 1, Opción 2"></textarea>
+            </label>
+
+            <legend style="font-size:.8rem;font-weight:600;color:var(--clr-secondary,#246257);padding:4px 0 0;">Campo dependiente</legend>
+            <div class="tm-grid tm-grid-2" style="gap:8px;">
+                <label>
+                    Etiqueta del dependiente
+                    <input type="text" data-name="linked_secondary_label" placeholder="ej. Semáforo de riesgo">
+                </label>
+                <label>
+                    Tipo del dependiente
+                    <select data-name="linked_secondary_type" data-linked-secondary-type>
+                        <option value="text">Texto</option>
+                        <option value="textarea">Texto largo</option>
+                        <option value="number">Número</option>
+                        <option value="date">Fecha</option>
+                        <option value="select">Lista de opciones</option>
+                        <option value="boolean">Sí / No</option>
+                    </select>
+                </label>
+            </div>
+            <label data-linked-secondary-options-wrap hidden>
+                Opciones del dependiente (separadas por coma o salto de línea)
+                <textarea data-name="linked_secondary_options" rows="2" placeholder="Rojo, Amarillo, Verde"></textarea>
+            </label>
+        </fieldset>
+
         <button type="button" class="tm-btn tm-btn-danger" data-remove-field>Quitar</button>
     </div>
 </template>
@@ -366,6 +426,8 @@
             const optionsWrap = row.querySelector('[data-options-wrap]');
             const categoriaWrap = row.querySelector('[data-categoria-wrap]');
             const seccionWraps = row.querySelectorAll('[data-seccion-wrap]');
+            const multiselectWrap = row.querySelector('[data-multiselect-wrap]');
+            const linkedWrap = row.querySelector('[data-linked-wrap]');
             const requiredWrap = row.querySelector('[data-required-wrap]');
             const removeButton = row.querySelector('[data-remove-field]');
             const commentWrap = row.querySelector('[data-comment-wrap]');
@@ -386,10 +448,14 @@
                     const isSelect = t === 'select';
                     const isCategoria = t === 'categoria';
                     const isSeccion = t === 'seccion';
+                    const isMultiselect = t === 'multiselect';
+                    const isLinked = t === 'linked';
 
                     optionsWrap.hidden = !isSelect;
                     if (categoriaWrap) categoriaWrap.hidden = !isCategoria;
                     seccionWraps.forEach(function (w) { w.hidden = !isSeccion; });
+                    if (multiselectWrap) multiselectWrap.hidden = !isMultiselect;
+                    if (linkedWrap) linkedWrap.hidden = !isLinked;
                     if (requiredWrap) requiredWrap.hidden = isSeccion;
 
                     const optionsInput = optionsWrap.querySelector('[data-name="options"]');
@@ -404,6 +470,39 @@
                         categoriaInput.disabled = !isCategoria;
                         if (!isCategoria) categoriaInput.value = '';
                     }
+                    const multiselectInput = multiselectWrap ? multiselectWrap.querySelector('[data-name="options"]') : null;
+                    if (multiselectInput) {
+                        multiselectInput.required = isMultiselect;
+                        multiselectInput.disabled = !isMultiselect;
+                        if (!isMultiselect) multiselectInput.value = '';
+                    }
+
+                    if (linkedWrap) {
+                        const toggleLinkedOpts = function (typeEl, optsWrapEl) {
+                            if (!typeEl || !optsWrapEl) return;
+                            const needsOpts = typeEl.value === 'select';
+                            optsWrapEl.hidden = !needsOpts;
+                            const ta = optsWrapEl.querySelector('textarea');
+                            if (ta) { ta.disabled = !needsOpts || !isLinked; }
+                        };
+                        const primaryTypeEl = linkedWrap.querySelector('[data-linked-primary-type]');
+                        const primaryOptsWrap = linkedWrap.querySelector('[data-linked-primary-options-wrap]');
+                        const secondaryTypeEl = linkedWrap.querySelector('[data-linked-secondary-type]');
+                        const secondaryOptsWrap = linkedWrap.querySelector('[data-linked-secondary-options-wrap]');
+                        if (primaryTypeEl) {
+                            primaryTypeEl.onchange = function () { toggleLinkedOpts(primaryTypeEl, primaryOptsWrap); };
+                            toggleLinkedOpts(primaryTypeEl, primaryOptsWrap);
+                        }
+                        if (secondaryTypeEl) {
+                            secondaryTypeEl.onchange = function () { toggleLinkedOpts(secondaryTypeEl, secondaryOptsWrap); };
+                            toggleLinkedOpts(secondaryTypeEl, secondaryOptsWrap);
+                        }
+                        linkedWrap.querySelectorAll('input, select, textarea').forEach(function (el) {
+                            if (!isLinked) el.disabled = true;
+                            else if (!el.closest('[hidden]')) el.disabled = false;
+                        });
+                    }
+
                     const optionsTitle = row.querySelector('[data-name="options_title"]');
                     const optionsSubsections = row.querySelector('[data-name="options_subsections"]');
                     if (optionsTitle) { optionsTitle.disabled = !isSeccion; if (!isSeccion) optionsTitle.value = ''; }
@@ -478,6 +577,7 @@
         const syncExistingOptions = function (row) {
             const typeSelect = row.querySelector('[data-existing-field-type]');
             const optionsWrap = row.querySelector('[data-existing-options-wrap]');
+            const multiselectWrap = row.querySelector('[data-existing-multiselect-wrap]');
             const categoriaWrap = row.querySelector('[data-existing-categoria-wrap]');
             const seccionWraps = row.querySelectorAll('[data-existing-seccion-wrap]');
             const requiredWrap = row.querySelector('[data-existing-required-wrap]');
@@ -488,6 +588,7 @@
             const isDeleted = row.classList.contains('is-marked-remove');
             const t = typeSelect.value;
             const isSelect = t === 'select';
+            const isMultiselect = t === 'multiselect';
             const isCategoria = t === 'categoria';
             const isSeccion = t === 'seccion';
 
@@ -498,6 +599,15 @@
                     optionsInput.disabled = isDeleted || !isSelect;
                     optionsInput.required = !isDeleted && isSelect;
                     if (!isSelect && !isDeleted) optionsInput.value = '';
+                }
+            }
+            if (multiselectWrap) {
+                multiselectWrap.hidden = !isMultiselect;
+                const multiselectInput = multiselectWrap.querySelector('textarea');
+                if (multiselectInput) {
+                    multiselectInput.disabled = isDeleted || !isMultiselect;
+                    multiselectInput.required = !isDeleted && isMultiselect;
+                    if (!isMultiselect && !isDeleted) multiselectInput.value = '';
                 }
             }
             if (categoriaWrap) {
@@ -715,12 +825,19 @@
 
                 conflictActionInput.value = 'none';
 
+                const submitWithAction = function (action) {
+                    conflictActionInput.value = action;
+                    forceSubmit = true;
+                    editForm.submit();
+                };
+
                 const normalizeFieldType = function (value) {
                     return value === 'file' ? 'image' : value;
                 };
 
                 let hasConflict = false;
                 let hasMunicipioConflict = false;
+                let hasSelectToMultiselect = false;
 
                 existingRows.forEach(function (row) {
                     const hasData = row.getAttribute('data-has-data') === '1';
@@ -736,6 +853,12 @@
                     const newKey = keyInput ? keyInput.value.trim() : oldKey;
                     const newType = normalizeFieldType(typeSelect ? typeSelect.value : oldType);
 
+                    // select → multiselect with same key: safe migration
+                    if (!isDeleted && newKey === oldKey && oldType === 'select' && newType === 'multiselect') {
+                        hasSelectToMultiselect = true;
+                        return; // not a destructive conflict
+                    }
+
                     const rowHasConflict = isDeleted || newKey !== oldKey || newType !== oldType;
                     if (rowHasConflict) {
                         hasConflict = true;
@@ -745,17 +868,34 @@
                     }
                 });
 
+                // Only pure migration (no other conflicts)
+                if (hasSelectToMultiselect && !hasConflict) {
+                    event.preventDefault();
+                    if (!templateSwal) {
+                        submitWithAction('migrate_to_multiselect');
+                        return;
+                    }
+                    templateSwal.fire({
+                        title: 'Convertir lista a selección múltiple',
+                        html: 'Los registros existentes que tenían <b>un valor</b> seleccionado se conservarán como <b>una opción seleccionada</b>.<br><br>¿Continuar con la migración?',
+                        icon: 'info',
+                        showCancelButton: true,
+                        confirmButtonText: 'Migrar y guardar',
+                        cancelButtonText: 'Cancelar',
+                        reverseButtons: true
+                    }).then(function (result) {
+                        if (result.isConfirmed) {
+                            submitWithAction('migrate_to_multiselect');
+                        }
+                    });
+                    return;
+                }
+
                 if (!hasConflict) {
                     return;
                 }
 
                 event.preventDefault();
-
-                const submitWithAction = function (action) {
-                    conflictActionInput.value = action;
-                    forceSubmit = true;
-                    editForm.submit();
-                };
 
                 if (!templateSwal) {
                     submitWithAction(hasMunicipioConflict ? 'normalize_municipio' : 'clear_module');

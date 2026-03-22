@@ -566,12 +566,32 @@ class TemporaryModuleExportService
                 continue;
             }
 
+            $makeColumn = function (string $header1, string $header2) use ($field): array {
+                return ['header1' => $header1, 'header2' => $header2, 'field' => $field];
+            };
+
+            // Linked fields expand into TWO virtual columns (primary then secondary)
+            if ($field->type === 'linked') {
+                $opts = is_array($field->options) ? $field->options : [];
+                $primaryLabel = trim((string) ($opts['primary_label'] ?? '')) ?: ($field->label.' (principal)');
+                $secondaryLabel = trim((string) ($opts['secondary_label'] ?? '')) ?: ($field->label.' (dep.)');
+                if ($currentSection !== null && !empty($currentSection['subsections'])) {
+                    $columns[] = ['header1' => $currentSection['title'], 'header2' => $primaryLabel, 'field' => $field];
+                    $columns[] = ['header1' => $currentSection['title'], 'header2' => $secondaryLabel, 'field' => $field];
+                } else {
+                    $columns[] = ['header1' => $primaryLabel, 'header2' => $primaryLabel, 'field' => $field];
+                    $columns[] = ['header1' => $secondaryLabel, 'header2' => $secondaryLabel, 'field' => $field];
+                    $currentSection = null;
+                }
+                continue;
+            }
+
             if ($currentSection !== null && !empty($currentSection['subsections'])) {
                 $idx = (int) ($field->subsection_index ?? 0);
                 $subName = $currentSection['subsections'][$idx] ?? $field->label;
-                $columns[] = ['header1' => $currentSection['title'], 'header2' => $subName, 'field' => $field];
+                $columns[] = $makeColumn($currentSection['title'], $subName);
             } else {
-                $columns[] = ['header1' => $field->label, 'header2' => $field->label, 'field' => $field];
+                $columns[] = $makeColumn($field->label, $field->label);
                 $currentSection = null;
             }
         }
@@ -599,6 +619,27 @@ class TemporaryModuleExportService
             $labelByLower = [];
             foreach ($entries as $entry) {
                 $val = $entry->data[$fieldKey] ?? null;
+
+                // Multiselect: count each option separately
+                if (is_array($val) && !isset($val['primary'])) {
+                    foreach ($val as $item) {
+                        $key = is_scalar($item) ? trim((string) $item) : '';
+                        if ($key !== '') {
+                            $lower = mb_strtolower($key);
+                            $valueCounts[$lower] = ($valueCounts[$lower] ?? 0) + 1;
+                            if (!isset($labelByLower[$lower])) {
+                                $labelByLower[$lower] = $key;
+                            }
+                        }
+                    }
+                    continue;
+                }
+
+                // Linked: count by primary value
+                if (is_array($val) && isset($val['primary'])) {
+                    $val = $val['primary'];
+                }
+
                 if (is_bool($val)) {
                     $key = $val ? 'Sí' : 'No';
                 } elseif (is_scalar($val)) {
@@ -919,6 +960,26 @@ class TemporaryModuleExportService
 
                         if (is_bool($cell)) {
                             $sheet->setCellValue($cellCoordinate, $cell ? 'Sí' : 'No');
+                            $columnIndex++;
+                            continue;
+                        }
+
+                        // Multiselect: array → comma-joined string
+                        if ($field->type === 'multiselect' && is_array($cell)) {
+                            $sheet->setCellValue($cellCoordinate, implode(', ', $cell));
+                            $columnIndex++;
+                            continue;
+                        }
+
+                        // Linked: {primary, secondary} object → split into two virtual columns
+                        if ($field->type === 'linked') {
+                            // We emit two cells: primary then secondary (columns are doubled in buildExportColumns)
+                            $primaryVal = is_array($cell) ? ($cell['primary'] ?? '') : '';
+                            $secondaryVal = is_array($cell) ? ($cell['secondary'] ?? '') : '';
+                            $sheet->setCellValue($cellCoordinate, is_scalar($primaryVal) ? (string) $primaryVal : '');
+                            $columnIndex++;
+                            $secondaryCoord = Coordinate::stringFromColumnIndex($columnIndex).$rowIndex;
+                            $sheet->setCellValue($secondaryCoord, is_scalar($secondaryVal) ? (string) $secondaryVal : '');
                             $columnIndex++;
                             continue;
                         }

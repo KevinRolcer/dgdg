@@ -52,6 +52,8 @@ class TemporaryModuleController extends Controller
         'date' => 'Fecha',
         'datetime' => 'Fecha y hora',
         'select' => 'Lista de opciones',
+        'multiselect' => 'Selección múltiple',
+        'linked' => 'Campo vinculado (principal + dependiente)',
         'categoria' => 'Categoría',
         'municipio' => 'Municipio',
         'boolean' => 'Sí / No',
@@ -92,7 +94,7 @@ class TemporaryModuleController extends Controller
             ->select(['id', 'name', 'description', 'expires_at', 'applies_to_all', 'is_active'])
             ->withCount(['fields', 'entries', 'targetUsers'])
             ->latest()
-            ->paginate(10);
+            ->paginate(8);
 
         return view('temporary_modules.admin.index', [
             'pageTitle' => 'Modulos temporales',
@@ -133,11 +135,12 @@ class TemporaryModuleController extends Controller
         }
 
         $modules = TemporaryModule::query()
+            ->select($select)
+            ->with(['entries.user', 'entries.microrregion', 'fields'])
             ->whereHas('entries')
             ->withCount(['fields', 'entries'])
-            ->select($select)
             ->latest()
-            ->paginate(15);
+            ->paginate(8);
 
         return view('temporary_modules.admin.records', [
             'pageTitle' => 'Registros de modulos temporales',
@@ -448,7 +451,7 @@ class TemporaryModuleController extends Controller
             'applies_to' => ['required', Rule::in(['all', 'selected'])],
             'delegate_ids' => ['nullable', 'array'],
             'delegate_ids.*' => ['integer', Rule::exists('users', 'id')],
-            'conflict_action' => ['nullable', Rule::in(['none', 'clear_module', 'clear_field_data', 'normalize_municipio'])],
+            'conflict_action' => ['nullable', Rule::in(['none', 'clear_module', 'clear_field_data', 'normalize_municipio', 'migrate_to_multiselect'])],
             'existing_fields' => ['nullable', 'array'],
             'existing_fields.*.id' => ['required_with:existing_fields', 'integer'],
             'existing_fields.*.label' => ['nullable', 'required_unless:existing_fields.*.delete,1', 'string', 'max:120'],
@@ -572,7 +575,13 @@ class TemporaryModuleController extends Controller
             );
 
             if ($hasData && ($normalized['key'] !== $oldKey || $this->fieldService->canonicalFieldType((string) $normalized['type']) !== $oldType)) {
-                $destructiveKeys[] = $oldKey;
+                // select → multiselect is a safe migration, not a destructive change
+                $isSelectToMultiselect = $oldType === 'select'
+                    && $this->fieldService->canonicalFieldType((string) $normalized['type']) === 'multiselect'
+                    && $normalized['key'] === $oldKey;
+                if (! $isSelectToMultiselect) {
+                    $destructiveKeys[] = $oldKey;
+                }
             }
 
             if ($normalized['key'] !== $oldKey) {
@@ -596,6 +605,44 @@ class TemporaryModuleController extends Controller
         $destructiveKeys = array_values(array_unique($destructiveKeys));
         $invalidMainImageKeys = array_values(array_unique($invalidMainImageKeys));
         $conflictAction = (string) ($validated['conflict_action'] ?? 'none');
+
+        // --- Migrate select → multiselect (wrap existing strings in arrays) ---
+        if ($conflictAction === 'migrate_to_multiselect') {
+            foreach ($temporaryModule->fields as $field) {
+                if ($this->fieldService->canonicalFieldType((string) $field->type) !== 'select') {
+                    continue;
+                }
+                $fieldId = (int) $field->id;
+                $submittedRow = $submittedExisting->get($fieldId);
+                if (! $submittedRow) {
+                    continue;
+                }
+                $newType = $this->fieldService->canonicalFieldType((string) ($submittedRow['type'] ?? $field->type));
+                if ($newType !== 'multiselect') {
+                    continue;
+                }
+                // Wrap each single-string value into a single-item array
+                $fieldKey = (string) $field->key;
+                $temporaryModule->entries()->chunkById(200, function ($entries) use ($fieldKey) {
+                    foreach ($entries as $entry) {
+                        $data = is_array($entry->data) ? $entry->data : [];
+                        if (! array_key_exists($fieldKey, $data)) {
+                            continue;
+                        }
+                        $val = $data[$fieldKey];
+                        if (is_string($val) && $val !== '') {
+                            $data[$fieldKey] = [$val];
+                            $entry->update(['data' => $data]);
+                        } elseif ($val === '') {
+                            $data[$fieldKey] = null;
+                            $entry->update(['data' => $data]);
+                        }
+                        // null stays null, existing arrays stay as-is
+                    }
+                });
+            }
+            $conflictAction = 'none';
+        }
 
         if ($conflictAction === 'normalize_municipio') {
             $adminSeed = app(\App\Services\TemporaryModules\TemporaryModuleAdminSeedService::class);
@@ -1078,6 +1125,22 @@ class TemporaryModuleController extends Controller
                     ? ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240']
                     : ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'];
                 $rules['remove_images.'.$field->key] = ['nullable', 'boolean'];
+            } elseif ($field->type === 'multiselect') {
+                $opts = is_array($field->options) ? $field->options : [];
+                $rules[$key] = $field->is_required ? ['required', 'array'] : ['nullable', 'array'];
+                $rules[$key.'.*'] = ['string', 'max:255', Rule::in($opts)];
+            } elseif ($field->type === 'linked') {
+                $opts = is_array($field->options) ? $field->options : [];
+                $primaryType = (string) ($opts['primary_type'] ?? 'text');
+                $secondaryType = (string) ($opts['secondary_type'] ?? 'text');
+                $primaryOpts = (array) ($opts['primary_options'] ?? []);
+                $secondaryOpts = (array) ($opts['secondary_options'] ?? []);
+                $secondaryRequired = (bool) ($opts['secondary_required'] ?? true);
+                // Primary field: use the outer is_required on the primary
+                $rules['values.'.$field->key.'__primary'] = $this->fieldService->rulesForField($primaryType, (bool) $field->is_required, $primaryOpts, $municipios);
+                // Secondary: only required when primary has a value (validated later in value processing)
+                $rules['values.'.$field->key.'__secondary'] = $this->fieldService->rulesForField($secondaryType, false, $secondaryOpts, $municipios);
+                unset($rules[$key]); // remove the top-level rule, sub-rules replace it
             } else {
                 $rules[$key] = $this->fieldService->rulesForField($field->type, (bool) $field->is_required, $field->options ?? [], $municipios);
             }
@@ -1127,6 +1190,33 @@ class TemporaryModuleController extends Controller
 
             if ($field->type === 'boolean') {
                 $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            }
+
+            if ($field->type === 'multiselect') {
+                $value = is_array($value) ? array_values(array_filter(array_map('trim', $value))) : [];
+                if (empty($value) && $field->is_required) {
+                    $value = null; // let required validation catch it
+                }
+                if (empty($value)) {
+                    $value = null;
+                }
+            }
+
+            if ($field->type === 'linked') {
+                $opts = is_array($field->options) ? $field->options : [];
+                $primaryKey = $field->key.'__primary';
+                $secondaryKey = $field->key.'__secondary';
+                $primaryRaw = $values[$primaryKey] ?? null;
+                $secondaryRaw = $values[$secondaryKey] ?? null;
+                // Remove helper keys from storage
+                unset($values[$primaryKey], $values[$secondaryKey]);
+                $primaryLabel = (string) ($opts['primary_label'] ?? 'Principal');
+                $primaryEmpty = $primaryRaw === null || $primaryRaw === '' || (is_array($primaryRaw) && empty($primaryRaw));
+                $secondaryLabel = (string) ($opts['secondary_label'] ?? 'Secundario');
+                $value = [
+                    'primary'   => $primaryEmpty ? null : $primaryRaw,
+                    'secondary' => $primaryEmpty ? ('Sin '.$primaryLabel) : $secondaryRaw,
+                ];
             }
 
             $values[$field->key] = $value;

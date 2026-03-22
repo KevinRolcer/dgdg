@@ -165,6 +165,61 @@
             <textarea data-name="options_subsections" rows="2" placeholder="Subsección 1&#10;Subsección 2"></textarea>
         </label>
 
+        {{-- multiselect: same options list as select --}}
+        <label class="tm-options-field" data-multiselect-wrap hidden>
+            Opciones seleccionables (separadas por coma o salto de línea)
+            <textarea data-name="options" rows="2" placeholder="Rojo, Verde, Amarillo"></textarea>
+        </label>
+
+        {{-- linked: two sub-field definitions --}}
+        <fieldset class="tm-linked-wrap" data-linked-wrap hidden style="border:1px solid var(--clr-divider,#ddd);border-radius:6px;padding:10px 14px;display:flex;flex-direction:column;gap:8px;">
+            <legend style="font-size:.8rem;font-weight:600;color:var(--clr-primary,#861e34);padding:0 4px;">Campo principal</legend>
+            <div class="tm-grid tm-grid-2" style="gap:8px;">
+                <label>
+                    Etiqueta del principal
+                    <input type="text" data-name="linked_primary_label" placeholder="ej. Problemática">
+                </label>
+                <label>
+                    Tipo del principal
+                    <select data-name="linked_primary_type" data-linked-primary-type>
+                        <option value="text">Texto</option>
+                        <option value="textarea">Texto largo</option>
+                        <option value="number">Número</option>
+                        <option value="date">Fecha</option>
+                        <option value="select">Lista de opciones</option>
+                        <option value="boolean">Sí / No</option>
+                    </select>
+                </label>
+            </div>
+            <label data-linked-primary-options-wrap hidden>
+                Opciones del principal (separadas por coma o salto de línea)
+                <textarea data-name="linked_primary_options" rows="2" placeholder="Opción 1, Opción 2"></textarea>
+            </label>
+
+            <legend style="font-size:.8rem;font-weight:600;color:var(--clr-secondary,#246257);padding:4px 0 0;">Campo dependiente</legend>
+            <div class="tm-grid tm-grid-2" style="gap:8px;">
+                <label>
+                    Etiqueta del dependiente
+                    <input type="text" data-name="linked_secondary_label" placeholder="ej. Semáforo de riesgo">
+                </label>
+                <label>
+                    Tipo del dependiente
+                    <select data-name="linked_secondary_type" data-linked-secondary-type>
+                        <option value="text">Texto</option>
+                        <option value="textarea">Texto largo</option>
+                        <option value="number">Número</option>
+                        <option value="date">Fecha</option>
+                        <option value="select">Lista de opciones</option>
+                        <option value="boolean">Sí / No</option>
+                    </select>
+                </label>
+            </div>
+            <label data-linked-secondary-options-wrap hidden>
+                Opciones del dependiente (separadas por coma o salto de línea)
+                <textarea data-name="linked_secondary_options" rows="2" placeholder="Rojo, Amarillo, Verde"></textarea>
+            </label>
+        </fieldset>
+
         <button type="button" class="tm-btn tm-btn-danger" data-remove-field>Quitar</button>
     </div>
 </template>
@@ -238,6 +293,8 @@
             const optionsWrap = row.querySelector('[data-options-wrap]');
             const categoriaWrap = row.querySelector('[data-categoria-wrap]');
             const seccionWraps = row.querySelectorAll('[data-seccion-wrap]');
+            const multiselectWrap = row.querySelector('[data-multiselect-wrap]');
+            const linkedWrap = row.querySelector('[data-linked-wrap]');
             const requiredWrap = row.querySelector('[data-required-wrap]');
             const removeButton = row.querySelector('[data-remove-field]');
             const commentWrap = row.querySelector('[data-comment-wrap]');
@@ -258,10 +315,14 @@
                     const isSelect = t === 'select';
                     const isCategoria = t === 'categoria';
                     const isSeccion = t === 'seccion';
+                    const isMultiselect = t === 'multiselect';
+                    const isLinked = t === 'linked';
 
                     optionsWrap.hidden = !isSelect;
                     if (categoriaWrap) categoriaWrap.hidden = !isCategoria;
                     seccionWraps.forEach(function (w) { w.hidden = !isSeccion; });
+                    if (multiselectWrap) multiselectWrap.hidden = !isMultiselect;
+                    if (linkedWrap) linkedWrap.hidden = !isLinked;
                     if (requiredWrap) requiredWrap.hidden = isSeccion;
 
                     const optionsInput = optionsWrap.querySelector('[data-name="options"]');
@@ -276,6 +337,41 @@
                         categoriaInput.disabled = !isCategoria;
                         if (!isCategoria) categoriaInput.value = '';
                     }
+                    const multiselectInput = multiselectWrap ? multiselectWrap.querySelector('[data-name="options"]') : null;
+                    if (multiselectInput) {
+                        multiselectInput.required = isMultiselect;
+                        multiselectInput.disabled = !isMultiselect;
+                        if (!isMultiselect) multiselectInput.value = '';
+                    }
+
+                    // Toggle linked sub-field option textareas based on their type selects
+                    if (linkedWrap) {
+                        const toggleLinkedOpts = function (typeEl, optsWrapEl) {
+                            if (!typeEl || !optsWrapEl) return;
+                            const needsOpts = typeEl.value === 'select';
+                            optsWrapEl.hidden = !needsOpts;
+                            const ta = optsWrapEl.querySelector('textarea');
+                            if (ta) { ta.disabled = !needsOpts || !isLinked; }
+                        };
+                        const primaryTypeEl = linkedWrap.querySelector('[data-linked-primary-type]');
+                        const primaryOptsWrap = linkedWrap.querySelector('[data-linked-primary-options-wrap]');
+                        const secondaryTypeEl = linkedWrap.querySelector('[data-linked-secondary-type]');
+                        const secondaryOptsWrap = linkedWrap.querySelector('[data-linked-secondary-options-wrap]');
+                        if (primaryTypeEl) {
+                            primaryTypeEl.onchange = function () { toggleLinkedOpts(primaryTypeEl, primaryOptsWrap); };
+                            toggleLinkedOpts(primaryTypeEl, primaryOptsWrap);
+                        }
+                        if (secondaryTypeEl) {
+                            secondaryTypeEl.onchange = function () { toggleLinkedOpts(secondaryTypeEl, secondaryOptsWrap); };
+                            toggleLinkedOpts(secondaryTypeEl, secondaryOptsWrap);
+                        }
+                        // Disable linked internals when not linked type
+                        linkedWrap.querySelectorAll('input, select, textarea').forEach(function (el) {
+                            if (!isLinked) el.disabled = true;
+                            else if (!el.closest('[hidden]')) el.disabled = false;
+                        });
+                    }
+
                     const optionsTitle = row.querySelector('[data-name="options_title"]');
                     const optionsSubsections = row.querySelector('[data-name="options_subsections"]');
                     if (optionsTitle) { optionsTitle.disabled = !isSeccion; if (!isSeccion) optionsTitle.value = ''; }
