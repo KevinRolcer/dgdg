@@ -3,7 +3,6 @@
 use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\AgendaController;
 use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\CanvaController;
 use App\Http\Controllers\GilroyFontController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\MesasPazController;
@@ -39,7 +38,12 @@ Route::middleware('auth')->group(function () {
         ->name('settings.images.migrate');
     Route::post('/ajustes/microrregiones/distribuir-excel', [AdminSettingsController::class, 'distribuirMunicipiosExcel'])
         ->middleware('can:Modulos-Temporales-Admin')
+        ->name('settings.images.migrate'); // Using same name as previous for distribute excel
+    
+    Route::post('/ajustes/microrregiones/distribuir-excel', [AdminSettingsController::class, 'distribuirMunicipiosExcel'])
+        ->middleware('can:Modulos-Temporales-Admin')
         ->name('settings.microrregiones.distribuir-excel');
+
     Route::get('/ajustes/chats-whatsapp-autenticador', [SettingsController::class, 'whatsappTotpReset'])
         ->middleware('can:Chats-WhatsApp-Sensible')
         ->name('settings.whatsapp-totp-reset');
@@ -50,7 +54,7 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:6,1')
         ->name('profile.password.update');
 
-    /* Mesas: consulta = Gate mesas-paz-ver; escritura = Gate Mesas-Paz (PAP usa solo Mesas-Paz en todo — aquí separado) */
+    /* Mesas: consulta = Gate mesas-paz-ver; escritura = Gate Mesas-Paz */
     Route::get('/mesas-paz', [MesasPazController::class, 'index'])->name('mesas-paz')->middleware('can:mesas-paz-ver');
     Route::post('/mesas-paz', [MesasPazController::class, 'store'])->name('mesas-paz.store')->middleware('can:Mesas-Paz');
     Route::post('/mesas-paz/asistencia-municipio', [MesasPazController::class, 'guardarMunicipio'])->name('mesas-paz.guardar-municipio')->middleware('can:Mesas-Paz');
@@ -60,7 +64,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/mesas-paz/importar-excel', [MesasPazController::class, 'importarExcel'])->name('mesas-paz.importar-excel')->middleware('can:Mesas-Paz');
     Route::post('/mesas-paz/vaciar-microrregion', [MesasPazController::class, 'vaciarMicrorregion'])->name('mesas-paz.vaciar-microrregion')->middleware('can:Mesas-Paz');
     Route::get('/mesas-paz/evidencia/preview', [MesasPazController::class, 'previewEvidencia'])->name('mesas-paz.evidencia.preview')->middleware('can:mesas-paz-ver');
-    Route::post('/ppt/generar-presentacion', [PowerPointController::class, 'generarPresentacion'])->name('ppt.generar-presentacion');
+    
+    Route::post('/ppt/generar-presentacion', [PowerPointController::class, 'generarPresentacion'])
+        ->name('ppt.generar-presentacion')
+        ->middleware('can:Tableros-incidencias');
+
     Route::get('/mesas-paz/historial-detalle', [MesasPazController::class, 'detallePorFecha'])->name('mesas-paz.historial-detalle')->middleware('can:mesas-paz-ver');
     Route::get('/mesas-paz/evidencias', [MesasPazSupervisionController::class, 'evidencias'])->name('mesas-paz.evidencias')->middleware('can:Tableros-incidencias');
     Route::get('/mesas-paz/evidencias/pdf', [MesasPazSupervisionController::class, 'descargarPdf'])->name('mesas-paz.evidencias.pdf')->middleware('can:Tableros-incidencias');
@@ -72,7 +80,6 @@ Route::middleware('auth')->group(function () {
         if ($user) {
             $user->notifications()->delete();
         }
-
         return back();
     })->name('notifications.clear');
 
@@ -81,7 +88,6 @@ Route::middleware('auth')->group(function () {
         if ($user) {
             $user->notifications()->where('id', $id)->delete();
         }
-
         return back();
     })->name('notifications.destroy');
 
@@ -148,79 +154,35 @@ Route::middleware('auth')->group(function () {
                 ->name('temporary-modules.admin.destroy');
         });
 
-        Route::get('/subir-informacion', [TemporaryModuleController::class, 'delegateIndex'])
-            ->middleware('can:modulos-temporales-ver')
-            ->name('temporary-modules.upload');
-        Route::get('/ver-mis-registros', [TemporaryModuleController::class, 'delegateIndex'])
-            ->middleware('can:modulos-temporales-ver')
-            ->name('temporary-modules.records');
-        Route::get('/', [TemporaryModuleController::class, 'delegateIndex'])
-            ->middleware('can:modulos-temporales-ver')
-            ->name('temporary-modules.index');
-        Route::get('/fragmento/modulos', [TemporaryModuleController::class, 'delegatePartialUpload'])
-            ->middleware('can:modulos-temporales-ver')
-            ->name('temporary-modules.fragment.upload');
-        Route::get('/fragmento/registros', [TemporaryModuleController::class, 'delegatePartialRecords'])
-            ->middleware('can:modulos-temporales-ver')
-            ->name('temporary-modules.fragment.records');
-        Route::get('/{module}/estado', [TemporaryModuleController::class, 'moduleStatus'])
-            ->middleware('can:modulos-temporales-ver')
-            ->whereNumber('module')
-            ->name('temporary-modules.module-status');
-        Route::post('/{module}/importar-excel-preview', [TemporaryModuleController::class, 'importExcelPreview'])
-            ->middleware('can:Modulos-Temporales')
-            ->whereNumber('module')
-            ->name('temporary-modules.import-excel-preview');
-        Route::post('/{module}/importar-excel', [TemporaryModuleController::class, 'importExcel'])
-            ->middleware('can:Modulos-Temporales')
-            ->whereNumber('module')
-            ->name('temporary-modules.import-excel');
-        Route::post('/{module}/importar-fila', [TemporaryModuleController::class, 'importSingleRow'])
-            ->middleware('can:Modulos-Temporales')
-            ->whereNumber('module')
-            ->name('temporary-modules.import-single-row');
-        Route::get('/{module}', [TemporaryModuleController::class, 'show'])
-            ->middleware('can:modulos-temporales-ver')
-            ->whereNumber('module')
-            ->name('temporary-modules.show');
-        Route::post('/{module}/registros', [TemporaryModuleController::class, 'submit'])
-            ->middleware('can:Modulos-Temporales')
-            ->whereNumber('module')
-            ->name('temporary-modules.submit');
-        Route::delete('/{module}/registros/{entry}', [TemporaryModuleController::class, 'destroyEntry'])
-            ->middleware('can:Modulos-Temporales')
-            ->whereNumber('module')
-            ->whereNumber('entry')
-            ->name('temporary-modules.entry.destroy');
-        Route::get('/{module}/plantilla', [TemporaryModuleController::class, 'downloadTemplate'])
-            ->middleware('can:modulos-temporales-ver')
-            ->whereNumber('module')
-            ->name('temporary-modules.download-template');
-        Route::get('/plantillas/{file}', [TemporaryModuleController::class, 'downloadTemplateFile'])
-            ->where('file', 'plantilla_[A-Za-z0-9_\-]+\.xlsx')
-            ->middleware('can:modulos-temporales-ver')
-            ->name('temporary-modules.plantilla.download');
-        Route::get('/{module}/registros/{entry}/archivo/{fieldKey}', [TemporaryModuleController::class, 'previewEntryFile'])
-            ->middleware('can:modulos-temporales-ver')
-            ->whereNumber('entry')
-            ->where('fieldKey', '[A-Za-z0-9_\-]+')
-            ->name('temporary-modules.entry-file.preview');
+        Route::get('/subir-informacion', [TemporaryModuleController::class, 'delegateIndex'])->middleware('can:modulos-temporales-ver')->name('temporary-modules.upload');
+        Route::get('/ver-mis-registros', [TemporaryModuleController::class, 'delegateIndex'])->middleware('can:modulos-temporales-ver')->name('temporary-modules.records');
+        Route::get('/', [TemporaryModuleController::class, 'delegateIndex'])->middleware('can:modulos-temporales-ver')->name('temporary-modules.index');
+        Route::get('/fragmento/modulos', [TemporaryModuleController::class, 'delegatePartialUpload'])->middleware('can:modulos-temporales-ver')->name('temporary-modules.fragment.upload');
+        Route::get('/fragmento/registros', [TemporaryModuleController::class, 'delegatePartialRecords'])->middleware('can:modulos-temporales-ver')->name('temporary-modules.fragment.records');
+        Route::get('/{module}/estado', [TemporaryModuleController::class, 'moduleStatus'])->middleware('can:modulos-temporales-ver')->whereNumber('module')->name('temporary-modules.module-status');
+        Route::post('/{module}/importar-excel-preview', [TemporaryModuleController::class, 'importExcelPreview'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.import-excel-preview');
+        Route::post('/{module}/importar-excel', [TemporaryModuleController::class, 'importExcel'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.import-excel');
+        Route::post('/{module}/importar-fila', [TemporaryModuleController::class, 'importSingleRow'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.import-single-row');
+        Route::get('/{module}', [TemporaryModuleController::class, 'show'])->middleware('can:modulos-temporales-ver')->whereNumber('module')->name('temporary-modules.show');
+        Route::post('/{module}/registros', [TemporaryModuleController::class, 'submit'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.submit');
+        Route::delete('/{module}/registros/{entry}', [TemporaryModuleController::class, 'destroyEntry'])->middleware('can:Modulos-Temporales')->whereNumber('module')->whereNumber('entry')->name('temporary-modules.entry.destroy');
+        Route::get('/{module}/plantilla', [TemporaryModuleController::class, 'downloadTemplate'])->middleware('can:modulos-temporales-ver')->whereNumber('module')->name('temporary-modules.download-template');
+        Route::get('/plantillas/{file}', [TemporaryModuleController::class, 'downloadTemplateFile'])->where('file', 'plantilla_[A-Za-z0-9_\-]+\.xlsx')->middleware('can:modulos-temporales-ver')->name('temporary-modules.plantilla.download');
+        Route::get('/{module}/registros/{entry}/archivo/{fieldKey}', [TemporaryModuleController::class, 'previewEntryFile'])->middleware('can:modulos-temporales-ver')->whereNumber('entry')->where('fieldKey', '[A-Za-z0-9_\-]+')->name('temporary-modules.entry-file.preview');
     });
 
-    /* Agenda: consulta (índice/ver) vs escritura (resto) — tipo PAP por permiso */
     Route::middleware(['agenda.access'])->group(function () {
         Route::get('agenda/modulo/enlaces', [AgendaController::class, 'moduloEnlaces'])->name('agenda.modulo.enlaces');
         Route::get('agenda/seguimiento', [\App\Http\Controllers\AgendaSeguimientoController::class, 'index'])->name('agenda.seguimiento.index');
         Route::get('agenda/calendario', [AgendaController::class, 'calendar'])->name('agenda.calendar');
         Route::post('agenda/calendario/fichas-pdf', [AgendaController::class, 'calendarFichasPdf'])->name('agenda.calendar.fichas-pdf');
-        Route::get('agenda/calendario/fichas-export/{file}', [AgendaController::class, 'downloadFichasExport'])
-            ->where('file', '[A-Za-z0-9._\-]+')
-            ->name('agenda.calendar.fichas-export.download');
+        Route::get('agenda/calendario/fichas-export/{file}', [AgendaController::class, 'downloadFichasExport'])->where('file', '[A-Za-z0-9._\-]+')->name('agenda.calendar.fichas-export.download');
         Route::get('agenda/{agenda}/ficha-pdf', [AgendaController::class, 'downloadSingleFichaPdf'])->name('agenda.ficha.download');
         Route::post('agenda/{agenda}/ficha-pdf', [AgendaController::class, 'queueSingleFichaPdf'])->name('agenda.ficha.queue');
         Route::get('agenda', [AgendaController::class, 'index'])->name('agenda.index');
         Route::get('agenda/{agenda}', [AgendaController::class, 'show'])->name('agenda.show');
     });
+
     Route::middleware(['agenda.access.escritura'])->group(function () {
         Route::post('agenda/modulo/asignar', [AgendaController::class, 'moduloAsignar'])->name('agenda.modulo.asignar');
         Route::post('agenda/modulo/quitar', [AgendaController::class, 'moduloQuitar'])->name('agenda.modulo.quitar');
@@ -234,12 +196,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('agenda/{agenda}', [AgendaController::class, 'destroy'])->name('agenda.destroy');
     });
 
-    Route::get('/canva/auth', [CanvaController::class, 'authRedirect'])->name('canva.auth');
-    Route::post('/canva/generar-documento', [CanvaController::class, 'generarDocumento'])->name('canva.generar-documento');
-
-    Route::get('admin/agenda/seguimiento', [\App\Http\Controllers\AgendaSeguimientoController::class, 'adminSeguimiento'])
-        ->middleware('can:Modulos-Temporales-Admin')
-        ->name('agenda.seguimiento.admin');
+    Route::get('admin/agenda/seguimiento', [\App\Http\Controllers\AgendaSeguimientoController::class, 'adminSeguimiento'])->middleware('can:Modulos-Temporales-Admin')->name('agenda.seguimiento.admin');
 
     Route::prefix('admin/usuarios')->middleware('can:Administrar-Usuarios')->group(function () {
         Route::get('/', [\App\Http\Controllers\Admin\UserManagementController::class, 'index'])->name('admin.usuarios.index');
@@ -251,37 +208,18 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/toggle-status', [\App\Http\Controllers\Admin\UserManagementController::class, 'toggleStatus'])->name('admin.usuarios.toggle-status');
     });
 
-    Route::prefix('admin/whatsapp-chats')
-        ->middleware([
-            'auth',
-            'can:Chats-WhatsApp-Sensible',
-            \App\Http\Middleware\WhatsAppNoStoreResponse::class,
-        ])
-        ->group(function () {
-            Route::get('/desbloqueo', function (\Illuminate\Http\Request $request) {
-                return redirect()->route('whatsapp-chats.admin.totp', $request->query());
-            });
-
-            Route::get('/totp', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'totpForm'])
-                ->name('whatsapp-chats.admin.totp');
-            Route::post('/totp', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'totpSubmit'])
-                ->middleware('throttle:12,1')
-                ->name('whatsapp-chats.admin.totp.post');
-
-            Route::middleware([\App\Http\Middleware\ConfirmWhatsAppSensitiveAccess::class])->group(function () {
-                Route::get('/', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'index'])
-                    ->name('whatsapp-chats.admin.index');
-                Route::post('/', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'store'])
-                    ->name('whatsapp-chats.admin.store');
-                Route::get('/{chat}', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'show'])
-                    ->whereNumber('chat')
-                    ->name('whatsapp-chats.admin.show');
-                Route::get('/{chat}/media', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'media'])
-                    ->whereNumber('chat')
-                    ->name('whatsapp-chats.admin.media');
-                Route::delete('/{chat}', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'destroy'])
-                    ->whereNumber('chat')
-                    ->name('whatsapp-chats.admin.destroy');
-            });
+    Route::prefix('admin/whatsapp-chats')->middleware(['auth', 'can:Chats-WhatsApp-Sensible', \App\Http\Middleware\WhatsAppNoStoreResponse::class])->group(function () {
+        Route::get('/desbloqueo', function (\Illuminate\Http\Request $request) {
+            return redirect()->route('whatsapp-chats.admin.totp', $request->query());
         });
+        Route::get('/totp', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'totpForm'])->name('whatsapp-chats.admin.totp');
+        Route::post('/totp', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'totpSubmit'])->middleware('throttle:12,1')->name('whatsapp-chats.admin.totp.post');
+        Route::middleware([\App\Http\Middleware\ConfirmWhatsAppSensitiveAccess::class])->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'index'])->name('whatsapp-chats.admin.index');
+            Route::post('/', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'store'])->name('whatsapp-chats.admin.store');
+            Route::get('/{chat}', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'show'])->whereNumber('chat')->name('whatsapp-chats.admin.show');
+            Route::get('/{chat}/media', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'media'])->whereNumber('chat')->name('whatsapp-chats.admin.media');
+            Route::delete('/{chat}', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'destroy'])->whereNumber('chat')->name('whatsapp-chats.admin.destroy');
+        });
+    });
 });

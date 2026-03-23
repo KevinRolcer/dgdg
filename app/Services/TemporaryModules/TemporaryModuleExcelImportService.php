@@ -16,7 +16,7 @@ class TemporaryModuleExcelImportService
 {
     /** Tipos que se pueden llenar desde Excel (sin archivo/imagen). */
     public const IMPORTABLE_TYPES = [
-        'text', 'textarea', 'number', 'date', 'datetime', 'select', 'multiselect', 'linked', 'boolean', 'categoria', 'municipio', 'geopoint', 'image',
+        'text', 'textarea', 'number', 'date', 'datetime', 'select', 'multiselect', 'linked', 'boolean', 'categoria', 'municipio', 'geopoint', 'image', 'semaforo',
     ];
 
     public function importableFields(Collection $fields): Collection
@@ -372,6 +372,14 @@ class TemporaryModuleExcelImportService
                 || $u === 'X';
         }
 
+        if ($t === 'semaforo') {
+            if ($str === '') {
+                return null;
+            }
+
+            return TemporaryModuleFieldService::normalizeSemaforoInput($str);
+        }
+
         if ($t === 'date') {
             if ($str === '') {
                 return null;
@@ -463,7 +471,18 @@ class TemporaryModuleExcelImportService
             $primary = trim($parts[0]);
             $secondary = isset($parts[1]) ? trim($parts[1]) : null;
 
-            return ['primary' => $primary !== '' ? $primary : null, 'secondary' => $secondary];
+            $result = ['primary' => $primary !== '' ? $primary : null, 'secondary' => $secondary];
+            $opts = is_array($field->options) ? $field->options : [];
+            $pt = (string) ($opts['primary_type'] ?? '');
+            if ($pt === 'semaforo' && is_string($result['primary']) && trim($result['primary']) !== '') {
+                $result['primary'] = TemporaryModuleFieldService::normalizeSemaforoInput($result['primary']);
+            }
+            $st = (string) ($opts['secondary_type'] ?? '');
+            if ($st === 'semaforo' && is_string($result['secondary']) && trim($result['secondary']) !== '') {
+                $result['secondary'] = TemporaryModuleFieldService::normalizeSemaforoInput($result['secondary']);
+            }
+
+            return $result;
         }
 
         if ($t === 'select') {

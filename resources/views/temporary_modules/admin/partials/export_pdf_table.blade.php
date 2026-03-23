@@ -1,5 +1,8 @@
 @php
+    use App\Services\TemporaryModules\TemporaryModuleFieldService;
     use Illuminate\Support\Arr;
+
+    $fieldTypesByKey = $fieldTypesByKey ?? [];
 @endphp
 <!DOCTYPE html>
 <html lang="es">
@@ -179,7 +182,9 @@
                         } elseif (is_array($val)) {
                             $text = implode(', ', array_map(static fn ($v) => is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE), $val));
                         } elseif (is_scalar($val)) {
-                            $text = (string) $val;
+                            $text = (($fieldTypesByKey[$key] ?? '') === 'semaforo')
+                                ? (TemporaryModuleFieldService::labelForSemaforo((string) $val) ?: (string) $val)
+                                : (string) $val;
                         } else {
                             $text = '';
                         }

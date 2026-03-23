@@ -295,6 +295,9 @@
                                                                                 </button>
                                                                             @elseif (is_bool($cell))
                                                                                 {{ $cell ? 'Sí' : 'No' }}
+                                                                            @elseif ($field->type === 'semaforo' && is_string($cell) && $cell !== '')
+                                                                                @php $semLab = \App\Services\TemporaryModules\TemporaryModuleFieldService::labelForSemaforo($cell); @endphp
+                                                                                <span class="tm-semaforo-badge tm-semaforo-badge--{{ $cell }}" title="{{ $semLab }}">{{ $semLab }}</span>
                                                                             @else
                                                                                 @php
                                                                                     if (is_array($cell)) {

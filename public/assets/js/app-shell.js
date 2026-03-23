@@ -91,17 +91,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function closeTopbarDropdowns() {
-        if (topbarNotifyToggle && topbarNotifyPanel) {
-            topbarNotifyToggle.setAttribute('aria-expanded', 'false');
-            topbarNotifyPanel.classList.remove('is-open');
-            topbarNotifyPanel.setAttribute('aria-hidden', 'true');
-        }
-
-        if (topbarProfileToggle && topbarProfilePanel) {
-            topbarProfileToggle.setAttribute('aria-expanded', 'false');
-            topbarProfilePanel.classList.remove('is-open');
-            topbarProfilePanel.setAttribute('aria-hidden', 'true');
-        }
+        [
+            [topbarNotifyToggle, topbarNotifyPanel],
+            [topbarProfileToggle, topbarProfilePanel],
+        ].forEach(function (pair) {
+            var toggle = pair[0];
+            var panel = pair[1];
+            if (!toggle || !panel) {
+                return;
+            }
+            toggle.setAttribute('aria-expanded', 'false');
+            panel.classList.remove('is-open');
+            panel.setAttribute('aria-hidden', 'true');
+        });
     }
 
     function openNotificationsDrawer() {
@@ -208,17 +210,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 var parser = new DOMParser();
                 var doc = parser.parseFromString(html, 'text/html');
 
-                var newTopList = doc.querySelector('#topbarNotifyPanel .topbar-notify-list');
-                var currentTopList = document.querySelector('#topbarNotifyPanel .topbar-notify-list');
-                if (newTopList && currentTopList) {
-                    currentTopList.innerHTML = newTopList.innerHTML;
+                function syncInnerHtmlFromParsedDoc(selector) {
+                    var nextEl = doc.querySelector(selector);
+                    var curEl = document.querySelector(selector);
+                    if (nextEl && curEl) {
+                        curEl.innerHTML = nextEl.innerHTML;
+                    }
                 }
 
-                var newDrawerBody = doc.querySelector('.notifications-drawer-body');
-                var currentDrawerBody = document.querySelector('.notifications-drawer-body');
-                if (newDrawerBody && currentDrawerBody) {
-                    currentDrawerBody.innerHTML = newDrawerBody.innerHTML;
-                }
+                syncInnerHtmlFromParsedDoc('#topbarNotifyPanel .topbar-notify-list');
+                syncInnerHtmlFromParsedDoc('.notifications-drawer-body');
 
                 var newDot = doc.querySelector('.topbar-notify-dot');
                 var currentDot = document.querySelector('.topbar-notify-dot');
@@ -324,20 +325,18 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function onNotificationsRefreshClick(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        refreshNotifications();
+    }
+
     if (topbarNotifyRefresh) {
-        topbarNotifyRefresh.addEventListener('click', function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-            refreshNotifications();
-        });
+        topbarNotifyRefresh.addEventListener('click', onNotificationsRefreshClick);
     }
 
     if (notificationsDrawerRefresh) {
-        notificationsDrawerRefresh.addEventListener('click', function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-            refreshNotifications();
-        });
+        notificationsDrawerRefresh.addEventListener('click', onNotificationsRefreshClick);
     }
 
     document.querySelectorAll('form[data-notifications-clear]').forEach(function (form) {

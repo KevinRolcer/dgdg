@@ -237,6 +237,15 @@
                                                 <textarea id="{{ $primaryId }}" name="{{ $primaryName }}"
                                                           rows="2" data-linked-primary
                                                           {{ $field->is_required ? 'required' : '' }}>{{ is_scalar($primaryValue) ? $primaryValue : '' }}</textarea>
+                                            @elseif ($primaryType === 'semaforo')
+                                                <select id="{{ $primaryId }}" name="{{ $primaryName }}"
+                                                        data-linked-primary
+                                                        {{ $field->is_required ? 'required' : '' }}>
+                                                    <option value="">Selecciona nivel</option>
+                                                    @foreach (\App\Services\TemporaryModules\TemporaryModuleFieldService::semaforoLabels() as $semVal => $semLabel)
+                                                        <option value="{{ $semVal }}" @selected($primaryValue === $semVal)>{{ $semLabel }}</option>
+                                                    @endforeach
+                                                </select>
                                             @else
                                                 <input id="{{ $primaryId }}"
                                                        type="{{ $primaryType === 'number' ? 'number' : ($primaryType === 'date' ? 'date' : 'text') }}"
@@ -266,6 +275,15 @@
                                                     <textarea id="{{ $secondaryId }}" name="{{ $secondaryName }}"
                                                               rows="2" data-linked-secondary
                                                               {{ $primaryValue ? 'required' : 'disabled' }}>{{ is_scalar($secondaryValue) ? $secondaryValue : '' }}</textarea>
+                                                @elseif ($secondaryType === 'semaforo')
+                                                    <select id="{{ $secondaryId }}" name="{{ $secondaryName }}"
+                                                            data-linked-secondary
+                                                            {{ $primaryValue ? 'required' : 'disabled' }}>
+                                                        <option value="">Selecciona nivel</option>
+                                                        @foreach (\App\Services\TemporaryModules\TemporaryModuleFieldService::semaforoLabels() as $semVal => $semLabel)
+                                                            <option value="{{ $semVal }}" @selected($secondaryValue === $semVal)>{{ $semLabel }}</option>
+                                                        @endforeach
+                                                    </select>
                                                 @else
                                                     <input id="{{ $secondaryId }}"
                                                            type="{{ $secondaryType === 'number' ? 'number' : ($secondaryType === 'date' ? 'date' : 'text') }}"
@@ -306,6 +324,13 @@
                                             <option value="">Selecciona</option>
                                             <option value="1" @selected($value === '1')>Si</option>
                                             <option value="0" @selected($value === '0')>No</option>
+                                        </select>
+                                    @elseif ($field->type === 'semaforo')
+                                        <select id="{{ $id }}" name="{{ $name }}" class="tm-semaforo-select" {{ $field->is_required ? 'required' : '' }}>
+                                            <option value="">Selecciona nivel</option>
+                                            @foreach (\App\Services\TemporaryModules\TemporaryModuleFieldService::semaforoLabels() as $semVal => $semLabel)
+                                                <option value="{{ $semVal }}" @selected($value === $semVal)>{{ $semLabel }}</option>
+                                            @endforeach
                                         </select>
                                     @elseif (in_array($field->type, ['image', 'file'], true))
                                         <div class="tm-upload-evidence">
@@ -665,6 +690,15 @@
                                                     <textarea id="{{ $primaryId }}" name="{{ $primaryName }}"
                                                               rows="2" data-linked-primary
                                                               {{ $field->is_required ? 'required' : '' }}>{{ is_scalar($primaryValue) ? $primaryValue : '' }}</textarea>
+                                                @elseif ($primaryType === 'semaforo')
+                                                    <select id="{{ $primaryId }}" name="{{ $primaryName }}"
+                                                            data-linked-primary
+                                                            {{ $field->is_required ? 'required' : '' }}>
+                                                        <option value="">Selecciona nivel</option>
+                                                        @foreach (\App\Services\TemporaryModules\TemporaryModuleFieldService::semaforoLabels() as $semVal => $semLabel)
+                                                            <option value="{{ $semVal }}" @selected($primaryValue === $semVal)>{{ $semLabel }}</option>
+                                                        @endforeach
+                                                    </select>
                                                 @else
                                                     <input id="{{ $primaryId }}"
                                                            type="{{ $primaryType === 'number' ? 'number' : ($primaryType === 'date' ? 'date' : 'text') }}"
@@ -693,6 +727,15 @@
                                                         <textarea id="{{ $secondaryId }}" name="{{ $secondaryName }}"
                                                                   rows="2" data-linked-secondary
                                                                   {{ $primaryValue ? 'required' : 'disabled' }}>{{ is_scalar($secondaryValue) ? $secondaryValue : '' }}</textarea>
+                                                    @elseif ($secondaryType === 'semaforo')
+                                                        <select id="{{ $secondaryId }}" name="{{ $secondaryName }}"
+                                                                data-linked-secondary
+                                                                {{ $primaryValue ? 'required' : 'disabled' }}>
+                                                            <option value="">Selecciona nivel</option>
+                                                            @foreach (\App\Services\TemporaryModules\TemporaryModuleFieldService::semaforoLabels() as $semVal => $semLabel)
+                                                                <option value="{{ $semVal }}" @selected($secondaryValue === $semVal)>{{ $semLabel }}</option>
+                                                            @endforeach
+                                                        </select>
                                                     @else
                                                         <input id="{{ $secondaryId }}"
                                                                type="{{ $secondaryType === 'number' ? 'number' : ($secondaryType === 'date' ? 'date' : 'text') }}"
@@ -733,6 +776,13 @@
                                                 <option value="">Selecciona</option>
                                                 <option value="1" @selected((string) $value === '1')>Si</option>
                                                 <option value="0" @selected((string) $value === '0')>No</option>
+                                            </select>
+                                        @elseif ($field->type === 'semaforo')
+                                            <select id="{{ $id }}" name="{{ $name }}" class="tm-semaforo-select" {{ $field->is_required ? 'required' : '' }}>
+                                                <option value="">Selecciona nivel</option>
+                                                @foreach (\App\Services\TemporaryModules\TemporaryModuleFieldService::semaforoLabels() as $semVal => $semLabel)
+                                                    <option value="{{ $semVal }}" @selected($value === $semVal)>{{ $semLabel }}</option>
+                                                @endforeach
                                             </select>
                                         @elseif (in_array($field->type, ['image', 'file'], true))
                                             <div class="tm-upload-evidence">
@@ -2779,7 +2829,8 @@
                         'date': 'Fecha',
                         'number': 'Número',
                         'url': 'Enlace web',
-                        'textarea': 'Texto largo'
+                        'textarea': 'Texto largo',
+                        'semaforo': 'Semáforo (Verde / Amarillo / Rojo)'
                     };
 
                     if (mapBody) {

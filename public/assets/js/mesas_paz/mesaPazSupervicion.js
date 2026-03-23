@@ -4,6 +4,47 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
+    // Modal de Detalle de Municipios (Global)
+    window.verDetalleMunicipios = function(delegado, presentes, noPresentes) {
+        const modalEl = document.getElementById('modalDetalleMunicipios');
+        if (!modalEl) return;
+
+        const modal = new bootstrap.Modal(modalEl);
+        document.getElementById('detalleMunicipiosDelegado').innerText = delegado;
+        
+        const containerPres = document.getElementById('listaMunicipiosPresentes');
+        const containerNo = document.getElementById('listaMunicipiosNoPresentes');
+        
+        containerPres.innerHTML = '';
+        containerNo.innerHTML = '';
+
+        if (presentes && presentes.length > 0) {
+            presentes.forEach(m => {
+                const span = document.createElement('span');
+                span.className = 'badge bg-success-subtle text-success border border-success-subtle px-2 py-1';
+                span.style.fontSize = '0.75rem';
+                span.innerText = m;
+                containerPres.appendChild(span);
+            });
+        } else {
+            containerPres.innerHTML = '<span class="text-muted small">Ninguno</span>';
+        }
+
+        if (noPresentes && noPresentes.length > 0) {
+            noPresentes.forEach(m => {
+                const span = document.createElement('span');
+                span.className = 'badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1';
+                span.style.fontSize = '0.75rem';
+                span.innerText = m;
+                containerNo.appendChild(span);
+            });
+        } else {
+            containerNo.innerHTML = '<span class="text-muted small">Ninguno</span>';
+        }
+
+        modal.show();
+    };
+
     const bindSupervisionAjax = function () {
         const form = document.getElementById('supervisionFiltersForm');
         const clearLink = document.getElementById('btnLimpiarSupervision');
@@ -60,13 +101,40 @@ document.addEventListener('DOMContentLoaded', function () {
             doRefresh(url, preserveOpen);
         };
 
-        if (fechaListaInput) {
-            fechaListaInput.addEventListener('change', function () {
-                refreshByCurrentFilters(true);
-            });
+        if (typeof flatpickr !== 'undefined') {
+            const fechasDatosRaw = pageContainer.getAttribute('data-fechas-datos');
+            let fechasConDatos = [];
+            try { 
+                fechasConDatos = JSON.parse(fechasDatosRaw) || []; 
+            } catch(e) { 
+                console.error("Error parsing fechas-datos:", e);
+            }
+
+            const commonPickerConfig = {
+                locale: "es",
+                dateFormat: "Y-m-d",
+                disableMobile: "true",
+                enable: fechasConDatos.length > 0 ? fechasConDatos : undefined,
+                onClose: function(selectedDates, dateStr, instance) {
+                    if (dateStr) {
+                        // Sincronizar ambos inputs si uno cambia
+                        if (fechaListaInput) fechaListaInput.value = dateStr;
+                        if (fechaAnalisisInput) fechaAnalisisInput.value = dateStr;
+                        
+                        refreshByCurrentFilters(true);
+                    }
+                }
+            };
+
+            if (fechaListaInput) {
+                flatpickr(fechaListaInput, commonPickerConfig);
+            }
+            if (fechaAnalisisInput) {
+                flatpickr(fechaAnalisisInput, commonPickerConfig);
+            }
         }
 
-        [fechaAnalisisInput, analisisAsisteInput, analisisMicrorregionInput].forEach(function (input) {
+        [analisisAsisteInput, analisisMicrorregionInput].forEach(function (input) {
             if (!input) {
                 return;
             }
@@ -82,391 +150,69 @@ document.addEventListener('DOMContentLoaded', function () {
                 doRefresh(clearLink.getAttribute('href'), false);
             });
         }
-
-        const bindEvidencePreview = function () {
-            if (pageContainer.dataset.previewBound === '1') {
-                return;
-            }
-
-            pageContainer.dataset.previewBound = '1';
-            pageContainer.addEventListener('click', function (event) {
-                const thumb = event.target.closest('.evidencia-thumb-mini');
-                if (!thumb) {
-                    return;
-                }
-
-                const modalEl = document.getElementById('evidenciaPreviewModal');
-                const modalImg = document.getElementById('evidenciaPreviewModalImg');
-                if (!modalEl || !modalImg) {
-                    return;
-                }
-
-                const url = thumb.getAttribute('data-evidencia-url') || thumb.getAttribute('src') || '';
-                if (!url) {
-                    return;
-                }
-
-                modalImg.src = url;
-
-                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                    const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
-                    modalInstance.show();
-                    return;
-                }
-
-                if (typeof swal === 'function') {
-                    swal({
-                        title: 'Vista previa de evidencia',
-                        text: '',
-                        icon: url,
-                        button: 'Cerrar'
-                    });
-                }
-            });
-        };
-
-        const asistentesBody = document.getElementById('asistentesMicrorregionTableBody');
-        const asistentesSearch = document.getElementById('asistentesMicroSearch');
-        const asistentesLimit = document.getElementById('asistentesMicroLimit');
-        const asistentesSort = document.getElementById('asistentesMicroSort');
-        const asistentesPrev = document.getElementById('asistentesMicroPrev');
-        const asistentesNext = document.getElementById('asistentesMicroNext');
-        const asistentesPageInfo = document.getElementById('asistentesMicroPageInfo');
-
-        let asistentesCurrentPage = 1;
-
-        const applyAsistentesView = function (resetPage) {
-            if (!asistentesBody) {
-                return;
-            }
-
-            if (resetPage) {
-                asistentesCurrentPage = 1;
-            }
-
-            const term = (asistentesSearch && asistentesSearch.value ? asistentesSearch.value : '').toLowerCase().trim();
-            const limitValue = asistentesLimit ? asistentesLimit.value : '5';
-            const maxRows = limitValue === 'all' ? Number.MAX_SAFE_INTEGER : Math.max(1, parseInt(limitValue, 10) || 5);
-            const sortDirection = asistentesSort ? asistentesSort.value : 'asc';
-
-            const rows = Array.from(asistentesBody.querySelectorAll('tr[data-micro-label]'));
-            rows.sort(function (a, b) {
-                const aId = parseInt(a.getAttribute('data-micro-id') || '0', 10);
-                const bId = parseInt(b.getAttribute('data-micro-id') || '0', 10);
-
-                if (aId === bId) {
-                    const aLabel = (a.getAttribute('data-micro-label') || '').toLowerCase();
-                    const bLabel = (b.getAttribute('data-micro-label') || '').toLowerCase();
-                    return sortDirection === 'desc' ? bLabel.localeCompare(aLabel) : aLabel.localeCompare(bLabel);
-                }
-
-                return sortDirection === 'desc' ? bId - aId : aId - bId;
-            });
-
-            rows.forEach(function (row) {
-                asistentesBody.appendChild(row);
-            });
-
-            const filteredRows = rows.filter(function (row) {
-                const label = (row.getAttribute('data-micro-label') || '').toLowerCase();
-                return term === '' || label.indexOf(term) !== -1;
-            });
-
-            const totalRows = filteredRows.length;
-            const totalPages = maxRows === Number.MAX_SAFE_INTEGER ? 1 : Math.max(1, Math.ceil(totalRows / maxRows));
-            if (asistentesCurrentPage > totalPages) {
-                asistentesCurrentPage = totalPages;
-            }
-
-            const startIndex = maxRows === Number.MAX_SAFE_INTEGER ? 0 : (asistentesCurrentPage - 1) * maxRows;
-            const endIndex = maxRows === Number.MAX_SAFE_INTEGER ? totalRows : startIndex + maxRows;
-
-            rows.forEach(function (row) {
-                row.style.display = 'none';
-            });
-
-            filteredRows.forEach(function (row, index) {
-                if (index < startIndex || index >= endIndex) {
-                    row.style.display = 'none';
-                    return;
-                }
-
-                row.style.display = '';
-            });
-
-            if (asistentesPageInfo) {
-                if (totalRows === 0) {
-                    asistentesPageInfo.textContent = 'Sin resultados';
-                } else if (maxRows === Number.MAX_SAFE_INTEGER) {
-                    asistentesPageInfo.textContent = 'Mostrando todas (' + totalRows + ')';
-                } else {
-                    const from = startIndex + 1;
-                    const to = Math.min(endIndex, totalRows);
-                    asistentesPageInfo.textContent = 'Mostrando ' + from + '-' + to + ' de ' + totalRows + ' (página ' + asistentesCurrentPage + '/' + totalPages + ')';
-                }
-            }
-
-            if (asistentesPrev) {
-                asistentesPrev.disabled = maxRows === Number.MAX_SAFE_INTEGER || asistentesCurrentPage <= 1 || totalRows === 0;
-            }
-
-            if (asistentesNext) {
-                asistentesNext.disabled = maxRows === Number.MAX_SAFE_INTEGER || asistentesCurrentPage >= totalPages || totalRows === 0;
-            }
-        };
-
-        if (asistentesSearch) {
-            asistentesSearch.addEventListener('input', function () {
-                applyAsistentesView(true);
-            });
-        }
-
-        if (asistentesLimit) {
-            asistentesLimit.addEventListener('change', function () {
-                applyAsistentesView(true);
-            });
-        }
-
-        if (asistentesSort) {
-            asistentesSort.addEventListener('change', function () {
-                applyAsistentesView(true);
-            });
-        }
-
-        if (asistentesPrev) {
-            asistentesPrev.addEventListener('click', function () {
-                asistentesCurrentPage = Math.max(1, asistentesCurrentPage - 1);
-                applyAsistentesView(false);
-            });
-        }
-
-        if (asistentesNext) {
-            asistentesNext.addEventListener('click', function () {
-                asistentesCurrentPage += 1;
-                applyAsistentesView(false);
-            });
-        }
-
-        applyAsistentesView(true);
-        bindEvidencePreview();
     };
 
+    // Inicializar lógica AJAX
     bindSupervisionAjax();
 
+    // Lógica para Presentación PPT
+    const bindPresentacionPPT = function() {
+        const btnAbrir = document.getElementById('btnAbrirRangoFechasPresentacion');
+        const modalEl = document.getElementById('rangoFechasPresentacionModal');
+        const btnConfirmar = document.getElementById('btnConfirmarRangoFechasPresentacion');
+        const inputRango = document.getElementById('fechaRangoPresentacion');
 
-    const bindPresentations = function() {
-        const btnAbrirRango = document.getElementById('btnAbrirRangoFechasPresentacion');
-        const btnConfirmarRango = document.getElementById('btnConfirmarRangoFechasPresentacion');
-        const btnGenerarCanva = document.getElementById('btnGenerarPresentacion');
+        if (!btnAbrir || !modalEl || !btnConfirmar || !inputRango) return;
 
-        let fpRango = null;
-        if (typeof flatpickr !== 'undefined') {
-            fpRango = flatpickr("#fechaRangoPresentacion", {
-                mode: "range",
-                inline: true,
-                locale: "es",
-                dateFormat: "Y-m-d",
-                onDayCreate: function(dObj, dStr, fp, dayElem) {
-                    const day = dayElem.dateObj.getDay();
-                    if (day === 0 || day === 6) {
-                        dayElem.classList.add("is-weekend-disabled");
-                    }
-                },
-                onChange: function(selectedDates, dateStr, instance) {
-                    if (selectedDates.length > 0) {
-                        // Evitar iniciar en fin de semana
-                        const startDay = selectedDates[0].getDay();
-                        if (startDay === 0 || startDay === 6) {
-                            instance.clear();
-                            return;
-                        }
-                    }
+        const modal = new bootstrap.Modal(modalEl);
+        const urlBase = pageContainer.getAttribute('data-url-ppt');
 
-                    if (selectedDates.length === 2) {
-                        const start = selectedDates[0];
-                        let end = selectedDates[1];
+        const fp = flatpickr(inputRango, {
+            mode: "range",
+            inline: true,
+            locale: "es",
+            dateFormat: "Y-m-d",
+            onReady: function(selectedDates, dateStr, instance) {
+                const container = instance.calendarContainer;
+                const header = document.createElement('div');
+                header.className = 'presentation-calendar-header border-bottom mb-2 text-center py-2';
+                header.innerHTML = '<span class="presentation-calendar-label fw-bold">Periodo del reporte</span>';
+                container.prepend(header);
+            }
+        });
 
-                        let current = new Date(start.getTime());
-                        let validDaysCount = 0;
-                        let lastValidDate = start;
+        btnAbrir.addEventListener('click', function() {
+            modal.show();
+        });
 
-                        while (current <= end) {
-                            const d = current.getDay();
-                            if (d !== 0 && d !== 6) {
-                                validDaysCount++;
-                                lastValidDate = new Date(current.getTime());
-                            }
-                            if (validDaysCount >= 5) {
-                                break;
-                            }
-                            current.setDate(current.getDate() + 1);
-                        }
-
-                        // Setear hasta el maximo de 5 dias o regresarlo si termino en fin de semana
-                        if (end > current || end.getDay() === 0 || end.getDay() === 6) {
-                            instance.setDate([start, lastValidDate], true);
-                        }
-                    }
+        btnConfirmar.addEventListener('click', function() {
+            const selectedDates = fp.selectedDates;
+            if (selectedDates.length < 2) {
+                if (typeof swal === 'function') {
+                    swal("Atención", "Por favor selecciona un rango de fechas (Inicio y Fin)", "warning");
+                } else {
+                    alert("Por favor selecciona un rango de fechas");
                 }
-            });
-        }
+                return;
+            }
 
-        if (btnAbrirRango) {
-            btnAbrirRango.addEventListener('click', function() {
-                const modalEl = document.getElementById('rangoFechasPresentacionModal');
-                if (modalEl) {
-                    const modal = new bootstrap.Modal(modalEl);
-                    modal.show();
-                    // Opcional: limpiar fecha al abrir
-                    if (fpRango) fpRango.clear();
-                }
-            });
-        }
+            const start = selectedDates[0].toISOString().split('T')[0];
+            const end = selectedDates[1].toISOString().split('T')[0];
+            const url = `${urlBase}?start=${start}&end=${end}`;
 
-        if (btnConfirmarRango) {
-            btnConfirmarRango.addEventListener('click', function() {
-                if (!fpRango || !fpRango.selectedDates || fpRango.selectedDates.length < 2) {
-                    if (typeof swal === 'function') {
-                        swal('Atención', 'Selecciona un rango válido (Inicio y Fin) para continuar.', 'warning');
-                    } else {
-                        alert('Selecciona un rango válido (Inicio y Fin) para continuar.');
-                    }
-                    return;
-                }
-
-                const fechaInicioVal = fpRango.selectedDates[0];
-                const fechaFinVal = fpRango.selectedDates[1];
-
-                const offsetInicio = fechaInicioVal.getTimezoneOffset() * 60000;
-                const offsetFin = fechaFinVal.getTimezoneOffset() * 60000;
-                const fechaInicioArr = new Date(fechaInicioVal.getTime() - offsetInicio).toISOString().split('T')[0];
-                const fechaFinArr = new Date(fechaFinVal.getTime() - offsetFin).toISOString().split('T')[0];
-
-                const fechaInicio = fechaInicioArr;
-                const fechaFin = fechaFinArr;
-
-                const rangoModal = bootstrap.Modal.getInstance(document.getElementById('rangoFechasPresentacionModal'));
-                if (rangoModal) rangoModal.hide();
-
-                const canvaModalEl = document.getElementById('canvaPresentacionModal');
-                const contentEl = document.getElementById('canvaPresentacionModalContent');
-                
-                if (canvaModalEl && contentEl) {
-                    const pptUrl = pageContainer?.dataset?.urlPpt || "/ppt/generar-presentacion";
-                    const modalPresentacion = new bootstrap.Modal(canvaModalEl);
-                    contentEl.innerHTML = '<span class="text-muted">Generando...</span>';
-                    modalPresentacion.show();
-
-                    fetch(pptUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                        },
-                        body: JSON.stringify({ fecha_inicio: fechaInicio, fecha_fin: fechaFin })
-                    })
-                    .then(async res => {
-                        if (!res.ok) {
-                            const errData = await res.json().catch(() => ({}));
-                            throw new Error(errData.error || 'Error al generar la presentación');
-                        }
-                        
-                        let filename = `mesas_paz_${fechaInicio}_${fechaFin}.pptx`;
-                        const disposition = res.headers.get('content-disposition');
-                        if (disposition && disposition.includes('filename=')) {
-                            const matches = disposition.match(/filename="?([^"]+)"?/);
-                            if (matches && matches[1]) {
-                                filename = matches[1];
-                            }
-                        }
-                        
-                        const blob = await res.blob();
-                        return { blob, filename };
-                    })
-                    .then(({ blob, filename }) => {
-                        contentEl.innerHTML = `<span class="text-success">Presentación generada y descargada.</span>`;
-                        
-                        const urlObj = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.style.display = 'none';
-                        a.href = urlObj;
-                        a.download = filename;
-                        document.body.appendChild(a);
-                        a.click();
-                        
-                        window.URL.revokeObjectURL(urlObj);
-                        document.body.removeChild(a);
-                        
-                        setTimeout(() => {
-                            bootstrap.Modal.getInstance(canvaModalEl).hide();
-                        }, 2000);
-                    })
-                    .catch(err => {
-                        contentEl.innerHTML = `<span class="text-danger">Error: ${err.message}</span>`;
-                    });
-                }
-            });
-        }
-
-        if (btnGenerarCanva) {
-            btnGenerarCanva.addEventListener('click', function() {
-                const fecha = document.getElementById('fecha_lista')?.value;
-                if (!fecha) {
-                    if (typeof swal === 'function') {
-                        swal('Atención', 'Selecciona una fecha para generar la presentación.', 'warning');
-                    } else {
-                        alert('Selecciona una fecha para generar la presentación.');
-                    }
-                    return;
-                }
-
-                const canvaModalEl = document.getElementById('canvaPresentacionModal');
-                const contentEl = document.getElementById('canvaPresentacionModalContent');
-
-                if (canvaModalEl && contentEl) {
-                    const canvaUrl = pageContainer?.dataset?.urlCanva || "/canva/generar-documento";
-                    const modal = new bootstrap.Modal(canvaModalEl);
-                    contentEl.innerHTML = '<span class="text-muted">Generando...</span>';
-                    modal.show();
-
-                    fetch(canvaUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                        },
-                        body: JSON.stringify({ fecha })
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.url) {
-                            contentEl.innerHTML = `<a href="${data.url}" target="_blank" class="btn btn-primary">Abrir presentación en Canva</a>`;
-                        } else {
-                            contentEl.innerHTML = `<span class="text-danger">Error: ${data.error || 'No se pudo generar el documento.'}</span>`;
-                        }
-                    })
-                    .catch(err => {
-                        contentEl.innerHTML = `<span class="text-danger">Error al generar el documento.</span>`;
-                    });
-                }
-            });
-        }
+            modal.hide();
+            window.location.href = url;
+        });
     };
 
-    bindPresentations();
-
-
-    window.mostrarVistaPreviaEvidencia = function(url) {
-        const modalEl = document.getElementById('evidenciaPreviewModal');
-        const modalImg = document.getElementById('evidenciaPreviewModalImg');
-        
-        if (!modalEl || !modalImg) {
-            window.open(url, '_blank');
-            return;
-        }
-
+    bindPresentacionPPT();
+});function mostrarVistaPreviaEvidencia(url) {
+    const modalEl = document.getElementById('evidenciaPreviewModal');
+    const modalImg = document.getElementById('evidenciaPreviewModalImg');
+    
+    if (modalEl && modalImg) {
         modalImg.src = url;
-        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        const modal = new bootstrap.Modal(modalEl);
         modal.show();
-    };
-});
+    }
+}

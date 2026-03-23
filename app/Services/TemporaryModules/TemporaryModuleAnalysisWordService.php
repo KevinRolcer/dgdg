@@ -545,6 +545,11 @@ class TemporaryModuleAnalysisWordService
         if (is_bool($value)) {
             return $value ? 'Sí' : 'No';
         }
+        if ($type === 'semaforo' && is_string($value)) {
+            $lab = TemporaryModuleFieldService::labelForSemaforo($value);
+
+            return $lab !== '' ? $lab : '—';
+        }
 
         return trim((string) $value) !== '' ? (string) $value : '—';
     }

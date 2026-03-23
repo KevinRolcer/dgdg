@@ -28,6 +28,9 @@
                                         data-image-title="{{ $field->label }}"><i class="fa fa-image"></i> Ver imagen</button>
                                 @elseif (is_bool($cell))
                                     {{ $cell ? 'Si' : 'No' }}
+                                @elseif ($field->type === 'semaforo' && is_string($cell) && $cell !== '')
+                                    @php $semLab = \App\Services\TemporaryModules\TemporaryModuleFieldService::labelForSemaforo($cell); @endphp
+                                    <span class="tm-semaforo-badge tm-semaforo-badge--{{ $cell }}" title="{{ $semLab }}">{{ $semLab }}</span>
                                 @else
                                     @php
                                         $displayText = is_array($cell) ? implode(', ', array_map(fn ($i) => is_scalar($i) ? (string) $i : json_encode($i, JSON_UNESCAPED_UNICODE), $cell)) : (is_scalar($cell) ? (string) $cell : '-');
@@ -84,6 +87,9 @@
                                         data-image-title="{{ $field->label }}"><i class="fa fa-image"></i> Ver imagen</button>
                                 @elseif (is_bool($cell))
                                     {{ $cell ? 'Si' : 'No' }}
+                                @elseif ($field->type === 'semaforo' && is_string($cell) && $cell !== '')
+                                    @php $semLab = \App\Services\TemporaryModules\TemporaryModuleFieldService::labelForSemaforo($cell); @endphp
+                                    <span class="tm-semaforo-badge tm-semaforo-badge--{{ $cell }}" title="{{ $semLab }}">{{ $semLab }}</span>
                                 @else
                                     @php
                                         $displayText = is_array($cell) ? implode(', ', array_map(fn ($i) => is_scalar($i) ? (string) $i : json_encode($i, JSON_UNESCAPED_UNICODE), $cell)) : (is_scalar($cell) ? (string) $cell : '-');

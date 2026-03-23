@@ -1,8 +1,8 @@
 :root {
     --clr-primary-dark: #5f1b2d;
-    --clr-primary: #861e34;
-    --clr-secondary: #246257;
+     --clr-secondary: #246257;
     --clr-accent: #c79b66;
+    --color-secondary-dark: #13322B;
     --clr-text-main: #484747;
     --clr-text-light: #6b6a6a;
     --clr-border: rgba(72, 71, 71, 0.14);
@@ -34,9 +34,9 @@
     --cal-cell-border: transparent;
     --cal-cell-hover-border: rgba(72, 71, 71, 0.12);
     --cal-cell-text: var(--clr-text-main);
-    --cal-today-bg: rgba(134, 30, 52, 0.08);
-    --cal-today-border: rgba(134, 30, 52, 0.32);
-    --cal-today-text: var(--clr-primary-dark);
+    --cal-today-bg: var(--color-secondary-dark);
+    --cal-today-border: var(--color-secondary-dark);
+    --cal-today-text: #ffffff;
     --cal-month-text: var(--clr-primary-dark);
     --cal-weekday-text: var(--clr-text-light);
     --cal-nav-btn-bg: transparent;
@@ -76,14 +76,12 @@ select {
 }
 
 @media (min-width: 801px) {
-    .app-shell:has(.um-page),
-    .app-shell:has(.agenda-shell) {
+    .app-shell:has(:is(.um-page, .agenda-shell)) {
         height: 100vh;
         max-height: 100vh;
         overflow: hidden;
     }
-    body:has(.app-shell .um-page),
-    body:has(.app-shell .agenda-shell) {
+    body:has(.app-shell :is(.um-page, .agenda-shell)) {
         overflow: hidden;
         height: 100vh;
     }
@@ -1043,11 +1041,7 @@ body.sidebar-collapsed .sidebar-logout-btn {
     flex: 1;
 }
 
-.app-content:has(> .settings-shell),
-.app-content:has(> .home-shell),
-.app-content:has(> .mesas-paz-shell),
-.app-content:has(> .tm-shell),
-.app-content:has(> .um-page) {
+.app-content:has(> :is(.settings-shell, .home-shell, .mesas-paz-shell, .tm-shell, .um-page)) {
     padding: .25rem .5rem;
 }
 .app-content:has(> .agenda-shell){
@@ -1074,37 +1068,19 @@ body.sidebar-collapsed .sidebar-logout-btn {
 }
 
 @media (min-width: 1400px) {
-    .app-content:has(> .home-shell) {
+    .app-content:has(> :is(.home-shell, .settings-shell)) {
         max-width: min(1660px, 96vw);
     }
 }
 
 @media (min-width: 1920px) {
-    .app-content:has(> .home-shell) {
+    .app-content:has(> :is(.home-shell, .settings-shell)) {
         max-width: min(1820px, 94vw);
     }
 }
 
 @media (min-width: 2400px) {
-    .app-content:has(> .home-shell) {
-        max-width: min(1980px, 92vw);
-    }
-}
-
-@media (min-width: 1400px) {
-    .app-content:has(> .settings-shell) {
-        max-width: min(1660px, 96vw);
-    }
-}
-
-@media (min-width: 1920px) {
-    .app-content:has(> .settings-shell) {
-        max-width: min(1820px, 94vw);
-    }
-}
-
-@media (min-width: 2400px) {
-    .app-content:has(> .settings-shell) {
+    .app-content:has(> :is(.home-shell, .settings-shell)) {
         max-width: min(1980px, 92vw);
     }
 }
@@ -1354,12 +1330,7 @@ body.sidebar-collapsed .sidebar-logout-btn {
         padding: var(--ui-gap) 10px;
     }
 
-    .app-content:has(> .settings-shell),
-    .app-content:has(> .home-shell),
-    .app-content:has(> .mesas-paz-shell),
-    .app-content:has(> .agenda-shell),
-    .app-content:has(> .tm-shell),
-    .app-content:has(> .um-page) {
+    .app-content:has(> :is(.settings-shell, .home-shell, .mesas-paz-shell, .agenda-shell, .tm-shell, .um-page)) {
         padding: 0.75rem 1rem;
     }
 

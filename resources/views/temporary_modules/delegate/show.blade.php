@@ -168,6 +168,13 @@
                                 <option value="1" @selected($value === '1')>Si</option>
                                 <option value="0" @selected($value === '0')>No</option>
                             </select>
+                        @elseif ($field->type === 'semaforo')
+                            <select id="{{ $id }}" name="{{ $name }}" class="tm-semaforo-select" {{ $field->is_required ? 'required' : '' }}>
+                                <option value="">Selecciona nivel</option>
+                                @foreach (\App\Services\TemporaryModules\TemporaryModuleFieldService::semaforoLabels() as $semVal => $semLabel)
+                                    <option value="{{ $semVal }}" @selected($value === $semVal)>{{ $semLabel }}</option>
+                                @endforeach
+                            </select>
                         @elseif (in_array($field->type, ['image', 'file'], true))
                             <div class="tm-upload-evidence">
                                 <div class="tm-upload-evidence-toolbar">
@@ -357,6 +364,9 @@
                                         </button>
                                     @elseif (is_bool($cell))
                                         {{ $cell ? 'Si' : 'No' }}
+                                    @elseif ($field->type === 'semaforo' && is_string($cell) && $cell !== '')
+                                        @php $semLab = \App\Services\TemporaryModules\TemporaryModuleFieldService::labelForSemaforo($cell); @endphp
+                                        <span class="tm-semaforo-badge tm-semaforo-badge--{{ $cell }}" title="{{ $semLab }}">{{ $semLab }}</span>
                                     @else
                                         {{ $cell ?? '-' }}
                                     @endif

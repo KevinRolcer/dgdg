@@ -32,12 +32,6 @@ class MesasPazPresentationService
             throw new \Exception('No se encontró la plantilla en: ' . $templatePath);
         }
 
-        // Cargar plantilla existente
-        $templatePath = storage_path('templates/Dgdg Mesas de paz.pptx');
-        if (!file_exists($templatePath)) {
-            throw new \Exception('No se encontró la plantilla en: ' . $templatePath);
-        }
-
         // Configurar ruta de destino
         $directorio = storage_path('app/public/ppt');
         if (!is_dir($directorio)) {

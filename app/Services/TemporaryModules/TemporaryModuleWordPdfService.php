@@ -44,6 +44,8 @@ class TemporaryModuleWordPdfService
              }
         }
 
+        $fieldTypesByKey = $temporaryModule->fields->pluck('type', 'key')->all();
+
         $columnMap = [];
         foreach ($columnsCfg as $col) {
             if (!is_array($col)) {
@@ -327,6 +329,7 @@ class TemporaryModuleWordPdfService
             'countTable' => $countTable,
             'countTableColorKeys' => $countTableColorKeys,
             'countTableColors' => $countTableColors,
+            'fieldTypesByKey' => $fieldTypesByKey,
         ])->render();
 
         $dompdf = new Dompdf([

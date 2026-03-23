@@ -59,9 +59,23 @@
     background: rgba(72, 71, 71, 0.05);
 }
 
-#supervisionEvidenciasPage .text-primary,
-#supervisionEvidenciasPage .table thead th {
+#supervisionEvidenciasPage .text-primary {
     color: var(--clr-primary-dark) !important;
+}
+
+#supervisionEvidenciasPage .table thead th {
+    color: var(--clr-text-main);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    padding: 10px 8px;
+    border-bottom: 2px solid var(--clr-border);
+}
+
+#supervisionEvidenciasPage .table tbody td {
+    padding: 8px;
+    font-size: 0.8rem;
 }
 
 #supervisionEvidenciasPage .badge.bg-primary {

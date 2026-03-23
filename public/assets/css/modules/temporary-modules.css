@@ -4888,3 +4888,36 @@ html.theme-dark .tm-record-item-header {
         right: 16px;
     }
 }
+
+/* Semáforo (riesgo): valor canónico en clase --verde | --amarillo | --rojo */
+.tm-semaforo-select {
+    width: 100%;
+}
+
+.tm-semaforo-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 3px 12px;
+    border-radius: 999px;
+    line-height: 1.25;
+}
+
+.tm-semaforo-badge--verde {
+    background: #e8f5e9;
+    color: #1b5e20;
+    border: 1px solid rgba(27, 94, 32, 0.25);
+}
+
+.tm-semaforo-badge--amarillo {
+    background: #fff8e1;
+    color: #f57f17;
+    border: 1px solid rgba(245, 127, 23, 0.35);
+}
+
+.tm-semaforo-badge--rojo {
+    background: #ffebee;
+    color: #b71c1c;
+    border: 1px solid rgba(183, 28, 28, 0.3);
+}

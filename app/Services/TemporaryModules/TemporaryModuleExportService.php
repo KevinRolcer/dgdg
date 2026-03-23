@@ -248,6 +248,8 @@ class TemporaryModuleExportService
                 $placeholder = '(Enlace de google maps)';
             } elseif ($type === 'boolean') {
                 $placeholder = '(Sí / No)';
+            } elseif ($type === 'semaforo') {
+                $placeholder = '(Verde, Amarillo, Rojo)';
             } elseif ($type === 'date') {
                 $placeholder = '(AAAA-MM-DD)';
             } elseif ($type === 'datetime') {
@@ -974,12 +976,27 @@ class TemporaryModuleExportService
                         // Linked: {primary, secondary} object → split into two virtual columns
                         if ($field->type === 'linked') {
                             // We emit two cells: primary then secondary (columns are doubled in buildExportColumns)
+                            $linkOpts = is_array($field->options) ? $field->options : [];
                             $primaryVal = is_array($cell) ? ($cell['primary'] ?? '') : '';
                             $secondaryVal = is_array($cell) ? ($cell['secondary'] ?? '') : '';
-                            $sheet->setCellValue($cellCoordinate, is_scalar($primaryVal) ? (string) $primaryVal : '');
+                            $primaryOut = is_scalar($primaryVal) ? (string) $primaryVal : '';
+                            if (($linkOpts['primary_type'] ?? '') === 'semaforo' && $primaryOut !== '') {
+                                $primaryOut = TemporaryModuleFieldService::labelForSemaforo($primaryOut) ?: $primaryOut;
+                            }
+                            $secondaryOut = is_scalar($secondaryVal) ? (string) $secondaryVal : '';
+                            if (($linkOpts['secondary_type'] ?? '') === 'semaforo' && $secondaryOut !== '') {
+                                $secondaryOut = TemporaryModuleFieldService::labelForSemaforo($secondaryOut) ?: $secondaryOut;
+                            }
+                            $sheet->setCellValue($cellCoordinate, $primaryOut);
                             $columnIndex++;
                             $secondaryCoord = Coordinate::stringFromColumnIndex($columnIndex).$rowIndex;
-                            $sheet->setCellValue($secondaryCoord, is_scalar($secondaryVal) ? (string) $secondaryVal : '');
+                            $sheet->setCellValue($secondaryCoord, $secondaryOut);
+                            $columnIndex++;
+                            continue;
+                        }
+
+                        if ($field->type === 'semaforo' && is_string($cell) && trim($cell) !== '') {
+                            $sheet->setCellValue($cellCoordinate, TemporaryModuleFieldService::labelForSemaforo($cell) ?: $cell);
                             $columnIndex++;
                             continue;
                         }

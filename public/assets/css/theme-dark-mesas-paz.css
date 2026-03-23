@@ -182,7 +182,7 @@ html.theme-dark #supervisionEvidenciasPage .table {
 html.theme-dark #mesasPazApp .table thead th,
 html.theme-dark #supervisionEvidenciasPage .table thead th {
     background: var(--tm-muted-bg, rgba(255, 255, 255, 0.06));
-    color: var(--clr-text-main);
+    color: var(--clr-accent) !important;
     border-color: var(--clr-border);
 }
 
@@ -219,6 +219,20 @@ html.theme-dark #supervisionEvidenciasPage .list-group-item {
     color: var(--clr-text-main);
 }
 
+html.theme-dark #mesasPazApp .card-header,
+html.theme-dark #mesasPazApp .form-label,
+html.theme-dark #mesasPazApp .fw-bold {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark #mesasPazApp .text-muted {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark #mesasPazApp .municipio-card .card-header span {
+    color: var(--clr-text-main) !important;
+}
+
 html.theme-dark #mesasPazApp .bg-white,
 html.theme-dark #supervisionEvidenciasPage .bg-white {
     background-color: var(--clr-card) !important;
@@ -246,8 +260,16 @@ html.theme-dark #supervisionEvidenciasPage .modal-body {
 }
 
 html.theme-dark .presentation-calendar-label {
-    color: var(--cal-month-text) !important;
+    color: var(--clr-accent) !important;
 }
+
+html.theme-dark .flatpickr-calendar {
+    --cal-month-text: var(--clr-accent);
+    --cal-today-bg: var(--color-secondary-dark);
+    --cal-today-border: var(--color-secondary-dark);
+    --cal-today-text: #ffffff;
+}
+
 
 html.theme-dark #rangoFechasPresentacionModal .modal-title {
     color: var(--clr-text-main) !important;
@@ -304,28 +326,26 @@ html.theme-dark .swal2-styled:focus {
 }
 
 html.theme-dark #supervisionEvidenciasPage .supervision-table-row {
-    background: var(--clr-bg);
-    border-color: var(--clr-border);
+    background: transparent !important;
+    border-bottom: 1px solid var(--clr-border) !important;
+    color: var(--clr-text-main);
 }
 
 html.theme-dark #supervisionEvidenciasPage .supervision-table-row:hover {
-    background: rgba(199, 155, 102, 0.08);
+    background: rgba(199, 155, 102, 0.05);
 }
 
-html.theme-dark #supervisionEvidenciasPage .btn-default {
-    background: rgba(255, 255, 255, 0.06) !important;
+html.theme-dark #supervisionEvidenciasPage .delegado-nombre {
     color: var(--clr-text-main) !important;
-    border-color: var(--clr-border) !important;
 }
 
-html.theme-dark #supervisionEvidenciasPage .btn-default:hover:not(:disabled) {
-    background: rgba(199, 155, 102, 0.12) !important;
-    border-color: rgba(199, 155, 102, 0.4) !important;
-    color: var(--clr-text-main) !important;
+html.theme-dark #supervisionEvidenciasPage .text-muted {
+    color: var(--clr-text-light) !important;
 }
 
 html.theme-dark #supervisionEvidenciasPage .evidencias-list-header {
     color: var(--clr-text-main);
+    border-bottom-color: var(--clr-border) !important;
 }
 
 html.theme-dark #supervisionEvidenciasPage .badge-supervision-soft {
@@ -345,8 +365,162 @@ html.theme-dark #supervisionEvidenciasPage .badge.bg-warning.text-dark {
     border: 1px solid rgba(199, 155, 102, 0.5);
 }
 
-html.theme-dark.theme-dark--slate #mesasPazApp .table thead th,
-html.theme-dark.theme-dark--slate #supervisionEvidenciasPage .table thead th,
-html.theme-dark.theme-dark--slate #supervisionEvidenciasPage .text-primary {
+html.theme-dark #mesasPazApp .text-primary,
+html.theme-dark #supervisionEvidenciasPage .text-primary {
     color: var(--clr-accent) !important;
 }
+
+html.theme-dark .btn-primary,
+html.theme-dark #btnConfirmarRangoFechasPresentacion,
+html.theme-dark #btnAbrirRangoFechasPresentacion {
+    background-color: var(--clr-accent) !important;
+    border-color: var(--clr-accent) !important;
+    color: #1a1a1a !important;
+}
+
+html.theme-dark .btn-primary:hover,
+html.theme-dark #btnConfirmarRangoFechasPresentacion:hover,
+html.theme-dark #btnAbrirRangoFechasPresentacion:hover {
+    filter: brightness(1.1);
+}
+
+/* Estilos para Flatpickr en tema oscuro - Mesas de Paz */
+html.theme-dark .flatpickr-calendar {
+    background: #1e222c !important;
+    border: 1px solid var(--clr-border) !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+    color: var(--clr-text-main) !important;
+    width: 240px !important; /* Aún más compacto */
+}
+
+html.theme-dark .flatpickr-months .flatpickr-month {
+    background: #1e222c !important;
+    color: var(--clr-accent) !important;
+    fill: var(--clr-accent) !important;
+}
+
+html.theme-dark .flatpickr-current-month .flatpickr-monthDropdown-months {
+    background: #1e222c !important;
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .flatpickr-weekday {
+    background: transparent !important;
+    color: var(--clr-text-light) !important;
+    font-size: 11px !important;
+}
+
+html.theme-dark .flatpickr-day {
+    color: var(--clr-text-main) !important;
+    border-radius: 4px !important;
+    font-size: 12px !important;
+}
+
+html.theme-dark .flatpickr-day:hover,
+html.theme-dark .flatpickr-day.prevMonthDay:hover,
+html.theme-dark .flatpickr-day.nextMonthDay:hover {
+    background: rgba(199, 155, 102, 0.15) !important;
+    border-color: var(--clr-accent) !important;
+}
+
+html.theme-dark .flatpickr-day.selected,
+html.theme-dark .flatpickr-day.startRange,
+html.theme-dark .flatpickr-day.endRange {
+    background: var(--clr-accent) !important;
+    border-color: var(--clr-accent) !important;
+    color: #1a1a1a !important;
+}
+
+html.theme-dark .flatpickr-day.today {
+    border-color: var(--clr-accent) !important;
+}
+
+html.theme-dark .flatpickr-day.flatpickr-disabled, 
+html.theme-dark .flatpickr-day.flatpickr-disabled:hover {
+    color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html.theme-dark .flatpickr-calendar.arrowTop:before,
+html.theme-dark .flatpickr-calendar.arrowTop:after {
+    border-bottom-color: #1e222c !important;
+}
+
+/* Reducir tamaño de las celdas para que sea minúsculo */
+html.theme-dark .flatpickr-days {
+    width: 240px !important;
+}
+
+html.theme-dark .dayContainer {
+    width: 240px !important;
+    min-width: 240px !important;
+    max-width: 240px !important;
+}
+
+html.theme-dark .flatpickr-day {
+    max-width: 30px !important;
+    height: 30px !important;
+    line-height: 28px !important;
+}
+
+/* --- Ajustes de Icono de Ojo y Modal de Detalles --- */
+
+/* Botón de ojo (eye icon) */
+html.theme-dark #supervisionEvidenciasPage .btn-outline-info {
+    color: var(--clr-accent) !important;
+    border-color: rgba(199, 155, 102, 0.35) !important;
+    background: transparent !important;
+}
+
+html.theme-dark #supervisionEvidenciasPage .btn-outline-info:hover {
+    background: rgba(199, 155, 102, 0.12) !important;
+    border-color: var(--clr-accent) !important;
+    color: var(--clr-accent) !important;
+}
+
+/* Modal de detalles de municipios */
+html.theme-dark #modalDetalleMunicipios .modal-content {
+    background-color: #1a1e26 !important;
+    border: 1px solid var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6) !important;
+}
+
+html.theme-dark #modalDetalleMunicipios .modal-header {
+    border-bottom-color: var(--clr-border) !important;
+}
+
+html.theme-dark #modalDetalleMunicipios .modal-header .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* Textos de Presentes y No Presentes */
+html.theme-dark #modalDetalleMunicipios .text-success,
+html.theme-dark #supervisionEvidenciasPage .text-success {
+    color: #48c78e !important; /* Versión luminosa del institucional para dark */
+}
+
+html.theme-dark #modalDetalleMunicipios .text-danger,
+html.theme-dark #supervisionEvidenciasPage .text-danger {
+    color: #f14668 !important; /* Versión luminosa del institucional para dark */
+}
+
+/* Badges dentro del modal */
+html.theme-dark #modalDetalleMunicipios .bg-success-subtle {
+    background-color: rgba(36, 98, 87, 0.4) !important;
+    color: #ffffff !important;
+    border-color: #246257 !important;
+    font-weight: 500;
+}
+
+html.theme-dark #modalDetalleMunicipios .bg-danger-subtle {
+    background-color: rgba(134, 30, 52, 0.4) !important;
+    color: #ffffff !important;
+    border-color: #861e34 !important;
+    font-weight: 500;
+}
+
+/* Estilo de la línea divisoria del modal */
+html.theme-dark #modalDetalleMunicipios .border-bottom {
+    border-bottom-color: var(--clr-border) !important;
+}
+

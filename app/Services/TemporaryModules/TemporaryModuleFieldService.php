@@ -10,7 +10,73 @@ use Illuminate\Validation\ValidationException;
 
 class TemporaryModuleFieldService
 {
+    /** Valores canónicos guardados en JSON (ponderación / viñetas). */
+    public const SEMAFORO_VALUES = ['verde', 'amarillo', 'rojo'];
+
     private ?bool $hasFieldCommentColumn = null;
+
+    /** @return array<string, string> slug => etiqueta */
+    public static function semaforoLabels(): array
+    {
+        return [
+            'verde' => 'Verde',
+            'amarillo' => 'Amarillo',
+            'rojo' => 'Rojo',
+        ];
+    }
+
+    public static function labelForSemaforo(?string $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        return self::semaforoLabels()[$value] ?? $value;
+    }
+
+    /**
+     * Normaliza texto (Excel o formulario) al valor canónico o null si no coincide.
+     */
+    public static function normalizeSemaforoInput(string $str): ?string
+    {
+        $raw = trim($str);
+        if ($raw === '') {
+            return null;
+        }
+        $s = mb_strtolower($raw, 'UTF-8');
+        $s = str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $s);
+        $s = preg_replace('/\s+/', ' ', $s) ?? $s;
+
+        if (in_array($s, ['verde', 'green'], true)) {
+            return 'verde';
+        }
+        if (in_array($s, ['amarillo', 'yellow'], true)) {
+            return 'amarillo';
+        }
+        if (in_array($s, ['rojo', 'red'], true)) {
+            return 'rojo';
+        }
+        if ($s === '1') {
+            return 'verde';
+        }
+        if ($s === '2') {
+            return 'amarillo';
+        }
+        if ($s === '3') {
+            return 'rojo';
+        }
+        if (str_contains($s, 'verde')) {
+            return 'verde';
+        }
+        if (str_contains($s, 'amarill')) {
+            return 'amarillo';
+        }
+        if (str_contains($s, 'rojo')) {
+            return 'rojo';
+        }
+
+        return null;
+    }
 
     public function prepareFields(array $fields, array $reservedKeys = [], int $startOrder = 1): array
     {
@@ -238,6 +304,14 @@ class TemporaryModuleFieldService
             })(),
             'municipio' => [...$rules, Rule::in($municipios)],
             'boolean' => [...$rules, 'boolean'],
+            'semaforo' => (function () use ($required, $rules) {
+                $allowed = self::SEMAFORO_VALUES;
+                if (! $required) {
+                    $allowed = array_values(array_unique(array_merge([''], $allowed)));
+                }
+
+                return [...$rules, 'string', 'max:32', Rule::in($allowed)];
+            })(),
             'seccion' => ['nullable', 'string'], // no se guarda valor; solo layout
             'geopoint' => [...$rules, 'string', 'max:120'],
             'file' => [...$rules, 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],

@@ -93,6 +93,7 @@ class TemporaryModuleController extends Controller
         'categoria' => 'Categoría',
         'municipio' => 'Municipio',
         'boolean' => 'Sí / No',
+        'semaforo' => 'Semáforo (Verde / Amarillo / Rojo)',
         'seccion' => 'Sección',
         'geopoint' => 'Georreferencia',
         'image' => 'Imagen',

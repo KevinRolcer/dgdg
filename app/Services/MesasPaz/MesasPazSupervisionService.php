@@ -70,6 +70,7 @@ class MesasPazSupervisionService
             ->select(['asist_id', 'municipio_id', 'delegado_id', 'user_id', 'microrregion_id', 'fecha_asist', 'created_at', 'presidente', 'asiste', 'delegado_asistio', 'evidencia', 'acuerdo_observacion', 'parte_observacion'])
             ->with([
                 'municipio:id,municipio',
+                'microrregion:id,microrregion,cabecera',
                 'delegado:id,nombre,ap_paterno,ap_materno,microrregion_id',
                 'delegado.microrregion:id,microrregion,cabecera',
                 'user:id,name,email',
@@ -79,25 +80,23 @@ class MesasPazSupervisionService
         $fechaAnalisisFiltro = Carbon::parse($fechaAnalisis)->toDateString();
 
         if ($fechaListaFiltro === $fechaAnalisisFiltro) {
-            $registrosComunes = (clone $query)
-                ->whereDate('fecha_asist', $fechaListaFiltro)
-                ->orderByDesc('fecha_asist')
-                ->orderByDesc('created_at')
-                ->paginate(10);
-
-            $registrosLista = $registrosComunes;
-            $registrosAnalisisBase = $registrosComunes;
-        } else {
             $registrosLista = (clone $query)
                 ->whereDate('fecha_asist', $fechaListaFiltro)
-                ->orderByDesc('fecha_asist')
                 ->orderByDesc('created_at')
-                ->paginate(10);
+                ->paginate(25);
 
             $registrosAnalisisBase = (clone $query)
                 ->whereDate('fecha_asist', $fechaAnalisisFiltro)
+                ->get();
+        } else {
+            $registrosLista = (clone $query)
+                ->whereDate('fecha_asist', $fechaListaFiltro)
                 ->orderByDesc('created_at')
-                ->paginate(10);
+                ->paginate(25);
+
+            $registrosAnalisisBase = (clone $query)
+                ->whereDate('fecha_asist', $fechaAnalisisFiltro)
+                ->get();
         }
 
         $representantesDisponibles = $registrosAnalisisBase
@@ -277,24 +276,32 @@ class MesasPazSupervisionService
 
         $resolverTiposAsistente = function ($registro) use ($normalizarAsiste, $esNoPresente) {
             $asiste = $normalizarAsiste($registro);
+            $presStored = (string) $registro->presidente;
             $tipos = [];
 
             if ($esNoPresente($registro)) {
                 return ['Ninguno'];
             }
 
+            // Presidente Municipal
             if (
-                in_array((string) $registro->presidente, ['Si', 'Ambos'], true)
+                in_array($presStored, ['Si', 'Ambos'], true)
                 || $asiste === 'presidente'
                 || mb_strpos($asiste, 'presidente y representante') !== false
             ) {
                 $tipos[] = 'Presidente';
             }
 
-            if (in_array($asiste, ['director de seguridad', 'director de seguridad municipal'], true) || mb_strpos($asiste, 'director de seguridad') !== false) {
+            // Director de Seguridad (o su Representante según la nueva regla)
+            if (
+                in_array($presStored, ['Representante', 'Ambos'], true)
+                || in_array($asiste, ['director de seguridad', 'director de seguridad municipal', 'representante'], true)
+                || mb_strpos($asiste, 'director de seguridad') !== false
+            ) {
                 $tipos[] = 'Director de seguridad';
             }
 
+            // Soporte para registros antiguos o manuales de Secretarios
             if ($asiste === mb_strtolower('Secretario/Regidor de gobernación') || mb_strpos($asiste, mb_strtolower('Secretario/Regidor de gobernación')) !== false) {
                 $tipos[] = 'Secretario/Regidor de gobernación';
             }
@@ -312,8 +319,10 @@ class MesasPazSupervisionService
 
         $microrregionLabel = function ($registro) {
             $id = (int) ($registro->microrregion_id ?? 0);
-            $nombre = optional(optional($registro->delegado)->microrregion)->cabecera
-                ?: optional(optional($registro->delegado)->microrregion)->microrregion;
+            
+            // Intentar obtener de la relación directa, sino de la del delegado (respaldo)
+            $micro = $registro->microrregion ?: optional($registro->delegado)->microrregion;
+            $nombre = optional($micro)->cabecera ?: optional($micro)->microrregion;
 
             if ($id > 0 && !empty($nombre)) {
                 return $id.' - '.$nombre;
@@ -608,6 +617,25 @@ class MesasPazSupervisionService
             ->sortByDesc('fecha_asist')
             ->values();
 
+        // Obtener fechas que tienen registros para el calendario (filtrado por permisos)
+        $fechasConDatosQuery = MesaPazAsistencia::query();
+        if (!empty($allowedMicroregionIds)) {
+            $fechasConDatosQuery->whereIn('microrregion_id', $allowedMicroregionIds);
+        }
+        $fechasConDatos = $fechasConDatosQuery
+            ->select('fecha_asist')
+            ->distinct()
+            ->orderBy('fecha_asist', 'desc')
+            ->get()
+            ->pluck('fecha_asist')
+            ->map(function ($f) {
+                if (is_string($f)) return $f;
+                return Carbon::parse($f)->toDateString();
+            })
+            ->unique()
+            ->values()
+            ->all();
+
         return [
             'valid' => true,
             'errors' => new MessageBag(),
@@ -625,6 +653,7 @@ class MesasPazSupervisionService
                 'listadoPresidente' => $listadoPresidente,
                 'listadoRepresentante' => $listadoRepresentante,
                 'opcionesAsiste' => $opcionesAsiste,
+                'fechasConDatos' => $fechasConDatos,
             ],
         ];
     }

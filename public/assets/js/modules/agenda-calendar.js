@@ -19,15 +19,19 @@
         }
     }
 
+    function applyVistaToSearchParams(u, tabName) {
+        if (tabName === 'lista' || tabName === 'fichas') {
+            u.searchParams.set(VISTA_QUERY, tabName);
+        } else {
+            u.searchParams.delete(VISTA_QUERY);
+        }
+    }
+
     /** Actualiza ?vista= sin nueva entrada en el historial (F5 conserva pestaña; enlace sin vista = predeterminado). */
     function syncVistaQueryToUrl(tabName) {
         try {
             var u = new URL(window.location.href);
-            if (tabName === 'lista' || tabName === 'fichas') {
-                u.searchParams.set(VISTA_QUERY, tabName);
-            } else {
-                u.searchParams.delete(VISTA_QUERY);
-            }
+            applyVistaToSearchParams(u, tabName);
             history.replaceState({ agendaCal: true }, '', u.pathname + u.search + u.hash);
         } catch (e2) {
             /* ignore */
@@ -37,11 +41,7 @@
     function mergeVistaIntoCalendarUrl(urlString, tabName) {
         try {
             var u = new URL(urlString, window.location.origin);
-            if (tabName === 'lista' || tabName === 'fichas') {
-                u.searchParams.set(VISTA_QUERY, tabName);
-            } else {
-                u.searchParams.delete(VISTA_QUERY);
-            }
+            applyVistaToSearchParams(u, tabName);
             return u.pathname + u.search + u.hash;
         } catch (e3) {
             return urlString;

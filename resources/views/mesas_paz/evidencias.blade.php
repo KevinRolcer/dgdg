@@ -4,7 +4,7 @@
 
 @push('css')
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
 <link href="{{ asset('assets/css/mesas_paz/mesas-paz-shell.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesas-paz-shell.css')) ?: time() }}" rel="stylesheet" />
 <link href="{{ asset('assets/css/mesas_paz/mesaPazSupervision.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesaPazSupervision.css')) ?: time() }}" rel="stylesheet" />
 <link href="{{ asset('assets/css/mesas_paz/mesaPaz.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesaPaz.css')) ?: time() }}" rel="stylesheet" />
@@ -27,7 +27,7 @@
             <p class="mesas-paz-shell-desc">Consulta de evidencias y asistencias por delegado. Filtros por fecha y análisis por microregión.</p>
         </header>
 
-<div id="supervisionEvidenciasPage" data-url-ppt="{{ route('ppt.generar-presentacion') }}" data-url-canva="{{ route('canva.generar-documento') }}">
+<div id="supervisionEvidenciasPage" data-url-ppt="{{ route('ppt.generar-presentacion') }}" data-fechas-datos="{{ json_encode($fechasConDatos ?? []) }}">
 <div class="mesas-paz-panel panel panel-inverse">
     <div class="mesas-paz-panel-head panel-heading">
         <h4 class="panel-title">Filtros de búsqueda</h4>
@@ -37,11 +37,12 @@
             <div class="col-md-4 col-lg-3">
                 <label for="fecha_lista" class="form-label">Fecha (lista de evidencias)</label>
                 <input
-                    type="date"
+                    type="text"
                     id="fecha_lista"
                     name="fecha_lista"
                     class="form-control @error('fecha_lista') is-invalid @enderror"
                     value="{{ old('fecha_lista', $fechaLista ?? \Carbon\Carbon::today()->toDateString()) }}"
+                    placeholder="Seleccionar fecha"
                 >
                 @error('fecha_lista')
                     <div class="invalid-feedback">{{ $message }}</div>
@@ -62,7 +63,7 @@
                 </button>
                 <button
                     type="button"
-                    class="btn btn-success btn-sm"
+                    class="btn btn-primary btn-sm"
                     id="btnAbrirRangoFechasPresentacion"
                 >
                     Generar Presentación
@@ -90,12 +91,13 @@
                     <div class="col-md-4 col-lg-3">
                         <label for="fecha_analisis" class="form-label">Fecha</label>
                         <input
-                            type="date"
+                            type="text"
                             id="fecha_analisis"
                             name="fecha_analisis"
                             form="supervisionFiltersForm"
                             class="form-control"
                             value="{{ old('fecha_analisis', $fechaAnalisis ?? \Carbon\Carbon::today()->toDateString()) }}"
+                            placeholder="Seleccionar fecha"
                         >
                     </div>
                     <div class="col-md-5 col-lg-4 ms-md-auto">
@@ -174,8 +176,6 @@
                                                     <th class="text-nowrap">Presentes</th>
                                                     <th class="text-nowrap" title="Presidente Municipal">Pres. Mpal.</th>
                                                     <th class="text-nowrap" title="Director de Seguridad Municipal">Dir. Seg. Mpal.</th>
-                                                    <th class="text-nowrap" title="Secretario/Regidor de Gobernación">Sec./Reg. Gob.</th>
-                                                    <th class="text-nowrap" title="Secretario de Ayuntamiento">Sec. Ayto</th>
                                                     <th class="text-nowrap" title="Asistencia del Delegado">Asist. Delegado</th>
                                                     <th class="text-nowrap">Ninguno</th>
                                                 </tr>
@@ -201,14 +201,6 @@
                                                         <td>
                                                             {{ $dato['conteo_por_tipo']['Director de seguridad'] ?? 0 }}
                                                             <div class="text-muted supervision-text-xs">{{ number_format((float)($dato['promedio_por_tipo']['Director de seguridad'] ?? 0), 1) }}%</div>
-                                                        </td>
-                                                        <td>
-                                                            {{ $dato['conteo_por_tipo']['Secretario/Regidor de gobernación'] ?? 0 }}
-                                                            <div class="text-muted supervision-text-xs">{{ number_format((float)($dato['promedio_por_tipo']['Secretario/Regidor de gobernación'] ?? 0), 1) }}%</div>
-                                                        </td>
-                                                        <td>
-                                                            {{ $dato['conteo_por_tipo']['Secretario de Ayuntamiento'] ?? 0 }}
-                                                            <div class="text-muted supervision-text-xs">{{ number_format((float)($dato['promedio_por_tipo']['Secretario de Ayuntamiento'] ?? 0), 1) }}%</div>
                                                         </td>
                                                         <td>
                                                             {{ $dato['delegado_asiste'] ?? 0 }}
@@ -331,7 +323,6 @@
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <button type="button" class="btn btn-default btn-sm" disabled aria-disabled="true">PDF</button>
                     <button
                         type="button"
                         class="btn btn-sm btn-outline-secondary"
@@ -354,12 +345,12 @@
     </div>
     <div id="evidenciasPanelBody" class="mesas-paz-panel-body panel-body">
         @if(isset($evidencias) && collect($evidencias)->isNotEmpty())
-            <div class="evidencias-list-header d-none d-md-flex px-3 pb-2 small border-bottom mb-2">
+            <div class="evidencias-list-header d-none d-md-flex px-3 pb-2 small border-bottom mb-2 text-muted fw-bold">
                 <div class="col-md-2">Delegado</div>
-                <div class="col-md-2">Microregión</div>
-                <div class="col-md-4">Municipios con asistencia</div>
-                <div class="col-md-2" title="Parte / Acuerdos / Observaciones">Parte/Acuerdos</div>
-                <div class="col-md-2">Evidencia</div>
+                <div class="col-md-2 text-center">Microregión</div>
+                <div class="col-md-3 text-center">Asistencias</div>
+                <div class="col-md-3 text-center">Parte/Acuerdos</div>
+                <div class="col-md-2 text-center">Evidencia</div>
             </div>
 
             <div class="d-flex flex-column gap-2">
@@ -371,7 +362,7 @@
                             <div class="text-muted" style="font-size: 0.75rem; word-break: break-all;">{{ $item['usuario'] }}</div>
                         </div>
 
-                        <div class="col-12 col-md-2">
+                        <div class="col-12 col-md-2 text-center text-md-start">
                             <small class="text-muted d-md-none d-block">Microregión</small>
                             @if(!empty($item['microrregion_label']))
                                 <span class="text-muted" style="font-size: 0.8rem;" title="{{ $item['microrregion_label'] }}">{{ $item['microrregion_label'] }}</span>
@@ -382,49 +373,34 @@
                             @endif
                         </div>
 
-                        <div class="col-12 col-md-4">
-                            <small class="text-muted d-md-none d-block">Municipios con asistencia</small>
-                            @if(collect($item['municipios_con_asistencia'] ?? [])->isNotEmpty())
-                                <div class="d-flex flex-wrap gap-1">
-                                    @foreach($item['municipios_con_asistencia'] as $municipio)
-                                        <span class="badge badge-evidencia-presente">{{ $municipio }}</span>
-                                    @endforeach
-                                </div>
-                            @else
-                                <span class="text-muted d-block small">Sin municipios con asistencia</span>
-                            @endif
-
-                            @php $collapseId = 'no_presentes_' . $loop->index; @endphp
-                            @if(collect($item['municipios_no_presentes'] ?? [])->isNotEmpty())
-                                <div class="mt-2 text-center text-md-start">
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-outline-primary py-0 px-2"
-                                        style="font-size: 0.7rem;"
-                                        data-bs-toggle="collapse"
-                                        data-bs-target="#{{ $collapseId }}"
-                                        aria-expanded="false"
-                                        aria-controls="{{ $collapseId }}"
-                                    >
-                                        No presentes ({{ count($item['municipios_no_presentes']) }})
-                                    </button>
-                                </div>
-
-                                <div class="collapse mt-2" id="{{ $collapseId }}">
-                                    <div class="border rounded p-2 bg-white">
-                                        <div class="d-flex flex-wrap gap-1">
-                                            @foreach($item['municipios_no_presentes'] as $municipioNoPresente)
-                                                <span class="badge bg-warning text-dark" style="font-size: 0.7rem;">{{ $municipioNoPresente }}</span>
-                                            @endforeach
-                                        </div>
+                        <div class="col-12 col-md-3 text-center text-md-start">
+                            <small class="text-muted d-md-none d-block">Asistencias</small>
+                            <div class="d-flex align-items-center justify-content-center justify-content-md-start gap-2">
+                                <div class="flex-grow-1 text-md-start">
+                                    <div class="text-success fw-bold" style="font-size: 0.8rem;">
+                                        <i class="fa fa-check-circle me-1"></i> {{ count($item['municipios_con_asistencia']) }} Presentes
                                     </div>
+                                    @if(count($item['municipios_no_presentes']) > 0)
+                                        <div class="text-danger fw-bold" style="font-size: 0.8rem;">
+                                            <i class="fa fa-times-circle me-1"></i> {{ count($item['municipios_no_presentes']) }} No presentes
+                                        </div>
+                                    @endif
                                 </div>
-                            @endif
+                                <button 
+                                    type="button" 
+                                    class="btn btn-xs btn-outline-info rounded-circle" 
+                                    style="width: 24px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center;"
+                                    title="Ver municipios"
+                                    onclick="verDetalleMunicipios('{{ addslashes($item['delegado']) }}', {{ json_encode($item['municipios_con_asistencia']) }}, {{ json_encode($item['municipios_no_presentes']) }})"
+                                >
+                                    <i class="fa fa-eye" style="font-size: 0.7rem;"></i>
+                                </button>
+                            </div>
                         </div>
 
-                        <div class="col-12 col-md-2">
+                        <div class="col-12 col-md-3 text-center text-md-start">
                             <small class="text-muted d-md-none d-block">Parte/Acuerdos</small>
-                            <div class="d-flex flex-column gap-1">
+                            <div class="d-flex flex-column gap-1 align-items-center align-items-md-start">
                                 @php $partesCollapseId = 'partes_' . $loop->index; @endphp
                                 @if(collect($item['partes_observaciones'] ?? [])->isNotEmpty())
                                     <button
@@ -485,8 +461,8 @@
                             </div>
                         </div>
 
-                        <div class="col-12 col-md-2">
-                            <small class="text-muted d-md-none d-block">Evidencia</small>
+                        <div class="col-12 col-md-2 text-center">
+                            <small class="text-muted d-md-none d-block text-center">Evidencia</small>
                             @php
                                 $evidenciasUrls = collect($item['evidencia_urls'] ?? [])->filter()->values();
                             @endphp
@@ -509,8 +485,9 @@
                     </div>
                 @endforeach
             </div>
-            @if(isset($registrosPaginator) && $registrosPaginator)
-                <div class="mt-3" id="evidenciasPagination">
+
+            @if(isset($registrosPaginator) && $registrosPaginator instanceof \Illuminate\Pagination\LengthAwarePaginator)
+                <div class="mt-4 d-flex justify-content-center" id="evidenciasPagination">
                     {{ $registrosPaginator->withQueryString()->links() }}
                 </div>
             @endif
@@ -538,8 +515,27 @@
         </div>
     </div>
 </div>
+
+<!-- Modal para Detalle de Municipios -->
+<div class="modal fade" id="modalDetalleMunicipios" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Municipios - <span id="detalleMunicipiosDelegado"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <h6 class="text-success border-bottom pb-1"><i class="fa fa-check-circle me-1"></i> Presentes</h6>
+                    <div id="listaMunicipiosPresentes" class="d-flex flex-wrap gap-2 mt-2"></div>
+                </div>
+                <div>
+                    <h6 class="text-danger border-bottom pb-1"><i class="fa fa-times-circle me-1"></i> No presentes</h6>
+                    <div id="listaMunicipiosNoPresentes" class="d-flex flex-wrap gap-2 mt-2"></div>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
 </div>
 @endsection
 
@@ -547,14 +543,11 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Selecciona el rango de fechas</h5>
+                <h5 class="modal-title">Selecciona la semana a evaluar</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
                 <form id="formRangoFechasPresentacion" class="d-flex flex-column align-items-center">
-                    <label for="fechaRangoPresentacion" class="form-label fw-bold mb-3 text-center presentation-calendar-label">
-                        Selecciona la semana a evaluar
-                    </label>
                     <div class="calendar-wrapper presentation-calendar-wrap w-100 d-flex justify-content-center">
                         <input type="text" id="fechaRangoPresentacion" name="fecha_rango" class="d-none" required>
                     </div>
@@ -562,31 +555,17 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-success" id="btnConfirmarRangoFechasPresentacion">Generar</button>
+                <button type="button" class="btn btn-primary" id="btnConfirmarRangoFechasPresentacion">Generar</button>
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="canvaPresentacionModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="canvaPresentacionModalTitle">Generando presentación</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-            </div>
-            <div class="modal-body">
-                <div id="canvaPresentacionModalContent" class="text-center">
-                    <span class="text-muted">Generando...</span>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
 <script src="{{ asset('assets/js/mesas_paz/mesaPazSupervicion.js') }}?v={{ @filemtime(public_path('assets/js/mesas_paz/mesaPazSupervicion.js')) ?: time() }}"></script>
 @endpush
