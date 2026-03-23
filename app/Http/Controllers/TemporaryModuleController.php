@@ -849,7 +849,7 @@ class TemporaryModuleController extends Controller
         $microrregionesAsignadas = $this->accessService->microrregionesConMunicipiosPorUsuario((int) $user->id);
         $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
 
-        $modules = TemporaryModule::query()
+        $allModulesQuery = TemporaryModule::query()
             ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all'])
             ->where('is_active', true)
             ->where(function ($query) use ($user) {
@@ -870,9 +870,10 @@ class TemporaryModuleController extends Controller
                     fn ($q) => $q->whereRaw('1 = 0')
                 ),
             ])
-            ->latest()
-            ->paginate(6)
-            ->withQueryString();
+            ->latest();
+
+        $allModules = (clone $allModulesQuery)->get();
+        $modules = $allModulesQuery->paginate(6)->withQueryString();
 
         if ($modules->isEmpty() && (int) $request->get('page', 1) > 1 && $modules->total() > 0) {
             return redirect()->route($request->route()->getName(), array_merge(
@@ -884,7 +885,7 @@ class TemporaryModuleController extends Controller
             return redirect()->route($request->route()->getName(), $request->except('page'));
         }
 
-        $moduleIds = $modules->getCollection()->pluck('id')->all();
+        $moduleIds = $allModules->pluck('id')->all();
         $entriesByModule = collect();
         if ($moduleIds !== []) {
             $entriesByModule = TemporaryModuleEntry::query()
@@ -900,7 +901,7 @@ class TemporaryModuleController extends Controller
                 ->get()
                 ->groupBy('temporary_module_id');
         }
-        foreach ($modules->getCollection() as $module) {
+        foreach ($allModules as $module) {
             $module->setRelation('myEntries', $entriesByModule->get($module->id, collect()));
         }
 
@@ -910,11 +911,11 @@ class TemporaryModuleController extends Controller
             : null;
 
         $activeModuleId = $requestedModuleId !== null
-            && $modules->contains(fn ($module) => (int) $module->id === $requestedModuleId)
+            && $allModules->contains(fn ($module) => (int) $module->id === $requestedModuleId)
             ? $requestedModuleId
-            : (int) ($modules->first()?->id ?? 0);
+            : (int) ($allModules->first()?->id ?? 0);
 
-        $activeModule = $modules->firstWhere('id', $activeModuleId);
+        $activeModule = $allModules->firstWhere('id', $activeModuleId);
 
         $fields = [];
         $myEntries = collect();
@@ -944,6 +945,7 @@ class TemporaryModuleController extends Controller
             'pageDescription' => 'Registra informacion solicitada para tus municipios en modulos activos.',
             'topbarNotifications' => [],
             'modules' => $modules,
+            'allModules' => $allModules,
             'fields' => $fields,
             'myEntries' => $myEntries,
             'municipios' => $municipios,

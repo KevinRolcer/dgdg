@@ -53,11 +53,11 @@
             <div class="inline-alert inline-alert-error" role="alert">{{ $errors->first() }}</div>
         @endif
 
-    <section class="tm-section-panel {{ $isUploadSection ? 'is-active' : '' }}" id="tmUploadView" role="tabpanel" aria-hidden="{{ $isUploadSection ? 'false' : 'true' }}">
-        @include('temporary_modules.delegate.partials.upload_modules', ['modules' => $modules, 'fragmentUploadUrl' => $fragmentUploadUrl ?? '#'])
+    <section class="tm-section-panel {{ $isUploadSection ? 'is-active' : '' }}" id="tmUploadView" role="tabpanel" aria-hidden="{{ $isUploadSection ? 'false' : 'true' }}" data-upload-url="{{ route('temporary-modules.fragment.upload') }}">
+    @include('temporary_modules.delegate.partials.upload_modules', ['modules' => $modules, 'fragmentUploadUrl' => $fragmentUploadUrl ?? '#'])
     </section>
 
-    @foreach ($modules as $module)
+    @foreach (($allModules ?? $modules) as $module)
         @php
             $tmImportable = $module->fields->filter(fn ($f) => in_array($f->type, \App\Services\TemporaryModules\TemporaryModuleExcelImportService::IMPORTABLE_TYPES, true));
         @endphp
@@ -465,9 +465,14 @@
                                         <div class="inline-alert inline-alert-success tm-hidden tm-excel-detect-note" style="margin-top:10px;" role="status"></div>
 
                                         <div class="tm-actions" style="margin-top:20px; flex-direction:column; align-items:stretch; gap:10px;">
-                                            <button type="button" class="tm-btn tm-btn-primary tm-excel-read-columns">
-                                                <i class="fa-solid fa-table-columns"></i> Leer secciones y mapear
-                                            </button>
+                                            <div style="display:flex; gap:8px;">
+                                                <button type="button" class="tm-btn tm-btn-primary tm-excel-read-columns" style="flex:1;">
+                                                    <i class="fa-solid fa-table-columns"></i> Leer secciones y mapear
+                                                </button>
+                                                <button type="button" class="tm-btn tm-btn-outline tm-excel-reset-trigger" title="Limpiar todo y empezar de nuevo">
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            </div>
                                             <button type="button" class="tm-btn tm-btn-outline tm-excel-auto-detect" style="display:none;">
                                                 <i class="fa-solid fa-magic"></i> Marcar todo el documento
                                             </button>
@@ -831,7 +836,7 @@
     @endforeach
 
     <section class="tm-section-panel {{ !$isUploadSection ? 'is-active' : '' }}" id="tmRecordsView" role="tabpanel" aria-hidden="{{ !$isUploadSection ? 'false' : 'true' }}" data-records-url="{{ route('temporary-modules.records') }}" data-fragment-records-url="{{ $fragmentRecordsUrl ?? '' }}">
-    @if ($modules->isNotEmpty())
+    @if (($allModules ?? $modules)->isNotEmpty())
         <article class="content-card tm-card tm-card-in-shell tm-records-container">
             <div class="tm-module-filters-row" data-tm-module-chips-row>
                 <button type="button" class="tm-module-filters-nav tm-module-filters-nav--prev" data-tm-module-chips-prev aria-label="Módulos anteriores" disabled>
@@ -839,7 +844,7 @@
                 </button>
                 <div class="tm-module-filters-track" data-tm-module-chips-track>
                     <div class="tm-module-filters" role="tablist" aria-label="Filtrar por modulo temporal">
-                        @foreach ($modules as $module)
+                        @foreach (($allModules ?? $modules) as $module)
                             @php $isModuleActive = (int) ($activeModuleId ?? 0) === (int) $module->id || ((int) ($activeModuleId ?? 0) === 0 && $loop->first); @endphp
                             <button
                                 type="button"
@@ -866,7 +871,7 @@
                 $tmMicrorregionFilterId = is_array($tmQueryMr) ? 0 : (int) $tmQueryMr;
             @endphp
             <div class="tm-module-records-panels">
-                @foreach ($modules as $module)
+                @foreach (($allModules ?? $modules) as $module)
                     @php
                         $municipioField = $module->fields->firstWhere('type', 'municipio');
                         $isModuleActive = (int) ($activeModuleId ?? 0) === (int) $module->id || ((int) ($activeModuleId ?? 0) === 0 && $loop->first);
@@ -1504,9 +1509,13 @@
         const imageModalTitle = document.getElementById('tmImagePreviewTitle');
         const imageInputSelector = 'input[type="file"][accept="image/*"]';
         const recordsViewPanel = document.getElementById('tmRecordsView');
+        const uploadViewPanel = document.getElementById('tmUploadView');
         const recordsUrl = recordsViewPanel ? String(recordsViewPanel.getAttribute('data-records-url') || '') : '';
         const fragmentRecordsBase = recordsViewPanel
             ? String(recordsViewPanel.getAttribute('data-fragment-records-url') || '')
+            : '';
+        const fragmentUploadBase = uploadViewPanel
+            ? String(uploadViewPanel.getAttribute('data-upload-url') || '')
             : '';
         let lastFocusedImageInput = null;
         const modalOpeners = new Map();
@@ -2092,6 +2101,29 @@
             });
         };
 
+        const loadUploadFragment = function (host, page) {
+            if (!host || !fragmentUploadBase) {
+                return;
+            }
+            host.style.opacity = '0.5';
+            const sep = fragmentUploadBase.indexOf('?') >= 0 ? '&' : '?';
+            fetch(fragmentUploadBase + sep + 'page=' + page, {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }
+            }).then(function (res) {
+                if (!res.ok) throw new Error('Error ' + res.status);
+                return res.text();
+            }).then(function (html) {
+                host.innerHTML = html;
+                host.style.opacity = '1';
+                // Reseteamos el scroll de la página o del host si es necesario
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }).catch(function (err) {
+                console.error(err);
+                host.style.opacity = '1';
+            });
+        };
+
         const syncTmBuscarClearVisibility = function (input) {
             if (!input) {
                 return;
@@ -2227,6 +2259,22 @@
             });
         }
 
+        if (uploadViewPanel && fragmentUploadBase) {
+            uploadViewPanel.addEventListener('click', function (event) {
+                const anchor = event.target.closest('a.tm-paginator-btn[href]');
+                if (!anchor || !anchor.getAttribute('href')) {
+                    return;
+                }
+                event.preventDefault();
+                const url = new URL(anchor.href, window.location.origin);
+                const pageNum = url.searchParams.get('page') || '1';
+                const grid = document.getElementById('tmFragmentUpload');
+                if (grid) {
+                    loadUploadFragment(grid, pageNum);
+                }
+            });
+        }
+
         let syncTmModuleChipsNav = function () {};
 
         (function initTmModuleChipsNav() {
@@ -2261,7 +2309,22 @@
                 prev.disabled = track.scrollLeft <= 2;
                 next.disabled = track.scrollLeft >= maxScroll - 2;
             };
+            const scrollToActive = function () {
+                const active = track.querySelector('.tm-module-chip.is-active');
+                if (active) {
+                    const trackWidth = track.clientWidth;
+                    const activeLeft = active.offsetLeft;
+                    const activeWidth = active.offsetWidth;
+                    const center = activeLeft - (trackWidth / 2) + (activeWidth / 2);
+                    track.scrollTo({ left: center, behavior: 'smooth' });
+                }
+            };
+
             syncTmModuleChipsNav = syncNav;
+            
+            // Scroll to active on start
+            setTimeout(scrollToActive, 200);
+
             prev.addEventListener('click', function () {
                 track.scrollBy({ left: -step(), behavior: 'smooth' });
             });
@@ -2281,10 +2344,12 @@
                     }
                     requestAnimationFrame(function () {
                         requestAnimationFrame(syncNav);
+                        requestAnimationFrame(scrollToActive);
                     });
                 }).observe(recordsSection, { attributes: true, attributeFilter: ['class'] });
             }
             syncNav();
+            scrollToActive();
         })();
 
         document.addEventListener('click', function (event) {
@@ -2785,6 +2850,10 @@
                 dataStartRowInput.value = found + 1;
                 updateRowHighlights();
             });
+            
+            modal.querySelector('.tm-excel-reset-trigger')?.addEventListener('click', () => {
+                if (typeof modal.__excelReset === 'function') modal.__excelReset();
+            });
 
             modal.querySelector('.tm-excel-read-columns')?.addEventListener('click', function () {
                 const errSection = modal.querySelector('.tm-excel-errors-section');
@@ -2801,6 +2870,11 @@
                 fd.append('archivo_excel', file);
                 fd.append('header_row', headerRowInput.value || '1');
                 fd.append('_token', csrfToken);
+
+                const btn = this;
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Leyendo...';
 
                 fetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
                 .then(r => r.json())
@@ -2864,6 +2938,9 @@
                     if (stepNote) stepNote.textContent = 'Relaciona cada campo del módulo con una columna de tu Excel.';
                 }).catch(e => {
                     if (errPreviewEl) { errPreviewEl.textContent = e.message; errPreviewEl.classList.remove('tm-hidden'); }
+                }).finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
                 });
             });
 
@@ -2875,7 +2952,7 @@
                 if (stepNote) stepNote.innerHTML = 'Haz clic en una fila para marcar <strong>Encabezado</strong> y <strong>Datos</strong>.';
             });
 
-            modal.querySelector('.tm-excel-importar')?.addEventListener('click', () => {
+            modal.querySelector('.tm-excel-importar')?.addEventListener('click', function() {
                 const errSection = modal.querySelector('.tm-excel-errors-section');
                 if (errSection) errSection.classList.add('tm-hidden');
                 const errList = modal.querySelector('.tm-excel-errors-list');
@@ -2896,6 +2973,11 @@
                 fd.append('all_microrregions', searchAllCheck?.checked ? '1' : '0');
                 fd.append('selected_microrregion_id', mrInput ? mrInput.value : '');
                 fd.append('_token', csrfToken);
+
+                const btn = this;
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importando...';
 
                 fetch(importUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
                 .then(r => r.json())
@@ -2983,6 +3065,9 @@
                 }).catch(e => {
                     const errEl = modal.querySelector('.tm-excel-import-err');
                     if (errEl) { errEl.textContent = e.message; errEl.classList.remove('tm-hidden'); }
+                }).finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
                 });
             });
         });

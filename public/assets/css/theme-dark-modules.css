@@ -530,7 +530,7 @@ html.theme-dark .calendar-event-form textarea {
 html.theme-dark .inline-alert-success {
     background: rgba(90, 157, 145, 0.15);
     border-color: rgba(90, 157, 145, 0.35);
-    color: var(--clr-secondary);
+    color: #fff !important;
 }
 
 html.theme-dark .inline-alert-error {

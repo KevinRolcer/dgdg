@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="{{ asset('assets/css/theme-dark-agenda.css') }}">
     {{-- jQuery vía cdnjs (CSP solo permite cdnjs/jsdelivr/unpkg, no code.jquery.com) --}}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="{{ asset('assets/js/vendor/simple-expand.min.js') }}"></script>
 </head>
 <body data-export-status-url="{{ route('temporary-modules.admin.export-status', ['exportRequest' => 0]) }}">
@@ -193,6 +194,57 @@
             <span>{{ session('toast') }}</span>
         </div>
     @endif
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Objeto global de configuración Toast
+        const Toast = typeof Swal !== 'undefined' ? Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3500,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('mouseenter', Swal.stopTimer)
+                toast.addEventListener('mouseleave', Swal.resumeTimer)
+            }
+        }) : null;
+
+        // Función para mostrar notificación emergente
+        window.segobToast = function(icon, message) {
+            if (Toast) {
+                Toast.fire({ icon: icon, title: message });
+            } else {
+                console.warn('Swal not loaded');
+            }
+        };
+
+        // Automáticamente "emergentes" para mensajes de sesión en cualquier vista
+        @if(session('success') || session('status'))
+            window.segobToast('success', '{{ session('success') ?: session('status') }}');
+        @endif
+        @if(session('error'))
+            window.segobToast('error', '{{ session('error') }}');
+        @endif
+        @if(session('warning'))
+            window.segobToast('warning', '{{ session('warning') }}');
+        @endif
+        @if(session('info'))
+            window.segobToast('info', '{{ session('info') }}');
+        @endif
+
+        // Opcional: Ocultar avisos inline clásicos que coincidan con el mensaje de sesión
+        // para evitar duplicidad si el usuario los dejó en el blade
+        const sessionMsg = '{{ session('success') ?: session('status') ?: session('error') ?: '' }}';
+        if (sessionMsg) {
+            document.querySelectorAll('.inline-alert').forEach(el => {
+                if (el.textContent.trim() === sessionMsg) {
+                    el.style.display = 'none';
+                }
+            });
+        }
+    });
+    </script>
 
     <aside class="notifications-drawer" id="notificationsDrawer" aria-hidden="true">
         <header class="notifications-drawer-header">

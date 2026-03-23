@@ -497,8 +497,23 @@ class TemporaryModuleExcelImportService
             if ($str === '') {
                 return null;
             }
+
+            // 1. Exact match (case-insensitive)
             foreach ($opts as $o) {
                 if (mb_strtoupper(trim($o), 'UTF-8') === mb_strtoupper($str, 'UTF-8')) {
+                    return $o;
+                }
+            }
+
+            // 2. Smart match: search for option labels within the cell text
+            // We sort options by length descending to match 'Inactiva' before 'Activa'
+            $sortedOpts = $opts;
+            usort($sortedOpts, fn ($a, $b) => mb_strlen($b) <=> mb_strlen($a));
+
+            $normStr = $this->normalizeLabel($str);
+            foreach ($sortedOpts as $o) {
+                $normO = $this->normalizeLabel($o);
+                if ($normO !== '' && str_contains($normStr, $normO)) {
                     return $o;
                 }
             }
@@ -511,6 +526,8 @@ class TemporaryModuleExcelImportService
                 return null;
             }
             $catOpts = is_array($field->options) ? $field->options : [];
+
+            // 1. Exact matches (full or sub)
             foreach ($catOpts as $cat) {
                 $name = (string) ($cat['name'] ?? '');
                 if (mb_strtoupper($name, 'UTF-8') === mb_strtoupper($str, 'UTF-8')) {
@@ -522,6 +539,26 @@ class TemporaryModuleExcelImportService
                         || mb_strtoupper((string) $sub, 'UTF-8') === mb_strtoupper($str, 'UTF-8')) {
                         return str_contains($str, '>') ? $str : $subVal;
                     }
+                }
+            }
+
+            // 2. Smart match: search for category or sub-category names within cell text
+            $normStr = $this->normalizeLabel($str);
+            // Collect all possible valid strings for categories and sort by length
+            $allPossible = [];
+            foreach ($catOpts as $cat) {
+                $allPossible[] = ['val' => (string) ($cat['name'] ?? ''), 'is_sub' => false];
+                foreach ((array) ($cat['sub'] ?? []) as $sub) {
+                    $allPossible[] = ['val' => ($cat['name'] ?? '').' > '.$sub, 'is_sub' => true, 'sub_only' => (string) $sub];
+                }
+            }
+            usort($allPossible, fn ($a, $b) => mb_strlen((string) $b['val']) <=> mb_strlen((string) $a['val']));
+
+            foreach ($allPossible as $item) {
+                $labelToSearch = $item['is_sub'] ? $item['sub_only'] : $item['val'];
+                $normLabel = $this->normalizeLabel((string) $labelToSearch);
+                if ($normLabel !== '' && str_contains($normStr, $normLabel)) {
+                    return $item['val'];
                 }
             }
 
