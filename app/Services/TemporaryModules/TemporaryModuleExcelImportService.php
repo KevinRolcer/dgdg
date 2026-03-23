@@ -339,6 +339,13 @@ class TemporaryModuleExcelImportService
         if (is_bool($raw)) {
             return $raw ? 'Sí' : 'No';
         }
+        if (is_object($raw)) {
+            if (method_exists($raw, '__toString')) {
+                return trim((string) $raw);
+            }
+
+            return '';
+        }
 
         return trim((string) $raw);
     }

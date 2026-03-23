@@ -131,7 +131,7 @@ class TemporaryModuleController extends Controller
             ->select(['id', 'name', 'description', 'expires_at', 'applies_to_all', 'is_active'])
             ->withCount(['fields', 'entries', 'targetUsers'])
             ->latest()
-            ->paginate(8);
+            ->paginate(6);
 
         return view('temporary_modules.admin.index', [
             'pageTitle' => 'Modulos temporales',
@@ -177,7 +177,7 @@ class TemporaryModuleController extends Controller
             ->whereHas('entries')
             ->withCount(['fields', 'entries'])
             ->latest()
-            ->paginate(8);
+            ->paginate(6);
 
         return view('temporary_modules.admin.records', [
             'pageTitle' => 'Registros de modulos temporales',
@@ -871,7 +871,7 @@ class TemporaryModuleController extends Controller
                 ),
             ])
             ->latest()
-            ->paginate(10)
+            ->paginate(6)
             ->withQueryString();
 
         if ($modules->isEmpty() && (int) $request->get('page', 1) > 1 && $modules->total() > 0) {
@@ -1009,7 +1009,7 @@ class TemporaryModuleController extends Controller
                 ),
             ])
             ->latest()
-            ->paginate(10)
+            ->paginate(6)
             ->withQueryString();
 
         return view('temporary_modules.delegate.partials.upload_modules', [
