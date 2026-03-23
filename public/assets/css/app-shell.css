@@ -1422,3 +1422,83 @@ body.sidebar-collapsed .sidebar-logout-btn {
     color: #fff !important;
 }
 
+/* SweetAlert Custom Standard Styles */
+.tm-swal-popup {
+    border-radius: 14px;
+    border: 1px solid var(--clr-border);
+    box-shadow: var(--shadow-soft);
+    background: var(--clr-card);
+}
+
+.tm-swal-title {
+    color: var(--clr-primary-dark);
+    font-size: 1.1rem;
+    font-family: var(--font-main);
+}
+
+.tm-swal-text {
+    color: var(--clr-text-main);
+    font-size: 0.92rem;
+    font-family: var(--font-main);
+}
+
+.tm-swal-confirm,
+.tm-swal-deny,
+.tm-swal-cancel {
+    min-height: 36px;
+    border-radius: 10px;
+    border: 1px solid var(--clr-border);
+    padding: 7px 16px;
+    font-family: var(--font-main);
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    margin: 0 6px;
+    transition: all 0.2s;
+}
+
+.swal2-actions {
+    gap: 8px !important;
+}
+
+.swal2-container {
+    z-index: 100000 !important;
+}
+
+.tm-swal-confirm {
+    border-color: transparent;
+    background: var(--clr-primary);
+    color: #fff;
+}
+
+.tm-swal-confirm:hover {
+    background: var(--clr-primary-dark);
+}
+
+.tm-swal-cancel {
+    background: transparent;
+    color: var(--clr-text-main);
+}
+
+.tm-swal-cancel:hover {
+    background: var(--clr-bg);
+}
+
+/* Dark theme overrides for Swals */
+html.theme-dark .tm-swal-popup {
+    background-color: #1a1a1a;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+html.theme-dark .tm-swal-title {
+    color: #fff;
+}
+html.theme-dark .tm-swal-text {
+    color: rgba(255, 255, 255, 0.8);
+}
+html.theme-dark .tm-swal-cancel {
+    color: #fff;
+    border-color: rgba(255,255,255,0.2);
+}
+html.theme-dark .tm-swal-cancel:hover {
+    background: rgba(255,255,255,0.1);
+}

@@ -2467,14 +2467,7 @@
                         icon: 'warning',
                         showCancelButton: true,
                         confirmButtonText: 'Sí, eliminar todos',
-                        cancelButtonText: 'Cancelar',
-                        reverseButtons: true,
-                        buttonsStyling: false,
-                        customClass: {
-                            popup: 'tm-swal-popup',
-                            confirmButton: 'tm-swal-confirm',
-                            cancelButton: 'tm-swal-cancel'
-                        }
+                        cancelButtonText: 'Cancelar'
                     }).then((result) => {
                         if (result.isConfirmed) {
                             const originalHtml = deleteBtn.innerHTML;

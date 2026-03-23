@@ -2604,61 +2604,9 @@ a.tm-paginator-btn:hover {
     line-height: 1.25;
 }
 
-.tm-swal-popup {
-    border-radius: 14px;
-    border: 1px solid var(--clr-border);
-    box-shadow: var(--shadow-soft);
-}
 
-.tm-swal-title {
-    color: var(--clr-primary-dark);
-    font-size: 1.1rem;
-}
 
-.tm-swal-text {
-    color: var(--clr-text-main);
-    font-size: 0.92rem;
-}
 
-.tm-swal-confirm,
-.tm-swal-deny,
-.tm-swal-cancel {
-    min-height: 36px;
-    border-radius: 10px;
-    border: 1px solid var(--clr-border);
-    padding: 7px 16px;
-    font-family: inherit;
-    font-size: 0.82rem;
-    font-weight: 700;
-    cursor: pointer;
-    margin: 0 6px;
-    transition: all 0.2s;
-}
-
-.swal2-actions {
-    gap: 8px !important;
-}
-
-.swal2-container {
-    z-index: 100000 !important;
-}
-
-.tm-swal-confirm {
-    border-color: transparent;
-    background: var(--clr-primary);
-    color: #fff;
-}
-
-.tm-swal-deny {
-    border-color: rgba(180, 120, 20, 0.35);
-    background: rgba(180, 120, 20, 0.1);
-    color: var(--clr-text-main);
-}
-
-.tm-swal-cancel {
-    background: var(--clr-card);
-    color: var(--clr-text-main);
-}
 
 @media (max-width: 900px) {
     .tm-grid-2,

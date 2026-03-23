@@ -189,20 +189,33 @@
         </div>
     </div>
 
-    @if (session('toast'))
-        <div class="app-toast" id="appToast">
-            <span>{{ session('toast') }}</span>
-        </div>
-    @endif
+
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // --- Configuración global para que todos los Swal usen el mismo diseño ---
+        if (typeof Swal !== 'undefined') {
+            window.Swal = Swal.mixin({
+                buttonsStyling: false,
+                reverseButtons: true,
+                iconColor: '#861e34',
+                customClass: {
+                    popup: 'tm-swal-popup',
+                    title: 'tm-swal-title',
+                    htmlContainer: 'tm-swal-text',
+                    confirmButton: 'tm-swal-confirm',
+                    cancelButton: 'tm-swal-cancel',
+                    denyButton: 'tm-swal-deny'
+                }
+            });
+        }
+
         // Objeto global de configuración Toast
         const Toast = typeof Swal !== 'undefined' ? Swal.mixin({
             toast: true,
             position: 'top-end',
             showConfirmButton: false,
-            timer: 1000,
+            timer: 3000,
             timerProgressBar: true,
             didOpen: (toast) => {
                 toast.addEventListener('mouseenter', Swal.stopTimer)
@@ -224,7 +237,9 @@
             }
         };
 
-        // Automáticamente "emergentes" para mensajes de sesión en cualquier vista
+        @if(session('toast'))
+            window.segobToast('info', '{{ session('toast') }}');
+        @endif
         @if(session('success') || session('status'))
             window.segobToast('success', '{{ session('success') ?: session('status') }}');
         @endif
@@ -238,17 +253,11 @@
             window.segobToast('info', '{{ session('info') }}');
         @endif
 
-        // Opcional: Ocultar avisos inline clásicos que coincidan con el mensaje de sesión
-        // para evitar duplicidad si el usuario los dejó en el blade
-        const sessionMsg = '{{ session('success') ?: session('status') ?: session('error') ?: '' }}';
+        // Ocultar avisos inline clásicos para evitar duplicación con los "emergentes"
+        const sessionMsg = '{{ session('success') ?: session('status') ?: session('error') ?: session('toast') ?: '' }}';
         if (sessionMsg) {
-            document.querySelectorAll('.inline-alert').forEach(el => {
-                if (el.textContent.trim() === sessionMsg) {
-                    // Si es el mensaje de "eliminado" en modo oscuro, cambiamos el color en lugar de solo ocultar
-                    // (aunque generalmente el Toast lo reemplaza)
-                    if (sessionMsg.includes('eliminado') && document.documentElement.classList.contains('theme-dark')) {
-                        el.style.color = '#c79b66';
-                    }
+            document.querySelectorAll('.inline-alert, .app-toast').forEach(el => {
+                if (el.textContent.trim().includes(sessionMsg) || sessionMsg.includes(el.textContent.trim())) {
                     el.style.display = 'none';
                 }
             });
