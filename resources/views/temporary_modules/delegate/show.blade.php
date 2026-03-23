@@ -1114,6 +1114,41 @@
         }
     }, { passive: false });
 
+    const applyExcelPreviewThumbnails = function(thumbs) {
+        if (!thumbs || !thumbs.length) return;
+        const table = document.getElementById('tmExcelPreviewTable');
+        if (!table) return;
+        thumbs.forEach(function(t) {
+            const r = parseInt(t.row, 10);
+            const c = parseInt(t.col, 10);
+            if (!Number.isFinite(r) || !Number.isFinite(c)) return;
+            const tr = table.querySelector('tbody tr[data-row-index="' + r + '"]');
+            if (!tr) return;
+            const td = tr.querySelector('td:nth-child(' + (c + 2) + ')');
+            if (!td || !t.data_url || String(t.data_url).indexOf('data:image/') !== 0) return;
+            const img = document.createElement('img');
+            img.src = t.data_url;
+            img.alt = '';
+            img.loading = 'lazy';
+            img.style.cssText = 'max-width:88px;max-height:88px;vertical-align:middle;border-radius:6px;object-fit:contain;display:block;';
+            td.replaceChildren(img);
+        });
+    };
+
+    const fetchExcelPreviewThumbnails = function(file) {
+        if (!file || !excelPreviewUrl) return;
+        const fd = new FormData();
+        fd.append('archivo_excel', file);
+        fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
+        fd.append('_token', csrfToken);
+        fetch(excelPreviewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
+            .then(function(r) { return r.json(); })
+            .then(function(j) {
+                if (j.success && j.preview_thumbnails) applyExcelPreviewThumbnails(j.preview_thumbnails);
+            })
+            .catch(function() { /* silencioso: la tabla de texto ya se ve con SheetJS */ });
+    };
+
     const renderExcelPreview = function(data) {
         const container = document.getElementById('tmExcelPreviewTableWrap');
         if (!container) return;
@@ -1293,6 +1328,7 @@
                 const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                 workbookData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
                 renderExcelPreview(workbookData);
+                fetchExcelPreviewThumbnails(file);
                 document.getElementById('tmExcelAutoDetect').style.display = 'inline-flex';
             } catch (err) {
                 const errEl = document.getElementById('tmExcelPreviewErr');
@@ -1363,6 +1399,7 @@
                 excelHeaders = j.headers || [];
                 excelFields = j.fields || [];
                 excelSuggested = j.suggested_map || {};
+                if (j.preview_thumbnails) applyExcelPreviewThumbnails(j.preview_thumbnails);
 
                 const updateMappedColumns = () => {
                     document.querySelectorAll('.is-mapped-column').forEach(el => el.classList.remove('is-mapped-column'));

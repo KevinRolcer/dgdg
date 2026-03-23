@@ -7,10 +7,15 @@ use App\Models\TemporaryModuleField;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
+use PhpOffice\PhpSpreadsheet\Worksheet\MemoryDrawing;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class TemporaryModuleExcelImportService
 {
@@ -27,9 +32,9 @@ class TemporaryModuleExcelImportService
     /**
      * Lee la fila de encabezados y sugiere mapeo campo -> índice de columna (0-based).
      *
-     * @return array{headers: list<array{index:int,letter:string,label:string}>, suggested_map: array<string,int|null>, header_row:int}
+     * @return array{headers: list<array{index:int,letter:string,label:string}>, suggested_map: array<string,int|null>, header_row:int, preview_thumbnails?: list<array{row:int,col:int,data_url:string}>}
      */
-    public function preview(UploadedFile $file, int $headerRow = 1): array
+    public function preview(UploadedFile $file, int $headerRow = 1, bool $includeDrawingThumbnails = false): array
     {
         $headerRow = max(1, $headerRow);
         $spreadsheet = $this->loadSpreadsheet($file);
@@ -49,11 +54,190 @@ class TemporaryModuleExcelImportService
             ];
         }
 
-        return [
+        $result = [
             'headers' => $headers,
             'suggested_map' => [],
             'header_row' => $headerRow,
         ];
+
+        if ($includeDrawingThumbnails) {
+            try {
+                $result['preview_thumbnails'] = $this->buildDrawingPreviewThumbnails($sheet, 80, 88);
+            } catch (\Throwable $e) {
+                Log::warning('Vista previa Excel: miniaturas de dibujos omitidas: '.$e->getMessage());
+                $result['preview_thumbnails'] = [];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return list<array{row:int,col:int,data_url:string}>
+     */
+    private function buildDrawingPreviewThumbnails(Worksheet $sheet, int $maxThumbs, int $maxWidthPx): array
+    {
+        if ($maxThumbs < 1 || ! extension_loaded('gd')) {
+            return [];
+        }
+
+        $out = [];
+        $seenCell = [];
+        foreach ($this->allSheetDrawings($sheet) as $drawing) {
+            if (count($out) >= $maxThumbs) {
+                break;
+            }
+            if (! method_exists($drawing, 'getCoordinates')) {
+                continue;
+            }
+            $coord = (string) $drawing->getCoordinates();
+            if ($coord === '') {
+                continue;
+            }
+            if (str_contains($coord, '!')) {
+                $coord = explode('!', $coord)[1];
+            }
+            if (str_contains($coord, ':')) {
+                $coord = explode(':', $coord)[0];
+            }
+            if (! preg_match('/^([A-Za-z]+)(\d+)$/', $coord, $m)) {
+                continue;
+            }
+            $colLetter = strtoupper($m[1]);
+            $row = (int) $m[2];
+            $colIndex = Coordinate::columnIndexFromString($colLetter) - 1;
+            $cellKey = $colLetter.$row;
+            if (isset($seenCell[$cellKey])) {
+                continue;
+            }
+
+            $resolved = $this->getDrawingBinaryAndExtension($drawing);
+            if ($resolved === null) {
+                continue;
+            }
+            [$binary, $ext] = $resolved;
+            $dataUrl = $this->binaryToJpegThumbnailDataUri($binary, $maxWidthPx);
+            if ($dataUrl === null) {
+                continue;
+            }
+            $seenCell[$cellKey] = true;
+            $out[] = [
+                'row' => $row,
+                'col' => $colIndex,
+                'data_url' => $dataUrl,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    private function allSheetDrawings(Worksheet $sheet): array
+    {
+        return array_merge(
+            iterator_to_array($sheet->getDrawingCollection()->getIterator(), false),
+            iterator_to_array($sheet->getInCellDrawingCollection()->getIterator(), false),
+        );
+    }
+
+    /**
+     * @return array{0: string, 1: string}|null [binary, extension without dot]
+     */
+    private function getDrawingBinaryAndExtension(mixed $drawing): ?array
+    {
+        if ($drawing instanceof MemoryDrawing) {
+            $image = $drawing->getImageResource();
+            $renderingFunction = $drawing->getRenderingFunction();
+            ob_start();
+            switch ($renderingFunction) {
+                case MemoryDrawing::RENDERING_JPEG:
+                    imagejpeg($image);
+                    $extension = 'jpg';
+                    break;
+                case MemoryDrawing::RENDERING_GIF:
+                    imagegif($image);
+                    $extension = 'gif';
+                    break;
+                case MemoryDrawing::RENDERING_PNG:
+                case MemoryDrawing::RENDERING_DEFAULT:
+                    imagepng($image);
+                    $extension = 'png';
+                    break;
+                default:
+                    imagepng($image);
+                    $extension = 'png';
+                    break;
+            }
+            $contents = ob_get_clean();
+            if ($contents === false || $contents === '') {
+                return null;
+            }
+
+            return [$contents, $extension];
+        }
+
+        if ($drawing instanceof Drawing) {
+            $path = $drawing->getPath();
+            if ($path === '') {
+                return null;
+            }
+            if (preg_match('/^data:image\/(\w+);base64,(.+)$/i', $path, $m)) {
+                $decoded = base64_decode($m[2], true);
+                if ($decoded === false || $decoded === '') {
+                    return null;
+                }
+                $ext = strtolower($m[1]);
+
+                return [$decoded, $ext === 'jpeg' ? 'jpg' : $ext];
+            }
+            // zip:// y otras rutas de flujo: is_file() falla en Windows con zip:// aunque file_get_contents funcione
+            $contents = @file_get_contents($path);
+            if ($contents === false || $contents === '') {
+                return null;
+            }
+            $ext = strtolower((string) $drawing->getExtension());
+            $ext = ltrim($ext, '.');
+
+            return [$contents, $ext !== '' ? $ext : 'jpg'];
+        }
+
+        return null;
+    }
+
+    private function binaryToJpegThumbnailDataUri(string $binary, int $maxWidthPx): ?string
+    {
+        if (! extension_loaded('gd')) {
+            return null;
+        }
+        $src = @imagecreatefromstring($binary);
+        if ($src === false) {
+            return null;
+        }
+        $w = imagesx($src);
+        $h = imagesy($src);
+        if ($w < 1 || $h < 1) {
+            imagedestroy($src);
+
+            return null;
+        }
+        $nw = min($maxWidthPx, $w);
+        $nh = (int) round($h * ($nw / $w));
+        $dst = imagescale($src, $nw, $nh, IMG_BILINEAR_FIXED);
+        imagedestroy($src);
+        if ($dst === false) {
+            return null;
+        }
+        ob_start();
+        imagejpeg($dst, null, 62);
+        imagedestroy($dst);
+        $jpg = ob_get_clean();
+        if ($jpg === false || $jpg === '') {
+            return null;
+        }
+
+        return 'data:image/jpeg;base64,'.base64_encode($jpg);
     }
 
     /**
@@ -110,8 +294,8 @@ class TemporaryModuleExcelImportService
 
     /**
      * @param  array<string,int|null>  $mapping  field_key => 0-based column index; null = omit
-    * @param  list<string>  $allowedMunicipioNames  nombres permitidos para microrregión actual
-    * @param  list<string>  $suggestionMunicipioNames  nombres para sugerencias de coincidencia
+     * @param  list<string>  $allowedMunicipioNames  nombres permitidos para microrregión actual
+     * @param  list<string>  $suggestionMunicipioNames  nombres para sugerencias de coincidencia
      * @return array{imported:int, skipped:int, row_errors:list<array{row:int,message:string,data:array,suggestions:array}>}
      */
     public function importRows(
@@ -135,11 +319,35 @@ class TemporaryModuleExcelImportService
         $highestCol = $sheet->getHighestDataColumn($headerRow);
         $maxCol = Coordinate::columnIndexFromString($highestCol);
 
+        // --- EXTRAER IMÁGENES DEL EXCEL ---
+        // Imágenes flotantes vs "en celda" (Excel 365): PhpSpreadsheet usa colecciones distintas.
+        $drawings = [];
+        try {
+            $allDrawings = $this->allSheetDrawings($sheet);
+            Log::info("Importación módulo {$module->id}: se encontraron ".count($allDrawings).' dibujo(s) en la hoja (incl. en celda).');
+            foreach ($allDrawings as $drawing) {
+                if (method_exists($drawing, 'getCoordinates')) {
+                    $coord = $drawing->getCoordinates();
+                    if ($coord) {
+                        // Limpiar coordenadas si vienen con nombre de hoja (ej: 'Hoja1!A1')
+                        if (str_contains($coord, '!')) {
+                            $coord = explode('!', $coord)[1];
+                        }
+                        $drawings[$coord] = $drawing;
+                        // Log::debug("Dibujo mapeado en: " . $coord);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::error('Error extrayendo dibujos de Excel: '.$e->getMessage());
+        }
+        // -----------------------------------
+
         $importable = $this->importableFields($fieldsByKey->values());
         $requiredKeys = $importable->where('is_required', true)->pluck('key')->all();
         $municipioField = $fieldsByKey->firstWhere('type', 'municipio');
         $municipioKey = $municipioField ? $municipioField->key : null;
-        $suggestionBaseMunicipios = !empty($suggestionMunicipioNames) ? $suggestionMunicipioNames : $allowedMunicipioNames;
+        $suggestionBaseMunicipios = ! empty($suggestionMunicipioNames) ? $suggestionMunicipioNames : $allowedMunicipioNames;
 
         $imported = 0;
         $skipped = 0;
@@ -164,11 +372,11 @@ class TemporaryModuleExcelImportService
             $rawValues = [];
             $hasAny = false;
             foreach ($mapping as $fieldKey => $colIndex) {
-                if ($colIndex === null || !isset($fieldsByKey[$fieldKey])) {
+                if ($colIndex === null || ! isset($fieldsByKey[$fieldKey])) {
                     continue;
                 }
                 $field = $fieldsByKey[$fieldKey];
-                if (!in_array($field->type, self::IMPORTABLE_TYPES, true)) {
+                if (! in_array($field->type, self::IMPORTABLE_TYPES, true)) {
                     continue;
                 }
                 $col = (int) $colIndex + 1;
@@ -176,6 +384,24 @@ class TemporaryModuleExcelImportService
                     continue;
                 }
                 $letter = Coordinate::stringFromColumnIndex($col);
+
+                // Prioridad a dibujos de Excel si el campo es de tipo imagen/archivo
+                if (in_array($field->type, ['image', 'file'], true)) {
+                    $coord = $letter.$row;
+                    $matchedDrawing = $this->matchDrawingInCell($sheet, $drawings, $letter, $row);
+
+                    if ($matchedDrawing) {
+                        $savedPath = $this->saveExcelDrawing($matchedDrawing, $module, $coord);
+                        if ($savedPath) {
+                            $values[$fieldKey] = $savedPath;
+                            $rawValues[$fieldKey] = '[Imagen extraída de Excel]';
+                            $hasAny = true;
+
+                            continue; // No procesamos como texto
+                        }
+                    }
+                }
+
                 $cell = $sheet->getCell($letter.$row);
                 $raw = $cell->getValue();
                 $calculated = $cell->getCalculatedValue();
@@ -187,7 +413,7 @@ class TemporaryModuleExcelImportService
                 $values[$fieldKey] = $this->coerceValue($field, $raw, $calculated, $str, $allowedMunicipioNames);
             }
 
-            if (!$hasAny) {
+            if (! $hasAny) {
                 $skipped++;
 
                 continue;
@@ -259,7 +485,7 @@ class TemporaryModuleExcelImportService
 
             // Defaults para campos no mapeados (evitar nulls en JSON)
             foreach ($importable as $field) {
-                if (!array_key_exists($field->key, $values)) {
+                if (! array_key_exists($field->key, $values)) {
                     $values[$field->key] = $field->type === 'boolean' ? false : null;
                 }
             }
@@ -307,7 +533,15 @@ class TemporaryModuleExcelImportService
 
     private function loadSpreadsheet(UploadedFile $file): Spreadsheet
     {
-        return IOFactory::load($file->getRealPath());
+        $path = $file->getRealPath();
+        $reader = IOFactory::createReaderForFile($path);
+
+        // Aseguramos que cargue dibujos y metadatos
+        if (method_exists($reader, 'setReadDataOnly')) {
+            $reader->setReadDataOnly(false);
+        }
+
+        return $reader->load($path);
     }
 
     public function normalizeLabel(string $s): string
@@ -330,7 +564,7 @@ class TemporaryModuleExcelImportService
         if ($raw === null) {
             return '';
         }
-        if (is_numeric($raw) && !is_string($raw)) {
+        if (is_numeric($raw) && ! is_string($raw)) {
             return (string) $raw;
         }
         if ($raw instanceof \DateTimeInterface) {
@@ -439,7 +673,7 @@ class TemporaryModuleExcelImportService
 
             $validOpts = array_map('strval', $field->options ?? []);
 
-            if (!empty($validOpts)) {
+            if (! empty($validOpts)) {
                 // Strategy 1: search for each known option inside the cell text (case-insensitive).
                 // We keep the order of the defined options list and only include those found.
                 $found = [];
@@ -454,7 +688,7 @@ class TemporaryModuleExcelImportService
                     }
                 }
 
-                if (!empty($found)) {
+                if (! empty($found)) {
                     return $found;
                 }
             }
@@ -575,6 +809,7 @@ class TemporaryModuleExcelImportService
                     return $name;
                 }
             }
+
             // Si el municipio no pertenece a la microregión seleccionada, lo dejamos vacío
             // para que el registro no se asigne incorrectamente.
             return null;
@@ -633,6 +868,82 @@ class TemporaryModuleExcelImportService
     private function compactAlnum(string $s): string
     {
         return preg_replace('/[^A-Z0-9]/', '', $s) ?? '';
+    }
+
+    /**
+     * Busca un dibujo en el listado que corresponda a la coordenada de la celda,
+     * considerando celdas combinadas y posibles offsets.
+     */
+    private function matchDrawingInCell(Worksheet $sheet, array $drawings, string $letter, int $row): mixed
+    {
+        $coord = $letter.$row;
+
+        // 1. Caso directo: "G2"
+        if (isset($drawings[$coord])) {
+            return $drawings[$coord];
+        }
+
+        // 2. Si la celda es parte de un rango combinado, buscar el dibujo en el inicio del rango
+        foreach ($sheet->getMergeCells() as $mergeRange) {
+            if ($sheet->getCell($coord)->isInRange($mergeRange)) {
+                [$start] = explode(':', $mergeRange);
+                if (isset($drawings[$start])) {
+                    return $drawings[$start];
+                }
+            }
+        }
+
+        // 3. Búsqueda exhaustiva por si la coordenada tiene prefijos o es un rango incompleto
+        foreach ($drawings as $drwCoord => $drawing) {
+            $cleanDrw = str_contains($drwCoord, '!') ? explode('!', $drwCoord)[1] : $drwCoord;
+            if (str_contains($cleanDrw, ':')) {
+                $cleanDrw = explode(':', $cleanDrw)[0];
+            }
+            if ($cleanDrw === $coord) {
+                return $drawing;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Guarda un dibujo extraído de una celda de Excel en el almacenamiento compartido.
+     */
+    private function saveExcelDrawing(mixed $drawing, TemporaryModule $module, string $logCoord = ''): ?string
+    {
+        try {
+            $resolved = $this->getDrawingBinaryAndExtension($drawing);
+        } catch (\Throwable $e) {
+            Log::error("Error procesando binario de dibujo en $logCoord: ".$e->getMessage());
+
+            return null;
+        }
+
+        if ($resolved === null) {
+            return null;
+        }
+
+        [$contents, $extension] = $resolved;
+        if ($contents === '') {
+            return null;
+        }
+
+        $filename = 'imp_'.$module->id.'_'.bin2hex(random_bytes(8)).'.'.($extension ?: 'png');
+        // Usar carpeta compartida si existe configuración, de lo contrario public
+        $secureDiskCfg = config('filesystems.disks.secure_shared');
+        $storageDisk = ! empty($secureDiskCfg) ? 'secure_shared' : 'public';
+        $storagePath = "temporary-modules/images/{$filename}";
+
+        try {
+            Storage::disk($storageDisk)->put($storagePath, $contents);
+        } catch (\Throwable $e) {
+            Log::error("Error guardando imagen extraída de Excel en disco $storageDisk: ".$e->getMessage());
+
+            return null;
+        }
+
+        return $storagePath;
     }
 
     public function buildDuplicateSignature(array $values): string

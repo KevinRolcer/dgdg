@@ -1520,12 +1520,14 @@
         let lastFocusedImageInput = null;
         const modalOpeners = new Map();
         const notify = function (title, message, type) {
+            if ((type === 'success' || type === 'status') && typeof window.segobToast === 'function') {
+                window.segobToast('success', message || title);
+                return;
+            }
             if (typeof Swal !== 'undefined') {
                 Swal.fire(title, message, type);
-            } else if (typeof window.swal === 'function') {
-                try { window.swal(title, message, type); } catch (e) { window.swal.fire(title, message, type); }
             } else {
-                alert(title + '\n' + (message || ''));
+                alert(title + (message ? '\n' + message : ''));
             }
         };
 
@@ -2550,6 +2552,41 @@
                 }
             };
 
+            const applyExcelPreviewThumbnails = (thumbs) => {
+                if (!thumbs || !thumbs.length) return;
+                const table = modal.querySelector('.tm-excel-preview-table');
+                if (!table) return;
+                thumbs.forEach((t) => {
+                    const r = parseInt(t.row, 10);
+                    const c = parseInt(t.col, 10);
+                    if (!Number.isFinite(r) || !Number.isFinite(c)) return;
+                    const tr = table.querySelector('tbody tr[data-row-index="' + r + '"]');
+                    if (!tr) return;
+                    const td = tr.querySelector('td:nth-child(' + (c + 2) + ')');
+                    if (!td || !t.data_url || String(t.data_url).indexOf('data:image/') !== 0) return;
+                    const img = document.createElement('img');
+                    img.src = t.data_url;
+                    img.alt = '';
+                    img.loading = 'lazy';
+                    img.style.cssText = 'max-width:88px;max-height:88px;vertical-align:middle;border-radius:6px;object-fit:contain;display:block;';
+                    td.replaceChildren(img);
+                });
+            };
+
+            const fetchExcelPreviewThumbnails = (file) => {
+                if (!file || !previewUrl) return;
+                const fd = new FormData();
+                fd.append('archivo_excel', file);
+                fd.append('header_row', headerRowInput?.value || '1');
+                fd.append('_token', csrfToken);
+                fetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
+                    .then((r) => r.json())
+                    .then((j) => {
+                        if (j.success && j.preview_thumbnails) applyExcelPreviewThumbnails(j.preview_thumbnails);
+                    })
+                    .catch(() => {});
+            };
+
             const renderExcelPreview = function(data) {
                 if (!previewTableWrap) return;
                 if (!data || data.length === 0) {
@@ -2806,6 +2843,7 @@
                         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                         workbookData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
                         renderExcelPreview(workbookData);
+                        fetchExcelPreviewThumbnails(file);
                         modal.querySelector('.tm-excel-auto-detect').style.display = 'inline-flex';
                     } catch (err) {
                         if (errPreviewEl) { errPreviewEl.textContent = 'Error al procesar el Excel.'; errPreviewEl.classList.remove('tm-hidden'); }
@@ -2880,6 +2918,8 @@
                 .then(r => r.json())
                 .then(j => {
                     if (!j.success) throw new Error(j.message);
+
+                    if (j.preview_thumbnails) applyExcelPreviewThumbnails(j.preview_thumbnails);
 
                     const updateMappedColumns = () => {
                         modal.querySelectorAll('.is-mapped-column').forEach(el => el.classList.remove('is-mapped-column'));

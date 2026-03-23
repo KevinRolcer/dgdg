@@ -202,7 +202,7 @@
             toast: true,
             position: 'top-end',
             showConfirmButton: false,
-            timer: 3500,
+            timer: 1000,
             timerProgressBar: true,
             didOpen: (toast) => {
                 toast.addEventListener('mouseenter', Swal.stopTimer)
@@ -213,7 +213,12 @@
         // Función para mostrar notificación emergente
         window.segobToast = function(icon, message) {
             if (Toast) {
-                Toast.fire({ icon: icon, title: message });
+                let options = { icon: icon, title: message };
+                // Personalización para avisos de eliminación en modo oscuro
+                if (message.includes('eliminado') && document.documentElement.classList.contains('theme-dark')) {
+                    options.color = '#c79b66';
+                }
+                Toast.fire(options);
             } else {
                 console.warn('Swal not loaded');
             }
@@ -239,6 +244,11 @@
         if (sessionMsg) {
             document.querySelectorAll('.inline-alert').forEach(el => {
                 if (el.textContent.trim() === sessionMsg) {
+                    // Si es el mensaje de "eliminado" en modo oscuro, cambiamos el color en lugar de solo ocultar
+                    // (aunque generalmente el Toast lo reemplaza)
+                    if (sessionMsg.includes('eliminado') && document.documentElement.classList.contains('theme-dark')) {
+                        el.style.color = '#c79b66';
+                    }
                     el.style.display = 'none';
                 }
             });

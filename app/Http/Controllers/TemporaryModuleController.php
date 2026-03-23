@@ -1365,7 +1365,7 @@ class TemporaryModuleController extends Controller
         }
 
         try {
-            $preview = $this->excelImportService->preview($file, $headerRow);
+            $preview = $this->excelImportService->preview($file, $headerRow, true);
             $preview['suggested_map'] = $this->excelImportService->suggestMap($importable, $preview['headers']);
         } catch (\Throwable $e) {
             return response()->json([
@@ -1380,6 +1380,7 @@ class TemporaryModuleController extends Controller
             'data_start_row' => $detected['data_start_row'] ?? ($headerRow + 1),
             'headers' => $preview['headers'],
             'suggested_map' => $preview['suggested_map'],
+            'preview_thumbnails' => $preview['preview_thumbnails'] ?? [],
             'fields' => $importable->map(fn ($f) => [
                 'key' => $f->key,
                 'label' => $f->label,
