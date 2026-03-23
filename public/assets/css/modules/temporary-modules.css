@@ -22,7 +22,12 @@
 
 .tm-shell-head {
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--clr-border);
+    border-bottom: none;
+}
+
+.tm-shell-head.tm-shell-head--no-rule {
+    border-bottom: none;
+    padding-bottom: 0;
 }
 
 .tm-shell-head--with-tabs {
@@ -171,6 +176,10 @@
     gap: 12px;
 }
 
+.tm-head.tm-head--actions-only {
+    justify-content: flex-end;
+}
+
 .tm-head h2 {
     margin: 0 0 6px;
     color: var(--clr-accent);
@@ -189,6 +198,54 @@
     color: var(--clr-text-light);
     font-size: var(--tm-fs-section-subtitle);
     line-height: 1.45;
+}
+
+/* Filtro listado admin módulos temporales */
+.tm-admin-module-search {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.tm-admin-module-search__label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--clr-text-main);
+}
+
+.tm-admin-module-search__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.tm-admin-module-search__input {
+    flex: 1 1 200px;
+    min-width: 0;
+    min-height: 36px;
+    border: 1px solid var(--clr-border);
+    border-radius: 10px;
+    padding: 7px 11px;
+    font-family: inherit;
+    font-size: 0.84rem;
+    background: #fff;
+    color: var(--clr-text-main);
+}
+
+.tm-admin-module-search__input:focus {
+    outline: none;
+    border-color: var(--clr-primary);
+    box-shadow: 0 0 0 2px rgba(199, 155, 102, 0.2);
+}
+
+.tm-admin-module-search__submit,
+.tm-admin-module-search__clear {
+    flex-shrink: 0;
+}
+
+.tm-shell .tm-admin-module-search {
+    margin-bottom: 14px;
 }
 
 .tm-head-stack {
@@ -4919,4 +4976,250 @@ html.theme-dark .tm-record-item-header {
     background: #ffebee;
     color: #b71c1c;
     border: 1px solid rgba(183, 28, 28, 0.3);
+}
+
+.tm-search-row {
+    margin: 1rem 0 1.5rem;
+    padding: 0 0.25rem;
+}
+
+.tm-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 24px;
+    background: transparent;
+    padding: 8px 0;
+    border: none;
+}
+
+.tm-search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 200px;
+}
+
+.tm-search-input-wrap i {
+    position: absolute;
+    left: 12px;
+    color: var(--clr-text-light);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+
+.tm-search-input-small {
+    width: 100%;
+    height: 34px;
+    padding: 0 36px 0 34px;
+    border: 1px solid var(--clr-border);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.02);
+    font-size: 0.8125rem;
+    color: var(--clr-text-main);
+    transition: all 0.2s ease;
+}
+
+html.theme-dark .tm-search-input-small {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.tm-search-input-small:focus {
+    outline: none;
+    border-color: var(--clr-accent);
+    background: var(--clr-bg);
+    box-shadow: 0 0 0 3px rgba(199, 155, 102, 0.12);
+}
+
+.tm-btn-clear-inline {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    padding: 4px;
+    color: var(--clr-text-light);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+}
+
+.tm-btn-clear-inline:hover {
+    color: var(--clr-primary);
+}
+
+.tm-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tm-filter-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--clr-text-main);
+}
+
+.tm-pill-group {
+    display: flex;
+    gap: 2px;
+    background: rgba(0, 0, 0, 0.04);
+    padding: 3px;
+    border-radius: 12px;
+}
+
+html.theme-dark .tm-pill-group {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tm-pill {
+    padding: 3px 14px;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--clr-text-main);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tm-pill:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+html.theme-dark .tm-pill:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.tm-pill.is-active {
+    background: var(--clr-card);
+    color: var(--clr-primary);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+html.theme-dark .tm-pill.is-active {
+    color: #fff;
+    background: var(--clr-primary);
+    box-shadow: none;
+}
+
+.tm-date-input {
+    height: 28px;
+    width: 110px;
+    padding: 0 4px;
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.02);
+    font-size: 0.75rem;
+    color: var(--clr-text-main);
+    font-family: inherit;
+    outline: none;
+}
+
+html.theme-dark .tm-date-input {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+@media (max-width: 768px) {
+    .tm-filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    .tm-filter-group {
+        justify-content: space-between;
+    }
+}
+
+/* Global Excel Drop Overlay */
+.tm-global-drop-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+    visibility: hidden;
+    opacity: 0;
+}
+
+.tm-global-drop-overlay.is-active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: all;
+}
+
+.tm-global-drop-content {
+    text-align: center;
+    color: #fff;
+    padding: 3rem;
+    border: 4px dashed rgba(255, 255, 255, 0.4);
+    border-radius: 30px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(4px);
+    max-width: 90%;
+}
+
+.tm-global-drop-content i {
+    font-size: 6rem;
+    color: #fff;
+    margin-bottom: 24px;
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+}
+
+.tm-global-drop-content h3 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.tm-global-drop-content p {
+    font-size: 1.1rem;
+    opacity: 0.8;
+}
+
+/* Dropzone hover states */
+.tm-excel-dropzone {
+    transition: all 0.2s ease;
+}
+
+.tm-excel-dropzone.is-dragover {
+    border-color: var(--clr-primary) !important;
+    background: rgba(var(--clr-primary-rgb, 199, 155, 102), 0.1) !important;
+    transform: scale(1.02);
+}
+
+.tm-excel-errors-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 480px;
+    overflow-y: auto;
+    padding-right: 8px;
+    margin-bottom: 15px;
+}
+
+.tm-excel-errors-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.tm-excel-errors-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tm-excel-errors-list::-webkit-scrollbar-thumb {
+    background: rgba(var(--clr-primary-rgb, 134, 30, 52), 0.2);
+    border-radius: 10px;
+}
+
+.tm-excel-errors-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--clr-primary-rgb, 134, 30, 52), 0.4);
 }

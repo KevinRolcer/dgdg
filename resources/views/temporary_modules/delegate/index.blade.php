@@ -54,7 +54,46 @@
         @endif
 
     <section class="tm-section-panel {{ $isUploadSection ? 'is-active' : '' }}" id="tmUploadView" role="tabpanel" aria-hidden="{{ $isUploadSection ? 'false' : 'true' }}" data-upload-url="{{ route('temporary-modules.fragment.upload') }}">
-    @include('temporary_modules.delegate.partials.upload_modules', ['modules' => $modules, 'fragmentUploadUrl' => $fragmentUploadUrl ?? '#'])
+        <div class="tm-search-row">
+            <div class="tm-filter-bar">
+                <div class="tm-search-input-wrap">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input 
+                        type="text" 
+                        id="tmModuleSearchInput"
+                        placeholder="Buscar..." 
+                        class="tm-search-input-small"
+                        aria-label="Buscar módulo">
+                    <button type="button" class="tm-btn-clear-inline tm-hidden" id="tmClearSearch" title="Limpiar búsqueda">
+                        <i class="fa-solid fa-circle-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <div class="tm-filter-group">
+                    <span class="tm-filter-label">Ordenar:</span>
+                    <div class="tm-pill-group">
+                        <button type="button" class="tm-pill is-active" data-sort="az" title="A-Z">A-Z</button>
+                        <button type="button" class="tm-pill" data-sort="za" title="Z-A">Z-A</button>
+                    </div>
+                </div>
+
+                <div class="tm-filter-group">
+                    <span class="tm-filter-label">Vigencia:</span>
+                    <div class="tm-pill-group">
+                        <button type="button" class="tm-pill is-active" data-filter-expiry="all">Todos</button>
+                        <button type="button" class="tm-pill" data-filter-expiry="none">Indefinida</button>
+                        <button type="button" class="tm-pill" data-filter-expiry="has">Con fecha</button>
+                    </div>
+                </div>
+
+                <div class="tm-filter-group tm-hidden" id="tmDateFilterGroup">
+                    <div class="tm-date-filter-wrap">
+                        <input type="date" id="tmDateLimit" class="tm-date-input" title="Vence hasta...">
+                    </div>
+                </div>
+            </div>
+        </div>
+        @include('temporary_modules.delegate.partials.upload_modules', ['modules' => $modules, 'fragmentUploadUrl' => $fragmentUploadUrl ?? '#'])
     </section>
 
     @foreach (($allModules ?? $modules) as $module)
@@ -912,6 +951,14 @@
                                         @endforeach
                                     </select>
                                 </label>
+                                <label class="tm-records-filter-field">
+                                    <div style="display:flex; gap:8px; align-items:center;">
+                                        <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-tm-bulk-toggle title="Selección masiva">Seleccionar</button>
+                                        <button type="button" class="tm-btn tm-btn-sm tm-btn-danger tm-hidden" data-tm-bulk-delete-trigger>
+                                            <i class="fa-solid fa-trash-can"></i> <span data-tm-bulk-count>0</span>
+                                        </button>
+                                    </div>
+                                </label>
                             </div>
                         </div>
                         @php
@@ -1113,6 +1160,73 @@
             return [];
         };
 
+        const renderErrorCardHtml = (err, idx, moduleId, singleUrl, cardId, isLogModal = false) => {
+            const moduleName = isLogModal ? getModuleNameById(moduleId) : '';
+            const failedFields = getFailedFields(err);
+            
+            let failedFieldsHtml = '';
+            if (failedFields.length > 0) {
+                failedFieldsHtml = '<div style="margin-top:8px;">';
+                failedFields.forEach(f => {
+                    let fieldSugg = '';
+                    // Sugerencias específicas de este campo (ej: para Listas o Listas múltiples)
+                    if (f.suggestions && f.suggestions.length > 0) {
+                        fieldSugg = '<div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">' +
+                            '<span style="width:100%; font-size:0.65rem; color:var(--clr-primary); font-weight:700;">VALORES DISPONIBLES:</span>' +
+                            f.suggestions.map(s => `
+                                <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" 
+                                    onclick="retryImportRow(${idx}, null, '${String(s).replace(/'/g, "\\'")}', '${singleUrl.replace(/'/g, "\\'")}', '${moduleId}', '${cardId}', this, ${err.row || 0}, '${f.key}')" 
+                                    style="font-size:0.68rem; padding:3px 8px; font-weight:600; text-transform:uppercase;">
+                                    ${escapeHtml(s)}
+                                </button>
+                            `).join('') +
+                        '</div>';
+                    }
+                    failedFieldsHtml += `
+                        <div style="margin-bottom:12px; padding:10px; background:rgba(0,0,0,0.03); border-radius:8px; border-left:3px solid var(--clr-primary);">
+                            <div style="font-size:0.8rem; line-height:1.4;">
+                                <strong style="color:var(--clr-text-main);">${escapeHtml(f.label || f.key || 'Campo')}</strong>: 
+                                <span style="color:var(--clr-text-light);">${escapeHtml(f.reason || 'Dato no válido')}</span>
+                            </div>
+                            ${f.received ? `<div style="font-size:0.75rem; margin-top:4px; font-style:italic; opacity:0.8;">Valor en Excel: "${escapeHtml(f.received)}"</div>` : ''}
+                            ${fieldSugg}
+                        </div>
+                    `;
+                });
+                failedFieldsHtml += '</div>';
+            }
+
+            // Sugerencias generales (normalmente para municipios/microrregiones)
+            let generalSuggHtml = '';
+            if (!failedFields.some(f => f.suggestions && f.suggestions.length > 0) && err.suggestions && err.suggestions.length > 0) {
+                generalSuggHtml = '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">' +
+                    '<span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">¿Quisiste decir? (Municipios)</span>' +
+                    err.suggestions.map(s => `
+                        <button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
+                            onclick="retryImportRow(${idx}, ${Number(s.microrregion_id || 0)}, '${String(s.municipio || '').replace(/'/g, "\\'")}', '${singleUrl.replace(/'/g, "\\'")}', '${moduleId}', '${cardId}', this, ${err.row || 0})"
+                            style="font-size:0.7rem; padding:4px 8px;">
+                            ${escapeHtml(s.municipio)}
+                        </button>
+                    `).join('') +
+                '</div>';
+            }
+
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                    <div>
+                        <div style="color:var(--clr-primary); font-weight:800; font-size:0.9rem;">
+                            ${isLogModal ? `${escapeHtml(moduleName)} · ` : ''}Fila ${err.row}
+                            ${isLogModal ? `<button type="button" class="tm-btn-delete-error" data-card-id="${cardId}" title="Eliminar este error" style="border:0; background:transparent; color:var(--clr-primary); cursor:pointer; padding:0; font-size:0.9em; margin-left:8px;"><i class="fa-solid fa-trash-alt"></i></button>` : ''}
+                        </div>
+                        <div style="font-size:0.78rem; font-weight:500; color:var(--clr-text-light); margin-top:2px;">${escapeHtml(normalizeRowErrorMessage(err))}</div>
+                    </div>
+                    ${isLogModal ? '<span class="tm-upload-meta-pill" style="font-size:0.65rem; padding:2px 8px;">PENDIENTE</span>' : ''}
+                </div>
+                ${failedFieldsHtml}
+                ${generalSuggHtml}
+            `;
+        };
+
         window.__tmSaveImportErrors = saveImportErrors;
 
         const renderErrorsLogModal = (filterModuleId = null) => {
@@ -1150,17 +1264,6 @@
 
                 errors.forEach((err, idx) => {
                     const cardId = `tmErrLogRow_${moduleId}_${idx}`;
-                    const failedFields = getFailedFields(err);
-
-                    const failedFieldsHtml = failedFields.length > 0
-                        ? `<div style="margin-top:8px;"><strong style="font-size:0.75rem;">Campos con fallo:</strong><ul style="margin:6px 0 0 16px; padding:0; font-size:0.8rem; color:var(--clr-text-light);">${failedFields.map((f) => `<li><strong>${escapeHtml(f.label || f.key || 'Campo')}</strong>: ${escapeHtml(f.reason || 'No válido')}${f.received ? ` <span style="color:var(--clr-primary); font-weight:600;">(ingresó: "${escapeHtml(f.received)}")</span>` : ''}</li>`).join('')}</ul></div>`
-                        : '';
-
-                    const suggestions = Array.isArray(err?.suggestions) ? err.suggestions : [];
-                    const suggestionsHtml = suggestions.length > 0
-                        ? `<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;"><span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">Sugerencias de municipio</span>${suggestions.map((s) => `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline" onclick="retryImportRow(${idx}, ${Number(s.microrregion_id || 0)}, '${String(s.municipio || '').replace(/'/g, "\\'")}', '${singleUrl.replace(/'/g, "\\'")}', '${moduleId}', '${cardId}', this, ${err?.row || 0})" style="font-size:0.72rem; padding:4px 8px;">${escapeHtml(s.municipio)}</button>`).join('')}</div>`
-                        : '<div style="margin-top:8px; font-size:0.78rem; color:var(--clr-text-light);">Sin sugerencias automáticas para esta fila.</div>';
-
                     const card = document.createElement('div');
                     card.className = 'tm-error-log-card';
                     card.id = cardId;
@@ -1168,23 +1271,8 @@
                     card.dataset.municipioKey = String(err?.municipio_key || 'municipio');
                     card.dataset.moduleId = moduleId;
                     card.dataset.errorIndex = idx;
-                    card.style = 'padding:12px; border:1px solid var(--clr-border); border-radius:10px; background:var(--clr-bg); font-size:0.85rem;';
-                    card.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
-                            <div style="flex:1;">
-                                <div style="color:var(--clr-primary); font-weight:700; display:flex; align-items:center; gap:8px;">
-                                    ${escapeHtml(moduleName)} · Fila ${escapeHtml(err?.row || '-')}
-                                    <button type="button" class="tm-btn-delete-error" data-card-id="${cardId}" title="Eliminar este error" style="border:0; background:transparent; color:var(--clr-primary); cursor:pointer; padding:0; font-size:0.85em; line-height:1;">
-                                        <i class="fa-solid fa-trash-alt"></i>
-                                    </button>
-                                </div>
-                                <div style="margin-top:4px; font-size:0.8rem; color:var(--clr-text-light);">${escapeHtml(normalizeRowErrorMessage(err))}</div>
-                            </div>
-                            <span class="tm-upload-meta-pill" style="white-space:nowrap;">No importado</span>
-                        </div>
-                        ${failedFieldsHtml}
-                        ${suggestionsHtml}
-                    `;
+                    card.style = 'padding:15px; border:1px solid var(--clr-border); border-radius:12px; background:var(--clr-bg); font-size:0.85rem; transition: all 0.3s ease;';
+                    card.innerHTML = renderErrorCardHtml(err, idx, moduleId, singleUrl, cardId, true);
                     listEl.appendChild(card);
                 });
             });
@@ -1293,45 +1381,14 @@
             errSection.classList.remove('tm-hidden');
             errList.innerHTML = '';
             errors.forEach((err, idx) => {
+                const cardId = `tmErrRow_${moduleId}_${idx}`;
                 const card = document.createElement('div');
                 card.className = 'tm-error-log-card';
-                card.style = 'padding:12px; border:1px solid var(--clr-border); border-radius:10px; background:var(--clr-bg); font-size:0.85rem;';
-
-                // Renderizar campos con fallo
-                const failedFields = Array.isArray(err?.failed_fields) && err.failed_fields.length > 0 ? err.failed_fields : [];
-                let failedFieldsHtml = '';
-                if (failedFields.length > 0) {
-                    failedFieldsHtml = '<div style="margin-top:8px;"><strong style="font-size:0.75rem;">Campos con fallo:</strong><ul style="margin:6px 0 0 16px; padding:0; font-size:0.8rem; color:var(--clr-text-light);">' +
-                        failedFields.map((f) => `<li><strong>${escapeHtml(f.label || f.key || 'Campo')}</strong>: ${escapeHtml(f.reason || 'No válido')}${f.received ? ` <span style="color:var(--clr-primary); font-weight:600;">(ingresó: "${escapeHtml(f.received)}")</span>` : ''}</li>`).join('') +
-                    '</ul></div>';
-                }
-
-                let suggHtml = '';
-                if (err.suggestions && err.suggestions.length > 0) {
-                    const cardId = `tmErrRow_${moduleId}_${idx}`;
-                    suggHtml = '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">' +
-                        '<span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">¿Quisiste decir?</span>' +
-                        err.suggestions.map(s => `
-                            <button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
-                                onclick="retryImportRow(${idx}, ${s.microrregion_id}, '${s.municipio.replace(/'/g, "\\'")}', '${singleUrl}', '${moduleId}', '${cardId}', this, ${err.row || 0})"
-                                style="font-size:0.7rem; padding:4px 8px;">
-                                ${s.municipio}
-                            </button>
-                        `).join('') +
-                    '</div>';
-                }
-
-                card.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                        <div style="color:var(--clr-primary); font-weight:700;">Fila ${err.row}</div>
-                        <div style="font-size:0.75rem; color:var(--clr-text-light); text-align:right;">${normalizeRowErrorMessage(err)}</div>
-                    </div>
-                    ${failedFieldsHtml}
-                    ${suggHtml}
-                `;
-                card.dataset.rowData = JSON.stringify(err.data);
+                card.id = cardId;
+                card.dataset.rowData = JSON.stringify(err?.data);
                 card.dataset.municipioKey = String(err.municipio_key || 'municipio');
-                card.id = `tmErrRow_${moduleId}_${idx}`;
+                card.style = 'padding:15px; border:1px solid var(--clr-border); border-radius:12px; background:var(--clr-bg); font-size:0.85rem; transition: all 0.3s ease;';
+                card.innerHTML = renderErrorCardHtml(err, idx, moduleId, singleUrl, cardId, false);
                 errList.appendChild(card);
             });
         };
@@ -1517,6 +1574,77 @@
         const fragmentUploadBase = uploadViewPanel
             ? String(uploadViewPanel.getAttribute('data-upload-url') || '')
             : '';
+
+        const tmModuleSearchInput = document.getElementById('tmModuleSearchInput');
+        const tmClearSearch = document.getElementById('tmClearSearch');
+        const tmSortPills = Array.from(document.querySelectorAll('[data-sort]'));
+        const tmExpiryPills = Array.from(document.querySelectorAll('[data-filter-expiry]'));
+        const tmDateLimit = document.getElementById('tmDateLimit');
+        const tmDateFilterGroup = document.getElementById('tmDateFilterGroup');
+        const tmModuleGrid = document.getElementById('tmFragmentUpload');
+
+        const applyModuleFilters = function () {
+            if (!tmModuleGrid) return;
+            const searchTerm = (tmModuleSearchInput?.value || '').toLowerCase().trim();
+            const expiryFilter = tmExpiryPills.find(p => p.classList.contains('is-active'))?.getAttribute('data-filter-expiry') || 'all';
+            const dateLimit = tmDateLimit?.value || '';
+            const sortMode = tmSortPills.find(p => p.classList.contains('is-active'))?.getAttribute('data-sort') || 'az';
+
+            const cards = Array.from(tmModuleGrid.querySelectorAll('[data-module-card]'));
+
+            cards.forEach(card => {
+                const name = card.getAttribute('data-name') || '';
+                const desc = card.getAttribute('data-desc') || '';
+                const expiry = card.getAttribute('data-expiry') || '';
+
+                let mSearch = !searchTerm || name.includes(searchTerm) || desc.includes(searchTerm);
+                let mExpiry = true;
+
+                if (expiryFilter === 'none') {
+                    mExpiry = expiry === 'none';
+                } else if (expiryFilter === 'has') {
+                    mExpiry = expiry !== 'none';
+                    if (mExpiry && dateLimit) {
+                        mExpiry = expiry <= dateLimit;
+                    }
+                }
+
+                card.style.display = (mSearch && mExpiry) ? '' : 'none';
+            });
+
+            cards.sort((a, b) => {
+                const nameA = a.getAttribute('data-name') || '';
+                const nameB = b.getAttribute('data-name') || '';
+                const res = nameA.localeCompare(nameB);
+                return sortMode === 'az' ? res : -res;
+            });
+
+            cards.forEach(c => tmModuleGrid.appendChild(c));
+            if (tmClearSearch) tmClearSearch.classList.toggle('tm-hidden', !searchTerm);
+        };
+
+        if (tmModuleSearchInput) {
+            tmModuleSearchInput.addEventListener('input', applyModuleFilters);
+            tmClearSearch?.addEventListener('click', () => {
+                tmModuleSearchInput.value = '';
+                applyModuleFilters();
+            });
+            tmSortPills.forEach(p => p.addEventListener('click', () => {
+                tmSortPills.forEach(x => x.classList.remove('is-active'));
+                p.classList.add('is-active');
+                applyModuleFilters();
+            }));
+            tmExpiryPills.forEach(p => p.addEventListener('click', () => {
+                tmExpiryPills.forEach(x => x.classList.remove('is-active'));
+                p.classList.add('is-active');
+                if (tmDateFilterGroup) {
+                    tmDateFilterGroup.classList.toggle('tm-hidden', p.getAttribute('data-filter-expiry') !== 'has');
+                }
+                applyModuleFilters();
+            }));
+            tmDateLimit?.addEventListener('change', applyModuleFilters);
+        }
+
         let lastFocusedImageInput = null;
         const modalOpeners = new Map();
         const notify = function (title, message, type) {
@@ -2092,13 +2220,25 @@
                 credentials: 'same-origin',
                 headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }
             }).then(function (res) {
+                if (res.redirected || (res.url && res.url.includes('/login'))) {
+                    window.location.reload();
+                    return null;
+                }
                 if (!res.ok) {
                     throw new Error('Error ' + res.status);
                 }
                 return res.text();
             }).then(function (html) {
+                if (!html) return;
                 host.innerHTML = html;
-            }).catch(function () {
+                const panel = host.closest('.tm-module-records-panel');
+                const tb = panel ? panel.querySelector('[data-tm-bulk-toggle]') : null;
+                if (tb && tb.classList.contains('is-active')) {
+                    panel.querySelectorAll('.tm-record-bulk-check, .tm-bulk-col').forEach(el => el.classList.remove('tm-hidden'));
+                }
+                if (typeof updateBulkUI === 'function') updateBulkUI(panel);
+            }).catch(function (err) {
+                console.error('Fragment load error:', err);
                 host.innerHTML = '<p class="inline-alert inline-alert-error">No se pudo cargar el listado. <a href="' + (recordsUrl ? recordsUrl + '?module=' + moduleId : '#') + '">Recargar página</a></p>';
             });
         };
@@ -2258,6 +2398,138 @@
                     ? buildRecordsQueryFromPanel(panel, entriesPage)
                     : ('module=' + encodeURIComponent(moduleId) + '&entries_page=' + encodeURIComponent(entriesPage));
                 loadRecordsFragment(host, moduleId, qs);
+            });
+
+            // --- Lógica de Selección y Borrado Masivo Persistente ---
+            const tmBulkSelections = new Map(); // moduleId -> Set of IDs
+            const getBulkSet = (panel) => {
+                const host = panel.querySelector('.tm-records-fragment-host');
+                const moduleId = host ? host.getAttribute('data-module-id') : null;
+                if (!moduleId) return null;
+                if (!tmBulkSelections.has(moduleId)) tmBulkSelections.set(moduleId, new Set());
+                return tmBulkSelections.get(moduleId);
+            };
+
+            window.updateBulkUI = function(panel) {
+                if (!panel) return;
+                const set = getBulkSet(panel);
+                if (!set) return;
+                const countEls = panel.querySelectorAll('[data-tm-bulk-count]');
+                const deleteBtns = panel.querySelectorAll('[data-tm-bulk-delete-trigger]');
+                countEls.forEach(el => el.textContent = set.size);
+                deleteBtns.forEach(btn => btn.classList.toggle('tm-hidden', set.size === 0));
+
+                // Sincronizar checkboxes actualmente visibles
+                panel.querySelectorAll('[data-tm-bulk-checkbox]').forEach(cb => {
+                    cb.checked = set.has(cb.value);
+                });
+
+                // Actualizar estado de "Seleccionar todo" (si todos los de la página están en el set)
+                panel.querySelectorAll('[data-tm-bulk-select-all]').forEach(selectAll => {
+                    const checkboxes = Array.from(panel.querySelectorAll('[data-tm-bulk-checkbox]'));
+                    if (checkboxes.length > 0) {
+                        selectAll.checked = checkboxes.every(cb => set.has(cb.value));
+                    } else {
+                        selectAll.checked = false;
+                    }
+                });
+            };
+
+            recordsViewPanel.addEventListener('click', function(e) {
+                const toggleBtn = e.target.closest('[data-tm-bulk-toggle]');
+                if (toggleBtn) {
+                    const panel = toggleBtn.closest('.tm-module-records-panel');
+                    if (!panel) return;
+                    const isActive = toggleBtn.classList.toggle('is-active');
+                    // El usuario pidió que SOLO diga "Seleccionar"
+                    const els = panel.querySelectorAll('.tm-record-bulk-check, .tm-bulk-col');
+                    els.forEach(el => el.classList.toggle('tm-hidden', !isActive));
+                    if (!isActive) {
+                        const set = getBulkSet(panel);
+                        if (set) set.clear();
+                    }
+                    updateBulkUI(panel);
+                    return;
+                }
+
+                const deleteBtn = e.target.closest('[data-tm-bulk-delete-trigger]');
+                if (deleteBtn) {
+                    const panel = deleteBtn.closest('.tm-module-records-panel');
+                    const host = panel.querySelector('.tm-records-fragment-host');
+                    const moduleId = host ? host.getAttribute('data-module-id') : null;
+                    const set = getBulkSet(panel);
+                    const selected = set ? Array.from(set) : [];
+                    if (!selected.length || !moduleId) return;
+
+                    Swal.fire({
+                        title: '¿Eliminar ' + selected.length + ' registros?',
+                        text: 'Esta acción no se puede deshacer y eliminará las evidencias asociadas de todos los elementos seleccionados (incluyendo otras páginas).',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: 'Sí, eliminar todos',
+                        cancelButtonText: 'Cancelar',
+                        reverseButtons: true,
+                        buttonsStyling: false,
+                        customClass: {
+                            popup: 'tm-swal-popup',
+                            confirmButton: 'tm-swal-confirm',
+                            cancelButton: 'tm-swal-cancel'
+                        }
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            const originalHtml = deleteBtn.innerHTML;
+                            deleteBtn.disabled = true;
+                            deleteBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                            fetch('/modulos-temporales/' + moduleId + '/registros-masivo', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                },
+                                body: JSON.stringify({ _method: 'DELETE', entry_ids: selected })
+                            })
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.success) {
+                                    notify('Éxito', data.message, 'success');
+                                    if (set) set.clear();
+                                    reloadRecordsPanelFromFilters(panel, { requireActive: false });
+                                } else {
+                                    notify('Error', data.message || 'Error al eliminar.', 'error');
+                                }
+                            })
+                            .catch(() => notify('Error', 'Error de conexión.', 'error'))
+                            .finally(() => {
+                                deleteBtn.disabled = false;
+                                deleteBtn.innerHTML = originalHtml;
+                            });
+                        }
+                    });
+                }
+            });
+
+            recordsViewPanel.addEventListener('change', function(e) {
+                const panel = e.target.closest('.tm-module-records-panel');
+                if (!panel) return;
+                const set = getBulkSet(panel);
+                if (!set) return;
+
+                if (e.target.matches('[data-tm-bulk-checkbox]')) {
+                    if (e.target.checked) set.add(e.target.value);
+                    else set.delete(e.target.value);
+                    updateBulkUI(panel);
+                }
+                
+                if (e.target.matches('[data-tm-bulk-select-all]')) {
+                    const isChecked = e.target.checked;
+                    panel.querySelectorAll('[data-tm-bulk-checkbox]').forEach(cb => {
+                        cb.checked = isChecked;
+                        if (isChecked) set.add(cb.value);
+                        else set.delete(cb.value);
+                    });
+                    updateBulkUI(panel);
+                }
             });
         }
 
@@ -2579,7 +2851,7 @@
                 fd.append('archivo_excel', file);
                 fd.append('header_row', headerRowInput?.value || '1');
                 fd.append('_token', csrfToken);
-                fetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
+                fetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
                     .then((r) => r.json())
                     .then((j) => {
                         if (j.success && j.preview_thumbnails) applyExcelPreviewThumbnails(j.preview_thumbnails);
@@ -2828,8 +3100,14 @@
                 }
             }, { passive: false });
 
-            const handleExcelFile = (file) => {
+            const handleExcelFile = (file, isFromInput = false) => {
                 if (!file) return;
+
+                if (!isFromInput && fileInput) {
+                    setSelectedFileOnInput(fileInput, file);
+                    return;
+                }
+
                 const nameEl = modal.querySelector('.tm-excel-file-name');
                 if (nameEl) {
                     nameEl.textContent = 'Archivo: ' + file.name;
@@ -2852,9 +3130,11 @@
                 reader.readAsArrayBuffer(file);
             };
 
+            modal.__tmHandleFile = (f) => handleExcelFile(f, false);
+
             const dropzone = modal.querySelector('.tm-excel-dropzone-el');
             dropzone?.addEventListener('click', () => fileInput?.click());
-            fileInput?.addEventListener('change', (e) => handleExcelFile(e.target.files[0]));
+            fileInput?.addEventListener('change', (e) => handleExcelFile(e.target.files[0], true));
 
             ['dragover', 'dragleave', 'drop'].forEach(evt => {
                 dropzone?.addEventListener(evt, (e) => {
@@ -2862,7 +3142,7 @@
                     e.stopPropagation();
                     if (evt === 'dragover') dropzone.classList.add('is-dragover');
                     else dropzone.classList.remove('is-dragover');
-                    if (evt === 'drop') handleExcelFile(e.dataTransfer.files[0]);
+                    if (evt === 'drop') handleExcelFile(e.dataTransfer.files[0], false);
                 });
             });
 
@@ -2914,7 +3194,7 @@
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Leyendo...';
 
-                fetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
+                fetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
                 .then(r => r.json())
                 .then(j => {
                     if (!j.success) throw new Error(j.message);
@@ -3019,7 +3299,7 @@
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importando...';
 
-                fetch(importUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
+                fetch(importUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
                 .then(r => r.json())
                 .then(j => {
                     const okEl = modal.querySelector('.tm-excel-import-ok');
@@ -3037,45 +3317,14 @@
                         if (errList) {
                             errList.innerHTML = '';
                             j.row_errors.forEach((err, idx) => {
+                                const cardId = `tmErrRow_${currentModuleId}_${idx}`;
                                 const card = document.createElement('div');
                                 card.className = 'tm-error-log-card';
-                                card.style = 'padding:12px; border:1px solid var(--clr-border); border-radius:10px; background:var(--clr-bg); font-size:0.85rem;';
-
-                                // Renderizar campos con fallo
-                                const failedFields = Array.isArray(err?.failed_fields) && err.failed_fields.length > 0 ? err.failed_fields : [];
-                                let failedFieldsHtml = '';
-                                if (failedFields.length > 0) {
-                                    failedFieldsHtml = '<div style="margin-top:8px;"><strong style="font-size:0.75rem;">Campos con fallo:</strong><ul style="margin:6px 0 0 16px; padding:0; font-size:0.8rem; color:var(--clr-text-light);">' +
-                                        failedFields.map((f) => `<li><strong>${escapeHtml(f.label || f.key || 'Campo')}</strong>: ${escapeHtml(f.reason || 'No válido')}${f.received ? ` <span style="color:var(--clr-primary); font-weight:600;">(ingresó: "${escapeHtml(f.received)}")</span>` : ''}</li>`).join('') +
-                                    '</ul></div>';
-                                }
-
-                                let suggHtml = '';
-                                if (err.suggestions && err.suggestions.length > 0) {
-                                    const cardId = `tmErrRow_${currentModuleId}_${idx}`;
-                                    suggHtml = '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">' +
-                                        '<span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">¿Quisiste decir?</span>' +
-                                        err.suggestions.map(s => `
-                                            <button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
-                                                onclick="retryImportRow(${idx}, ${s.microrregion_id}, '${s.municipio.replace(/'/g, "\\'")}', '${importSingleUrl}', '${currentModuleId}', '${cardId}', this, ${err.row || 0})"
-                                                style="font-size:0.7rem; padding:4px 8px;">
-                                                ${s.municipio}
-                                            </button>
-                                        `).join('') +
-                                    '</div>';
-                                }
-
-                                card.innerHTML = `
-                                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                                        <div style="color:var(--clr-primary); font-weight:700;">Fila ${err.row}</div>
-                                        <div style="font-size:0.75rem; color:var(--clr-text-light); text-align:right;">${normalizeRowErrorMessage(err)}</div>
-                                    </div>
-                                    ${failedFieldsHtml}
-                                    ${suggHtml}
-                                `;
+                                card.id = cardId;
                                 card.dataset.rowData = JSON.stringify(err.data);
                                 card.dataset.municipioKey = String(err.municipio_key || 'municipio');
-                                card.id = `tmErrRow_${currentModuleId}_${idx}`;
+                                card.style = 'padding:15px; border:1px solid var(--clr-border); border-radius:12px; background:var(--clr-bg); font-size:0.85rem; transition: all 0.3s ease;';
+                                card.innerHTML = renderErrorCardHtml(err, idx, currentModuleId, importSingleUrl, cardId, false);
                                 errList.appendChild(card);
                             });
 
@@ -3145,15 +3394,56 @@
             event.preventDefault();
             setSelectedFileOnInput(targetInput, imageFile);
         });
+
+        // Global Drag & Drop for Excel
+        const globalOverlay = document.getElementById('tmGlobalExcelDropOverlay');
+        let dragCounter = 0;
+
+        window.addEventListener('dragenter', (e) => {
+            if (e.dataTransfer.types.includes('Files')) {
+                dragCounter++;
+                globalOverlay?.classList.add('is-active');
+            }
+        });
+
+        window.addEventListener('dragleave', (e) => {
+            dragCounter--;
+            if (dragCounter <= 0) {
+                globalOverlay?.classList.remove('is-active');
+                dragCounter = 0;
+            }
+        });
+
+        window.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        window.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            globalOverlay?.classList.remove('is-active');
+
+            const file = e.dataTransfer.files[0];
+            if (!file) return;
+
+            const name = (file.name || '').toLowerCase();
+            if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) return;
+
+            // Encontrar modal de excel abierto
+            const openModal = document.querySelector('.tm-excel-import-modal.is-open');
+            if (openModal && typeof openModal.__tmHandleFile === 'function') {
+                openModal.__tmHandleFile(file);
+            }
+        });
     });
 
-    window.retryImportRow = function(errIdx, microrregionId, correctedMunicipio, singleUrl, moduleId, cardId, buttonEl, rowNumber) {
+    window.retryImportRow = function(errIdx, microrregionId, correctedValue, singleUrl, moduleId, cardId, buttonEl, rowNumber, specificFieldKey = null) {
         const card = document.getElementById(cardId || ('tmErrRow_' + errIdx));
         if (!card) return;
 
         const rowData = JSON.parse(card.dataset.rowData);
-        const municipioKey = String(card.dataset.municipioKey || 'municipio');
-        rowData[municipioKey] = correctedMunicipio;
+        const fieldKey = specificFieldKey || String(card.dataset.municipioKey || 'municipio');
+        rowData[fieldKey] = correctedValue;
 
         const btn = buttonEl || null;
         if (!btn) {
@@ -3179,18 +3469,30 @@
         .then(r => r.json())
         .then(j => {
             if (j.success) {
-                card.style.opacity = '0.5';
-                card.style.pointerEvents = 'none';
                 btn.innerText = '✓ Importado';
                 btn.style.background = 'var(--clr-secondary)';
                 btn.style.color = '#fff';
+                
+                // Animación de salida y remoción
+                card.style.transition = 'all 0.4s ease';
+                card.style.opacity = '0';
+                card.style.transform = 'translateX(20px)';
+                
+                setTimeout(() => {
+                    card.remove();
+                    // Si el contenedor se queda vacío, ocultar sección o poner mensaje
+                    const list = card.parentElement;
+                    if (list && list.children.length === 0) {
+                        const sec = list.closest('.tm-excel-errors-section');
+                        if (sec) sec.classList.add('tm-hidden');
+                    }
+                }, 400);
 
-                // Si se pasó moduleId y rowNumber, remover este error de la sesión usando el número de fila (identificador único)
+                // Si se pasó moduleId y rowNumber, remover este error de la sesión usando el número de fila
                 if (moduleId && rowNumber) {
                     const data = sessionStorage.getItem(`tm_errors_${moduleId}`);
                     if (data) {
                         const parsed = JSON.parse(data);
-                        // Usar el número de fila como identificador único, no el índice
                         parsed.errors = (parsed.errors || []).filter((e) => e.row !== rowNumber);
                         if (typeof window.__tmSaveImportErrors === 'function') {
                             window.__tmSaveImportErrors(moduleId, parsed.errors, parsed.singleUrl);
@@ -3212,4 +3514,13 @@
         });
     };
 </script>
+
+<div id="tmGlobalExcelDropOverlay" class="tm-global-drop-overlay">
+    <div class="tm-global-drop-content">
+        <i class="fa-solid fa-file-excel"></i>
+        <h3>¡Suelta tu archivo Excel aquí!</h3>
+        <p>Arrastra el archivo a cualquier área dentro de la página para comenzar la importación.</p>
+    </div>
+</div>
+
 @endpush

@@ -125,19 +125,33 @@ class TemporaryModuleController extends Controller
         return $duplicateId;
     }
 
-    public function adminIndex(): View
+    public function adminIndex(Request $request): View
     {
-        $modules = TemporaryModule::query()
+        $searchQuery = trim((string) $request->input('q', ''));
+        if (mb_strlen($searchQuery) > 200) {
+            $searchQuery = mb_substr($searchQuery, 0, 200);
+        }
+
+        $modulesQuery = TemporaryModule::query()
             ->select(['id', 'name', 'description', 'expires_at', 'applies_to_all', 'is_active'])
-            ->withCount(['fields', 'entries', 'targetUsers'])
-            ->latest()
-            ->paginate(6);
+            ->withCount(['fields', 'entries', 'targetUsers']);
+
+        if ($searchQuery !== '') {
+            $like = '%'.addcslashes($searchQuery, '%_\\').'%';
+            $modulesQuery->where(function ($q) use ($like): void {
+                $q->where('name', 'like', $like)
+                    ->orWhere('description', 'like', $like);
+            });
+        }
+
+        $modules = $modulesQuery->latest()->paginate(15)->withQueryString();
 
         return view('temporary_modules.admin.index', [
             'pageTitle' => 'Modulos temporales',
             'pageDescription' => 'Configura apartados temporales para captura de informacion por delegados.',
             'topbarNotifications' => [],
             'modules' => $modules,
+            'searchQuery' => $searchQuery,
         ]);
     }
 
@@ -160,7 +174,7 @@ class TemporaryModuleController extends Controller
         return response()->download($path, $file);
     }
 
-    public function adminRecords(): View
+    public function adminRecords(Request $request): View
     {
         // Evita 500 si en producción no corrió la migración de exported_at / seed_discard_log
         $select = ['id', 'name', 'description', 'expires_at'];
@@ -171,19 +185,33 @@ class TemporaryModuleController extends Controller
             $select[] = 'seed_discard_log';
         }
 
-        $modules = TemporaryModule::query()
+        $searchQuery = trim((string) $request->input('q', ''));
+        if (mb_strlen($searchQuery) > 200) {
+            $searchQuery = mb_substr($searchQuery, 0, 200);
+        }
+
+        $modulesQuery = TemporaryModule::query()
             ->select($select)
             ->with(['entries.user', 'entries.microrregion', 'fields'])
             ->whereHas('entries')
-            ->withCount(['fields', 'entries'])
-            ->latest()
-            ->paginate(6);
+            ->withCount(['fields', 'entries']);
+
+        if ($searchQuery !== '') {
+            $like = '%'.addcslashes($searchQuery, '%_\\').'%';
+            $modulesQuery->where(function ($q) use ($like): void {
+                $q->where('name', 'like', $like)
+                    ->orWhere('description', 'like', $like);
+            });
+        }
+
+        $modules = $modulesQuery->latest()->get();
 
         return view('temporary_modules.admin.records', [
             'pageTitle' => 'Registros de modulos temporales',
             'pageDescription' => 'Consulta registros de delegados y exporta resultados en Excel.',
             'topbarNotifications' => [],
             'modules' => $modules,
+            'searchQuery' => $searchQuery,
         ]);
     }
 
@@ -872,18 +900,16 @@ class TemporaryModuleController extends Controller
             ])
             ->latest();
 
-        $allModules = (clone $allModulesQuery)->get();
-        $modules = $allModulesQuery->paginate(6)->withQueryString();
+        $searchVal = trim((string) $request->query('buscar_modulo', ''));
+        if ($searchVal !== '') {
+            $allModulesQuery->where(function ($q) use ($searchVal) {
+                $q->where('name', 'like', "%{$searchVal}%")
+                  ->orWhere('description', 'like', "%{$searchVal}%");
+            });
+        }
 
-        if ($modules->isEmpty() && (int) $request->get('page', 1) > 1 && $modules->total() > 0) {
-            return redirect()->route($request->route()->getName(), array_merge(
-                $request->except('page'),
-                ['page' => 1]
-            ));
-        }
-        if ($modules->isEmpty() && $modules->total() === 0 && (int) $request->get('page', 1) > 1) {
-            return redirect()->route($request->route()->getName(), $request->except('page'));
-        }
+        $allModules = (clone $allModulesQuery)->get();
+        $modules = $allModules; // Sin paginación para la lista de módulos
 
         $moduleIds = $allModules->pluck('id')->all();
         $entriesByModule = collect();
@@ -1327,6 +1353,41 @@ class TemporaryModuleController extends Controller
             ->route('temporary-modules.records', ['module' => $temporaryModule->id])
             ->with('status', 'Registro eliminado correctamente.');
     }
+
+    /** El delegado elimina varios de sus registros de forma masiva. */
+    public function bulkDestroyEntries(Request $request, int $module): JsonResponse
+    {
+        $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
+        abort_unless($temporaryModule->isAvailable(), 404);
+        abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
+
+        $request->validate([
+            'entry_ids' => ['required', 'array'],
+            'entry_ids.*' => ['integer'],
+        ]);
+
+        $entryIds = $request->input('entry_ids');
+        $microrregionIdsPermitidos = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
+
+        $entries = TemporaryModuleEntry::query()
+            ->whereIn('id', $entryIds)
+            ->where('temporary_module_id', $temporaryModule->id)
+            ->whereIn('microrregion_id', $microrregionIdsPermitidos)
+            ->get();
+
+        $count = 0;
+        foreach ($entries as $entry) {
+            $this->entryDataService->deleteEntryAndFiles($entry, $temporaryModule);
+            $count++;
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Se eliminaron {$count} registros correctamente.",
+            'count' => $count,
+        ]);
+    }
+
 
     /**
      * Paso 1: sube Excel y devuelve columnas detectadas + sugerencia de mapeo a campos del módulo.

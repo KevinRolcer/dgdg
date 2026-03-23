@@ -11,7 +11,7 @@
 @section('content')
 <section class="tm-page tm-shell app-density-compact">
     <div class="tm-shell-main">
-        <header class="tm-shell-head">
+        <header class="tm-shell-head tm-shell-head--no-rule">
             <h1 class="tm-shell-title">Eventos temporales</h1>
             <p class="tm-shell-desc">Administración de módulos: crear, editar, vigencia y exportación de registros.</p>
         </header>
@@ -21,16 +21,24 @@
             <div class="inline-alert inline-alert-success" role="alert">{{ session('status') }}</div>
         @endif
 
-        <div class="tm-head">
-            <div>
-                <p class="tm-head-desc-only">Gestiona módulos creados: editar, eliminar y ajustar vigencia/alcance.</p>
-            </div>
+        <div class="tm-head tm-head--actions-only">
             <div class="tm-inline-actions">
                 <a href="{{ route('temporary-modules.admin.records') }}" class="tm-btn">Ver registros</a>
                 <a href="{{ route('temporary-modules.admin.create-from-excel') }}" class="tm-btn">Módulo desde Excel (base)</a>
                 <a href="{{ route('temporary-modules.admin.create') }}" class="tm-btn tm-btn-primary">Nuevo módulo</a>
             </div>
         </div>
+
+        <form class="tm-admin-module-search" method="get" action="{{ route('temporary-modules.admin.index') }}" role="search">
+            <label class="tm-admin-module-search__label" for="tm-admin-module-q">Buscar módulo</label>
+            <div class="tm-admin-module-search__row">
+                <input type="search" id="tm-admin-module-q" name="q" value="{{ $searchQuery }}" autocomplete="off" placeholder="Nombre o descripción…" class="tm-admin-module-search__input">
+                <button type="submit" class="tm-btn tm-btn-primary tm-admin-module-search__submit">Buscar</button>
+                @if ($searchQuery !== '')
+                    <a href="{{ route('temporary-modules.admin.index') }}" class="tm-btn tm-btn-ghost tm-admin-module-search__clear">Limpiar</a>
+                @endif
+            </div>
+        </form>
 
         <div class="tm-table-wrap">
             <table class="tm-table">
@@ -80,11 +88,20 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7">Aún no existen módulos temporales.</td>
+                            <td colspan="7">
+                                @if ($searchQuery !== '')
+                                    No hay módulos que coincidan con «{{ $searchQuery }}».
+                                @else
+                                    Aún no existen módulos temporales.
+                                @endif
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
+            @if ($modules instanceof \Illuminate\Pagination\LengthAwarePaginator)
+                {{ $modules->links('vendor.pagination.tm') }}
+            @endif
         </div>
         </article>
     </div>

@@ -17,7 +17,7 @@
 @section('content')
 <section class="tm-page tm-shell app-density-compact">
     <div class="tm-shell-main">
-        <header class="tm-shell-head">
+        <header class="tm-shell-head tm-shell-head--no-rule">
             <h1 class="tm-shell-title">Registros de eventos temporales</h1>
             <p class="tm-shell-desc">Visualiza módulos con registros capturados, exportación a Excel y análisis en Word.</p>
         </header>
@@ -27,15 +27,23 @@
         @endif
 
         <article class="content-card tm-card tm-card-in-shell" style="border: none; box-shadow: none;">
-        <div class="tm-head">
-            <div>
-                <p class="tm-head-desc-only">Filtra por módulo y exporta datos o análisis.</p>
-            </div>
+        <div class="tm-head tm-head--actions-only">
             <div class="tm-inline-actions">
                 <a href="{{ route('temporary-modules.admin.index') }}" class="tm-btn">Gestión de módulos</a>
                 <a href="{{ route('temporary-modules.admin.create') }}" class="tm-btn tm-btn-primary">Nuevo módulo</a>
             </div>
         </div>
+
+        <form class="tm-admin-module-search" method="get" action="{{ route('temporary-modules.admin.records') }}" role="search">
+            <label class="tm-admin-module-search__label" for="tm-admin-records-q">Buscar módulo</label>
+            <div class="tm-admin-module-search__row">
+                <input type="search" id="tm-admin-records-q" name="q" value="{{ $searchQuery }}" autocomplete="off" placeholder="Nombre o descripción…" class="tm-admin-module-search__input">
+                <button type="submit" class="tm-btn tm-btn-primary tm-admin-module-search__submit">Buscar</button>
+                @if ($searchQuery !== '')
+                    <a href="{{ route('temporary-modules.admin.records') }}" class="tm-btn tm-btn-ghost tm-admin-module-search__clear">Limpiar</a>
+                @endif
+            </div>
+        </form>
 
         <div class="tm-table-wrap tm-table-wrap-scroll">
             <table class="tm-table">
@@ -119,18 +127,18 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4">No hay módulos con registros capturados.</td>
+                            <td colspan="4">
+                                @if ($searchQuery !== '')
+                                    No hay módulos con registros que coincidan con «{{ $searchQuery }}».
+                                @else
+                                    No hay módulos con registros capturados.
+                                @endif
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-
-        @if (method_exists($modules, 'links'))
-            <div class="tm-pagination-wrap tm-pagination--footer">
-                {{ $modules->withQueryString()->links('vendor.pagination.tm') }}
-            </div>
-        @endif
         </article>
     </div>
 

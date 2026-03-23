@@ -11,8 +11,11 @@
                 $municipioValue = $municipioField ? ($entry->data[$municipioField->key] ?? null) : null;
                 $cardTitle = (is_string($municipioValue) && trim($municipioValue) !== '') ? $municipioValue : 'Registro '.($loop->iteration + ($entries->firstItem() ?? 1) - 1);
             @endphp
-            <details class="tm-record-card">
+            <details class="tm-record-card" data-entry-id="{{ $entry->id }}">
                 <summary>
+                    <span class="tm-record-bulk-check tm-hidden" style="margin-right:10px;">
+                        <input type="checkbox" class="tm-record-checkbox" data-tm-bulk-checkbox value="{{ $entry->id }}">
+                    </span>
                     <span class="tm-record-card-title">{{ $cardTitle }}</span>
                     <small>MR {{ $entry->microrregion->microrregion ?? '?' }}</small>
                 </summary>
@@ -67,6 +70,9 @@
         <table class="tm-table">
             <thead>
                 <tr>
+                    <th class="tm-bulk-col tm-hidden" style="width:40px; text-align:center;">
+                        <input type="checkbox" data-tm-bulk-select-all>
+                    </th>
                     <th>Microregión</th>
                     @foreach ($module->fields as $field)
                         <th>{{ $field->label }}</th>
@@ -76,7 +82,10 @@
             </thead>
             <tbody>
                 @forelse ($entries as $entry)
-                    <tr>
+                    <tr data-entry-id="{{ $entry->id }}">
+                        <td class="tm-bulk-col tm-hidden" style="text-align:center;">
+                            <input type="checkbox" class="tm-record-checkbox" data-tm-bulk-checkbox value="{{ $entry->id }}">
+                        </td>
                         <td>MR {{ $entry->microrregion->microrregion ?? '-' }}</td>
                         @foreach ($module->fields as $field)
                             @php $cell = $entry->data[$field->key] ?? null; @endphp

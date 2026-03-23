@@ -15,7 +15,7 @@
                 (Total en listado: <strong>{{ $total }}</strong>)
             @else
                 Mostrando <strong>{{ $first }}</strong>–<strong>{{ $last }}</strong>
-                de <strong>{{ $total }}</strong> {{ $total === 1 ? 'registro' : 'registros' }}
+                de <strong>{{ $total }}</strong> {{ $total === 1 ? 'elemento' : 'elementos' }}
             @endif
         </p>
         <ul class="tm-paginator-list">

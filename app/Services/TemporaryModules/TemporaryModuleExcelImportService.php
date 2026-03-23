@@ -419,6 +419,55 @@ class TemporaryModuleExcelImportService
                 continue;
             }
 
+            // --- VALIDACIÓN DE CAMPOS (Lista, Lista Múltiple, etc.) ---
+            $failedFields = [];
+            foreach ($importable as $f) {
+                $val = $values[$f->key] ?? null;
+                if ($val === null || $val === '' || (is_array($val) && empty($val))) {
+                    continue;
+                }
+
+                if ($f->type === 'select') {
+                    $opts = array_map('strval', $f->options ?? []);
+                    if (! empty($opts) && ! in_array((string) $val, $opts, true)) {
+                        $failedFields[] = [
+                            'key' => $f->key,
+                            'label' => $f->label,
+                            'reason' => 'La opción no coincide con la lista permitida.',
+                            'received' => (string) ($rawValues[$f->key] ?? ''),
+                            'suggestions' => $opts,
+                        ];
+                    }
+                } elseif ($f->type === 'multiselect') {
+                    $opts = array_map('strval', $f->options ?? []);
+                    $valArray = is_array($val) ? $val : [$val];
+                    $invalidOnes = array_diff($valArray, $opts);
+                    if (! empty($opts) && ! empty($invalidOnes)) {
+                        $failedFields[] = [
+                            'key' => $f->key,
+                            'label' => $f->label,
+                            'reason' => 'Contiene elementos que no están en la lista.',
+                            'received' => (string) ($rawValues[$f->key] ?? ''),
+                            'suggestions' => $opts,
+                        ];
+                    }
+                }
+            }
+
+            if (! empty($failedFields)) {
+                $rowErrors[] = [
+                    'row' => $row,
+                    'message' => "Fila {$row}: contiene datos no válidos en ".count($failedFields).' campo(s).',
+                    'data' => $values,
+                    'failed_fields' => $failedFields,
+                    'suggestions' => (count($failedFields) === 1 && ! empty($failedFields[0]['suggestions'])) ? $failedFields[0]['suggestions'] : [],
+                ];
+                $skipped++;
+
+                continue;
+            }
+            // ---------------------------------------------------------
+
             foreach ($requiredKeys as $rk) {
                 $v = $values[$rk] ?? null;
                 $empty = $v === null || $v === '' || (is_string($v) && trim($v) === '');

@@ -1,6 +1,10 @@
 <div class="tm-module-grid" id="tmFragmentUpload">
     @forelse ($modules as $module)
-        <article class="content-card tm-card tm-module-card tm-upload-card">
+        <article class="content-card tm-card tm-module-card tm-upload-card" 
+                 data-module-card 
+                 data-name="{{ strtolower($module->name) }}" 
+                 data-desc="{{ strtolower($module->description ?: '') }}" 
+                 data-expiry="{{ $module->expires_at ? $module->expires_at->format('Y-m-d') : 'none' }}">
             <div class="tm-upload-card-head">
                 <div class="tm-card-title-row">
                     <h2>{{ $module->name }}</h2>
@@ -38,9 +42,4 @@
             <p>No hay modulos temporales activos en este momento.</p>
         </article>
     @endforelse
-    @if ($modules->hasPages())
-        <div class="tm-pagination tm-pagination--footer">
-            {{ $modules->links('vendor.pagination.tm') }}
-        </div>
-    @endif
 </div>
