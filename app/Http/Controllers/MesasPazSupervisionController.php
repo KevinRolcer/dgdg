@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\MesaPazAsistencia;
 use App\Services\MesasPaz\MesasPazSupervisionService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 
 class MesasPazSupervisionController extends Controller
@@ -32,6 +35,71 @@ class MesasPazSupervisionController extends Controller
         $resultado['data']['registrosPaginator'] = $resultado['data']['registrosLista'] ?? null;
 
         return view('mesas_paz.evidencias', $resultado['data']);
+    }
+
+    public function registrosBruto(Request $request): JsonResponse
+    {
+        $usuario = Auth::user();
+        abort_unless($this->service->puedeSupervisarEvidencias($usuario), 403);
+
+        $validated = $request->validate([
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin'    => ['required', 'date', 'after_or_equal:fecha_inicio'],
+            'page'         => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $inicio = Carbon::parse($validated['fecha_inicio'])->startOfDay();
+        $fin    = Carbon::parse($validated['fecha_fin'])->endOfDay();
+
+        $registros = MesaPazAsistencia::query()
+            ->whereBetween('fecha_asist', [$inicio->toDateString(), $fin->toDateString()])
+            ->with([
+                'municipio:id,municipio',
+                'microrregion:id,microrregion,cabecera',
+                'delegado:id,nombre,ap_paterno,ap_materno',
+                'user:id,name,email',
+            ])
+            ->orderByDesc('fecha_asist')
+            ->orderByDesc('created_at')
+            ->paginate(50);
+
+        return response()->json([
+            'data'         => $registros->items(),
+            'current_page' => $registros->currentPage(),
+            'last_page'    => $registros->lastPage(),
+            'total'        => $registros->total(),
+        ]);
+    }
+
+    public function eliminarRango(Request $request): JsonResponse
+    {
+        $usuario = Auth::user();
+        abort_unless($this->service->puedeSupervisarEvidencias($usuario), 403);
+        abort_unless(
+            $usuario->hasRole('Superadmin') || $usuario->hasRole('superadmin')
+            || $usuario->hasRole('Enlace')
+            || $usuario->hasRole('Administrador'),
+            403,
+            'No tienes permiso para vaciar registros.'
+        );
+
+        $validated = $request->validate([
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_fin'    => ['required', 'date', 'after_or_equal:fecha_inicio'],
+        ]);
+
+        $inicio = Carbon::parse($validated['fecha_inicio'])->toDateString();
+        $fin    = Carbon::parse($validated['fecha_fin'])->toDateString();
+
+        $eliminados = MesaPazAsistencia::query()
+            ->whereBetween('fecha_asist', [$inicio, $fin])
+            ->delete();
+
+        return response()->json([
+            'success'    => true,
+            'eliminados' => $eliminados,
+            'message'    => "Se eliminaron {$eliminados} registro(s) del {$inicio} al {$fin}.",
+        ]);
     }
 
     public function descargarPdf(Request $request)

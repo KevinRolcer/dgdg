@@ -641,7 +641,7 @@ class TemporaryModuleExcelImportService
         array $allowedMunicipioNames,
     ): mixed {
         $t = $field->type;
-        $str = trim($strTrim);
+        $str = preg_replace('/^[\s\x{00A0}\x{200B}\x{FEFF}]+|[\s\x{00A0}\x{200B}\x{FEFF}]+$/u', '', $strTrim);
 
         if ($t === 'number') {
             if ($str === '') {

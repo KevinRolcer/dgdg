@@ -186,6 +186,57 @@ html.theme-dark #supervisionEvidenciasPage .table thead th {
     border-color: var(--clr-border);
 }
 
+/* Registros en bruto — table overrides */
+html.theme-dark #supervisionEvidenciasPage .table-light,
+html.theme-dark #supervisionEvidenciasPage .table-light th {
+    background: var(--clr-surface) !important;
+    color: var(--clr-accent) !important;
+    --bs-table-bg: var(--clr-surface);
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark #supervisionEvidenciasPage .table-bordered {
+    --bs-table-border-color: var(--clr-border);
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark #supervisionEvidenciasPage .table-bordered > :not(caption) > * > * {
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark #supervisionEvidenciasPage .table-striped > tbody > tr:nth-of-type(odd) > * {
+    --bs-table-bg-type: rgba(255, 255, 255, 0.03);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark #supervisionEvidenciasPage .table td {
+    color: var(--clr-text-main);
+}
+
+html.theme-dark #supervisionEvidenciasPage .table .badge.bg-success {
+    background-color: var(--clr-secondary) !important;
+}
+
+html.theme-dark #supervisionEvidenciasPage .table .text-muted {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark #supervisionEvidenciasPage .alert-secondary {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark #supervisionEvidenciasPage .btn-outline-secondary {
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark #supervisionEvidenciasPage .btn-outline-secondary:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--clr-text-main) !important;
+}
+
 html.theme-dark #mesasPazApp .accordion-item,
 html.theme-dark #supervisionEvidenciasPage .accordion-item {
     background: var(--clr-card);
@@ -304,6 +355,108 @@ html.theme-dark .sweet-alert .sa-button-container .cancel {
     border: 1px solid var(--clr-border) !important;
 }
 
+/* SweetAlert v1 (newer .swal-* syntax) — dark theme */
+html.theme-dark .swal-overlay {
+    background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+html.theme-dark .swal-modal {
+    background: var(--clr-card) !important;
+    color: var(--clr-text-main) !important;
+    border: 1px solid var(--clr-border) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6),
+                0 0 0 1px rgba(255, 255, 255, 0.04) inset !important;
+}
+
+html.theme-dark .swal-title {
+    color: var(--clr-text-main) !important;
+    font-weight: 600 !important;
+}
+
+html.theme-dark .swal-text {
+    color: var(--clr-text-light) !important;
+}
+
+/* — Confirm / OK button — */
+html.theme-dark .swal-button--confirm {
+    background: var(--clr-primary) !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 10px 32px !important;
+    font-weight: 600 !important;
+    transition: background 0.2s, box-shadow 0.2s !important;
+}
+
+html.theme-dark .swal-button--confirm:hover {
+    background: var(--clr-primary-dark) !important;
+    box-shadow: 0 4px 14px rgba(134, 30, 52, 0.45) !important;
+}
+
+/* — Cancel button — */
+html.theme-dark .swal-button--cancel {
+    background: var(--clr-surface) !important;
+    color: var(--clr-text-main) !important;
+    border: 1px solid var(--clr-border) !important;
+    border-radius: 8px !important;
+    padding: 10px 32px !important;
+    font-weight: 600 !important;
+    transition: background 0.2s !important;
+}
+
+html.theme-dark .swal-button--cancel:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+html.theme-dark .swal-button:focus {
+    box-shadow: 0 0 0 2px var(--clr-card), 0 0 0 4px rgba(134, 30, 52, 0.4) !important;
+}
+
+/* — Warning icon — */
+html.theme-dark .swal-icon--warning {
+    border-color: var(--clr-accent) !important;
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .swal-icon--warning__body,
+html.theme-dark .swal-icon--warning__dot {
+    background-color: var(--clr-accent) !important;
+}
+
+/* — Success icon — fix white circle on dark bg — */
+html.theme-dark .swal-icon--success {
+    border-color: #4caf50 !important;
+}
+
+html.theme-dark .swal-icon--success__hide-corners {
+    background: var(--clr-card) !important;
+}
+
+html.theme-dark .swal-icon--success__ring {
+    border-color: rgba(76, 175, 80, 0.25) !important;
+}
+
+html.theme-dark .swal-icon--success__line {
+    background-color: #4caf50 !important;
+}
+
+/* — Error icon — */
+html.theme-dark .swal-icon--error {
+    border-color: #ef5350 !important;
+}
+
+html.theme-dark .swal-icon--error__line {
+    background-color: #ef5350 !important;
+}
+
+/* — Footer area — */
+html.theme-dark .swal-footer {
+    background: transparent !important;
+    border-top: 1px solid var(--clr-border) !important;
+    margin-top: 12px !important;
+}
+
 html.theme-dark .swal2-popup {
     background: var(--clr-card) !important;
     color: var(--clr-text-main) !important;
@@ -390,11 +543,18 @@ html.theme-dark .flatpickr-calendar {
     border: 1px solid var(--clr-border) !important;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
     color: var(--clr-text-main) !important;
-    width: 240px !important; /* Aún más compacto */
+}
+
+html.theme-dark .flatpickr-calendar.flatpickr-premium {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 440px !important;
 }
 
 html.theme-dark .flatpickr-months .flatpickr-month {
-    background: #1e222c !important;
+    background: transparent !important;
     color: var(--clr-accent) !important;
     fill: var(--clr-accent) !important;
 }
@@ -404,38 +564,75 @@ html.theme-dark .flatpickr-current-month .flatpickr-monthDropdown-months {
     color: var(--clr-accent) !important;
 }
 
-html.theme-dark .flatpickr-weekday {
+html.theme-dark span.flatpickr-weekday {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .flatpickr-premium .flatpickr-weekdays {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: space-between !important;
+}
+
+html.theme-dark .flatpickr-premium span.flatpickr-weekday {
     background: transparent !important;
     color: var(--clr-text-light) !important;
-    font-size: 11px !important;
+    font-size: 13px !important;
+    flex: 1 !important;
+    max-width: none !important;
+    font-weight: 700 !important;
 }
 
 html.theme-dark .flatpickr-day {
     color: var(--clr-text-main) !important;
     border-radius: 4px !important;
-    font-size: 12px !important;
+}
+
+html.theme-dark .flatpickr-premium .flatpickr-day {
+    border-radius: 8px !important;
+    font-size: 0.95rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    max-width: calc(14.28% - 2px) !important;
+    flex-basis: calc(14.28% - 2px) !important;
+    height: 48px !important;
+    line-height: 46px !important;
+}
+
+html.theme-dark .flatpickr-premium .flatpickr-days,
+html.theme-dark .flatpickr-premium .dayContainer {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+    gap: 2px !important;
 }
 
 html.theme-dark .flatpickr-day:hover,
 html.theme-dark .flatpickr-day.prevMonthDay:hover,
 html.theme-dark .flatpickr-day.nextMonthDay:hover {
-    background: rgba(199, 155, 102, 0.15) !important;
-    border-color: var(--clr-accent) !important;
+    background: rgba(199, 155, 102, 0.08) !important;
+    border-color: rgba(199, 155, 102, 0.3) !important;
 }
 
 html.theme-dark .flatpickr-day.selected,
 html.theme-dark .flatpickr-day.startRange,
 html.theme-dark .flatpickr-day.endRange {
-    background: var(--clr-accent) !important;
-    border-color: var(--clr-accent) !important;
-    color: #1a1a1a !important;
+    background: rgba(199, 155, 102, 0.15) !important;
+    border: 2px solid var(--clr-accent) !important;
+    color: var(--clr-accent) !important;
+    font-weight: 700 !important;
 }
 
 html.theme-dark .flatpickr-day.today {
-    border-color: var(--clr-accent) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
-html.theme-dark .flatpickr-day.flatpickr-disabled, 
+html.theme-dark .flatpickr-day.flatpickr-disabled,
 html.theme-dark .flatpickr-day.flatpickr-disabled:hover {
     color: rgba(255, 255, 255, 0.1) !important;
 }
@@ -445,22 +642,7 @@ html.theme-dark .flatpickr-calendar.arrowTop:after {
     border-bottom-color: #1e222c !important;
 }
 
-/* Reducir tamaño de las celdas para que sea minúsculo */
-html.theme-dark .flatpickr-days {
-    width: 240px !important;
-}
 
-html.theme-dark .dayContainer {
-    width: 240px !important;
-    min-width: 240px !important;
-    max-width: 240px !important;
-}
-
-html.theme-dark .flatpickr-day {
-    max-width: 30px !important;
-    height: 30px !important;
-    line-height: 28px !important;
-}
 
 /* --- Ajustes de Icono de Ojo y Modal de Detalles --- */
 

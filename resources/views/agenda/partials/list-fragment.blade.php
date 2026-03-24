@@ -131,9 +131,6 @@
         </table>
     </div>
     <div class="agenda-pagination-wrap">
-        <p class="agenda-pagination-info">Mostrando {{ $agendas->firstItem() ?? 0 }}–{{ $agendas->lastItem() ?? 0 }} de {{ $agendas->total() }}</p>
-        <div class="agenda-pagination">
-            {{ $agendas->withQueryString()->links() }}
-        </div>
+        {{ $agendas->withQueryString()->links('pagination::tm') }}
     </div>
 </div>

@@ -1358,7 +1358,7 @@ class TemporaryModuleController extends Controller
     public function bulkDestroyEntries(Request $request, int $module): JsonResponse
     {
         $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
-        abort_unless($temporaryModule->isAvailable(), 404);
+        abort_unless($temporaryModule->isAvailable(), 403, 'Módulo no disponible o fuera de vigencia.');
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
 
         $request->validate([
@@ -1366,12 +1366,11 @@ class TemporaryModuleController extends Controller
             'entry_ids.*' => ['integer'],
         ]);
 
-        $entryIds = $request->input('entry_ids');
-        $microrregionIdsPermitidos = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
+        $entryIds = (array) $request->input('entry_ids');
+        $microrregionIdsPermitidos = (array) $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
 
-        $entries = TemporaryModuleEntry::query()
-            ->whereIn('id', $entryIds)
-            ->where('temporary_module_id', $temporaryModule->id)
+        $entries = TemporaryModuleEntry::whereIn('id', $entryIds)
+            ->where('temporary_module_id', (int) $temporaryModule->id)
             ->whereIn('microrregion_id', $microrregionIdsPermitidos)
             ->get();
 
@@ -1564,10 +1563,29 @@ class TemporaryModuleController extends Controller
 
         $validated = $request->validate([
             'data' => ['required', 'array'],
-            'microrregion_id' => ['required', 'integer'],
+            'microrregion_id' => ['nullable', 'integer'],
         ]);
 
-        $microrregionId = (int) $validated['microrregion_id'];
+        $microrregionId = ! empty($validated['microrregion_id']) ? (int) $validated['microrregion_id'] : null;
+
+        // Si no se proporcionó microrregion_id, resolverlo desde el municipio en los datos
+        if ($microrregionId === null) {
+            $municipioField = $temporaryModule->fields()->where('type', 'municipio')->first();
+            if ($municipioField) {
+                $munVal = trim((string) ($validated['data'][$municipioField->key] ?? ''));
+                if ($munVal !== '') {
+                    $microrregionId = \App\Models\Municipio::where('municipio', $munVal)->value('microrregion_id');
+                }
+            }
+        }
+
+        if ($microrregionId === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo determinar la microrregión.',
+            ], 422);
+        }
+
         abort_unless(
             $this->accessService->userCanAccessEntryByMicrorregion((int) $request->user()->id, $microrregionId),
             403

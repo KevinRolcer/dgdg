@@ -480,15 +480,25 @@
                 let suggHtml = '';
                 if (err.suggestions && err.suggestions.length > 0) {
                     const cardId = `tmErrRow_${moduleId}_${idx}`;
+                    const isFieldSugg = typeof err.suggestions[0] === 'string';
+                    const failedKey = isFieldSugg && err.failed_fields && err.failed_fields.length === 1 ? err.failed_fields[0].key : '';
                     suggHtml = '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">' +
                         '<span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">¿Quisiste decir?</span>' +
-                        err.suggestions.map(s => `
-                            <button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
+                        err.suggestions.map(s => {
+                            if (isFieldSugg) {
+                                const val = String(s).replace(/'/g, "\\'");
+                                return `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
+                                    onclick="retryImportRow(${idx}, null, '${val}', '${singleUrl}', ${moduleId}, '${cardId}', this, ${err.row || 0}, '${failedKey}')"
+                                    style="font-size:0.7rem; padding:4px 8px;">
+                                    ${s}
+                                </button>`;
+                            }
+                            return `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
                                 onclick="retryImportRow(${idx}, ${s.microrregion_id}, '${s.municipio.replace(/'/g, "\\'")}', '${singleUrl}', ${moduleId}, '${cardId}', this, ${err.row || 0})"
                                 style="font-size:0.7rem; padding:4px 8px;">
                                 ${s.municipio}
-                            </button>
-                        `).join('') +
+                            </button>`;
+                        }).join('') +
                     '</div>';
                 }
 
@@ -934,44 +944,44 @@
 
     const openExcelModal = function () {
         if (!excelModal) return;
-        
+
         const errPreviewEl = document.getElementById('tmExcelPreviewErr');
         if (errPreviewEl) { errPreviewEl.textContent = ''; errPreviewEl.classList.add('tm-hidden'); }
         const errImportEl = document.getElementById('tmExcelImportErr');
         if (errImportEl) { errImportEl.textContent = ''; errImportEl.classList.add('tm-hidden'); }
         const okImportEl = document.getElementById('tmExcelImportOk');
         if (okImportEl) { okImportEl.textContent = ''; okImportEl.classList.add('tm-hidden'); }
-        
+
         const errSection = document.getElementById('tmExcelErrorsSection');
         if (errSection) errSection.classList.add('tm-hidden');
         const errList = document.getElementById('tmExcelErrorsList');
         if (errList) errList.innerHTML = '';
-        
+
         const fileInput = document.getElementById('tmExcelFile');
         if (fileInput) fileInput.value = '';
         const nameEl = document.getElementById('tmExcelFileName');
         if (nameEl) { nameEl.textContent = ''; nameEl.classList.add('tm-hidden'); }
-        
+
         const hInput = document.getElementById('tmExcelHeaderRow');
         const dInput = document.getElementById('tmExcelDataStartRow');
         if (hInput) hInput.value = '';
         if (dInput) dInput.value = '';
         workbookData = null;
-        
+
         const inner = document.getElementById('tmExcelSheetInner');
         if (inner) inner.innerHTML = '<div style="padding:60px; text-align:center; color:var(--clr-text-light);"><i class="fa-solid fa-file-excel" style="font-size:4rem; margin-bottom:16px; opacity:0.2;"></i><p style="font-weight:600;">Vista previa del documento</p><p style="font-size:0.85rem; opacity:0.7;">Carga un archivo Excel para comenzar a marcar las columnas.</p></div>';
-        
+
         const zoomBar = document.getElementById('tmExcelZoomBar');
         if (zoomBar) zoomBar.style.display = 'none';
-        
+
         const badgeH = document.getElementById('badgeHeaderRow');
         const badgeD = document.getElementById('badgeDataRow');
         if (badgeH) badgeH.style.display = 'none';
         if (badgeD) badgeD.style.display = 'none';
-        
+
         const controlsSide = document.querySelector('.tm-excel-controls-side');
         if (controlsSide) controlsSide.scrollTo({ top: 0, behavior: 'auto' });
-        
+
         excelModal.classList.add('is-open');
         excelModal.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
@@ -1542,15 +1552,25 @@
                             if (err.suggestions && err.suggestions.length > 0) {
                                 const cardId = 'tmErrRow_' + idx;
                                 const moduleId = '{{ $temporaryModule->id }}';
+                                const isFieldSugg = typeof err.suggestions[0] === 'string';
+                                const failedKey = isFieldSugg && err.failed_fields && err.failed_fields.length === 1 ? err.failed_fields[0].key : '';
                                 suggHtml = '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">' +
                                     '<span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">¿Quisiste decir?</span>' +
-                                    err.suggestions.map(s => `
-                                        <button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
+                                    err.suggestions.map(s => {
+                                        if (isFieldSugg) {
+                                            const val = String(s).replace(/'/g, "\\'");
+                                            return `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
+                                                onclick="retryImportRow(${idx}, null, '${val}', null, ${moduleId}, '${cardId}', this, ${err.row || 0}, '${failedKey}')"
+                                                style="font-size:0.7rem; padding:4px 8px;">
+                                                ${s}
+                                            </button>`;
+                                        }
+                                        return `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
                                             onclick="retryImportRow(${idx}, ${s.microrregion_id}, '${s.municipio.replace(/'/g, "\\'")}'  , null, ${moduleId}, '${cardId}', this, ${err.row || 0})"
                                             style="font-size:0.7rem; padding:4px 8px;">
                                             ${s.municipio}
-                                        </button>
-                                    `).join('') +
+                                        </button>`;
+                                    }).join('') +
                                 '</div>';
                             }
 
@@ -1599,17 +1619,26 @@
             });
     });
 
-    window.retryImportRow = function(errIdx, microrregionId, correctedMunicipio, singleUrl, moduleId, cardId, buttonEl, rowNumber) {
+    window.retryImportRow = function(errIdx, microrregionId, correctedValue, singleUrl, moduleId, cardId, buttonEl, rowNumber, fieldKey) {
         const card = document.getElementById(cardId || ('tmErrRow_' + errIdx));
         if (!card) return;
 
         const rowData = JSON.parse(card.dataset.rowData);
-        rowData.municipio = correctedMunicipio;
+        if (fieldKey) {
+            rowData[fieldKey] = correctedValue;
+        } else {
+            rowData.municipio = correctedValue;
+        }
 
         const btn = buttonEl || event.target;
         const oldText = btn.innerText;
         btn.disabled = true;
         btn.innerText = 'Cargando...';
+
+        const payload = { data: rowData };
+        if (microrregionId != null) {
+            payload.microrregion_id = microrregionId;
+        }
 
         fetch(singleUrl || excelImportSingleUrl, {
             method: 'POST',
@@ -1619,10 +1648,7 @@
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify({
-                data: rowData,
-                microrregion_id: microrregionId
-            })
+            body: JSON.stringify(payload)
         })
         .then(r => r.json())
         .then(j => {

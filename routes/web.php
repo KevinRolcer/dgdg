@@ -39,7 +39,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/ajustes/microrregiones/distribuir-excel', [AdminSettingsController::class, 'distribuirMunicipiosExcel'])
         ->middleware('can:Modulos-Temporales-Admin')
         ->name('settings.images.migrate'); // Using same name as previous for distribute excel
-    
+
     Route::post('/ajustes/microrregiones/distribuir-excel', [AdminSettingsController::class, 'distribuirMunicipiosExcel'])
         ->middleware('can:Modulos-Temporales-Admin')
         ->name('settings.microrregiones.distribuir-excel');
@@ -64,7 +64,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/mesas-paz/importar-excel', [MesasPazController::class, 'importarExcel'])->name('mesas-paz.importar-excel')->middleware('can:Mesas-Paz');
     Route::post('/mesas-paz/vaciar-microrregion', [MesasPazController::class, 'vaciarMicrorregion'])->name('mesas-paz.vaciar-microrregion')->middleware('can:Mesas-Paz');
     Route::get('/mesas-paz/evidencia/preview', [MesasPazController::class, 'previewEvidencia'])->name('mesas-paz.evidencia.preview')->middleware('can:mesas-paz-ver');
-    
+
     Route::post('/ppt/generar-presentacion', [PowerPointController::class, 'generarPresentacion'])
         ->name('ppt.generar-presentacion')
         ->middleware('can:Tableros-incidencias');
@@ -72,6 +72,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/mesas-paz/historial-detalle', [MesasPazController::class, 'detallePorFecha'])->name('mesas-paz.historial-detalle')->middleware('can:mesas-paz-ver');
     Route::get('/mesas-paz/evidencias', [MesasPazSupervisionController::class, 'evidencias'])->name('mesas-paz.evidencias')->middleware('can:Tableros-incidencias');
     Route::get('/mesas-paz/evidencias/pdf', [MesasPazSupervisionController::class, 'descargarPdf'])->name('mesas-paz.evidencias.pdf')->middleware('can:Tableros-incidencias');
+    Route::get('/mesas-paz/evidencias/registros-bruto', [MesasPazSupervisionController::class, 'registrosBruto'])->name('mesas-paz.evidencias.registros-bruto')->middleware('can:Tableros-incidencias');
+    Route::delete('/mesas-paz/evidencias/eliminar-rango', [MesasPazSupervisionController::class, 'eliminarRango'])->name('mesas-paz.evidencias.eliminar-rango')->middleware('can:Tableros-incidencias');
 
     Route::redirect('/admin/configuracion', '/ajustes/importacion-exportacion')->name('admin.settings.index');
 

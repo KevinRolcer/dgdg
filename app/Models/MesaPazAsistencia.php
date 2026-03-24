@@ -8,8 +8,10 @@ class MesaPazAsistencia extends Model
 {
     // Entidad persistente para asistencias de Mesas de Paz.
     protected $table = 'mesas_paz_asistencias';
+
     // PK personalizada de la tabla.
     protected $primaryKey = 'asist_id';
+
     // La tabla administra created_at manualmente, sin updated_at.
     public $timestamps = false;
 
@@ -94,9 +96,10 @@ class MesaPazAsistencia extends Model
             }
 
             $patternBloquesVinyeta = '/(?:^|\R)\s*(?:[-*\x{2022}]|\d+[\.)])\s+(.*?)(?=(?:\R\s*(?:[-*\x{2022}]|\d+[\.)])\s+)|$)/us';
-            if (preg_match_all($patternBloquesVinyeta, $texto, $coincidencias) && !empty($coincidencias[1])) {
+            if (preg_match_all($patternBloquesVinyeta, $texto, $coincidencias) && ! empty($coincidencias[1])) {
                 $items = array_map(static function ($bloque) {
                     $compactado = preg_replace('/\s*\R\s*/u', ' ', (string) $bloque);
+
                     return trim((string) $compactado);
                 }, $coincidencias[1]);
             } else {
@@ -146,7 +149,7 @@ class MesaPazAsistencia extends Model
             }
         }
 
-        if (!$hayVinyetas) {
+        if (! $hayVinyetas) {
             $limpios = [];
             foreach ($lineas as $linea) {
                 $textoItem = trim((string) preg_replace('/^[\-*\x{2022}]\s*/u', '', $linea));
@@ -163,6 +166,7 @@ class MesaPazAsistencia extends Model
             foreach ($limpios as $fragmento) {
                 if (empty($recompuestos)) {
                     $recompuestos[] = $fragmento;
+
                     continue;
                 }
 
@@ -210,6 +214,30 @@ class MesaPazAsistencia extends Model
         }
 
         return array_values($normalizados);
+    }
+
+    /**
+     * Inasistencias explícitas (misma lógica que MesasPazSupervisionService).
+     */
+    public static function asistenciaEsNoPresente(?string $asiste): bool
+    {
+        $v = mb_strtolower(trim((string) $asiste));
+
+        return in_array($v, [
+            'no',
+            'srd',
+            'sie',
+            'suspención',
+            'suspencion',
+        ], true);
+    }
+
+    /**
+     * Presencia para totales de reporte: cualquier valor que no sea inasistencia explícita.
+     */
+    public static function asistenciaEsPresente(?string $asiste): bool
+    {
+        return ! static::asistenciaEsNoPresente($asiste);
     }
 
     /**

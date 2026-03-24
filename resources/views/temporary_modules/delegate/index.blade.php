@@ -2473,26 +2473,31 @@
                             const originalHtml = deleteBtn.innerHTML;
                             deleteBtn.disabled = true;
                             deleteBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-                            fetch('/modulos-temporales/' + moduleId + '/registros-masivo', {
-                                method: 'POST',
+                            let delUrl = "{{ route('temporary-modules.entries.bulk-destroy', ['module' => ':moduleId']) }}".replace(':moduleId', moduleId);
+                            fetch(delUrl, {
+                                method: 'DELETE',
                                 headers: {
                                     'Content-Type': 'application/json',
                                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
                                     'X-Requested-With': 'XMLHttpRequest'
                                 },
-                                body: JSON.stringify({ _method: 'DELETE', entry_ids: selected })
+                                body: JSON.stringify({ entry_ids: selected })
                             })
                             .then(res => res.json())
                             .then(data => {
                                 if (data.success) {
-                                    notify('Éxito', data.message, 'success');
+                                    if (typeof window.segobToast === 'function') {
+                                        window.segobToast('success', data.message);
+                                    }
                                     if (set) set.clear();
                                     reloadRecordsPanelFromFilters(panel, { requireActive: false });
                                 } else {
-                                    notify('Error', data.message || 'Error al eliminar.', 'error');
+                                    Swal.fire('Error', data.message || 'Error al eliminar.', 'error');
                                 }
                             })
-                            .catch(() => notify('Error', 'Error de conexión.', 'error'))
+                            .catch(() => {
+                                Swal.fire('Error', 'Error de conexión o permisos.', 'error');
+                            })
                             .finally(() => {
                                 deleteBtn.disabled = false;
                                 deleteBtn.innerHTML = originalHtml;

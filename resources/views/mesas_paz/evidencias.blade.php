@@ -22,12 +22,23 @@
 @endphp
 <div class="mesas-paz-shell app-density-compact">
     <div class="mesas-paz-shell-main">
-        <header class="mesas-paz-shell-head">
+
+<div id="supervisionEvidenciasPage" data-url-ppt="{{ route('ppt.generar-presentacion') }}" data-fechas-datos="{{ json_encode($fechasConDatos ?? []) }}" data-url-bruto="{{ route('mesas-paz.evidencias.registros-bruto') }}" data-url-eliminar-rango="{{ route('mesas-paz.evidencias.eliminar-rango') }}" data-csrf="{{ csrf_token() }}">
+
+{{-- ═══ VISTA: Evidencias (vista principal) ═══ --}}
+<div id="vistaEvidencias">
+    <header class="mesas-paz-shell-head d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
             <h1 class="mesas-paz-shell-title">Evidencias Mesas de Paz</h1>
             <p class="mesas-paz-shell-desc">Consulta de evidencias y asistencias por delegado. Filtros por fecha y análisis por microregión.</p>
-        </header>
+        </div>
+        <div class="pt-1">
+            <button type="button" id="btnToggleBruto" class="btn btn-sm btn-outline-primary">
+                <i class="fa fa-database me-1"></i> Registros en bruto
+            </button>
+        </div>
+    </header>
 
-<div id="supervisionEvidenciasPage" data-url-ppt="{{ route('ppt.generar-presentacion') }}" data-fechas-datos="{{ json_encode($fechasConDatos ?? []) }}">
 <div class="mesas-paz-panel panel panel-inverse">
     <div class="mesas-paz-panel-head panel-heading">
         <h4 class="panel-title">Filtros de búsqueda</h4>
@@ -386,9 +397,9 @@
                                         </div>
                                     @endif
                                 </div>
-                                <button 
-                                    type="button" 
-                                    class="btn btn-xs btn-outline-info rounded-circle" 
+                                <button
+                                    type="button"
+                                    class="btn btn-xs btn-outline-info rounded-circle"
                                     style="width: 24px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center;"
                                     title="Ver municipios"
                                     onclick="verDetalleMunicipios('{{ addslashes($item['delegado']) }}', {{ json_encode($item['municipios_con_asistencia']) }}, {{ json_encode($item['municipios_no_presentes']) }})"
@@ -501,6 +512,91 @@
         @endif
     </div>
 </div>
+</div>{{-- /#vistaEvidencias --}}
+
+{{-- ═══ VISTA: Registros en bruto ═══ --}}
+<div id="vistaRegistrosBruto" class="d-none">
+    <header class="mesas-paz-shell-head d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+            <h1 class="mesas-paz-shell-title">Registros en bruto</h1>
+            <p class="mesas-paz-shell-desc">Consulta y gestión de todos los registros crudos de asistencias por rango de fechas.</p>
+        </div>
+        <div class="pt-1">
+            <button type="button" id="btnVolverEvidencias" class="btn btn-sm btn-outline-secondary">
+                <i class="fa fa-arrow-left me-1"></i> Volver a evidencias
+            </button>
+        </div>
+    </header>
+
+    <div class="mesas-paz-panel panel panel-inverse">
+        <div class="mesas-paz-panel-head panel-heading">
+            <h4 class="panel-title">Buscar registros</h4>
+        </div>
+        <div class="mesas-paz-panel-body panel-body">
+            <div class="row g-3 align-items-end mb-3">
+                <div class="col-md-3">
+                    <label for="brutoFechaInicio" class="form-label small mb-1">Fecha inicio</label>
+                    <input type="text" id="brutoFechaInicio" class="form-control form-control-sm" placeholder="YYYY-MM-DD">
+                </div>
+                <div class="col-md-3">
+                    <label for="brutoFechaFin" class="form-label small mb-1">Fecha fin</label>
+                    <input type="text" id="brutoFechaFin" class="form-control form-control-sm" placeholder="YYYY-MM-DD">
+                </div>
+                <div class="col-md-auto d-flex gap-2">
+                    <button type="button" id="btnBuscarBruto" class="btn btn-sm btn-primary">
+                        <i class="fa fa-search me-1"></i> Buscar
+                    </button>
+                    <button type="button" id="btnEliminarRango" class="btn btn-sm btn-danger d-none">
+                        <i class="fa fa-trash me-1"></i> Vaciar rango
+                    </button>
+                </div>
+            </div>
+
+            <div id="brutoResumen" class="d-none mb-2">
+                <span class="badge bg-secondary" id="brutoTotalBadge"></span>
+            </div>
+
+            <div id="brutoLoading" class="text-center py-4 d-none">
+                <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div>
+            </div>
+
+            <div id="brutoTableWrap" class="d-none">
+                <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
+                    <table class="table table-sm table-bordered table-striped align-middle mb-0" style="font-size:0.78rem;">
+                        <thead class="table-light" style="position:sticky;top:0;z-index:2;">
+                            <tr>
+                                <th>ID</th>
+                                <th>Fecha asist.</th>
+                                <th>Delegado</th>
+                                <th>Microregión</th>
+                                <th>Municipio</th>
+                                <th>Presidente</th>
+                                <th>Asiste</th>
+                                <th>Deleg. asistió</th>
+                                <th>Modalidad</th>
+                                <th>Evidencias</th>
+                                <th>Creado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="brutoTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <small id="brutoPagInfo" class="text-muted"></small>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" id="brutoPagPrev" class="btn btn-outline-secondary" disabled>&laquo; Anterior</button>
+                        <button type="button" id="brutoPagNext" class="btn btn-outline-secondary" disabled>Siguiente &raquo;</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="brutoEmpty" class="d-none">
+                <div class="alert alert-secondary mb-0">No se encontraron registros en el rango seleccionado.</div>
+            </div>
+        </div>
+    </div>
+</div>{{-- /#vistaRegistrosBruto --}}
 
 <div class="modal fade" id="evidenciaPreviewModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -547,7 +643,10 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
-                <form id="formRangoFechasPresentacion" class="d-flex flex-column align-items-center">
+                <form id="formRangoFechasPresentation" method="POST" action="{{ route('ppt.generar-presentacion') }}" class="d-flex flex-column align-items-center">
+                    @csrf
+                    <input type="hidden" name="fecha_inicio" id="inputStart">
+                    <input type="hidden" name="fecha_fin" id="inputEnd">
                     <div class="calendar-wrapper presentation-calendar-wrap w-100 d-flex justify-content-center">
                         <input type="text" id="fechaRangoPresentacion" name="fecha_rango" class="d-none" required>
                     </div>
