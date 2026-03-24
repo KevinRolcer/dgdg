@@ -212,15 +212,31 @@
     min-width: 180px;
 }
 
-.agenda-ficha-date-box p {
+.agenda-ficha-date-box .agenda-ficha-date-main {
     margin: 0;
     font-size: 15pt;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
-.agenda-ficha-card--sparse .agenda-ficha-date-box p {
+.agenda-ficha-card--sparse .agenda-ficha-date-box .agenda-ficha-date-main {
     font-size: 19pt;
+}
+
+.agenda-ficha-time {
+    margin: 1.8mm 0 0;
+    font-size: 12pt;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+    color: #333;
+}
+.agenda-ficha-card--gira .agenda-ficha-time,
+.agenda-ficha-card--agenda .agenda-ficha-time {
+    color: rgba(255, 255, 255, 0.92);
+}
+.agenda-ficha-card--sparse .agenda-ficha-time {
+    font-size: 14pt;
 }
 
 .agenda-ficha-description {

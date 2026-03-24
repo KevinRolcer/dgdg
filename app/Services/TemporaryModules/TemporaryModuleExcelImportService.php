@@ -374,6 +374,7 @@ class TemporaryModuleExcelImportService
             });
 
         $pendingSignaturesByMicro = [];
+        $firstOccurrenceRowByMicro = []; // microId => signature => first_row_number
 
         for ($row = $dataStartRow; $row <= $highestRow; $row++) {
             $values = [];
@@ -572,29 +573,55 @@ class TemporaryModuleExcelImportService
                     $values[$field->key] = $field->type === 'boolean' ? false : null;
                 }
             }
-
             $rowSignature = $this->buildDuplicateSignature($values);
             $microKey = (int) $rowMrId;
-            $isDuplicate = isset($existingSignaturesByMicro[$microKey][$rowSignature])
-                || isset($pendingSignaturesByMicro[$microKey][$rowSignature]);
 
-            if ($isDuplicate) {
+            $existingDuplicate = isset($existingSignaturesByMicro[$microKey][$rowSignature]);
+            $excelDuplicate = isset($pendingSignaturesByMicro[$microKey][$rowSignature]);
+
+            if ($existingDuplicate || $excelDuplicate) {
+                $duplicateRef = $excelDuplicate ? ($firstOccurrenceRowByMicro[$microKey][$rowSignature] ?? null) : 'db';
+
                 $rowErrors[] = [
                     'row' => $row,
-                    'message' => "Fila {$row}: registro duplicado (todos los campos iguales).",
+                    'is_duplicate' => true,
+                    'duplicate_type' => $excelDuplicate ? 'excel' : 'database',
+                    'original_row' => $duplicateRef,
+                    'message' => "Fila {$row}: registro duplicado (".($excelDuplicate ? "coincide con fila {$duplicateRef}" : 'ya existe en el sistema').').',
                     'data' => $values,
                     'failed_fields' => [[
                         'key' => '__duplicate__',
-                        'label' => 'Registro completo',
-                        'reason' => 'Ya existe un registro igual en el módulo para la misma microrregión.',
+                        'label' => 'Registro duplicado',
+                        'reason' => $excelDuplicate ? "Esta fila es idéntica a la fila {$duplicateRef} del mismo Excel." : 'Este registro ya existe en el sistema para esta microrregión.',
                         'received' => '',
                     ]],
                     'suggestions' => [],
                 ];
+
+                // Si hay imágenes extraídas, incluir su data_url para evitar problemas de permisos (403) en la previsualización del error
+                foreach ($values as $k => $v) {
+                    if (is_string($v) && str_starts_with($v, 'temporary-modules/images/')) {
+                        try {
+                            $disk = ! empty(config('filesystems.disks.secure_shared')) ? 'secure_shared' : 'public';
+                            if (Storage::disk($disk)->exists($v)) {
+                                $mime = Storage::disk($disk)->mimeType($v) ?: 'image/jpeg';
+                                $base64 = base64_encode(Storage::disk($disk)->get($v));
+                                $rowErrors[count($rowErrors) - 1]['data_urls'][$k] = "data:{$mime};base64,{$base64}";
+                            }
+                        } catch (\Throwable $e) {
+                        }
+                    }
+                }
                 $skipped++;
 
                 continue;
             }
+
+            // Si llegamos aquí, es la "primera ocurrencia" (o única) de este registro
+            if (! isset($firstOccurrenceRowByMicro[$microKey][$rowSignature])) {
+                $firstOccurrenceRowByMicro[$microKey][$rowSignature] = $row;
+            }
+            $pendingSignaturesByMicro[$microKey][$rowSignature] = true;
 
             $module->entries()->create([
                 'user_id' => $userId,

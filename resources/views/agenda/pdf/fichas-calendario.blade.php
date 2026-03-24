@@ -151,6 +151,19 @@
             word-wrap: break-word;
             overflow-wrap: break-word;
         }
+        .card-time {
+            font-size: 6pt;
+            font-weight: 600;
+            margin-top: 0.5mm;
+            color: #fff;
+            letter-spacing: 0.04em;
+            line-height: 1.2;
+            text-transform: lowercase;
+        }
+        .card-h--gira .card-time,
+        .card-h--pre_gira .card-time {
+            color: #fff;
+        }
         .card-body {
             margin-top: -1.8mm;
             padding: 2.4mm 2.85mm 2.5mm;
@@ -273,6 +286,9 @@
                                         <div class="card-daynum">{{ $card['badge_day'] }}</div>
                                         @if(!empty($card['month_year_label']))
                                             <div class="card-my">{{ strtoupper($card['month_year_label']) }}</div>
+                                        @endif
+                                        @if(!empty($card['hora_ficha']) && in_array($kind, ['gira', 'pre_gira'], true))
+                                            <div class="card-time">{{ $card['hora_ficha'] }}</div>
                                         @endif
                                     </div>
                                 </div>

@@ -139,6 +139,9 @@
         .ficha--sparse .date-box .date-text {
             font-size: 19pt;
         }
+        .ficha--sparse .date-box .date-time {
+            font-size: 15pt;
+        }
         .ficha--sparse .label {
             font-size: 9pt;
         }
@@ -212,9 +215,21 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
+        .date-box .date-time {
+            font-size: 13pt;
+            font-weight: 600;
+            color: #333;
+            text-transform: lowercase;
+            letter-spacing: 0.04em;
+            margin-top: 1.8mm;
+        }
         .ficha--gira .date-text,
         .ficha--agenda .date-text {
             color: #fff;
+        }
+        .ficha--gira .date-time,
+        .ficha--agenda .date-time {
+            color: rgba(255, 255, 255, 0.92);
         }
 
         .aforo-line {
@@ -263,6 +278,9 @@
 
                         <div class="date-box">
                             <div class="date-text">{{ $card['badge_day'] }} DE {{ strtoupper($card['month_year_label'] ?? '') }}</div>
+                            @if (! empty($card['hora_ficha']))
+                                <div class="date-time">{{ $card['hora_ficha'] }}</div>
+                            @endif
                         </div>
 
                         @if (! empty($card['descripcion']))

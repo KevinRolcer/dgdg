@@ -9,6 +9,32 @@
     html.theme-dark {
         --clr-error-text: #c79b66;
     }
+    .tm-row-glow-purple > td {
+        box-shadow: inset 0 2px 0 #8e44ad, inset 0 -2px 0 #8e44ad !important;
+        background-color: rgba(142, 68, 173, 0.1) !important;
+    }
+    .tm-row-glow-purple > td:first-child { box-shadow: inset 2px 2px 0 #8e44ad, inset 0 -2px 0 #8e44ad !important; }
+    .tm-row-glow-purple > td:last-child { box-shadow: inset -2px 2px 0 #8e44ad, inset 0 -2px 0 #8e44ad, inset 0 2px 0 #8e44ad !important; }
+
+    .tm-row-glow-orange > td {
+        box-shadow: inset 0 2px 0 #e67e22, inset 0 -2px 0 #e67e22 !important;
+        background-color: rgba(230, 126, 34, 0.1) !important;
+    }
+    .tm-row-glow-orange > td:first-child { box-shadow: inset 2px 2px 0 #e67e22, inset 0 -2px 0 #e67e22 !important; }
+    .tm-row-glow-orange > td:last-child { box-shadow: inset -2px 2px 0 #e67e22, inset 0 -2px 0 #e67e22, inset 0 2px 0 #e67e22 !important; }
+
+    .tm-error-log-card {
+        cursor: pointer;
+        border: 2px solid transparent !important;
+    }
+    .tm-error-log-card:hover {
+        border-color: var(--clr-error-text) !important;
+        background: rgba(0,0,0,0.02) !important;
+    }
+    .tm-error-log-card.is-active-row {
+        border-color: #8e44ad !important;
+        box-shadow: 0 0 8px rgba(142,68,173,0.3) !important;
+    }
 </style>
 @endpush
 
@@ -1173,6 +1199,7 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
+        window.escapeHtml = escapeHtml;
 
         const getModuleNameById = (moduleId) => {
             const subtitle = document.querySelector(`#delegate-preview-${moduleId} .tm-modal-subtitle`);
@@ -1265,7 +1292,14 @@
                     ${isLogModal ? '<span class="tm-upload-meta-pill" style="font-size:0.65rem; padding:2px 8px;">PENDIENTE</span>' : ''}
                 </div>
                 ${failedFieldsHtml}
-                ${generalSuggHtml}
+                <div style="margin-top:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <button type="button" class="tm-btn tm-btn-sm tm-btn-primary" 
+                        onclick="openErrorModifyModal('${cardId}')"
+                        style="padding:4px 10px; font-size:0.75rem;">
+                        <i class="fa-solid fa-pen"></i> Corregir datos manualmente
+                    </button>
+                    ${generalSuggHtml}
+                </div>
             `;
         };
 
@@ -1310,8 +1344,10 @@
                     card.className = 'tm-error-log-card';
                     card.id = cardId;
                     card.dataset.rowData = JSON.stringify(err?.data || {});
+                    if (err?.data_urls) card.dataset.dataUrls = JSON.stringify(err.data_urls);
                     card.dataset.municipioKey = String(err?.municipio_key || 'municipio');
                     card.dataset.moduleId = moduleId;
+                    card.dataset.singleUrl = singleUrl;
                     card.dataset.errorIndex = idx;
                     card.style = 'padding:15px; border:1px solid var(--clr-border); border-radius:12px; background:var(--clr-bg); font-size:0.85rem; transition: all 0.3s ease;';
                     card.innerHTML = renderErrorCardHtml(err, idx, moduleId, singleUrl, cardId, true);
@@ -1749,7 +1785,9 @@
             modal.classList.add('is-open');
             modal.setAttribute('aria-hidden', 'false');
             document.body.style.overflow = 'hidden';
+            modal.dispatchEvent(new CustomEvent('modal:open', { detail: { modal, opener } }));
         };
+        window.openModal = openModal;
 
         const setMunicipiosForForm = function (form, microrregionId) {
             if (!form || !microrregionId) {
@@ -2127,6 +2165,7 @@
                 opener.focus();
             }
         };
+        window.closeModal = closeModal;
 
         document.addEventListener('click', function (event) {
             const btn = event.target.closest('[data-open-module-preview]');
@@ -3010,7 +3049,7 @@
                 for (let i = 0; i < maxCols; i++) html += '<th>' + getColLetter(i) + '</th>';
                 html += '</tr></thead><tbody>';
 
-                data.slice(0, 100).forEach((row, rowIndex) => {
+                data.slice(0, 1000).forEach((row, rowIndex) => {
                     const displayRowIndex = rowIndex + 1;
                     html += '<tr data-row-index="' + displayRowIndex + '"><td class="row-num">' + displayRowIndex + '</td>';
                     for (let i = 0; i < maxCols; i++) {
@@ -3463,6 +3502,7 @@
                                 card.className = 'tm-error-log-card';
                                 card.id = cardId;
                                 card.dataset.rowData = JSON.stringify(err.data);
+                                if (err.data_urls) card.dataset.dataUrls = JSON.stringify(err.data_urls);
                                 card.dataset.municipioKey = String(err.municipio_key || 'municipio');
                                 card.style = 'padding:15px; border:1px solid var(--clr-border); border-radius:12px; background:var(--clr-bg); font-size:0.85rem; transition: all 0.3s ease;';
                                 card.innerHTML = renderErrorCardHtml(err, idx, currentModuleId, importSingleUrl, cardId, false);
@@ -3475,6 +3515,52 @@
                                     controlsSide.scrollTo({ top: errSection.offsetTop, behavior: 'smooth' });
                                 }, 100);
                             }
+                        }
+                    }
+
+                    // Resaltar duplicados: interactivo al hacer click en cada tarjeta
+                    if (j.row_errors && errList) {
+                        const table = modal.querySelector('.tm-excel-preview-table');
+                        if (table) {
+                            j.row_errors.forEach((err, idx) => {
+                                const cardId = `tmErrRow_${currentModuleId}_${idx}`;
+                                const card = document.getElementById(cardId);
+                                if (!card) return;
+
+                                // Guardar metadata del error en la tarjeta para el click
+                                card.dataset.errRow = String(err.row || '');
+                                card.dataset.originalRow = String(err.original_row || '');
+                                card.dataset.isDuplicate = err.is_duplicate ? '1' : '0';
+
+                                card.title = 'Clic para localizar en el Excel';
+                                card.addEventListener('click', function(e) {
+                                    if (e.target.closest('button') || e.target.closest('.tm-inline-edit-form') || e.target.closest('select') || e.target.closest('input')) return;
+
+                                    // Limpiar anteriores
+                                    table.querySelectorAll('.tm-row-glow-purple, .tm-row-glow-orange').forEach(r => {
+                                        r.classList.remove('tm-row-glow-purple', 'tm-row-glow-orange');
+                                    });
+                                    errList.querySelectorAll('.is-active-row').forEach(c => c.classList.remove('is-active-row'));
+
+                                    // Marcar esta tarjeta como activa
+                                    card.classList.add('is-active-row');
+
+                                    // Resaltar la fila del error en naranja
+                                    const errRowIdx = card.dataset.errRow;
+                                    const rowEl = table.querySelector('tr[data-row-index="' + errRowIdx + '"]');
+                                    if (rowEl) {
+                                        rowEl.classList.add('tm-row-glow-orange');
+                                        rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }
+
+                                    // Si es duplicado y tiene fila original, resaltarla en morado
+                                    const origRow = card.dataset.originalRow;
+                                    if (card.dataset.isDuplicate === '1' && origRow && origRow !== 'db' && origRow !== '') {
+                                        const origEl = table.querySelector('tr[data-row-index="' + origRow + '"]');
+                                        if (origEl) origEl.classList.add('tm-row-glow-purple');
+                                    }
+                                });
+                            });
                         }
                     }
 
@@ -3663,6 +3749,262 @@
             btn.disabled = false;
             btn.innerText = oldText;
             Swal.fire('Error', e.message, 'error');
+        });
+    };
+
+    window.openErrorModifyModal = function(cardId) {
+        const card = document.getElementById(cardId);
+        if (!card) return;
+
+        // Toggle: si ya existe formulario inline, quitarlo
+        var existingForm = card.querySelector('.tm-inline-edit-form');
+        if (existingForm) { existingForm.remove(); return; }
+
+        const rowData = JSON.parse(card.dataset.rowData || '{}');
+        const dataUrls = JSON.parse(card.dataset.dataUrls || '{}');
+        // Soportar ambos formatos: tmErrRow y tmErrLogRow
+        const isLogCard = cardId.startsWith('tmErrLogRow_');
+        const moduleId = card.dataset.moduleId || cardId.split('_')[1];
+        
+        // URL de importación individual
+        const exModal = document.getElementById('tmImportarExcelModal-' + moduleId);
+        const singleUrl = card.dataset.singleUrl || (exModal ? exModal.dataset.excelImportSingleUrl : ('/modulos-temporales/' + moduleId + '/importar-fila'));
+
+        // Microrregión del formulario de excel
+        const mrInput = exModal ? exModal.querySelector('.tm-excel-mr-input') : null;
+        const mrId = mrInput ? mrInput.value : '';
+
+        // Formulario original para obtener labels y selects
+        const entryModal = document.getElementById('delegate-preview-' + moduleId);
+        const origForm = entryModal ? entryModal.querySelector('.tm-entry-form') : null;
+
+        // Clonar campos reales del formulario original
+        var formDiv = document.createElement('div');
+        formDiv.className = 'tm-inline-edit-form';
+        formDiv.style.cssText = 'margin-top:12px; padding:12px; border:1px dashed var(--clr-border); border-radius:10px; background:rgba(0,0,0,0.02);';
+
+        var headerHtml = '<div style="font-size:0.75rem; font-weight:700; color:var(--clr-error-text); margin-bottom:10px;">' +
+            '<i class="fa-solid fa-pen-to-square"></i> Editar datos para reimportar' +
+            '</div>';
+
+        var gridDiv = document.createElement('div');
+        gridDiv.style.cssText = 'display:grid; grid-template-columns:1fr 1fr; gap:6px 12px;';
+
+        if (origForm) {
+            // Clonar la grilla de campos del formulario original
+            var origGrid = origForm.querySelector('.tm-entry-grid');
+            if (origGrid) {
+                var clonedGrid = origGrid.cloneNode(true);
+                // Quitar microrregion selector del clon (se envía aparte)
+                var mrSel = clonedGrid.querySelector('.tm-mr-selector');
+                if (mrSel) {
+                    var mrLabel = mrSel.closest('.tm-entry-field');
+                    if (mrLabel) mrLabel.remove();
+                }
+                // Quitar secciones header decorativas
+                clonedGrid.querySelectorAll('.tm-entry-section-header, .tm-form-divider').forEach(function(el) { el.remove(); });
+
+                // Quitar campo municipio del clon (se corrige con las sugerencias de arriba)
+                var munSel = clonedGrid.querySelector('.tm-municipio-select');
+                if (munSel) {
+                    var munLabel = munSel.closest('.tm-entry-field');
+                    if (munLabel) munLabel.remove();
+                }
+
+                // Limpiar todas las previsualizaciones de imagen clonadas para evitar requests a URLs de otros registros
+                clonedGrid.querySelectorAll('[data-image-preview]').forEach(function(pv) {
+                    pv.hidden = true;
+                    var img = pv.querySelector('img');
+                    if (img) img.removeAttribute('src');
+                });
+
+                // Aplicar valores del rowData a cada campo clonado
+                clonedGrid.querySelectorAll('.tm-entry-field').forEach(function(fieldLabel) {
+                    // Buscar inputs, selects, textareas dentro
+                    fieldLabel.querySelectorAll('input, select, textarea').forEach(function(input) {
+                        var nameAttr = input.getAttribute('name') || '';
+                        // Extraer key de values[key] o values[key__primary]
+                        var match = nameAttr.match(/^values\[([^\]]+)\]/);
+                        if (!match) return;
+                        var key = match[1];
+                        var subKey = null;
+                        if (key.includes('__')) {
+                            var parts = key.split('__');
+                            key = parts[0];
+                            subKey = parts[1];
+                        }
+
+                        var val = rowData[key];
+                        if (subKey && typeof val === 'object' && val !== null) {
+                            val = val[subKey];
+                        }
+
+                        // Limpiar IDs del clon para evitar duplicados
+                        if (input.id) input.id = input.id + '_inline_' + cardId;
+
+                        // Quitar required del clon
+                        input.removeAttribute('required');
+
+                        if (input.type === 'file') {
+                            // Imagen: mostrar preview si tenemos data
+                            var imgVal = typeof rowData[key] === 'string' ? rowData[key] : '';
+                            var dUrl = dataUrls[key];
+                            if (dUrl || (imgVal && (imgVal.startsWith('temporary-modules/') || imgVal.startsWith('data:')))) {
+                                var previewDiv = fieldLabel.querySelector('[data-image-preview]');
+                                var previewImg = previewDiv ? previewDiv.querySelector('img') : null;
+                                if (previewImg && previewDiv) {
+                                    previewImg.src = dUrl || imgVal;
+                                    previewDiv.hidden = false;
+                                }
+                            }
+                            // Agregar hidden para mantener el valor
+                            var hiddenImg = document.createElement('input');
+                            hiddenImg.type = 'hidden';
+                            hiddenImg.setAttribute('data-field-key', key);
+                            hiddenImg.value = imgVal;
+                            input.parentElement.appendChild(hiddenImg);
+                            return;
+                        }
+
+                        if (input.type === 'checkbox') {
+                            // Multiselect: marcar según array
+                            var arrVal = Array.isArray(rowData[key]) ? rowData[key] : (typeof rowData[key] === 'string' ? rowData[key].split(',').map(function(s) { return s.trim(); }) : []);
+                            input.checked = arrVal.indexOf(input.value) !== -1;
+                            input.setAttribute('data-field-key-multi', key);
+                            return;
+                        }
+
+                        if (input.type === 'radio') {
+                            input.checked = String(input.value) === String(val || '');
+                            input.setAttribute('data-field-key', key);
+                            return;
+                        }
+
+                        if (input.tagName === 'SELECT') {
+                            input.setAttribute('data-field-key', subKey ? (key + '__' + subKey) : key);
+                            var strVal = (val !== null && val !== undefined) ? String(val) : '';
+                            // Intentar seleccionar
+                            var found = false;
+                            for (var oi = 0; oi < input.options.length; oi++) {
+                                if (input.options[oi].value === strVal) {
+                                    input.selectedIndex = oi;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found) input.selectedIndex = 0;
+                            return;
+                        }
+
+                        // Text, number, date, textarea
+                        input.setAttribute('data-field-key', subKey ? (key + '__' + subKey) : key);
+                        input.value = (val !== null && val !== undefined) ? String(val) : '';
+                    });
+                });
+
+                gridDiv = clonedGrid;
+                gridDiv.style.cssText = 'display:grid; grid-template-columns:1fr 1fr; gap:6px 12px;';
+            }
+        } else {
+            // Fallback: generar inputs simples si no hay formulario original
+            var fieldsHtml = '';
+            for (var fkey in rowData) {
+                if (!rowData.hasOwnProperty(fkey)) continue;
+                var val = rowData[fkey];
+                var displayVal = (val !== null && val !== undefined) ? String(val) : '';
+                fieldsHtml += '<div style="margin-bottom:8px;">' +
+                    '<label style="font-size:0.7rem; font-weight:700; color:var(--clr-text-light); text-transform:uppercase; letter-spacing:0.5px;">' + escapeHtml(fkey) + '</label>' +
+                    '<input type="text" data-field-key="' + escapeHtml(fkey) + '" value="' + escapeHtml(displayVal) + '"' +
+                    ' style="width:100%; padding:5px 8px; border:1px solid var(--clr-border); border-radius:6px; background:var(--clr-bg); color:var(--clr-text-main); font-size:0.8rem; margin-top:4px;">' +
+                    '</div>';
+            }
+            gridDiv.innerHTML = fieldsHtml;
+        }
+
+        formDiv.innerHTML = headerHtml;
+        formDiv.appendChild(gridDiv);
+
+        var btnsDiv = document.createElement('div');
+        btnsDiv.style.cssText = 'margin-top:10px; display:flex; gap:8px;';
+        btnsDiv.innerHTML = '<button type="button" class="tm-btn tm-btn-sm tm-btn-primary tm-inline-save-btn" style="padding:5px 14px; font-size:0.75rem;"><i class="fa-solid fa-check"></i> Guardar corregido</button>' +
+            '<button type="button" class="tm-btn tm-btn-sm tm-btn-outline tm-inline-cancel-btn" style="padding:5px 14px; font-size:0.75rem;">Cancelar</button>';
+        formDiv.appendChild(btnsDiv);
+        card.appendChild(formDiv);
+
+        // Prevenir que el click del formDiv haga scroll en la tabla
+        formDiv.addEventListener('click', function(e) { e.stopPropagation(); });
+
+        // Cancelar
+        formDiv.querySelector('.tm-inline-cancel-btn').addEventListener('click', function() { formDiv.remove(); });
+
+        // Guardar
+        formDiv.querySelector('.tm-inline-save-btn').addEventListener('click', async function() {
+            var btn = this;
+            var oldT = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Guardando...';
+
+            var data = {};
+            // Campos simples (text, select, hidden, etc.)
+            formDiv.querySelectorAll('[data-field-key]').forEach(function(el) {
+                var k = el.dataset.fieldKey;
+                if (k.includes('__')) {
+                    var parts = k.split('__');
+                    if (!data[parts[0]]) data[parts[0]] = {};
+                    data[parts[0]][parts[1]] = el.value;
+                } else {
+                    data[k] = el.value;
+                }
+            });
+            // Campos multiselect (checkboxes)
+            var multiKeys = {};
+            formDiv.querySelectorAll('[data-field-key-multi]').forEach(function(cb) {
+                var k = cb.dataset.fieldKeyMulti;
+                if (!multiKeys[k]) multiKeys[k] = [];
+                if (cb.checked) multiKeys[k].push(cb.value);
+            });
+            for (var mk in multiKeys) {
+                if (multiKeys.hasOwnProperty(mk)) data[mk] = multiKeys[mk];
+            }
+
+            try {
+                var r = await fetch(singleUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ data: data, microrregion_id: mrId })
+                });
+                var j = await r.json();
+                if (j.success) {
+                    Swal.fire({ title: 'Éxito', text: 'Registro corregido e importado.', icon: 'success' });
+                    // Si es tarjeta del modal de log, eliminar del sessionStorage
+                    if (isLogCard && card.dataset.errorIndex !== undefined) {
+                        var eidx = parseInt(card.dataset.errorIndex, 10);
+                        if (typeof deleteErrorFromSession === 'function') {
+                            deleteErrorFromSession(moduleId, eidx);
+                        }
+                        if (typeof updateErrorIndicator === 'function') updateErrorIndicator(moduleId);
+                        if (typeof updateHeaderErrorIndicator === 'function') updateHeaderErrorIndicator();
+                    }
+                    card.style.transition = 'all 0.4s ease';
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateX(20px)';
+                    setTimeout(function() {
+                        var list = card.parentElement;
+                        card.remove();
+                        if (list && list.children.length === 0) {
+                            var sec = list.closest('.tm-excel-errors-section');
+                            if (sec) sec.classList.add('tm-hidden');
+                        }
+                    }, 400);
+                } else {
+                    throw new Error(j.message || 'Error al guardar');
+                }
+            } catch (err) {
+                Swal.fire('Error', err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = oldT;
+            }
         });
     };
 </script>

@@ -24,6 +24,9 @@
                 <div class="agenda-cal-card-head-date" aria-hidden="true">
                     <span class="agenda-cal-card-head-daynum">{{ $card['badge_day'] }}</span>
                     <span class="agenda-cal-card-head-dateline">{{ e($card['month_year_label'] ?? '') }}</span>
+                    @if (in_array($fichaKind, ['gira', 'pre_gira'], true) && ! empty($card['hora_ficha']))
+                        <span class="agenda-cal-card-head-time">{{ e($card['hora_ficha']) }}</span>
+                    @endif
                 </div>
             </div>
             <div class="agenda-cal-card-body">

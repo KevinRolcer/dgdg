@@ -75,7 +75,10 @@
                     @endif
 
                     <div class="agenda-ficha-date-box">
-                        <p>{{ $card['badge_day'] }} DE {{ strtoupper((string) ($card['month_year_label'] ?? '')) }}</p>
+                        <p class="agenda-ficha-date-main">{{ $card['badge_day'] }} DE {{ strtoupper((string) ($card['month_year_label'] ?? '')) }}</p>
+                        @if (! empty($card['hora_ficha']))
+                            <p class="agenda-ficha-time">{{ $card['hora_ficha'] }}</p>
+                        @endif
                     </div>
 
                     @if (!empty($card['descripcion']))

@@ -180,6 +180,7 @@ class AgendaDirectivaCalendarService
                 'agenda_id' => $agenda->id,
                 'month_year_label' => $monthYearLabel,
                 'badge_day' => $occs[0]['date']->day,
+                'hora_ficha' => $this->fichaHoraLabel12hForGira($agenda),
                 'title' => $titleFicha,
                 'lugar' => $lugarCard,
                 'descripcion' => $desc,
@@ -309,6 +310,33 @@ class AgendaDirectivaCalendarService
     }
 
     /**
+     * Hora en 12 h (p. ej. 06:00 pm) solo para giras y pre-giras con hora habilitada.
+     */
+    private function fichaHoraLabel12hForGira(Agenda $agenda): ?string
+    {
+        if ($agenda->tipo !== 'gira') {
+            return null;
+        }
+        if (! $agenda->habilitar_hora) {
+            return null;
+        }
+        $raw = trim((string) ($agenda->hora ?? ''));
+        if ($raw === '') {
+            return null;
+        }
+        $tz = config('app.timezone', 'UTC');
+        $h = $raw;
+        if (substr_count($h, ':') === 1) {
+            $h .= ':00';
+        }
+        try {
+            return Carbon::parse('2000-01-01 '.$h, $tz)->format('h:i a');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * Fichas para PDF: incluye contenido completo salvo líneas de encargado/creador (sanitizado).
      *
      * @param  array{clasificacion?: string, buscar?: string}  $filters
@@ -432,6 +460,7 @@ class AgendaDirectivaCalendarService
             'agenda_id' => $agenda->id,
             'month_year_label' => $monthYearLabel,
             'badge_day' => $anchor->day,
+            'hora_ficha' => $this->fichaHoraLabel12hForGira($agenda),
             'title' => $titleFicha,
             'lugar' => $lugarCard,
             'descripcion' => $desc,
