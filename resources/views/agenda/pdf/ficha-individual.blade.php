@@ -150,7 +150,7 @@
             font-size: 9pt;
         }
         .ficha--sparse .value {
-            font-size: 15pt;
+            font-size: 20pt;
         }
 
         .detail-group {
@@ -172,7 +172,7 @@
         }
 
         .value {
-            font-size: 13pt;
+            font-size: 17pt;
             font-weight: 600;
             color: #444;
             max-width: 100%;

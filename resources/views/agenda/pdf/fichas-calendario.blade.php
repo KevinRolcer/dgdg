@@ -219,7 +219,7 @@
         }
         /* Lugar: .agenda-cal-card-address */
         .card-address {
-            font-size: 7.1pt;
+            font-size: 10pt;
             font-weight: 600;
             color: #484747;
             margin: 0 0 0.85mm;

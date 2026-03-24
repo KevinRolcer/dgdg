@@ -1111,7 +1111,7 @@ html.theme-dark .agenda-cal-card-body .agenda-cal-card-title {
 
 .agenda-cal-card-address {
     margin: 0;
-    font-size: 0.84rem;
+    font-size: calc(1rem + 2px);
     font-weight: 600;
     line-height: 1.4;
     color: var(--agenda-ficha-body-text, #484747);

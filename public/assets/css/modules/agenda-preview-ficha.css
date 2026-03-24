@@ -194,13 +194,13 @@
 
 .agenda-ficha-value {
     margin: 0;
-    font-size: 13pt;
+    font-size: 17pt;
     font-weight: 600;
-    line-height: 1.2;
+    line-height: 1.22;
     word-wrap: break-word;
 }
 .agenda-ficha-card--sparse .agenda-ficha-value {
-    font-size: 15pt;
+    font-size: 19.5pt;
 }
 
 .agenda-ficha-date-box {
