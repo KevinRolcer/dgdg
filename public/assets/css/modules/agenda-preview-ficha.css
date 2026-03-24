@@ -125,13 +125,22 @@
     top: 50%;
     left: 14mm;
     right: 14mm;
-    margin-top: -105mm; 
+    margin-top: -105mm;
     height: 220mm;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     text-align: center;
+}
+
+/* Poco texto (agenda/gira/pre-gira): centrar el bloque en toda la hoja, dejando aire para el logo inferior */
+.agenda-ficha-card--sparse .agenda-ficha-card-body {
+    top: 50%;
+    margin-top: 0;
+    height: auto;
+    max-height: calc(297mm - 42mm);
+    transform: translateY(-50%);
 }
 
 .agenda-ficha-eyebrow {

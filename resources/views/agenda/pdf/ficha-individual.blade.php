@@ -19,7 +19,7 @@
 
         /*
          * Una ficha = una hoja; hijos absolutos no alargan el flujo (evita 2ª página).
-         * Misma geometría que la vista previa web (.agenda-ficha-card-body): top 50%, -110mm, 220mm + flex vertical.
+         * Geometría alineada con agenda-preview-ficha.css (.agenda-ficha-card-body).
          */
         .ficha {
             width: 210mm;
@@ -59,13 +59,25 @@
             top: 50%;
             left: 14mm;
             right: 14mm;
-            margin-top: -110mm;
+            margin-top: -105mm;
             height: 220mm;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
+        }
+
+        /* Poco texto: igual que .agenda-ficha-card--sparse .agenda-ficha-card-body en la vista previa */
+        .ficha--sparse .ficha__body-wrap {
+            top: 50%;
+            left: 14mm;
+            right: 14mm;
+            margin-top: 0;
+            height: auto;
+            bottom: auto;
+            max-height: calc(297mm - 42mm);
+            transform: translateY(-50%);
         }
 
         .ficha__body-inner {
@@ -76,10 +88,6 @@
         .ficha__body-cell {
             text-align: center;
             width: 100%;
-        }
-
-        .ficha--sparse .ficha__body-cell {
-            /* Centrado optimizado para contenido escaso */
         }
 
         .ficha__logo {
