@@ -1229,6 +1229,17 @@
             return [];
         };
 
+        const getFieldLabel = (moduleId, key) => {
+            const entryModal = document.getElementById('delegate-preview-' + moduleId);
+            if (!entryModal) return key;
+            const input = entryModal.querySelector(`[name="values[${key}]"], [name="values[${key}__primary]"], [name="values[${key}__secondary]"]`);
+            if (input) {
+                const labelWrap = input.closest('.tm-entry-field');
+                if (labelWrap) return labelWrap.childNodes[0].textContent.trim();
+            }
+            return key;
+        };
+
         const renderErrorCardHtml = (err, idx, moduleId, singleUrl, cardId, isLogModal = false) => {
             const moduleName = isLogModal ? getModuleNameById(moduleId) : '';
             const failedFields = getFailedFields(err);
@@ -1280,6 +1291,39 @@
                 '</div>';
             }
 
+            // Previsualización de registro en conflicto (si existe)
+            let conflictPreviewHtml = '';
+            if (err.conflict_data && Object.keys(err.conflict_data).length > 0) {
+                let conflictDetails = '';
+                Object.entries(err.conflict_data).forEach(([key, val]) => {
+                    if (val === null || val === undefined || val === '') return;
+                    const label = getFieldLabel(moduleId, key);
+                    let displayVal = '';
+                    if (typeof val === 'string' && val.startsWith('data:image/')) {
+                        displayVal = '<img src="' + val + '" style="max-height:40px; border-radius:4px; margin-top:2px;">';
+                    } else {
+                        displayVal = escapeHtml(Array.isArray(val) ? val.join(', ') : val);
+                    }
+                    conflictDetails += `
+                        <div style="margin-bottom:4px;">
+                            <span style="font-weight:700; font-size:0.65rem; color:var(--clr-text-light); text-transform:uppercase; margin-right:4px;">${escapeHtml(label)}:</span>
+                            <span style="font-size:0.75rem; color:var(--clr-text-main); font-weight:500;">${displayVal}</span>
+                        </div>
+                    `;
+                });
+
+                conflictPreviewHtml = `
+                    <div style="margin:10px 0; padding:12px; background:rgba(124, 77, 255, 0.08); border:1px solid rgba(124, 77, 255, 0.2); border-radius:10px;">
+                        <div style="font-size:0.7rem; font-weight:800; color:#7c4dff; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                            <i class="fa-solid fa-circle-exclamation"></i> REGISTRO ORIGINAL (CONFIRMADO)
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 12px;">
+                            ${conflictDetails}
+                        </div>
+                    </div>
+                `;
+            }
+
             return `
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
                     <div>
@@ -1292,6 +1336,7 @@
                     ${isLogModal ? '<span class="tm-upload-meta-pill" style="font-size:0.65rem; padding:2px 8px;">PENDIENTE</span>' : ''}
                 </div>
                 ${failedFieldsHtml}
+                ${conflictPreviewHtml}
                 <div style="margin-top:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                     <button type="button" class="tm-btn tm-btn-sm tm-btn-primary" 
                         onclick="openErrorModifyModal('${cardId}')"
@@ -1345,6 +1390,7 @@
                     card.id = cardId;
                     card.dataset.rowData = JSON.stringify(err?.data || {});
                     if (err?.data_urls) card.dataset.dataUrls = JSON.stringify(err.data_urls);
+                    if (err?.conflict_data) card.dataset.conflictData = JSON.stringify(err.conflict_data);
                     card.dataset.municipioKey = String(err?.municipio_key || 'municipio');
                     card.dataset.moduleId = moduleId;
                     card.dataset.singleUrl = singleUrl;
@@ -3503,6 +3549,7 @@
                                 card.id = cardId;
                                 card.dataset.rowData = JSON.stringify(err.data);
                                 if (err.data_urls) card.dataset.dataUrls = JSON.stringify(err.data_urls);
+                                if (err.conflict_data) card.dataset.conflictData = JSON.stringify(err.conflict_data);
                                 card.dataset.municipioKey = String(err.municipio_key || 'municipio');
                                 card.style = 'padding:15px; border:1px solid var(--clr-border); border-radius:12px; background:var(--clr-bg); font-size:0.85rem; transition: all 0.3s ease;';
                                 card.innerHTML = renderErrorCardHtml(err, idx, currentModuleId, importSingleUrl, cardId, false);
@@ -3778,13 +3825,63 @@
         const entryModal = document.getElementById('delegate-preview-' + moduleId);
         const origForm = entryModal ? entryModal.querySelector('.tm-entry-form') : null;
 
+        const conflictData = JSON.parse(card.dataset.conflictData || '{}');
+        const hasConflict = Object.keys(conflictData).length > 0;
+
         // Clonar campos reales del formulario original
         var formDiv = document.createElement('div');
         formDiv.className = 'tm-inline-edit-form';
         formDiv.style.cssText = 'margin-top:12px; padding:12px; border:1px dashed var(--clr-border); border-radius:10px; background:rgba(0,0,0,0.02);';
 
-        var headerHtml = '<div style="font-size:0.75rem; font-weight:700; color:var(--clr-error-text); margin-bottom:10px;">' +
-            '<i class="fa-solid fa-pen-to-square"></i> Editar datos para reimportar' +
+        var headerHtml = '';
+        if (hasConflict) {
+            // Renderizar preview del registro original (conflictivo)
+            var conflictFieldsHtml = '';
+            if (origForm) {
+                origForm.querySelectorAll('.tm-entry-grid .tm-entry-field').forEach(function(fieldLabel) {
+                    var input = fieldLabel.querySelector('input, select, textarea');
+                    if (!input) return;
+                    var nameAttr = input.getAttribute('name') || '';
+                    var match = nameAttr.match(/^values\[([^\]]+)\]/);
+                    if (!match) return;
+                    var key = match[1];
+                    if (key.includes('__')) key = key.split('__')[0];
+
+                    var val = conflictData[key];
+                    if (val === undefined || val === null) return;
+
+                    var displayVal = '';
+                    var isImg = false;
+                    if (typeof val === 'string' && val.startsWith('data:image/')) {
+                        displayVal = '<img src="' + val + '" style="max-height:50px; border-radius:4px; border:1px solid var(--clr-border);">';
+                        isImg = true;
+                    } else if (input.tagName === 'SELECT') {
+                        var opt = Array.from(input.options).find(o => String(o.value) === String(val));
+                        displayVal = opt ? opt.textContent : val;
+                    } else if (input.type === 'checkbox') {
+                        displayVal = Array.isArray(val) ? val.join(', ') : val;
+                    } else {
+                        displayVal = val;
+                    }
+
+                    var labelText = fieldLabel.childNodes[0] ? fieldLabel.childNodes[0].textContent.trim() : key;
+                    conflictFieldsHtml += '<div style="margin-bottom:6px;">' +
+                        '<div style="font-size:0.65rem; font-weight:700; color:var(--clr-text-light); text-transform:uppercase; opacity:0.8;">' + escapeHtml(labelText) + '</div>' +
+                        '<div style="font-size:0.75rem; color:var(--clr-text-main); font-weight:500;">' + (isImg ? displayVal : escapeHtml(displayVal)) + '</div>' +
+                        '</div>';
+                });
+            }
+
+            headerHtml += '<div style="margin-bottom:15px; padding:10px; background:rgba(124, 77, 255, 0.08); border:1px solid rgba(124, 77, 255, 0.2); border-radius:8px;">' +
+                '<div style="font-size:0.75rem; font-weight:800; color:#7c4dff; margin-bottom:8px; display:flex; align-items:center; gap:6px;">' +
+                '<i class="fa-solid fa-circle-exclamation"></i> REGISTRO ORIGINAL (YA EXISTENTE)' +
+                '</div>' +
+                '<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 12px;">' + conflictFieldsHtml + '</div>' +
+                '</div>';
+        }
+
+        headerHtml += '<div style="font-size:0.75rem; font-weight:700; color:var(--clr-error-text); margin-bottom:10px;">' +
+            '<i class="fa-solid fa-pen-to-square"></i> EDITAR DATOS PARA REIMPORTAR' +
             '</div>';
 
         var gridDiv = document.createElement('div');
@@ -3968,9 +4065,9 @@
             }
 
             try {
-                var r = await fetch(singleUrl, {
+                var r = await csrfFetch(singleUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                     body: JSON.stringify({ data: data, microrregion_id: mrId })
                 });
                 var j = await r.json();

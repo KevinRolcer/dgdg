@@ -19,7 +19,7 @@
 
         /*
          * Una ficha = una hoja; hijos absolutos no alargan el flujo (evita 2ª página).
-         * Altura fija en .ficha__body-wrap + flex/sparse centra el bloque con poco texto.
+         * Misma geometría que la vista previa web (.agenda-ficha-card-body): top 50%, -110mm, 220mm + flex vertical.
          */
         .ficha {
             width: 210mm;
@@ -59,9 +59,13 @@
             top: 50%;
             left: 14mm;
             right: 14mm;
-            margin-top: -80mm;
+            margin-top: -110mm;
             height: 220mm;
             box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
 
         .ficha__body-inner {
@@ -140,7 +144,7 @@
             font-size: 19pt;
         }
         .ficha--sparse .date-box .date-time {
-            font-size: 15pt;
+            font-size: 17pt;
         }
         .ficha--sparse .label {
             font-size: 9pt;
@@ -181,9 +185,9 @@
         }
 
         .description {
-            font-size: 9.8pt;
+            font-size: 12pt;
             font-weight: 400;
-            line-height: 1.4;
+            line-height: 1.42;
             color: #555;
             max-width: 98%;
             margin: 3.5mm auto 0;
@@ -216,7 +220,7 @@
             letter-spacing: 0.05em;
         }
         .date-box .date-time {
-            font-size: 13pt;
+            font-size: 15pt;
             font-weight: 600;
             color: #333;
             text-transform: lowercase;

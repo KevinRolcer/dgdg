@@ -937,7 +937,7 @@ html.theme-dark .agenda-cal-card {
 }
 
 .agenda-cal-card-head-time {
-    font-size: 0.62rem;
+    font-size: 0.78rem;
     font-weight: 600;
     line-height: 1.25;
     text-transform: lowercase;
@@ -1156,7 +1156,7 @@ html.theme-dark .agenda-cal-card-body .agenda-cal-card-title {
 
 .agenda-cal-card-desc {
     margin: 0;
-    font-size: 0.82rem;
+    font-size: 0.98rem;
     line-height: 1.45;
     color: var(--agenda-ficha-body-muted, #6b6a6a);
     white-space: pre-wrap;

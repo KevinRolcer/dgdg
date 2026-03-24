@@ -369,12 +369,14 @@ class TemporaryModuleExcelImportService
                 foreach ($entries as $entry) {
                     $microId = (int) ($entry->microrregion_id ?? 0);
                     $signature = $this->buildDuplicateSignature((array) ($entry->data ?? []));
-                    $existingSignaturesByMicro[$microId][$signature] = true;
+                    // Guardamos la data completa para mostrarla en caso de conflicto
+                    $existingSignaturesByMicro[$microId][$signature] = (array) ($entry->data ?? []);
                 }
             });
 
         $pendingSignaturesByMicro = [];
         $firstOccurrenceRowByMicro = []; // microId => signature => first_row_number
+        $firstOccurrenceDataByMicro = []; // microId => signature => data
 
         for ($row = $dataStartRow; $row <= $highestRow; $row++) {
             $values = [];
@@ -581,12 +583,29 @@ class TemporaryModuleExcelImportService
 
             if ($existingDuplicate || $excelDuplicate) {
                 $duplicateRef = $excelDuplicate ? ($firstOccurrenceRowByMicro[$microKey][$rowSignature] ?? null) : 'db';
+                $conflictData = $excelDuplicate ? ($firstOccurrenceDataByMicro[$microKey][$rowSignature] ?? []) : ($existingSignaturesByMicro[$microKey][$rowSignature] ?? []);
+
+                // Si tiene imágenes, generar data URLs para la previsualización del conflicto
+                foreach ($conflictData as $k => $v) {
+                    if (is_string($v) && str_starts_with($v, 'temporary-modules/images/')) {
+                        try {
+                            $disk = ! empty(config('filesystems.disks.secure_shared')) ? 'secure_shared' : 'public';
+                            if (Storage::disk($disk)->exists($v)) {
+                                $mime = Storage::disk($disk)->mimeType($v) ?: 'image/jpeg';
+                                $base64 = base64_encode(Storage::disk($disk)->get($v));
+                                $conflictData[$k] = "data:{$mime};base64,{$base64}";
+                            }
+                        } catch (\Throwable $e) {
+                        }
+                    }
+                }
 
                 $rowErrors[] = [
                     'row' => $row,
                     'is_duplicate' => true,
                     'duplicate_type' => $excelDuplicate ? 'excel' : 'database',
                     'original_row' => $duplicateRef,
+                    'conflict_data' => $conflictData,
                     'message' => "Fila {$row}: registro duplicado (".($excelDuplicate ? "coincide con fila {$duplicateRef}" : 'ya existe en el sistema').').',
                     'data' => $values,
                     'failed_fields' => [[
@@ -620,6 +639,7 @@ class TemporaryModuleExcelImportService
             // Si llegamos aquí, es la "primera ocurrencia" (o única) de este registro
             if (! isset($firstOccurrenceRowByMicro[$microKey][$rowSignature])) {
                 $firstOccurrenceRowByMicro[$microKey][$rowSignature] = $row;
+                $firstOccurrenceDataByMicro[$microKey][$rowSignature] = $values;
             }
             $pendingSignaturesByMicro[$microKey][$rowSignature] = true;
 

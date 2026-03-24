@@ -125,7 +125,7 @@
     top: 50%;
     left: 14mm;
     right: 14mm;
-    margin-top: -80mm; /* Igual al margin-top del PDF */
+    margin-top: -90mm; 
     height: 220mm;
     display: flex;
     flex-direction: column;
@@ -225,7 +225,7 @@
 
 .agenda-ficha-time {
     margin: 1.8mm 0 0;
-    font-size: 12pt;
+    font-size: 14pt;
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: lowercase;
@@ -236,13 +236,13 @@
     color: rgba(255, 255, 255, 0.92);
 }
 .agenda-ficha-card--sparse .agenda-ficha-time {
-    font-size: 14pt;
+    font-size: 17pt;
 }
 
 .agenda-ficha-description {
     margin: 4mm auto 0;
-    font-size: 9.8pt;
-    line-height: 1.4;
+    font-size: 12pt;
+    line-height: 1.42;
     max-width: 95%;
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -258,8 +258,8 @@
 
 .agenda-ficha-card--gira .agenda-ficha-value,
 .agenda-ficha-card--agenda .agenda-ficha-value,
-.agenda-ficha-card--gira .agenda-ficha-date-box p,
-.agenda-ficha-card--agenda .agenda-ficha-date-box p,
+.agenda-ficha-card--gira .agenda-ficha-date-box .agenda-ficha-date-main,
+.agenda-ficha-card--agenda .agenda-ficha-date-box .agenda-ficha-date-main,
 .agenda-ficha-card--gira .agenda-ficha-description,
 .agenda-ficha-card--agenda .agenda-ficha-description {
     color: #f5f5f5;

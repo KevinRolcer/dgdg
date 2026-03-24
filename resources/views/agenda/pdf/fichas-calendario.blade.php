@@ -152,7 +152,7 @@
             overflow-wrap: break-word;
         }
         .card-time {
-            font-size: 6pt;
+            font-size: 7.6pt;
             font-weight: 600;
             margin-top: 0.5mm;
             color: #fff;
@@ -227,7 +227,7 @@
         }
         /* Detalle: .agenda-cal-card-desc */
         .card-desc {
-            font-size: 6.95pt;
+            font-size: 8.35pt;
             font-weight: 400;
             color: #6b6a6a;
             margin: 0 0 0.85mm;
