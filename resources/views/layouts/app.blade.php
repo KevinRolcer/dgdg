@@ -227,8 +227,8 @@
         window.segobToast = function(icon, message) {
             if (Toast) {
                 let options = { icon: icon, title: message };
-                // Personalización para avisos de eliminación en modo oscuro
-                if (message.includes('eliminado') && document.documentElement.classList.contains('theme-dark')) {
+                // En modo oscuro, usar color accent para el texto de todos los avisos
+                if (document.documentElement.classList.contains('theme-dark')) {
                     options.color = '#c79b66';
                 }
                 Toast.fire(options);

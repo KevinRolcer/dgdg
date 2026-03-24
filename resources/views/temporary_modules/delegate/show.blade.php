@@ -237,6 +237,11 @@
                             <button type="button" class="tm-excel-zoom-btn" id="tmExcelZoomIn" title="Acercar (Ctrl + Rueda arriba)"><i class="fa-solid fa-plus"></i></button>
                             <button type="button" class="tm-excel-zoom-btn" id="tmExcelZoomReset" title="Restablecer"><i class="fa-solid fa-rotate-left"></i></button>
                         </div>
+                        <div class="tm-excel-sheet-tabs-wrap" id="tmExcelSheetTabsWrap" style="display:none;">
+                            <button type="button" class="tm-excel-sheet-arrow tm-excel-sheet-arrow--left" id="tmSheetArrowLeft" title="Anterior"><i class="fa-solid fa-chevron-left"></i></button>
+                            <div class="tm-excel-sheet-tabs" id="tmExcelSheetTabs"></div>
+                            <button type="button" class="tm-excel-sheet-arrow tm-excel-sheet-arrow--right" id="tmSheetArrowRight" title="Siguiente"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
                         <div class="tm-excel-sheet-wrapper" id="tmExcelPreviewTableWrap">
                             <div class="tm-excel-sheet-inner" id="tmExcelSheetInner">
                                 <div style="padding:60px; text-align:center; color:var(--clr-text-light);">
@@ -326,7 +331,7 @@
     </div>
     @endif
 
-    <article class="content-card tm-card">
+    <article class="content-card tm-card" id="tmRecentRecords">
         <h2>Mis registros recientes</h2>
         <div class="tm-table-wrap">
             <table class="tm-table">
@@ -511,6 +516,7 @@
                     ${suggHtml}
                 `;
                 card.dataset.rowData = JSON.stringify(err.data);
+                card.dataset.municipioKey = String(err.municipio_key || 'municipio');
                 card.id = 'tmErrRow_' + idx;
                 errList.appendChild(card);
             });
@@ -922,6 +928,9 @@
             if (event.key === 'Escape' && imageModal && imageModal.classList.contains('is-open')) {
                 closeImageModal();
             }
+            if (event.key === 'Escape' && excelModal && excelModal.classList.contains('is-open')) {
+                closeExcelModal();
+            }
         });
 
     /* Importar Excel - Premium Logic */
@@ -929,12 +938,42 @@
     const excelPreviewUrl = @json(route('temporary-modules.import-excel-preview', $temporaryModule->id));
     const excelImportUrl = @json(route('temporary-modules.import-excel', $temporaryModule->id));
     const excelImportSingleUrl = @json(route('temporary-modules.import-single-row', $temporaryModule->id));
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json(csrf_token());
+    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json(csrf_token());
+
+    async function refreshCsrfToken() {
+        try {
+            const r = await fetch(@json(route('csrf.refresh')), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!r.ok) throw new Error('refresh failed');
+            const j = await r.json();
+            if (j.token) {
+                csrfToken = j.token;
+                const meta = document.querySelector('meta[name="csrf-token"]');
+                if (meta) meta.setAttribute('content', j.token);
+            }
+        } catch (_) { /* will fail on retry anyway */ }
+    }
+
+    async function csrfFetch(url, opts = {}) {
+        const res = await fetch(url, opts);
+        if (res.status === 419) {
+            await refreshCsrfToken();
+            // Rebuild body with the new token
+            if (opts.body instanceof FormData) {
+                opts.body.set('_token', csrfToken);
+            }
+            if (opts.headers && typeof opts.headers === 'object' && !(opts.headers instanceof Headers)) {
+                if ('X-CSRF-TOKEN' in opts.headers) opts.headers['X-CSRF-TOKEN'] = csrfToken;
+            }
+            return fetch(url, opts);
+        }
+        return res;
+    }
 
     let excelHeaders = [];
     let excelFields = [];
     let excelSuggested = {};
     let workbookData = null;
+    let excelImportedCount = 0;
 
     if (typeof XLSX === 'undefined') {
         const script = document.createElement('script');
@@ -944,6 +983,7 @@
 
     const openExcelModal = function () {
         if (!excelModal) return;
+        excelImportedCount = 0;
 
         const errPreviewEl = document.getElementById('tmExcelPreviewErr');
         if (errPreviewEl) { errPreviewEl.textContent = ''; errPreviewEl.classList.add('tm-hidden'); }
@@ -967,6 +1007,12 @@
         if (hInput) hInput.value = '';
         if (dInput) dInput.value = '';
         workbookData = null;
+        currentWorkbook = null;
+        currentSheetIdx = 0;
+        const sheetTabsWrap = document.getElementById('tmExcelSheetTabsWrap');
+        if (sheetTabsWrap) sheetTabsWrap.style.display = 'none';
+        const sheetTabsEl = document.getElementById('tmExcelSheetTabs');
+        if (sheetTabsEl) sheetTabsEl.innerHTML = '';
 
         const inner = document.getElementById('tmExcelSheetInner');
         if (inner) inner.innerHTML = '<div style="padding:60px; text-align:center; color:var(--clr-text-light);"><i class="fa-solid fa-file-excel" style="font-size:4rem; margin-bottom:16px; opacity:0.2;"></i><p style="font-weight:600;">Vista previa del documento</p><p style="font-size:0.85rem; opacity:0.7;">Carga un archivo Excel para comenzar a marcar las columnas.</p></div>';
@@ -994,6 +1040,32 @@
         excelModal.classList.remove('is-open');
         excelModal.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';
+
+        if (excelImportedCount > 0) {
+            var total = excelImportedCount;
+            excelImportedCount = 0;
+
+            if (typeof window.segobToast === 'function') {
+                window.segobToast('success', total + ' registro(s) agregado(s) desde Excel.');
+            }
+
+            // Refrescar tabla de registros recientes via AJAX
+            var recordsEl = document.getElementById('tmRecentRecords');
+            if (recordsEl) {
+                fetch(location.href, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+                    credentials: 'same-origin'
+                })
+                .then(function (r) { return r.ok ? r.text() : Promise.reject(r); })
+                .then(function (html) {
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(html, 'text/html');
+                    var fresh = doc.getElementById('tmRecentRecords');
+                    if (fresh) recordsEl.innerHTML = fresh.innerHTML;
+                })
+                .catch(function () {});
+            }
+        }
     };
 
     document.getElementById('tmBtnImportarExcel')?.addEventListener('click', openExcelModal);
@@ -1150,8 +1222,9 @@
         const fd = new FormData();
         fd.append('archivo_excel', file);
         fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
+        fd.append('sheet_index', currentSheetIdx);
         fd.append('_token', csrfToken);
-        fetch(excelPreviewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
+        csrfFetch(excelPreviewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
             .then(function(r) { return r.json(); })
             .then(function(j) {
                 if (j.success && j.preview_thumbnails) applyExcelPreviewThumbnails(j.preview_thumbnails);
@@ -1163,7 +1236,8 @@
         const container = document.getElementById('tmExcelPreviewTableWrap');
         if (!container) return;
         if (!data || data.length === 0) {
-            container.innerHTML = '<div style="padding:60px; text-align:center;">Archivo vacío o no legible.</div>';
+            const inner = document.getElementById('tmExcelSheetInner');
+            if (inner) inner.innerHTML = '<div style="padding:60px; text-align:center; color:var(--clr-text-light);"><i class="fa-solid fa-table" style="font-size:2.5rem; margin-bottom:12px; opacity:0.25;"></i><p>Esta hoja no contiene datos.</p></div>';
             return;
         }
 
@@ -1335,9 +1409,10 @@
             try {
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, {type: 'array'});
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                workbookData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
-                renderExcelPreview(workbookData);
+                currentWorkbook = workbook;
+                currentSheetIdx = 0;
+                switchToSheet(0);
+                renderSheetTabs(workbook.SheetNames, 0);
                 fetchExcelPreviewThumbnails(file);
                 document.getElementById('tmExcelAutoDetect').style.display = 'inline-flex';
             } catch (err) {
@@ -1347,6 +1422,75 @@
         };
         reader.readAsArrayBuffer(file);
     };
+
+    let currentWorkbook = null;
+    let currentSheetIdx = 0;
+
+    const switchToSheet = function(idx) {
+        if (!currentWorkbook) return;
+        const names = currentWorkbook.SheetNames;
+        if (idx < 0 || idx >= names.length) return;
+        currentSheetIdx = idx;
+        const worksheet = currentWorkbook.Sheets[names[idx]];
+        workbookData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+        renderExcelPreview(workbookData);
+    };
+
+    const renderSheetTabs = function(sheetNames, activeIdx) {
+        const wrap = document.getElementById('tmExcelSheetTabsWrap');
+        const container = document.getElementById('tmExcelSheetTabs');
+        if (!container || !wrap) return;
+        if (!sheetNames || sheetNames.length <= 1) {
+            wrap.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+        let html = '';
+        sheetNames.forEach(function(name, idx) {
+            const cls = 'tm-excel-sheet-tab-btn' + (idx === activeIdx ? ' tm-excel-sheet-tab-btn--active' : '');
+            html += '<button type="button" class="' + cls + '" data-sheet-idx="' + idx + '">'
+                + String(name).replace(/</g, '&lt;') + '</button>';
+        });
+        container.innerHTML = html;
+        wrap.style.display = 'flex';
+        updateSheetArrows();
+    };
+
+    const updateSheetArrows = function() {
+        const tabs = document.getElementById('tmExcelSheetTabs');
+        const leftArr = document.getElementById('tmSheetArrowLeft');
+        const rightArr = document.getElementById('tmSheetArrowRight');
+        if (!tabs || !leftArr || !rightArr) return;
+        leftArr.disabled = tabs.scrollLeft <= 0;
+        rightArr.disabled = tabs.scrollLeft + tabs.clientWidth >= tabs.scrollWidth - 1;
+    };
+
+    document.getElementById('tmSheetArrowLeft')?.addEventListener('click', function() {
+        const tabs = document.getElementById('tmExcelSheetTabs');
+        if (tabs) { tabs.scrollBy({ left: -200, behavior: 'smooth' }); setTimeout(updateSheetArrows, 350); }
+    });
+    document.getElementById('tmSheetArrowRight')?.addEventListener('click', function() {
+        const tabs = document.getElementById('tmExcelSheetTabs');
+        if (tabs) { tabs.scrollBy({ left: 200, behavior: 'smooth' }); setTimeout(updateSheetArrows, 350); }
+    });
+    document.getElementById('tmExcelSheetTabs')?.addEventListener('scroll', updateSheetArrows);
+
+    document.getElementById('tmExcelSheetTabs')?.addEventListener('click', function(e) {
+        const btn = e.target.closest('[data-sheet-idx]');
+        if (!btn) return;
+        const idx = parseInt(btn.dataset.sheetIdx, 10);
+        if (idx === currentSheetIdx) return;
+        switchToSheet(idx);
+        renderSheetTabs(currentWorkbook.SheetNames, idx);
+        // Reset header/data row for new sheet
+        const hInput = document.getElementById('tmExcelHeaderRow');
+        const dInput = document.getElementById('tmExcelDataStartRow');
+        if (hInput) hInput.value = '1';
+        if (dInput) dInput.value = '2';
+        updateRowHighlights();
+        // Hide step 2 when switching sheets
+        document.getElementById('tmExcelStep2')?.classList.add('tm-hidden');
+    });
 
     const dropzone = document.getElementById('tmExcelDropzone');
     const fileInput = document.getElementById('tmExcelFile');
@@ -1400,9 +1544,10 @@
         const fd = new FormData();
         fd.append('archivo_excel', file);
         fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
+        fd.append('sheet_index', currentSheetIdx);
         fd.append('_token', csrfToken);
 
-        fetch(excelPreviewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
+        csrfFetch(excelPreviewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
             .then(r => r.json())
             .then(j => {
                 if (!j.success) throw new Error(j.message);
@@ -1507,9 +1652,10 @@
         fd.append('mapping', JSON.stringify(mapping));
         fd.append('all_microrregions', document.getElementById('tmExcelSearchAll')?.checked ? '1' : '0');
         fd.append('selected_microrregion_id', document.getElementById('tmExcelMicrorregionId')?.value || '');
+        fd.append('sheet_index', currentSheetIdx);
         fd.append('_token', csrfToken);
 
-        fetch(excelImportUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
+        csrfFetch(excelImportUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
             .then(r => r.json())
             .then(j => {
                 const okEl = document.getElementById('tmExcelImportOk');
@@ -1583,6 +1729,7 @@
                                 ${suggHtml}
                             `;
                             card.dataset.rowData = JSON.stringify(err.data);
+                            card.dataset.municipioKey = String(err.municipio_key || 'municipio');
                             card.id = 'tmErrRow_' + idx;
                             errList.appendChild(card);
                         });
@@ -1599,6 +1746,9 @@
 
                 const msg = j.message;
 
+                // Acumular registros importados
+                if (j.imported > 0) excelImportedCount += j.imported;
+
                 // Persistir errores en sesión
                 if (j.row_errors && j.row_errors.length > 0) {
                     const moduleId = '{{ $temporaryModule->id }}';
@@ -1610,7 +1760,6 @@
                         if (j.skipped === 0) {
                             const moduleId = '{{ $temporaryModule->id }}';
                             saveImportErrors(moduleId, [], ''); // Limpiar si todo fue ok
-                            if (typeof openExcelModal === 'function') openExcelModal();
                         }
                     });
             }).catch(e => {
@@ -1624,11 +1773,8 @@
         if (!card) return;
 
         const rowData = JSON.parse(card.dataset.rowData);
-        if (fieldKey) {
-            rowData[fieldKey] = correctedValue;
-        } else {
-            rowData.municipio = correctedValue;
-        }
+        const resolvedKey = fieldKey || String(card.dataset.municipioKey || 'municipio');
+        rowData[resolvedKey] = correctedValue;
 
         const btn = buttonEl || event.target;
         const oldText = btn.innerText;
@@ -1640,7 +1786,7 @@
             payload.microrregion_id = microrregionId;
         }
 
-        fetch(singleUrl || excelImportSingleUrl, {
+        csrfFetch(singleUrl || excelImportSingleUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1653,6 +1799,7 @@
         .then(r => r.json())
         .then(j => {
             if (j.success) {
+                excelImportedCount++;
                 card.style.opacity = '0.5';
                 card.style.pointerEvents = 'none';
                 btn.innerText = '✓ Importado';

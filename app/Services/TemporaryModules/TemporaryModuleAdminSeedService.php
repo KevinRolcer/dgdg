@@ -23,9 +23,9 @@ class TemporaryModuleAdminSeedService
         private readonly TemporaryModuleExcelImportService $excelReader,
     ) {}
 
-    public function previewHeaders(UploadedFile $file, int $headerRow): array
+    public function previewHeaders(UploadedFile $file, int $headerRow, int $sheetIndex = 0): array
     {
-        return $this->excelReader->preview($file, $headerRow);
+        return $this->excelReader->preview($file, $headerRow, false, $sheetIndex);
     }
 
     /**
@@ -34,10 +34,12 @@ class TemporaryModuleAdminSeedService
      *
      * @return array{header_row:int,data_start_row:int,score:int,note:string}|null
      */
-    public function detectTableLayout(UploadedFile $file, int $maxScanRow = 80): ?array
+    public function detectTableLayout(UploadedFile $file, int $maxScanRow = 80, int $sheetIndex = 0): ?array
     {
         $spreadsheet = IOFactory::load($file->getRealPath());
-        $sheet = $spreadsheet->getActiveSheet();
+        $sheetNames = $spreadsheet->getSheetNames();
+        $sheetIndex = max(0, min($sheetIndex, count($sheetNames) - 1));
+        $sheet = $spreadsheet->getSheet($sheetIndex);
         $maxScanRow = min($maxScanRow, (int) $sheet->getHighestRow());
         $maxScanRow = max(1, $maxScanRow);
 
@@ -163,6 +165,7 @@ class TemporaryModuleAdminSeedService
         int $colMunicipio,
         array $fieldColumnIndices,
         array &$stats,
+        int $sheetIndex = 0,
     ): TemporaryModule {
         $hasMunCol = $colMunicipio >= 0;
         $hasMrCol = $colMicrorregion >= 0;
@@ -173,7 +176,9 @@ class TemporaryModuleAdminSeedService
         $headerRow = max(1, $headerRow);
         $dataStartRow = max($headerRow + 1, $dataStartRow);
         $spreadsheet = IOFactory::load($file->getRealPath());
-        $sheet = $spreadsheet->getActiveSheet();
+        $sheetNames = $spreadsheet->getSheetNames();
+        $sheetIndex = max(0, min($sheetIndex, count($sheetNames) - 1));
+        $sheet = $spreadsheet->getSheet($sheetIndex);
         $highestRow = (int) $sheet->getHighestDataRow();
         // Fin real de la tabla por columnas clave (evita timeout: no barrer 12k×40 celdas)
         $scanEnd = max($highestRow, $dataStartRow);

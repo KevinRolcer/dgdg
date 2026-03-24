@@ -811,6 +811,144 @@
     color: #b91c1c;
 }
 
+/* ── Sheet tabs (pestañas de Excel) ── */
+.tm-seed-sheet-tabs {
+    margin-top: 14px;
+}
+
+.tm-seed-sheet-tabs-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--fs-small);
+    font-weight: 600;
+    color: var(--clr-text-light);
+    margin-bottom: 8px;
+}
+
+.tm-seed-sheet-tabs-label i {
+    color: #217346;
+    font-size: 1rem;
+}
+
+.tm-seed-sheet-tabs-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tm-seed-sheet-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    font-size: var(--fs-small);
+    font-weight: 500;
+    color: var(--clr-text-main);
+    background: var(--clr-bg);
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.tm-seed-sheet-tab:hover {
+    background: rgba(33, 115, 70, 0.08);
+    border-color: rgba(33, 115, 70, 0.35);
+    color: #217346;
+}
+
+.tm-seed-sheet-tab--active {
+    background: rgba(33, 115, 70, 0.12);
+    border-color: #217346;
+    color: #217346;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(33, 115, 70, 0.15);
+}
+
+.tm-seed-sheet-tab--active i {
+    color: #217346;
+}
+
+.tm-seed-sheet-tab i {
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+/* ── Delegate Excel sheet tabs (Excel-style) ── */
+.tm-excel-sheet-tabs-wrap {
+    display: none;
+    align-items: stretch;
+    background: #e6e6e6;
+    border-bottom: 2px solid #217346;
+}
+.tm-excel-sheet-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: #555;
+    cursor: pointer;
+    font-size: 0.7rem;
+    transition: background 0.15s, color 0.15s;
+}
+.tm-excel-sheet-arrow:hover:not(:disabled) {
+    background: rgba(33,115,70,0.1);
+    color: #217346;
+}
+.tm-excel-sheet-arrow:disabled {
+    opacity: 0.25;
+    cursor: default;
+}
+.tm-excel-sheet-tabs {
+    display: flex;
+    gap: 0;
+    align-items: flex-end;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.tm-excel-sheet-tabs::-webkit-scrollbar {
+    display: none;
+}
+.tm-excel-sheet-tab-btn {
+    position: relative;
+    padding: 6px 18px;
+    font-size: 0.77rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    background: transparent;
+    color: #555;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.tm-excel-sheet-tab-btn:hover {
+    background: rgba(33,115,70,0.08);
+    color: #217346;
+}
+.tm-excel-sheet-tab-btn--active {
+    background: #fff;
+    color: #217346;
+    font-weight: 600;
+    border-color: #bbb #bbb transparent;
+    pointer-events: none;
+    margin-bottom: -2px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #fff;
+}
+
 .tm-seed-module-fields {
     display: grid;
     gap: 14px;
@@ -3930,8 +4068,8 @@ html.theme-dark .tm-btn-danger:hover {
 }
 
 .theme-dark .tm-excel-step-title {
-    color: #ffffff !important;
-    border-bottom-color: rgba(255,255,255,0.1);
+    color: var(--clr-accent) !important;
+    border-bottom-color: rgba(199, 155, 102, 0.2);
 }
 
 .tm-excel-map-table {
@@ -4435,6 +4573,67 @@ html.theme-dark .tm-btn-danger:hover {
 .tm-excel-map-table th {
     white-space: nowrap;
     text-align: left;
+}
+
+/* ── Dark theme — sheet tabs ── */
+html.theme-dark .tm-seed-sheet-tabs-label {
+    color: var(--clr-text-light);
+}
+
+html.theme-dark .tm-seed-sheet-tabs-label i {
+    color: #4caf50;
+}
+
+html.theme-dark .tm-seed-sheet-tab {
+    background: var(--clr-surface);
+    border-color: var(--clr-border);
+    color: var(--clr-text-main);
+}
+
+html.theme-dark .tm-seed-sheet-tab:hover {
+    background: rgba(76, 175, 80, 0.1);
+    border-color: rgba(76, 175, 80, 0.4);
+    color: #81c784;
+}
+
+html.theme-dark .tm-seed-sheet-tab--active {
+    background: rgba(76, 175, 80, 0.15);
+    border-color: #4caf50;
+    color: #81c784;
+    box-shadow: 0 2px 10px rgba(76, 175, 80, 0.2);
+}
+
+html.theme-dark .tm-seed-sheet-tab--active i {
+    color: #81c784;
+}
+
+/* ── Dark theme — delegate Excel sheet tabs ── */
+html.theme-dark .tm-excel-sheet-tabs-wrap {
+    background: #1a1d24;
+    border-bottom-color: #2e7d32;
+}
+html.theme-dark .tm-excel-sheet-arrow {
+    color: rgba(255,255,255,0.5);
+}
+html.theme-dark .tm-excel-sheet-arrow:hover:not(:disabled) {
+    background: rgba(76, 175, 80, 0.12);
+    color: #81c784;
+}
+html.theme-dark .tm-excel-sheet-tab-btn {
+    background: transparent;
+    border-color: transparent;
+    color: rgba(255,255,255,0.55);
+}
+html.theme-dark .tm-excel-sheet-tab-btn:hover {
+    background: rgba(76, 175, 80, 0.1);
+    color: #81c784;
+}
+html.theme-dark .tm-excel-sheet-tab-btn--active {
+    background: var(--clr-card, #161920);
+    border-color: rgba(255,255,255,0.1) rgba(255,255,255,0.1) transparent;
+    border-bottom-color: var(--clr-card, #161920);
+    color: #81c784;
+    font-weight: 600;
 }
 
 /* Session Error Log Button */

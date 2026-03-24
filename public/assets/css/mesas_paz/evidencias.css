@@ -225,3 +225,341 @@
 .ajax-loader {
     z-index: 1000;
 }
+
+/* Presentación PPTX — modal compacto (una sola columna con scroll interno) */
+.mp-ppt-modal-dialog {
+    max-width: min(1180px, 96vw);
+    width: min(1180px, 96vw);
+    max-height: 88vh;
+    margin: 1vh auto;
+}
+
+.mp-ppt-modal-dialog .modal-content {
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.mp-ppt-modal-dialog .modal-header {
+    flex-shrink: 0;
+    padding: 0.5rem 1rem;
+}
+
+.mp-ppt-modal-dialog .modal-title {
+    font-size: 1rem;
+}
+
+.mp-ppt-modal-body {
+    overflow: hidden;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    max-height: calc(88vh - 52px);
+}
+
+.mp-ppt-preview-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+    min-height: 0;
+    max-height: 100%;
+    background: var(--mesas-shell-bg, var(--clr-bg, #f8f9fa));
+}
+
+.mp-ppt-preview-side {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+    padding: 0.5rem 0.65rem;
+    border-bottom: 1px solid var(--clr-border, #dee2e6);
+    overflow: hidden;
+}
+
+.mp-ppt-controls-side {
+    flex-shrink: 0;
+    padding: 0 0.65rem 0.65rem;
+    overflow-y: auto;
+    max-height: 42vh;
+}
+
+.mp-ppt-selection-info {
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: var(--clr-text-main, #212529);
+    padding: 0.45rem 0.6rem;
+    background: var(--clr-card, #fff);
+    border-radius: 6px;
+    border: 1px solid var(--clr-border, #dee2e6);
+    margin-bottom: 0.4rem;
+    flex-shrink: 0;
+}
+
+.mp-ppt-selection-info i {
+    color: var(--clr-primary, #861e34);
+    margin-right: 0.25rem;
+}
+
+.mp-ppt-sheet-wrapper {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    max-height: 100%;
+    background: #fff;
+    border: 1px solid var(--clr-border, #ccc);
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    overflow: auto;
+}
+
+.mp-ppt-preview-empty {
+    padding: 1.5rem 1rem;
+    text-align: center;
+    color: var(--clr-text-muted, #6c757d);
+}
+
+.mp-ppt-preview-empty .fa-file-powerpoint {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.22;
+}
+
+.mp-ppt-preview-empty-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+    color: var(--clr-text-main, #333);
+}
+
+.mp-ppt-preview-empty-desc {
+    font-size: 0.75rem;
+    opacity: 0.85;
+    max-width: 320px;
+    margin: 0 auto;
+}
+
+.mp-ppt-preview-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 140px;
+    padding: 1rem;
+}
+
+.mp-ppt-preview-content {
+    padding: 0.35rem;
+    min-height: 0;
+}
+
+/* Réplica visual de la diapositiva 3 (sin cargar .pptx: evita descargas en el navegador) */
+.mp-ppt-slide-replica {
+    font-family: 'Montserrat', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    color: #1a1a1a;
+    background-color: #fbfbfb;
+    background-image: radial-gradient(circle, rgba(0, 0, 0, 0.12) 1px, transparent 1px);
+    background-size: 9px 9px;
+    border: 1px solid #d8d8d8;
+    border-radius: 6px;
+    padding: 0.55rem 0.75rem 0.65rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.mp-ppt-slide-replica-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.35rem 0.75rem;
+    margin-bottom: 0.45rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.mp-ppt-slide-replica-kicker {
+    margin: 0;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #333;
+}
+
+.mp-ppt-slide-replica-title {
+    margin: 0.1rem 0 0;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #111;
+}
+
+.mp-ppt-slide-replica-semana {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #222;
+    text-align: right;
+    max-width: 14rem;
+}
+
+.mp-ppt-slide-replica-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 0.5rem 0.65rem;
+    align-items: start;
+}
+
+.mp-ppt-replica-num {
+    font-size: clamp(1.35rem, 3.5vw, 1.85rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+}
+
+.mp-ppt-replica-num--gold {
+    color: #b89b6a;
+}
+
+.mp-ppt-replica-num--grey {
+    color: #3a3a3a;
+}
+
+.mp-ppt-replica-num--maroon {
+    color: #861e3d;
+}
+
+.mp-ppt-replica-caption {
+    margin: 0.05rem 0 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.mp-ppt-replica-meta {
+    margin: 0 0 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: #222;
+}
+
+.mp-ppt-replica-chart-wrap {
+    margin-top: 0.2rem;
+    padding: 0.35rem;
+    background: #fff;
+    border: 1px solid #e4e4e4;
+    border-radius: 4px;
+}
+
+.mp-ppt-replica-chart {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    vertical-align: middle;
+}
+
+/* Calendario más pequeño dentro del modal */
+.mp-ppt-controls-side .calendar-wrapper {
+    margin-top: 0.35rem;
+}
+
+.mp-ppt-controls-side .flatpickr-calendar.flatpickr-premium {
+    max-width: 300px !important;
+    transform: scale(0.88);
+    transform-origin: top center;
+}
+
+.mp-ppt-controls-side .flatpickr-day {
+    max-width: 32px !important;
+    height: 32px !important;
+    line-height: 32px !important;
+}
+
+.mp-ppt-controls-side .flatpickr-current-month {
+    font-size: 1rem !important;
+}
+
+.mp-ppt-controls-side p.small {
+    font-size: 0.72rem !important;
+    margin-bottom: 0.35rem !important;
+}
+
+@media (min-width: 1100px) {
+    .mp-ppt-modal-body {
+        padding: 0.5rem 0.65rem 0.65rem !important;
+    }
+
+    .mp-ppt-preview-container {
+        flex-direction: row-reverse;
+        align-items: stretch;
+        overflow: hidden;
+        max-height: calc(88vh - 56px);
+        gap: 0.65rem;
+    }
+
+    .mp-ppt-preview-side {
+        flex: 1;
+        min-width: 0;
+        border-bottom: none;
+        border-left: 1px solid var(--clr-border, #dee2e6);
+        padding: 0.35rem 0 0.35rem 0.65rem;
+        max-height: calc(88vh - 56px);
+        overflow: hidden;
+    }
+
+    .mp-ppt-controls-side {
+        width: 300px;
+        flex-shrink: 0;
+        padding: 0.15rem 0.35rem 0.35rem 0;
+        max-height: calc(88vh - 56px);
+        overflow-y: auto;
+    }
+
+    .mp-ppt-sheet-wrapper {
+        min-height: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .mp-ppt-slide-replica-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mp-ppt-slide-replica-semana {
+        text-align: left;
+        max-width: none;
+    }
+}
+
+html.theme-dark .mp-ppt-sheet-wrapper {
+    background: var(--clr-card, #1e1e1e);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+html.theme-dark .mp-ppt-preview-empty .fa-file-powerpoint {
+    opacity: 0.35;
+}
+
+html.theme-dark .mp-ppt-selection-info {
+    background: var(--clr-card, #252525);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* La réplica imita papel de diapositiva; se mantiene clara también en tema oscuro */
+html.theme-dark .mp-ppt-slide-replica {
+    background-color: #fbfbfb;
+    color: #1a1a1a;
+    border-color: #ccc;
+}
+
+html.theme-dark .mp-ppt-replica-caption,
+html.theme-dark .mp-ppt-replica-meta,
+html.theme-dark .mp-ppt-slide-replica-semana {
+    color: #222;
+}

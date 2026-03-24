@@ -23,7 +23,7 @@
 <div class="mesas-paz-shell app-density-compact">
     <div class="mesas-paz-shell-main">
 
-<div id="supervisionEvidenciasPage" data-url-ppt="{{ route('ppt.generar-presentacion') }}" data-fechas-datos="{{ json_encode($fechasConDatos ?? []) }}" data-url-bruto="{{ route('mesas-paz.evidencias.registros-bruto') }}" data-url-eliminar-rango="{{ route('mesas-paz.evidencias.eliminar-rango') }}" data-csrf="{{ csrf_token() }}">
+<div id="supervisionEvidenciasPage" data-url-ppt="{{ route('ppt.generar-presentacion') }}" data-url-ppt-vista-previa="{{ route('ppt.vista-previa.preparar') }}" data-fechas-datos="{{ json_encode($fechasConDatos ?? []) }}" data-url-bruto="{{ route('mesas-paz.evidencias.registros-bruto') }}" data-url-eliminar-rango="{{ route('mesas-paz.evidencias.eliminar-rango') }}" data-csrf="{{ csrf_token() }}">
 
 {{-- ═══ VISTA: Evidencias (vista principal) ═══ --}}
 <div id="vistaEvidencias">
@@ -635,26 +635,84 @@
 </div>
 @endsection
 
-<div class="modal fade" id="rangoFechasPresentacionModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+<div class="modal fade" id="rangoFechasPresentacionModal" tabindex="-1" aria-labelledby="rangoFechasPresentacionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mp-ppt-modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Selecciona la semana a evaluar</h5>
+                <h5 class="modal-title" id="rangoFechasPresentacionModalLabel">Presentación Mesas de Paz</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
-            <div class="modal-body">
-                <form id="formRangoFechasPresentation" method="POST" action="{{ route('ppt.generar-presentacion') }}" class="d-flex flex-column align-items-center">
-                    @csrf
-                    <input type="hidden" name="fecha_inicio" id="inputStart">
-                    <input type="hidden" name="fecha_fin" id="inputEnd">
-                    <div class="calendar-wrapper presentation-calendar-wrap w-100 d-flex justify-content-center">
-                        <input type="text" id="fechaRangoPresentacion" name="fecha_rango" class="d-none" required>
+            <div class="modal-body p-0 mp-ppt-modal-body">
+                <div class="mp-ppt-preview-container">
+                    <div class="mp-ppt-preview-side">
+                        <div class="mp-ppt-selection-info">
+                            <div>
+                                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                                <span id="mpPptStepNote">Seleccione fechas y pulse <strong>Actualizar vista previa</strong> para ver una réplica de la diapositiva con los mismos datos que el .pptx. <strong>Descargar</strong> genera el archivo.</span>
+                            </div>
+                        </div>
+                        <div class="mp-ppt-sheet-wrapper">
+                            <div id="mpPptPreviewLoading" class="mp-ppt-preview-loading d-none">
+                                <div class="spinner-border text-secondary" role="status" aria-hidden="true"></div>
+                                <p class="mt-2 mb-0 small text-muted">Generando vista previa…</p>
+                            </div>
+                            <div id="mpPptPreviewEmpty" class="mp-ppt-preview-empty">
+                                <i class="fa-solid fa-file-powerpoint" aria-hidden="true"></i>
+                                <p class="mp-ppt-preview-empty-title">Vista previa de la presentación</p>
+                                <p class="mp-ppt-preview-empty-desc">Elija el rango de fechas y actualice la vista previa para ver el comparativo y los totales.</p>
+                            </div>
+                            <div id="mpPptPreviewContent" class="mp-ppt-preview-content d-none">
+                                <div id="mpPptSlideReplica" class="mp-ppt-slide-replica" aria-label="Vista previa de la diapositiva de reporte">
+                                    <div class="mp-ppt-slide-replica-head">
+                                        <div>
+                                            <p class="mp-ppt-slide-replica-kicker">1. REPORTE GENERAL</p>
+                                            <h3 class="mp-ppt-slide-replica-title">REPORTE SEMANAL</h3>
+                                        </div>
+                                        <p class="mp-ppt-slide-replica-semana" id="mpPptReplicaSemana"></p>
+                                    </div>
+                                    <div class="mp-ppt-slide-replica-grid">
+                                        <div class="mp-ppt-slide-replica-left">
+                                            <div class="mp-ppt-replica-num mp-ppt-replica-num--gold" id="mpPptReplicaTotal"></div>
+                                            <p class="mp-ppt-replica-caption">Mesas de seguridad</p>
+                                            <div class="mp-ppt-replica-num mp-ppt-replica-num--grey" id="mpPptReplicaAsist"></div>
+                                            <p class="mp-ppt-replica-caption">Asistencias</p>
+                                            <div class="mp-ppt-replica-num mp-ppt-replica-num--maroon" id="mpPptReplicaInasist"></div>
+                                            <p class="mp-ppt-replica-caption">Inasistencias</p>
+                                        </div>
+                                        <div class="mp-ppt-slide-replica-right">
+                                            <p class="mp-ppt-replica-meta" id="mpPptReplicaCumplimiento"></p>
+                                            <p class="mp-ppt-replica-meta" id="mpPptReplicaSinReg"></p>
+                                            <div class="mp-ppt-replica-chart-wrap">
+                                                <img id="mpPptChartImg" src="" alt="" class="mp-ppt-replica-chart">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="mpPptPreviewErr" class="alert alert-danger d-none mx-3 mb-3 py-2 small" role="alert"></div>
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnConfirmarRangoFechasPresentacion">Generar</button>
+                    <div class="mp-ppt-controls-side">
+                        <p class="small text-muted mb-2">Rango del formulario (solo días laborables). La diapositiva de totales usa la <strong>semana laboral anterior</strong> a la semana de la fecha fin.</p>
+                        <form id="formRangoFechasPresentation" method="POST" action="{{ route('ppt.generar-presentacion') }}">
+                            @csrf
+                            <input type="hidden" name="fecha_inicio" id="inputStart">
+                            <input type="hidden" name="fecha_fin" id="inputEnd">
+                            <div class="calendar-wrapper presentation-calendar-wrap w-100 d-flex justify-content-center">
+                                <input type="text" id="fechaRangoPresentacion" name="fecha_rango" class="d-none" required>
+                            </div>
+                        </form>
+                        <div class="d-grid gap-2 mt-3">
+                            <button type="button" class="btn btn-outline-primary" id="btnVistaPreviaPresentacion">
+                                <i class="fa-solid fa-eye me-1" aria-hidden="true"></i> Actualizar vista previa
+                            </button>
+                            <button type="button" class="btn btn-primary" id="btnDescargarPresentacion">
+                                <i class="fa-solid fa-download me-1" aria-hidden="true"></i> Descargar .pptx
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

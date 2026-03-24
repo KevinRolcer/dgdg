@@ -158,49 +158,132 @@ document.addEventListener('DOMContentLoaded', function () {
     // Inicializar lógica AJAX
     bindSupervisionAjax();
 
-    // Lógica para Presentación PPT
+    // Lógica para Presentación PPT (vista previa en modal, estilo importar Excel)
     const bindPresentacionPPT = function() {
         const btnAbrir = document.getElementById('btnAbrirRangoFechasPresentacion');
         const modalEl = document.getElementById('rangoFechasPresentacionModal');
-        const btnConfirmar = document.getElementById('btnConfirmarRangoFechasPresentacion');
+        const btnVistaPrevia = document.getElementById('btnVistaPreviaPresentacion');
+        const btnDescargar = document.getElementById('btnDescargarPresentacion');
         const inputRango = document.getElementById('fechaRangoPresentacion');
+        const elLoading = document.getElementById('mpPptPreviewLoading');
+        const elEmpty = document.getElementById('mpPptPreviewEmpty');
+        const elContent = document.getElementById('mpPptPreviewContent');
+        const chartImg = document.getElementById('mpPptChartImg');
+        const elReplicaSemana = document.getElementById('mpPptReplicaSemana');
+        const elReplicaTotal = document.getElementById('mpPptReplicaTotal');
+        const elReplicaAsist = document.getElementById('mpPptReplicaAsist');
+        const elReplicaInasist = document.getElementById('mpPptReplicaInasist');
+        const elReplicaCumpl = document.getElementById('mpPptReplicaCumplimiento');
+        const elReplicaSinReg = document.getElementById('mpPptReplicaSinReg');
+        const elErr = document.getElementById('mpPptPreviewErr');
+        const stepNote = document.getElementById('mpPptStepNote');
 
-        if (!btnAbrir || !modalEl || !btnConfirmar || !inputRango) return;
+        if (!btnAbrir || !modalEl || !btnVistaPrevia || !btnDescargar || !inputRango) return;
 
         const modal = new bootstrap.Modal(modalEl);
-        const urlBase = pageContainer.getAttribute('data-url-ppt');
+        const urlVistaPrevia = pageContainer.getAttribute('data-url-ppt-vista-previa');
+        let lastPreviewDownloadUrl = null;
 
-        // Función para deshabilitar fines de semana (sábado = 6, domingo = 0)
         const disableWeekends = function(date) {
             const day = date.getDay();
-            // Retorna true para deshabilitar (sábado 6 y domingo 0)
             return day === 0 || day === 6;
         };
 
         const fp = flatpickr(inputRango, {
-            mode: "range",
+            mode: 'range',
             inline: true,
-            locale: "es",
-            dateFormat: "Y-m-d",
+            locale: 'es',
+            dateFormat: 'Y-m-d',
             disable: [disableWeekends],
             onReady: function(selectedDates, dateStr, instance) {
                 instance.calendarContainer.classList.add('flatpickr-premium');
             }
         });
 
+        const clearSlideReplica = function() {
+            const blanks = [
+                elReplicaSemana,
+                elReplicaTotal,
+                elReplicaAsist,
+                elReplicaInasist,
+                elReplicaCumpl,
+                elReplicaSinReg,
+            ];
+            blanks.forEach(function(el) {
+                if (el) {
+                    el.textContent = '';
+                }
+            });
+            if (chartImg) {
+                chartImg.removeAttribute('src');
+            }
+        };
+
+        const fillSlideReplica = function(r) {
+            if (!r) {
+                return;
+            }
+            if (elReplicaSemana) {
+                elReplicaSemana.textContent = r.texto_semana_analizada || '';
+            }
+            if (elReplicaTotal) {
+                elReplicaTotal.textContent = r.total_mesas != null ? String(r.total_mesas) : '';
+            }
+            if (elReplicaAsist) {
+                elReplicaAsist.textContent = r.mesas_con_asistencia != null ? String(r.mesas_con_asistencia) : '';
+            }
+            if (elReplicaInasist) {
+                elReplicaInasist.textContent = r.mesas_con_inasistencia != null ? String(r.mesas_con_inasistencia) : '';
+            }
+            if (elReplicaCumpl) {
+                const p = r.porcentaje_cumplimiento != null ? Number(r.porcentaje_cumplimiento) : 0;
+                elReplicaCumpl.textContent =
+                    'Cumplimiento del ' + p.toFixed(2) + '% de avance de meta';
+            }
+            if (elReplicaSinReg) {
+                const n = r.mesas_sin_registro_semanal != null ? parseInt(r.mesas_sin_registro_semanal, 10) : 0;
+                elReplicaSinReg.textContent =
+                    n === 1 ? '1 mesa sin registro en la semana' : n + ' mesas sin registro en la semana';
+            }
+        };
+
+        const resetPptPreviewUi = function() {
+            lastPreviewDownloadUrl = null;
+            clearSlideReplica();
+            if (elContent) {
+                elContent.classList.add('d-none');
+            }
+            if (elEmpty) {
+                elEmpty.classList.remove('d-none');
+            }
+            if (elLoading) {
+                elLoading.classList.add('d-none');
+            }
+            if (elErr) {
+                elErr.classList.add('d-none');
+                elErr.textContent = '';
+            }
+            if (stepNote) {
+                stepNote.innerHTML =
+                    'Seleccione fechas y pulse <strong>Actualizar vista previa</strong> para ver una réplica de la diapositiva con los mismos datos que el .pptx. <strong>Descargar</strong> genera el archivo.';
+            }
+        };
+
+        modalEl.addEventListener('hidden.bs.modal', resetPptPreviewUi);
+
         btnAbrir.addEventListener('click', function() {
             modal.show();
         });
 
-        btnConfirmar.addEventListener('click', function() {
+        const aplicarRangoSeleccionado = function() {
             const selectedDates = fp.selectedDates;
             if (selectedDates.length < 2) {
                 if (typeof swal === 'function') {
-                    swal("Atención", "Por favor selecciona un rango de fechas (Inicio y Fin)", "warning");
+                    swal('Atención', 'Por favor selecciona un rango de fechas (Inicio y Fin)', 'warning');
                 } else {
-                    alert("Por favor selecciona un rango de fechas");
+                    alert('Por favor selecciona un rango de fechas');
                 }
-                return;
+                return null;
             }
 
             const startStr = fp.formatDate(selectedDates[0], 'Y-m-d');
@@ -209,12 +292,182 @@ document.addEventListener('DOMContentLoaded', function () {
             const startHidden = document.getElementById('inputStart');
             const endHidden = document.getElementById('inputEnd');
 
-            if (startHidden && endHidden) {
-                startHidden.value = startStr;
-                endHidden.value = endStr;
-                modal.hide();
-                document.getElementById('formRangoFechasPresentation').submit();
+            if (!startHidden || !endHidden) {
+                return null;
             }
+
+            startHidden.value = startStr;
+            endHidden.value = endStr;
+
+            return { startStr: startStr, endStr: endStr };
+        };
+
+        btnDescargar.addEventListener('click', function() {
+            if (lastPreviewDownloadUrl) {
+                fetch(lastPreviewDownloadUrl, { credentials: 'same-origin' })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            throw new Error('No se pudo descargar');
+                        }
+                        return response.blob();
+                    })
+                    .then(function(blob) {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'mesas_paz.pptx';
+                        a.rel = 'noopener';
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                    })
+                    .catch(function() {
+                        if (typeof swal === 'function') {
+                            swal('Error', 'No se pudo descargar el archivo. Intente de nuevo o use una nueva vista previa.', 'error');
+                        } else {
+                            alert('No se pudo descargar el archivo.');
+                        }
+                    });
+                return;
+            }
+
+            if (!aplicarRangoSeleccionado()) {
+                return;
+            }
+            modal.hide();
+            const formDl = document.getElementById('formRangoFechasPresentation');
+            if (formDl) {
+                formDl.submit();
+            }
+        });
+
+        btnVistaPrevia.addEventListener('click', function() {
+            if (!urlVistaPrevia) {
+                if (typeof swal === 'function') {
+                    swal('Error', 'No está configurada la ruta de vista previa.', 'error');
+                } else {
+                    alert('No está configurada la ruta de vista previa.');
+                }
+                return;
+            }
+
+            if (!aplicarRangoSeleccionado()) {
+                return;
+            }
+
+            const form = document.getElementById('formRangoFechasPresentation');
+            if (!form) {
+                return;
+            }
+
+            if (elErr) {
+                elErr.classList.add('d-none');
+                elErr.textContent = '';
+            }
+            if (elEmpty) {
+                elEmpty.classList.add('d-none');
+            }
+            if (elContent) {
+                elContent.classList.add('d-none');
+            }
+            if (elLoading) {
+                elLoading.classList.remove('d-none');
+            }
+
+            const fd = new FormData(form);
+            btnVistaPrevia.disabled = true;
+
+            fetch(urlVistaPrevia, {
+                method: 'POST',
+                body: fd,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    Accept: 'application/json',
+                },
+            })
+                .then(function(response) {
+                    return response.json().then(function(data) {
+                        return { ok: response.ok, data: data };
+                    });
+                })
+                .then(function(result) {
+                    if (elLoading) {
+                        elLoading.classList.add('d-none');
+                    }
+
+                    if (!result.ok) {
+                        const d = result.data || {};
+                        const msg =
+                            d.message ||
+                            d.error ||
+                            (d.errors && typeof d.errors === 'object'
+                                ? Object.values(d.errors)
+                                      .flat()
+                                      .filter(Boolean)
+                                      .join(' ')
+                                : '') ||
+                            'No se pudo generar la vista previa.';
+                        if (elErr) {
+                            elErr.textContent = msg;
+                            elErr.classList.remove('d-none');
+                        }
+                        if (elEmpty) {
+                            elEmpty.classList.remove('d-none');
+                        }
+                        if (typeof swal === 'function') {
+                            swal('Error', msg, 'error');
+                        } else {
+                            alert(msg);
+                        }
+                        return;
+                    }
+
+                    const data = result.data || {};
+                    if (!data.download_url) {
+                        if (typeof swal === 'function') {
+                            swal('Error', 'Respuesta inválida del servidor.', 'error');
+                        } else {
+                            alert('Respuesta inválida del servidor.');
+                        }
+                        if (elEmpty) {
+                            elEmpty.classList.remove('d-none');
+                        }
+                        return;
+                    }
+
+                    lastPreviewDownloadUrl = data.download_url;
+
+                    if (stepNote) {
+                        stepNote.innerHTML =
+                            'Réplica de la diapositiva con los datos que llevará el PowerPoint. <strong>Descargar .pptx</strong> obtiene el archivo ya generado (sin volver a calcular).';
+                    }
+
+                    if (elContent) {
+                        elContent.classList.remove('d-none');
+                    }
+
+                    fillSlideReplica(data.resumen);
+                    if (chartImg && data.signed_chart_url) {
+                        chartImg.src = data.signed_chart_url;
+                    }
+                })
+                .catch(function() {
+                    if (elLoading) {
+                        elLoading.classList.add('d-none');
+                    }
+                    if (elEmpty) {
+                        elEmpty.classList.remove('d-none');
+                    }
+                    if (typeof swal === 'function') {
+                        swal('Error', 'No se pudo contactar al servidor.', 'error');
+                    } else {
+                        alert('No se pudo contactar al servidor.');
+                    }
+                })
+                .finally(function() {
+                    btnVistaPrevia.disabled = false;
+                });
         });
     };
 

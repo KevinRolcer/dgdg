@@ -247,15 +247,17 @@ class TemporaryModuleController extends Controller
             'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:20480'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:200'],
             'auto_detect' => ['nullable', 'boolean'],
+            'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
         ]);
         $file = $request->file('archivo_excel');
         $autoDetect = $request->boolean('auto_detect', true);
         $headerRow = (int) ($request->input('header_row') ?: 1);
+        $sheetIndex = (int) ($request->input('sheet_index') ?: 0);
         $detected = null;
 
         if ($autoDetect) {
             try {
-                $detected = $this->adminSeedService->detectTableLayout($file);
+                $detected = $this->adminSeedService->detectTableLayout($file, 80, $sheetIndex);
                 if ($detected !== null) {
                     $headerRow = $detected['header_row'];
                 }
@@ -265,7 +267,7 @@ class TemporaryModuleController extends Controller
         }
 
         try {
-            $preview = $this->adminSeedService->previewHeaders($file, $headerRow);
+            $preview = $this->adminSeedService->previewHeaders($file, $headerRow, $sheetIndex);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
@@ -275,6 +277,8 @@ class TemporaryModuleController extends Controller
             'headers' => $preview['headers'],
             'header_row' => $headerRow,
             'data_start_row' => $headerRow + 1,
+            'sheet_names' => $preview['sheet_names'] ?? [],
+            'sheet_index' => $preview['sheet_index'] ?? $sheetIndex,
         ];
         if ($autoDetect && isset($detected)) {
             $payload['auto_detected'] = true;
@@ -302,6 +306,7 @@ class TemporaryModuleController extends Controller
             'col_microrregion' => ['nullable', 'integer', 'min:-1'],
             'col_municipio' => ['nullable', 'integer', 'min:-1'],
             'field_columns' => ['required', 'string'],
+            'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
         ]);
 
         $colMr = (int) $request->input('col_microrregion', -1);
@@ -340,6 +345,7 @@ class TemporaryModuleController extends Controller
                 $colMun,
                 $fieldColumns,
                 $stats,
+                (int) ($request->input('sheet_index') ?: 0),
             );
         } catch (\InvalidArgumentException $e) {
             throw ValidationException::withMessages(['archivo_excel' => $e->getMessage()]);
@@ -904,7 +910,7 @@ class TemporaryModuleController extends Controller
         if ($searchVal !== '') {
             $allModulesQuery->where(function ($q) use ($searchVal) {
                 $q->where('name', 'like', "%{$searchVal}%")
-                  ->orWhere('description', 'like', "%{$searchVal}%");
+                    ->orWhere('description', 'like', "%{$searchVal}%");
             });
         }
 
@@ -1387,7 +1393,6 @@ class TemporaryModuleController extends Controller
         ]);
     }
 
-
     /**
      * Paso 1: sube Excel y devuelve columnas detectadas + sugerencia de mapeo a campos del módulo.
      */
@@ -1401,10 +1406,12 @@ class TemporaryModuleController extends Controller
             'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:15360'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:200'],
             'auto_detect' => ['nullable', 'boolean'],
+            'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
         ]);
 
         $file = $request->file('archivo_excel');
         $headerRow = (int) ($request->input('header_row') ?: 1);
+        $sheetIndex = (int) ($request->input('sheet_index') ?: 0);
         $detected = null;
         if ($request->boolean('auto_detect', true)) {
             try {
@@ -1425,7 +1432,7 @@ class TemporaryModuleController extends Controller
         }
 
         try {
-            $preview = $this->excelImportService->preview($file, $headerRow, true);
+            $preview = $this->excelImportService->preview($file, $headerRow, true, $sheetIndex);
             $preview['suggested_map'] = $this->excelImportService->suggestMap($importable, $preview['headers']);
         } catch (\Throwable $e) {
             return response()->json([
@@ -1471,6 +1478,7 @@ class TemporaryModuleController extends Controller
             'mapping' => ['required', 'string'],
             'selected_microrregion_id' => ['nullable', 'integer'],
             'all_microrregions' => ['nullable', 'boolean'],
+            'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
         ]);
 
         $mapping = json_decode((string) $request->input('mapping'), true);
@@ -1518,6 +1526,7 @@ class TemporaryModuleController extends Controller
 
         $headerRow = (int) ($request->input('header_row') ?: 1);
         $dataStartRow = (int) ($request->input('data_start_row') ?: $headerRow + 1);
+        $sheetIndex = (int) ($request->input('sheet_index') ?: 0);
         $fieldsByKey = $temporaryModule->fields->keyBy('key');
 
         try {
@@ -1527,12 +1536,13 @@ class TemporaryModuleController extends Controller
                 $microrregionId ? (int) $microrregionId : null,
                 $request->file('archivo_excel'),
                 $headerRow,
-                $dataStart_row = (int) ($request->input('data_start_row') ?: $headerRow + 1),
+                $dataStartRow,
                 $normalizedMap,
                 $fieldsByKey,
                 $allowedMunicipioNames,
                 $municipioToMrMap,
                 $suggestionMunicipioNames,
+                $sheetIndex,
             );
         } catch (\Throwable $e) {
             return response()->json([

@@ -2,6 +2,14 @@
 
 @push('css')
 <link rel="stylesheet" href="{{ asset('assets/css/modules/temporary-modules.css') }}?v={{ @filemtime(public_path('assets/css/modules/temporary-modules.css')) ?: time() }}">
+<style>
+    :root {
+        --clr-error-text: var(--clr-primary);
+    }
+    html.theme-dark {
+        --clr-error-text: #c79b66;
+    }
+</style>
 @endpush
 
 @php
@@ -58,10 +66,10 @@
             <div class="tm-filter-bar">
                 <div class="tm-search-input-wrap">
                     <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                    <input 
-                        type="text" 
+                    <input
+                        type="text"
                         id="tmModuleSearchInput"
-                        placeholder="Buscar..." 
+                        placeholder="Buscar..."
                         class="tm-search-input-small"
                         aria-label="Buscar módulo">
                     <button type="button" class="tm-btn-clear-inline tm-hidden" id="tmClearSearch" title="Limpiar búsqueda">
@@ -442,6 +450,11 @@
                                     <button type="button" class="tm-excel-zoom-btn tm-excel-zoom-in" title="Acercar (Ctrl + Rueda arriba)"><i class="fa-solid fa-plus"></i></button>
                                     <button type="button" class="tm-excel-zoom-btn tm-excel-zoom-reset" title="Restablecer"><i class="fa-solid fa-rotate-left"></i></button>
                                 </div>
+                                <div class="tm-excel-sheet-tabs-wrap tm-excel-sheet-tabs-wrap-el" style="display:none;">
+                                    <button type="button" class="tm-excel-sheet-arrow tm-excel-sheet-arrow--left tm-sheet-arrow-left-el" title="Anterior"><i class="fa-solid fa-chevron-left"></i></button>
+                                    <div class="tm-excel-sheet-tabs tm-excel-sheet-tabs-el"></div>
+                                    <button type="button" class="tm-excel-sheet-arrow tm-excel-sheet-arrow--right tm-sheet-arrow-right-el" title="Siguiente"><i class="fa-solid fa-chevron-right"></i></button>
+                                </div>
                                 <div class="tm-excel-sheet-wrapper tm-excel-preview-table-wrap">
                                     <div class="tm-excel-sheet-inner tm-excel-sheet-inner-el">
                                         <div style="padding:60px; text-align:center; color:var(--clr-text-light);">
@@ -537,9 +550,8 @@
                                     <div class="inline-alert inline-alert-error tm-hidden tm-excel-import-err" role="alert"></div>
                                     <div class="inline-alert inline-alert-success tm-hidden tm-excel-import-ok" role="alert"></div>
 
-                                    <!-- SECCIÓN DE ERRORES (Logs) -->
                                     <div class="tm-excel-errors-section tm-hidden" style="margin-top:20px; padding-top:20px; border-top:1px solid var(--clr-border);">
-                                        <h4 class="tm-excel-step-title" style="color:var(--clr-primary); border-bottom-color:var(--clr-primary);">Errores de Importación</h4>
+                                        <h4 class="tm-excel-step-title" style="color:var(--clr-error-text); border-bottom-color:var(--clr-error-text);">Errores de Importación</h4>
                                         <p style="font-size:0.85rem; color:var(--clr-text-light); margin-bottom:15px;">Las siguientes filas no se pudieron importar. Puedes corregirlas seleccionando una sugerencia:</p>
                                         <div class="tm-excel-errors-list" style="display:grid; gap:12px;"></div>
                                     </div>
@@ -1044,6 +1056,36 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json(csrf_token());
+
+    async function refreshCsrfToken() {
+        try {
+            const r = await fetch(@json(route('csrf.refresh')), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!r.ok) throw new Error('refresh failed');
+            const j = await r.json();
+            if (j.token) {
+                csrfToken = j.token;
+                const meta = document.querySelector('meta[name="csrf-token"]');
+                if (meta) meta.setAttribute('content', j.token);
+            }
+        } catch (_) { /* will fail on retry anyway */ }
+    }
+
+    async function csrfFetch(url, opts = {}) {
+        const res = await fetch(url, opts);
+        if (res.status === 419) {
+            await refreshCsrfToken();
+            if (opts.body instanceof FormData) {
+                opts.body.set('_token', csrfToken);
+            }
+            if (opts.headers && typeof opts.headers === 'object' && !(opts.headers instanceof Headers)) {
+                if ('X-CSRF-TOKEN' in opts.headers) opts.headers['X-CSRF-TOKEN'] = csrfToken;
+            }
+            return fetch(url, opts);
+        }
+        return res;
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         // --- Persistent Error Log Helpers ---
         const saveImportErrors = (moduleId, errors, singleUrl) => {
@@ -1163,7 +1205,7 @@
         const renderErrorCardHtml = (err, idx, moduleId, singleUrl, cardId, isLogModal = false) => {
             const moduleName = isLogModal ? getModuleNameById(moduleId) : '';
             const failedFields = getFailedFields(err);
-            
+
             let failedFieldsHtml = '';
             if (failedFields.length > 0) {
                 failedFieldsHtml = '<div style="margin-top:8px;">';
@@ -1172,10 +1214,10 @@
                     // Sugerencias específicas de este campo (ej: para Listas o Listas múltiples)
                     if (f.suggestions && f.suggestions.length > 0) {
                         fieldSugg = '<div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">' +
-                            '<span style="width:100%; font-size:0.65rem; color:var(--clr-primary); font-weight:700;">VALORES DISPONIBLES:</span>' +
+                            '<span style="width:100%; font-size:0.65rem; color:var(--clr-error-text); font-weight:700;">VALORES DISPONIBLES:</span>' +
                             f.suggestions.map(s => `
-                                <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" 
-                                    onclick="retryImportRow(${idx}, null, '${String(s).replace(/'/g, "\\'")}', '${singleUrl.replace(/'/g, "\\'")}', '${moduleId}', '${cardId}', this, ${err.row || 0}, '${f.key}')" 
+                                <button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
+                                    onclick="retryImportRow(${idx}, null, '${String(s).replace(/'/g, "\\'")}', '${singleUrl.replace(/'/g, "\\'")}', '${moduleId}', '${cardId}', this, ${err.row || 0}, '${f.key}')"
                                     style="font-size:0.68rem; padding:3px 8px; font-weight:600; text-transform:uppercase;">
                                     ${escapeHtml(s)}
                                 </button>
@@ -1183,9 +1225,9 @@
                         '</div>';
                     }
                     failedFieldsHtml += `
-                        <div style="margin-bottom:12px; padding:10px; background:rgba(0,0,0,0.03); border-radius:8px; border-left:3px solid var(--clr-primary);">
+                        <div style="margin-bottom:12px; padding:10px; background:rgba(0,0,0,0.03); border-radius:8px;">
                             <div style="font-size:0.8rem; line-height:1.4;">
-                                <strong style="color:var(--clr-text-main);">${escapeHtml(f.label || f.key || 'Campo')}</strong>: 
+                                <strong style="color:var(--clr-text-main);">${escapeHtml(f.label || f.key || 'Campo')}</strong>:
                                 <span style="color:var(--clr-text-light);">${escapeHtml(f.reason || 'Dato no válido')}</span>
                             </div>
                             ${f.received ? `<div style="font-size:0.75rem; margin-top:4px; font-style:italic; opacity:0.8;">Valor en Excel: "${escapeHtml(f.received)}"</div>` : ''}
@@ -1214,9 +1256,9 @@
             return `
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
                     <div>
-                        <div style="color:var(--clr-primary); font-weight:800; font-size:0.9rem;">
+                        <div style="color:var(--clr-error-text); font-weight:800; font-size:0.9rem;">
                             ${isLogModal ? `${escapeHtml(moduleName)} · ` : ''}Fila ${err.row}
-                            ${isLogModal ? `<button type="button" class="tm-btn-delete-error" data-card-id="${cardId}" title="Eliminar este error" style="border:0; background:transparent; color:var(--clr-primary); cursor:pointer; padding:0; font-size:0.9em; margin-left:8px;"><i class="fa-solid fa-trash-alt"></i></button>` : ''}
+                            ${isLogModal ? `<button type="button" class="tm-btn-delete-error" data-card-id="${cardId}" title="Eliminar este error" style="border:0; background:transparent; color:var(--clr-error-text); cursor:pointer; padding:0; font-size:0.9em; margin-left:8px;"><i class="fa-solid fa-trash-alt"></i></button>` : ''}
                         </div>
                         <div style="font-size:0.78rem; font-weight:500; color:var(--clr-text-light); margin-top:2px;">${escapeHtml(normalizeRowErrorMessage(err))}</div>
                     </div>
@@ -2047,6 +2089,30 @@
                 }
             }
 
+            // Al cerrar el modal de Excel, notificar y refrescar si hubo importaciones
+            if (modal.classList.contains('tm-excel-import-modal') && modal.__excelImportedCount > 0) {
+                var excelModuleId = String(modal.id || '').replace(/^tmImportarExcelModal-/, '');
+                var totalImported = modal.__excelImportedCount;
+                modal.__excelImportedCount = 0;
+
+                // Actualizar contador "Mis registros"
+                var refreshBtn = document.querySelector('[data-refresh-module="' + excelModuleId + '"]');
+                if (refreshBtn) refreshBtn.click();
+
+                // Actualizar panel de historial
+                var recordsPanel = document.getElementById('module-records-' + excelModuleId);
+                if (recordsPanel && typeof window.__tmReloadRecordsPanel === 'function') {
+                    window.__tmReloadRecordsPanel(recordsPanel, { requireActive: false });
+                }
+
+                // Mostrar aviso emergente
+                setTimeout(function () {
+                    if (typeof window.segobToast === 'function') {
+                        window.segobToast('success', totalImported + ' registro(s) agregado(s) desde Excel.');
+                    }
+                }, 200);
+            }
+
             const activeElement = document.activeElement;
             if (activeElement instanceof HTMLElement && modal.contains(activeElement)) {
                 activeElement.blur();
@@ -2104,7 +2170,7 @@
 
                 const formData = new FormData(form);
 
-                fetch(form.action, {
+                csrfFetch(form.action, {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
@@ -2296,6 +2362,7 @@
             }
             loadRecordsFragment(host, moduleId, buildRecordsQueryFromPanel(panel, '1'));
         };
+        window.__tmReloadRecordsPanel = reloadRecordsPanelFromFilters;
 
         moduleFilterButtons.forEach(function (button) {
             button.addEventListener('click', function () {
@@ -2474,11 +2541,11 @@
                             deleteBtn.disabled = true;
                             deleteBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
                             let delUrl = "{{ route('temporary-modules.entries.bulk-destroy', ['module' => ':moduleId']) }}".replace(':moduleId', moduleId);
-                            fetch(delUrl, {
+                            csrfFetch(delUrl, {
                                 method: 'DELETE',
                                 headers: {
                                     'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                                    'X-CSRF-TOKEN': csrfToken,
                                     'X-Requested-With': 'XMLHttpRequest'
                                 },
                                 body: JSON.stringify({ entry_ids: selected })
@@ -2518,7 +2585,7 @@
                     else set.delete(e.target.value);
                     updateBulkUI(panel);
                 }
-                
+
                 if (e.target.matches('[data-tm-bulk-select-all]')) {
                     const isChecked = e.target.checked;
                     panel.querySelectorAll('[data-tm-bulk-checkbox]').forEach(cb => {
@@ -2593,7 +2660,7 @@
             };
 
             syncTmModuleChipsNav = syncNav;
-            
+
             // Scroll to active on start
             setTimeout(scrollToActive, 200);
 
@@ -2726,7 +2793,6 @@
         });
 
         /* Importar Excel (eventos temporales) - Premium Logic */
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json(csrf_token());
 
         if (typeof XLSX === 'undefined') {
             const script = document.createElement('script');
@@ -2768,38 +2834,110 @@
             const okImportEl = modal.querySelector('.tm-excel-import-ok');
 
             let workbookData = null;
+            let currentWorkbook = null;
+            let currentSheetIdx = 0;
+
+            const switchToSheet = function(idx) {
+                if (!currentWorkbook) return;
+                const names = currentWorkbook.SheetNames;
+                if (idx < 0 || idx >= names.length) return;
+                currentSheetIdx = idx;
+                const worksheet = currentWorkbook.Sheets[names[idx]];
+                workbookData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                renderExcelPreview(workbookData);
+            };
+
+            const renderSheetTabs = function(sheetNames, activeIdx) {
+                const wrap = modal.querySelector('.tm-excel-sheet-tabs-wrap-el');
+                const container = modal.querySelector('.tm-excel-sheet-tabs-el');
+                if (!container || !wrap) return;
+                if (!sheetNames || sheetNames.length <= 1) { wrap.style.display = 'none'; container.innerHTML = ''; return; }
+                let html = '';
+                sheetNames.forEach(function(name, idx) {
+                    const cls = 'tm-excel-sheet-tab-btn' + (idx === activeIdx ? ' tm-excel-sheet-tab-btn--active' : '');
+                    html += '<button type="button" class="' + cls + '" data-sheet-idx="' + idx + '">' + String(name).replace(/</g, '&lt;') + '</button>';
+                });
+                container.innerHTML = html;
+                wrap.style.display = 'flex';
+                updateSheetArrows();
+            };
+
+            const updateSheetArrows = function() {
+                const tabs = modal.querySelector('.tm-excel-sheet-tabs-el');
+                const leftArr = modal.querySelector('.tm-sheet-arrow-left-el');
+                const rightArr = modal.querySelector('.tm-sheet-arrow-right-el');
+                if (!tabs || !leftArr || !rightArr) return;
+                leftArr.disabled = tabs.scrollLeft <= 0;
+                rightArr.disabled = tabs.scrollLeft + tabs.clientWidth >= tabs.scrollWidth - 1;
+            };
+
+            (function() {
+                const tabsContainer = modal.querySelector('.tm-excel-sheet-tabs-el');
+                const leftArr = modal.querySelector('.tm-sheet-arrow-left-el');
+                const rightArr = modal.querySelector('.tm-sheet-arrow-right-el');
+
+                if (leftArr) leftArr.addEventListener('click', function() {
+                    if (tabsContainer) { tabsContainer.scrollBy({ left: -200, behavior: 'smooth' }); setTimeout(updateSheetArrows, 350); }
+                });
+                if (rightArr) rightArr.addEventListener('click', function() {
+                    if (tabsContainer) { tabsContainer.scrollBy({ left: 200, behavior: 'smooth' }); setTimeout(updateSheetArrows, 350); }
+                });
+                if (tabsContainer) {
+                    tabsContainer.addEventListener('scroll', updateSheetArrows);
+                    tabsContainer.addEventListener('click', function(e) {
+                        const btn = e.target.closest('.tm-excel-sheet-tab-btn');
+                        if (!btn) return;
+                        const idx = parseInt(btn.getAttribute('data-sheet-idx'));
+                        if (isNaN(idx) || idx === currentSheetIdx) return;
+                        switchToSheet(idx);
+                        renderSheetTabs(currentWorkbook.SheetNames, idx);
+                        if (headerRowInput) headerRowInput.value = '';
+                        if (dataStartRowInput) dataStartRowInput.value = '';
+                        if (step2) step2.classList.add('tm-hidden');
+                    });
+                }
+            })();
+
+            modal.__excelImportedCount = 0;
 
             modal.__excelReset = function() {
+                modal.__excelImportedCount = 0;
                 if (errPreviewEl) { errPreviewEl.textContent = ''; errPreviewEl.classList.add('tm-hidden'); }
                 if (errImportEl) { errImportEl.textContent = ''; errImportEl.classList.add('tm-hidden'); }
                 if (okImportEl) { okImportEl.textContent = ''; okImportEl.classList.add('tm-hidden'); }
                 if (step2) step2.classList.add('tm-hidden');
                 if (step1) step1.classList.remove('tm-hidden');
-                
+
                 const errSection = modal.querySelector('.tm-excel-errors-section');
                 if (errSection) errSection.classList.add('tm-hidden');
                 const errList = modal.querySelector('.tm-excel-errors-list');
                 if (errList) errList.innerHTML = '';
-                
+
                 if (fileInput) fileInput.value = '';
                 const nameEl = modal.querySelector('.tm-excel-file-name');
                 if (nameEl) { nameEl.textContent = ''; nameEl.classList.add('tm-hidden'); }
-                
+
                 if (headerRowInput) headerRowInput.value = '';
                 if (dataStartRowInput) dataStartRowInput.value = '';
                 workbookData = null;
-                
+                currentWorkbook = null;
+                currentSheetIdx = 0;
+                const sheetTabsWrap = modal.querySelector('.tm-excel-sheet-tabs-wrap-el');
+                if (sheetTabsWrap) sheetTabsWrap.style.display = 'none';
+                const sheetTabsEl = modal.querySelector('.tm-excel-sheet-tabs-el');
+                if (sheetTabsEl) sheetTabsEl.innerHTML = '';
+
                 const inner = modal.querySelector('.tm-excel-sheet-inner-el');
                 if (inner) inner.innerHTML = '<div style="padding:60px; text-align:center; color:var(--clr-text-light);"><i class="fa-solid fa-file-excel" style="font-size:4rem; margin-bottom:16px; opacity:0.2;"></i><p style="font-weight:600;">Vista previa del documento</p><p style="font-size:0.85rem; opacity:0.7;">Carga un archivo Excel para comenzar a marcar las columnas.</p></div>';
-                
+
                 const zoomBar = modal.querySelector('.tm-excel-zoom-bar-el');
                 if (zoomBar) zoomBar.style.display = 'none';
-                
+
                 const badgeH = modal.querySelector('.tm-excel-badge-header');
                 const badgeD = modal.querySelector('.tm-excel-badge-data');
                 if (badgeH) badgeH.style.display = 'none';
                 if (badgeD) badgeD.style.display = 'none';
-                
+
                 const controlsSide = modal.querySelector('.tm-excel-controls-side');
                 if (controlsSide) controlsSide.scrollTo({ top: 0, behavior: 'auto' });
             };
@@ -2848,8 +2986,9 @@
                 const fd = new FormData();
                 fd.append('archivo_excel', file);
                 fd.append('header_row', headerRowInput?.value || '1');
+                fd.append('sheet_index', currentSheetIdx);
                 fd.append('_token', csrfToken);
-                fetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
+                csrfFetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
                     .then((r) => r.json())
                     .then((j) => {
                         if (j.success && j.preview_thumbnails) applyExcelPreviewThumbnails(j.preview_thumbnails);
@@ -2860,7 +2999,8 @@
             const renderExcelPreview = function(data) {
                 if (!previewTableWrap) return;
                 if (!data || data.length === 0) {
-                    previewTableWrap.innerHTML = '<div style="padding:60px; text-align:center;">Archivo vacío.</div>';
+                    const inner = modal.querySelector('.tm-excel-sheet-inner-el');
+                    if (inner) inner.innerHTML = '<div style="padding:60px; text-align:center; color:var(--clr-text-light);"><i class="fa-solid fa-table" style="font-size:2.5rem; margin-bottom:12px; opacity:0.25;"></i><p>Esta hoja no contiene datos.</p></div>';
                     return;
                 }
                 let maxCols = 0;
@@ -3116,9 +3256,10 @@
                     try {
                         const data = new Uint8Array(re.target.result);
                         const workbook = XLSX.read(data, {type: 'array'});
-                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                        workbookData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
-                        renderExcelPreview(workbookData);
+                        currentWorkbook = workbook;
+                        currentSheetIdx = 0;
+                        switchToSheet(0);
+                        renderSheetTabs(workbook.SheetNames, 0);
                         fetchExcelPreviewThumbnails(file);
                         modal.querySelector('.tm-excel-auto-detect').style.display = 'inline-flex';
                     } catch (err) {
@@ -3166,7 +3307,7 @@
                 dataStartRowInput.value = found + 1;
                 updateRowHighlights();
             });
-            
+
             modal.querySelector('.tm-excel-reset-trigger')?.addEventListener('click', () => {
                 if (typeof modal.__excelReset === 'function') modal.__excelReset();
             });
@@ -3185,6 +3326,7 @@
                 const fd = new FormData();
                 fd.append('archivo_excel', file);
                 fd.append('header_row', headerRowInput.value || '1');
+                fd.append('sheet_index', currentSheetIdx);
                 fd.append('_token', csrfToken);
 
                 const btn = this;
@@ -3192,7 +3334,7 @@
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Leyendo...';
 
-                fetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
+                csrfFetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
                 .then(r => r.json())
                 .then(j => {
                     if (!j.success) throw new Error(j.message);
@@ -3290,6 +3432,7 @@
                 fd.append('mapping', JSON.stringify(mapping));
                 fd.append('all_microrregions', searchAllCheck?.checked ? '1' : '0');
                 fd.append('selected_microrregion_id', mrInput ? mrInput.value : '');
+                fd.append('sheet_index', currentSheetIdx);
                 fd.append('_token', csrfToken);
 
                 const btn = this;
@@ -3297,7 +3440,7 @@
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importando...';
 
-                fetch(importUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
+                csrfFetch(importUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
                 .then(r => r.json())
                 .then(j => {
                     const okEl = modal.querySelector('.tm-excel-import-ok');
@@ -3342,11 +3485,16 @@
                         saveImportErrors(currentModuleId, j.row_errors, importSingleUrl);
                     }
 
+                    // Acumular registros importados en esta sesión de modal
+                    if (j.imported > 0) modal.__excelImportedCount = (modal.__excelImportedCount || 0) + j.imported;
+
                     Swal.fire({ title: '¡Completado!', text: msg, icon: 'success', confirmButtonText: 'Aceptar' })
                         .then(() => {
                             if (j.skipped === 0) {
                                 saveImportErrors(currentModuleId, [], ''); // Limpiar si todo fue ok
+                                var savedCount = modal.__excelImportedCount || 0;
                                 if (typeof modal.__excelReset === 'function') modal.__excelReset();
+                                modal.__excelImportedCount = savedCount;
                             }
                         });
                 }).catch(e => {
@@ -3451,11 +3599,11 @@
         btn.disabled = true;
         btn.innerText = 'Cargando...';
 
-        fetch(singleUrl, {
+        csrfFetch(singleUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'X-CSRF-TOKEN': csrfToken,
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
             },
@@ -3470,12 +3618,12 @@
                 btn.innerText = '✓ Importado';
                 btn.style.background = 'var(--clr-secondary)';
                 btn.style.color = '#fff';
-                
+
                 // Animación de salida y remoción
                 card.style.transition = 'all 0.4s ease';
                 card.style.opacity = '0';
                 card.style.transform = 'translateX(20px)';
-                
+
                 setTimeout(() => {
                     card.remove();
                     // Si el contenedor se queda vacío, ocultar sección o poner mensaje
@@ -3500,6 +3648,12 @@
 
                 if (typeof window.__tmRefreshImportErrorsModal === 'function') {
                     window.__tmRefreshImportErrorsModal();
+                }
+
+                // Acumular en el contador del modal de Excel abierto
+                var openExcelModal = document.querySelector('.tm-excel-import-modal.is-open');
+                if (openExcelModal) {
+                    openExcelModal.__excelImportedCount = (openExcelModal.__excelImportedCount || 0) + 1;
                 }
             } else {
                 throw new Error(j.message || 'Error al reintentar');

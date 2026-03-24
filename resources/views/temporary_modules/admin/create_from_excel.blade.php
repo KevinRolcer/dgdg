@@ -52,8 +52,11 @@
                     </button>
                     <div id="tmSeedDetectNote" class="tm-seed-note tm-seed-note--ok tm-hidden" role="status"></div>
                     <div id="tmSeedPreviewErr" class="tm-seed-note tm-seed-note--err tm-hidden"></div>
+                    <div id="tmSeedSheetTabs" class="tm-seed-sheet-tabs tm-hidden"></div>
                 </div>
             </div>
+
+            <input type="hidden" name="sheet_index" id="tmSeedSheetIndex" value="0">
 
             {{-- Paso 2: datos del módulo + mapeo (visible tras leer Excel) --}}
             <div id="tmSeedMapping" class="tm-hidden tm-seed-panel">
@@ -121,7 +124,21 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const previewUrl = @json(route('temporary-modules.admin.seed-preview'));
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    let csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+    async function csrfFetch(url, opts = {}) {
+        const res = await fetch(url, opts);
+        if (res.status === 419) {
+            try {
+                const r = await fetch(@json(route('csrf.refresh')), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+                if (r.ok) { const j = await r.json(); if (j.token) { csrf = j.token; const m = document.querySelector('meta[name="csrf-token"]'); if (m) m.setAttribute('content', j.token); } }
+            } catch (_) {}
+            if (opts.body instanceof FormData) opts.body.set('_token', csrf);
+            if (opts.headers && typeof opts.headers === 'object' && !(opts.headers instanceof Headers) && 'X-CSRF-TOKEN' in opts.headers) opts.headers['X-CSRF-TOKEN'] = csrf;
+            return fetch(url, opts);
+        }
+        return res;
+    }
     const fileInput = document.getElementById('tmSeedFile');
     const headerRowInput = document.getElementById('tmSeedHeaderRow');
     const dataRowInput = document.getElementById('tmSeedDataRow');
@@ -139,6 +156,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const wrapMun = document.getElementById('tmSeedWrapMun');
     const wrapMr = document.getElementById('tmSeedWrapMr');
     const mrHint = document.getElementById('tmSeedMrHint');
+    const sheetTabsEl = document.getElementById('tmSeedSheetTabs');
+    const sheetIndexInput = document.getElementById('tmSeedSheetIndex');
+    const detectNoteEl = document.getElementById('tmSeedDetectNote');
+    const autoDetectChk = document.getElementById('tmSeedAutoDetect');
+
+    let currentSheetIndex = 0;
 
     function syncMrMunMode() {
         const mrOnly = mrOnlyChk.checked;
@@ -152,7 +175,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function fillSelects(headers) {
         const opts = headers.map(function (h) {
-            return '<option value="' + h.index + '">' + h.letter + ' — ' + String(h.label || '(vacío)').replace(/</g, '') + '</option>';
+            return '<option value="' + h.index + '">' + h.letter + ' — ' + String(h.label || '(vacío)').replace(/</g, '&lt;') + '</option>';
         }).join('');
         colMr.innerHTML = '<option value="-1">— Ninguna —</option>' + opts;
         colMun.innerHTML = opts;
@@ -171,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const id = 'fc_' + h.index;
             const row = document.createElement('label');
             row.className = 'tm-seed-fc-label';
-            row.innerHTML = '<input type="checkbox" class="tm-seed-fc" value="' + h.index + '" id="' + id + '"> <span>' + h.letter + ' — ' + String(h.label || '').replace(/</g, '') + '</span>';
+            row.innerHTML = '<input type="checkbox" class="tm-seed-fc" value="' + h.index + '" id="' + id + '"> <span>' + h.letter + ' — ' + String(h.label || '').replace(/</g, '&lt;') + '</span>';
             fieldChecks.appendChild(row);
         });
         mappingEl.classList.remove('tm-hidden');
@@ -187,20 +210,52 @@ document.addEventListener('DOMContentLoaded', function () {
 
     fieldChecks.addEventListener('change', syncFieldColumns);
 
-    const detectNoteEl = document.getElementById('tmSeedDetectNote');
-    const autoDetectChk = document.getElementById('tmSeedAutoDetect');
+    function renderSheetTabs(sheetNames, activeIndex) {
+        if (!sheetNames || sheetNames.length <= 1) {
+            sheetTabsEl.classList.add('tm-hidden');
+            sheetTabsEl.innerHTML = '';
+            return;
+        }
+        var html = '<div class="tm-seed-sheet-tabs-label"><i class="fa-solid fa-file-excel"></i> Pestañas del archivo:</div><div class="tm-seed-sheet-tabs-list">';
+        sheetNames.forEach(function (name, idx) {
+            var cls = 'tm-seed-sheet-tab' + (idx === activeIndex ? ' tm-seed-sheet-tab--active' : '');
+            html += '<button type="button" class="' + cls + '" data-sheet-idx="' + idx + '">'
+                + '<i class="fa-regular fa-file-lines"></i> '
+                + String(name).replace(/</g, '&lt;')
+                + '</button>';
+        });
+        html += '</div>';
+        sheetTabsEl.innerHTML = html;
+        sheetTabsEl.classList.remove('tm-hidden');
+    }
 
-    document.getElementById('tmSeedReadHeaders').addEventListener('click', function () {
-        const f = fileInput.files[0];
+    sheetTabsEl.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-sheet-idx]');
+        if (!btn) return;
+        var idx = parseInt(btn.dataset.sheetIdx, 10);
+        if (idx === currentSheetIndex) return;
+        currentSheetIndex = idx;
+        sheetIndexInput.value = String(idx);
+        // Mark active visually immediately
+        sheetTabsEl.querySelectorAll('.tm-seed-sheet-tab').forEach(function (t) {
+            t.classList.toggle('tm-seed-sheet-tab--active', parseInt(t.dataset.sheetIdx, 10) === idx);
+        });
+        // Re-read headers for this sheet
+        readHeaders(idx);
+    });
+
+    function readHeaders(sheetIdx) {
+        var f = fileInput.files[0];
         if (!f) { errEl.textContent = 'Selecciona un archivo Excel.'; errEl.classList.remove('tm-hidden'); return; }
         errEl.classList.add('tm-hidden');
         detectNoteEl.classList.add('tm-hidden');
-        const fd = new FormData();
+        var fd = new FormData();
         fd.append('archivo_excel', f);
         fd.append('header_row', headerRowInput.value || '1');
         fd.append('auto_detect', autoDetectChk.checked ? '1' : '0');
+        fd.append('sheet_index', String(sheetIdx));
         fd.append('_token', csrf);
-        fetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, credentials: 'same-origin' })
+        csrfFetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, credentials: 'same-origin' })
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
             .then(function (x) {
                 if (!x.ok || !x.j.success) { errEl.textContent = x.j.message || 'Error al leer.'; errEl.classList.remove('tm-hidden'); return; }
@@ -210,10 +265,19 @@ document.addEventListener('DOMContentLoaded', function () {
                     detectNoteEl.textContent = x.j.detection_note;
                     detectNoteEl.classList.remove('tm-hidden');
                 }
+                if (x.j.sheet_names) {
+                    renderSheetTabs(x.j.sheet_names, typeof x.j.sheet_index === 'number' ? x.j.sheet_index : sheetIdx);
+                }
                 colMr.dataset.set = '';
                 colMun.dataset.set = '';
                 fillSelects(x.j.headers || []);
             });
+    }
+
+    document.getElementById('tmSeedReadHeaders').addEventListener('click', function () {
+        currentSheetIndex = 0;
+        sheetIndexInput.value = '0';
+        readHeaders(0);
     });
 
     indef.addEventListener('change', function () {

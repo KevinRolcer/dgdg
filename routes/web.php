@@ -25,7 +25,17 @@ Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:login');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
+Route::middleware(['signed', 'throttle:120,1'])->group(function () {
+    Route::get('/ppt/preview-archivo/{token}', [PowerPointController::class, 'previewArchivo'])
+        ->where('token', '[A-Za-z0-9]{40}')
+        ->name('ppt.preview-archivo');
+    Route::get('/ppt/preview-chart/{token}', [PowerPointController::class, 'previewChart'])
+        ->where('token', '[A-Za-z0-9]{40}')
+        ->name('ppt.preview-chart');
+});
+
 Route::middleware('auth')->group(function () {
+    Route::get('/csrf-token', fn () => response()->json(['token' => csrf_token()]))->name('csrf.refresh');
     Route::get('/home', [HomeController::class, 'index'])->name('home');
     Route::get('/mi-perfil', [ProfileController::class, 'show'])->name('profile.show');
     Route::get('/ajustes', [SettingsController::class, 'index'])->name('settings.index');
@@ -69,6 +79,18 @@ Route::middleware('auth')->group(function () {
         ->name('ppt.generar-presentacion')
         ->middleware('can:Tableros-incidencias');
 
+    Route::post('/ppt/vista-previa/preparar', [PowerPointController::class, 'prepararVistaPrevia'])
+        ->name('ppt.vista-previa.preparar')
+        ->middleware('can:Tableros-incidencias');
+    Route::get('/ppt/vista-previa/{token}', [PowerPointController::class, 'vistaPrevia'])
+        ->where('token', '[A-Za-z0-9]{40}')
+        ->name('ppt.vista-previa')
+        ->middleware('can:Tableros-incidencias');
+    Route::get('/ppt/vista-previa/{token}/descargar', [PowerPointController::class, 'descargarVistaPrevia'])
+        ->where('token', '[A-Za-z0-9]{40}')
+        ->name('ppt.vista-previa.descargar')
+        ->middleware('can:Tableros-incidencias');
+
     Route::get('/mesas-paz/historial-detalle', [MesasPazController::class, 'detallePorFecha'])->name('mesas-paz.historial-detalle')->middleware('can:mesas-paz-ver');
     Route::get('/mesas-paz/evidencias', [MesasPazSupervisionController::class, 'evidencias'])->name('mesas-paz.evidencias')->middleware('can:Tableros-incidencias');
     Route::get('/mesas-paz/evidencias/pdf', [MesasPazSupervisionController::class, 'descargarPdf'])->name('mesas-paz.evidencias.pdf')->middleware('can:Tableros-incidencias');
@@ -82,6 +104,7 @@ Route::middleware('auth')->group(function () {
         if ($user) {
             $user->notifications()->delete();
         }
+
         return back();
     })->name('notifications.clear');
 
@@ -90,6 +113,7 @@ Route::middleware('auth')->group(function () {
         if ($user) {
             $user->notifications()->where('id', $id)->delete();
         }
+
         return back();
     })->name('notifications.destroy');
 

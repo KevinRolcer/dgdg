@@ -34,11 +34,15 @@ class TemporaryModuleExcelImportService
      *
      * @return array{headers: list<array{index:int,letter:string,label:string}>, suggested_map: array<string,int|null>, header_row:int, preview_thumbnails?: list<array{row:int,col:int,data_url:string}>}
      */
-    public function preview(UploadedFile $file, int $headerRow = 1, bool $includeDrawingThumbnails = false): array
+    public function preview(UploadedFile $file, int $headerRow = 1, bool $includeDrawingThumbnails = false, int $sheetIndex = 0): array
     {
         $headerRow = max(1, $headerRow);
         $spreadsheet = $this->loadSpreadsheet($file);
-        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheetNames = $spreadsheet->getSheetNames();
+        $sheetIndex = max(0, min($sheetIndex, count($sheetNames) - 1));
+        $sheet = $spreadsheet->getSheet($sheetIndex);
+
         $highestCol = $sheet->getHighestDataColumn($headerRow);
         $maxColIndex = Coordinate::columnIndexFromString($highestCol);
 
@@ -58,6 +62,8 @@ class TemporaryModuleExcelImportService
             'headers' => $headers,
             'suggested_map' => [],
             'header_row' => $headerRow,
+            'sheet_names' => $sheetNames,
+            'sheet_index' => $sheetIndex,
         ];
 
         if ($includeDrawingThumbnails) {
@@ -310,11 +316,13 @@ class TemporaryModuleExcelImportService
         array $allowedMunicipioNames,
         array $municipioToMrMap = [],
         array $suggestionMunicipioNames = [],
+        int $sheetIndex = 0,
     ): array {
         $headerRow = max(1, $headerRow);
         $dataStartRow = max($headerRow + 1, $dataStartRow);
         $spreadsheet = $this->loadSpreadsheet($file);
-        $sheet = $spreadsheet->getActiveSheet();
+        $sheetIndex = max(0, min($sheetIndex, count($spreadsheet->getSheetNames()) - 1));
+        $sheet = $spreadsheet->getSheet($sheetIndex);
         $highestRow = (int) $sheet->getHighestDataRow();
         $highestCol = $sheet->getHighestDataColumn($headerRow);
         $maxCol = Coordinate::columnIndexFromString($highestCol);
@@ -414,6 +422,30 @@ class TemporaryModuleExcelImportService
             }
 
             if (! $hasAny) {
+                // Check if the row has ANY data at all (even in unmapped columns)
+                $rowHasAnyData = false;
+                for ($c = 1; $c <= $maxCol; $c++) {
+                    $cellValue = $sheet->getCell(Coordinate::stringFromColumnIndex($c).$row)->getValue();
+                    if ($cellValue !== null && trim((string) $cellValue) !== '') {
+                        $rowHasAnyData = true;
+                        break;
+                    }
+                }
+
+                if ($rowHasAnyData) {
+                    $rowErrors[] = [
+                        'row' => $row,
+                        'message' => "Fila {$row}: las columnas mapeadas están vacías, pero la fila contiene otros datos.",
+                        'data' => $values,
+                        'failed_fields' => [[
+                            'key' => '__empty_mapped__',
+                            'label' => 'Columnas mapeadas',
+                            'reason' => 'Ninguna de las columnas asignadas tiene datos en esta fila.',
+                            'received' => '',
+                        ]],
+                        'suggestions' => [],
+                    ];
+                }
                 $skipped++;
 
                 continue;
@@ -509,21 +541,23 @@ class TemporaryModuleExcelImportService
 
             if ($rowMrId === null || $rowMrId <= 0) {
                 $munVal = $municipioKey ? ($values[$municipioKey] ?? '') : '';
+                $rawMunVal = $municipioKey ? trim((string) ($rawValues[$municipioKey] ?? '')) : '';
+                $displayMun = $rawMunVal !== '' ? $rawMunVal : $munVal;
                 $suggestions = [];
-                if ($munVal !== '') {
-                    $suggestions = $this->suggestMunicipios($munVal, $suggestionBaseMunicipios, $municipioToMrMap);
+                if ($rawMunVal !== '') {
+                    $suggestions = $this->suggestMunicipios($rawMunVal, $suggestionBaseMunicipios, $municipioToMrMap);
                 }
 
                 $rowErrors[] = [
                     'row' => $row,
-                    'message' => "Fila {$row}: No se pudo determinar la microrregión para el municipio '{$munVal}'.",
+                    'message' => "Fila {$row}: No se pudo determinar la microrregión para el municipio '{$displayMun}'.",
                     'data' => $values,
                     'municipio_key' => $municipioKey,
                     'failed_fields' => $municipioKey ? [[
                         'key' => $municipioKey,
                         'label' => (string) ($fieldsByKey[$municipioKey]->label ?? $municipioKey),
                         'reason' => 'El municipio no coincide con una microrregión asignada.',
-                        'received' => (string) $munVal,
+                        'received' => (string) $displayMun,
                     ]] : [],
                     'suggestions' => $suggestions,
                 ];
