@@ -29,7 +29,7 @@ class AdminSettingsController extends Controller
     public function distribuirMunicipiosExcel(Request $request, DistribuirMunicipiosExcelService $service): RedirectResponse
     {
         $validator = Validator::make($request->all(), [
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:20480'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:51200'],
         ], [
             'archivo_excel.required' => 'Selecciona un archivo Excel.',
             'archivo_excel.mimes' => 'El archivo debe ser Excel (.xlsx o .xls).',

@@ -8,10 +8,10 @@ class ImportarExcelRequest extends MesasPazFormRequest
     {
         return [
             'fecha_importacion' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:51200'],
         ];
     }
-    
+
     public function messages(): array
     {
         return array_merge(parent::messages(), [
@@ -19,7 +19,7 @@ class ImportarExcelRequest extends MesasPazFormRequest
             'fecha_importacion.before_or_equal' => 'No puedes importar datos de una fecha futura.',
             'archivo_excel.required' => 'El archivo Excel es obligatorio.',
             'archivo_excel.mimes' => 'El archivo debe ser tipo Excel (.xls, .xlsx).',
-            'archivo_excel.max' => 'El archivo no debe pesar más de 10 MB.',
+            'archivo_excel.max' => 'El archivo no debe pesar más de 50 MB.',
         ]);
     }
 }

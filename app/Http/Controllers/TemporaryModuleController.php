@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -246,7 +247,7 @@ class TemporaryModuleController extends Controller
     public function seedPreview(Request $request): JsonResponse
     {
         $request->validate([
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:20480'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:51200'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:200'],
             'auto_detect' => ['nullable', 'boolean'],
             'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
@@ -302,7 +303,7 @@ class TemporaryModuleController extends Controller
             'description' => ['nullable', 'string', 'max:1000'],
             'expires_at' => ['nullable', 'date', 'after_or_equal:today'],
             'is_indefinite' => ['nullable', 'boolean'],
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:20480'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:51200'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:50'],
             'data_start_row' => ['nullable', 'integer', 'min:2', 'max:50000'],
             'col_microrregion' => ['nullable', 'integer', 'min:-1'],
@@ -1195,8 +1196,8 @@ class TemporaryModuleController extends Controller
                 $isRequiredNow = (bool) $field->is_required && (! $hasExistingImage || $removeRequested);
 
                 $rules[$key] = $isRequiredNow
-                    ? ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240']
-                    : ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'];
+                    ? ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:20480']
+                    : ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:20480'];
                 $rules['remove_images.'.$field->key] = ['nullable', 'boolean'];
             } elseif ($field->type === 'multiselect') {
                 $opts = is_array($field->options) ? $field->options : [];
@@ -1240,10 +1241,14 @@ class TemporaryModuleController extends Controller
             $removeRequested = filter_var(Arr::get($validated, 'remove_images.'.$field->key), FILTER_VALIDATE_BOOLEAN);
 
             if (in_array($field->type, ['file', 'image'], true) && $request->hasFile('values.'.$field->key)) {
-                $storedPath = $request->file('values.'.$field->key)->store(
-                    'temporary-modules/'.$temporaryModule->id.'/'.$request->user()->id,
-                    'secure_shared'
-                );
+                $uploadedFile = $request->file('values.'.$field->key);
+                $directory = 'temporary-modules/'.$temporaryModule->id.'/'.$request->user()->id;
+
+                if ($field->type === 'image' && in_array($uploadedFile->getMimeType(), ['image/jpeg', 'image/png', 'image/webp'])) {
+                    $storedPath = $this->compressAndStoreImage($uploadedFile, $directory);
+                } else {
+                    $storedPath = $uploadedFile->store($directory, 'secure_shared');
+                }
 
                 if (is_string($existingValue) && trim($existingValue) !== '' && $existingValue !== $storedPath) {
                     $this->entryDataService->deleteStoredPath($existingValue);
@@ -1405,7 +1410,7 @@ class TemporaryModuleController extends Controller
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
 
         $request->validate([
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls,pdf', 'max:15360'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls,pdf', 'max:51200'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:200'],
             'auto_detect' => ['nullable', 'boolean'],
             'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
@@ -1490,7 +1495,7 @@ class TemporaryModuleController extends Controller
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
 
         $request->validate([
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls,pdf', 'max:15360'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls,pdf', 'max:51200'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:50'],
             'data_start_row' => ['nullable', 'integer', 'min:2', 'max:1000'],
             'mapping' => ['required', 'string'],
@@ -1592,7 +1597,7 @@ class TemporaryModuleController extends Controller
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
 
         $request->validate([
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:15360'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:51200'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:50'],
             'data_start_row' => ['nullable', 'integer', 'min:2', 'max:1000'],
             'mapping' => ['required', 'string'],
@@ -2088,5 +2093,63 @@ class TemporaryModuleController extends Controller
         abort_unless(is_string($fullPath) && is_file($fullPath), 404);
 
         return response()->file($fullPath);
+    }
+
+    private function compressAndStoreImage(\Illuminate\Http\UploadedFile $file, string $directory): string
+    {
+        $mime = $file->getMimeType();
+        $image = match ($mime) {
+            'image/jpeg' => @imagecreatefromjpeg($file->getRealPath()),
+            'image/png'  => @imagecreatefrompng($file->getRealPath()),
+            'image/webp' => @imagecreatefromwebp($file->getRealPath()),
+            default      => false,
+        };
+
+        if (!$image) {
+            return $file->store($directory, 'secure_shared');
+        }
+
+        $width  = imagesx($image);
+        $height = imagesy($image);
+        $maxDim = 1920;
+
+        if ($width > $maxDim || $height > $maxDim) {
+            $ratio = min($maxDim / $width, $maxDim / $height);
+            $newW  = (int) round($width * $ratio);
+            $newH  = (int) round($height * $ratio);
+            $resized = imagecreatetruecolor($newW, $newH);
+
+            if ($mime === 'image/png' || $mime === 'image/webp') {
+                imagealphablending($resized, false);
+                imagesavealpha($resized, true);
+            }
+
+            imagecopyresampled($resized, $image, 0, 0, 0, 0, $newW, $newH, $width, $height);
+            imagedestroy($image);
+            $image = $resized;
+        }
+
+        $tmpPath = tempnam(sys_get_temp_dir(), 'img_');
+
+        match ($mime) {
+            'image/png'  => imagepng($image, $tmpPath, 8),
+            'image/webp' => imagewebp($image, $tmpPath, 75),
+            default      => imagejpeg($image, $tmpPath, 75),
+        };
+
+        imagedestroy($image);
+
+        $filename = Str::random(40).match ($mime) {
+            'image/png'  => '.png',
+            'image/webp' => '.webp',
+            default      => '.jpg',
+        };
+
+        $storedPath = $directory.'/'.$filename;
+        Storage::disk('secure_shared')->put($storedPath, file_get_contents($tmpPath));
+
+        @unlink($tmpPath);
+
+        return $storedPath;
     }
 }
