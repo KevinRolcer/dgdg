@@ -62,6 +62,13 @@ class PersonalNoteController extends Controller
         $note = $this->personalNoteService->createNote($validated, $request->user()->id);
 
         if ($request->hasFile('attachments')) {
+            $newImages = collect($request->file('attachments'))->filter(fn ($f) => str_contains($f->getMimeType(), 'image'));
+            $newDocs   = collect($request->file('attachments'))->reject(fn ($f) => str_contains($f->getMimeType(), 'image'));
+
+            if ($newImages->count() > 10 || $newDocs->count() > 10) {
+                return response()->json(['success' => false, 'message' => 'Máximo 10 imágenes y 10 archivos por nota.'], 422);
+            }
+
             foreach ($request->file('attachments') as $file) {
                 $path = $file->store('personal-notes/attachments', 'public');
                 $note->attachments()->create([
@@ -121,6 +128,15 @@ class PersonalNoteController extends Controller
         $this->personalNoteService->updateNote($note, $validated);
 
         if ($request->hasFile('attachments')) {
+            $existingImages = $note->attachments()->where('file_type', 'image')->count();
+            $existingDocs   = $note->attachments()->where('file_type', 'document')->count();
+            $newImages = collect($request->file('attachments'))->filter(fn ($f) => str_contains($f->getMimeType(), 'image'));
+            $newDocs   = collect($request->file('attachments'))->reject(fn ($f) => str_contains($f->getMimeType(), 'image'));
+
+            if (($existingImages + $newImages->count()) > 10 || ($existingDocs + $newDocs->count()) > 10) {
+                return response()->json(['success' => false, 'message' => 'Máximo 10 imágenes y 10 archivos por nota.'], 422);
+            }
+
             foreach ($request->file('attachments') as $file) {
                 $path = $file->store('personal-notes/attachments', 'public');
                 $note->attachments()->create([

@@ -5,6 +5,7 @@
 const swalAlert = window.Swal || Swal;
 
 window.openPersonalNoteModal = function(noteData = null) {
+    window._pendingAttachments = [];
     const foldersContainer = document.getElementById('pa-folders-json');
     const folders = foldersContainer ? JSON.parse(foldersContainer.textContent) : [];
     const activeFolderId = noteData?.folder_id || window.paCurrentFolderId || null;
@@ -81,6 +82,7 @@ window.openPersonalNoteModal = function(noteData = null) {
                     <label class="pa-att-trigger" onclick="document.getElementById('note-attachments').click()">
                         <i class="fa-solid fa-paperclip"></i> Adjuntar archivo
                     </label>
+                    <span id="att-counter" style="font-size:0.7rem;color:#888;margin-left:6px;"></span>
                     <input type="file" id="note-attachments" multiple style="display:none;" onchange="previewNewAttachments(this)">
                     <div class="pa-att-list" id="attachments-preview">
                         ${(noteData?.attachments || []).map(att => `
@@ -89,7 +91,7 @@ window.openPersonalNoteModal = function(noteData = null) {
                                     ? `<img src="${att.file_path}" alt="${att.file_name}">`
                                     : `<div class="pa-att-file-icon"><i class="fa-solid fa-file-lines"></i></div>`}
                                 <div class="pa-att-name" title="${att.file_name}">${att.file_name}</div>
-                                <button class="pa-att-remove" onclick="removeAttachment(${att.id}, this.closest('.pa-att-item'))"><i class="fa-solid fa-xmark"></i></button>
+                                <button class="pa-att-remove" onclick="removeAttachment(${att.id}, this.closest('.pa-att-item')); updateAttCounter();"><i class="fa-solid fa-xmark"></i></button>
                             </div>
                         `).join('')}
                     </div>
@@ -107,6 +109,7 @@ window.openPersonalNoteModal = function(noteData = null) {
             cancelButton: 'tm-swal-cancel'
         },
         didOpen: () => {
+            updateAttCounter();
             // Color preview update
             const colorInput = document.getElementById('note-color');
             const colorPreview = document.getElementById('note-color-preview');
@@ -163,7 +166,7 @@ window.openPersonalNoteModal = function(noteData = null) {
                 scheduled_date: isReminderActive ? document.getElementById('note-date').value : null,
                 is_encrypted: isEncryptActive ? 1 : 0,
                 password: document.getElementById('note-password').value,
-                attachments: document.getElementById('note-attachments').files
+                attachments: (window._pendingAttachments || []).filter(f => f !== null)
             };
         }
     }).then((result) => {
@@ -624,6 +627,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     const currentFilter = document.querySelector('.pa-nav-item.is-active')?.dataset.filter || 'all';
                     window.loadNotes(currentFilter);
                 }
+            } else if (response.status === 422) {
+                const err = await response.json().catch(() => null);
+                segobToast('warning', err?.message || 'Máximo 10 imágenes y 10 archivos por nota.');
             } else {
                 segobToast('error', 'No se pudo guardar la nota');
             }
@@ -793,20 +799,59 @@ document.addEventListener('DOMContentLoaded', function() {
     window.previewNewAttachments = function(input) {
         const container = document.getElementById('attachments-preview');
         if (!container) return;
+
+        const MAX_IMAGES = 10, MAX_FILES = 10;
+        const existingImages = container.querySelectorAll('.pa-att-item img').length;
+        const existingDocs  = container.querySelectorAll('.pa-att-item .pa-att-file-icon').length;
+        let addedImages = 0, addedDocs = 0;
+
         Array.from(input.files).forEach(file => {
+            const isImage = file.type.startsWith('image/');
+            if (isImage && (existingImages + addedImages) >= MAX_IMAGES) {
+                segobToast('warning', `Máximo ${MAX_IMAGES} imágenes por nota`);
+                return;
+            }
+            if (!isImage && (existingDocs + addedDocs) >= MAX_FILES) {
+                segobToast('warning', `Máximo ${MAX_FILES} archivos por nota`);
+                return;
+            }
+
+            const fileIndex = window._pendingAttachments.length;
+            window._pendingAttachments.push(file);
             const item = document.createElement('div');
             item.className = 'pa-att-item pa-att-item--new';
-            if (file.type.startsWith('image/')) {
+            item.dataset.fileIndex = fileIndex;
+            if (isImage) {
+                addedImages++;
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    item.innerHTML = `<img src="${e.target.result}" alt="${file.name}"><div class="pa-att-name" title="${file.name}">${file.name}</div><button class="pa-att-remove" onclick="this.closest('.pa-att-item').remove()"><i class="fa-solid fa-xmark"></i></button>`;
+                    item.innerHTML = `<img src="${e.target.result}" alt="${file.name}"><div class="pa-att-name" title="${file.name}">${file.name}</div><button class="pa-att-remove" onclick="removeNewAttachment(this.closest('.pa-att-item'))"><i class="fa-solid fa-xmark"></i></button>`;
                 };
                 reader.readAsDataURL(file);
             } else {
-                item.innerHTML = `<div class="pa-att-file-icon"><i class="fa-solid fa-file-lines"></i></div><div class="pa-att-name" title="${file.name}">${file.name}</div><button class="pa-att-remove" onclick="this.closest('.pa-att-item').remove()"><i class="fa-solid fa-xmark"></i></button>`;
+                addedDocs++;
+                item.innerHTML = `<div class="pa-att-file-icon"><i class="fa-solid fa-file-lines"></i></div><div class="pa-att-name" title="${file.name}">${file.name}</div><button class="pa-att-remove" onclick="removeNewAttachment(this.closest('.pa-att-item'))"><i class="fa-solid fa-xmark"></i></button>`;
             }
             container.appendChild(item);
         });
+        input.value = '';
+        updateAttCounter();
+    };
+
+    window.updateAttCounter = function() {
+        const container = document.getElementById('attachments-preview');
+        const counter = document.getElementById('att-counter');
+        if (!container || !counter) return;
+        const imgs = container.querySelectorAll('.pa-att-item img').length;
+        const docs = container.querySelectorAll('.pa-att-item .pa-att-file-icon').length;
+        counter.textContent = (imgs || docs) ? `${imgs}/10 img · ${docs}/10 arch` : '';
+    };
+
+    window.removeNewAttachment = function(item) {
+        const idx = parseInt(item.dataset.fileIndex);
+        if (!isNaN(idx)) window._pendingAttachments[idx] = null;
+        item.remove();
+        updateAttCounter();
     };
 
     async function saveFolder(data) {

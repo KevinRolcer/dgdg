@@ -24,6 +24,7 @@ return new class extends Migration
             $table->dateTime('reminder_at')->nullable();
             $table->date('scheduled_date')->nullable();
             $table->time('scheduled_time')->nullable();
+            $table->boolean('is_archived')->default(false);
             $table->timestamps();
             $table->softDeletes();
 
