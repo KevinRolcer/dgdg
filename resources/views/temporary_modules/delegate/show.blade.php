@@ -217,7 +217,7 @@
         <div class="tm-modal-backdrop" data-tm-excel-close></div>
         <div class="tm-modal-dialog tm-excel-modal-dialog">
             <div class="tm-modal-head">
-                <h3 id="tmImportarExcelModalLabel">Importar desde Excel</h3>
+                <h3 id="tmImportarExcelModalLabel">Importar desde Excel / PDF</h3>
                 <button type="button" class="tm-modal-close" data-tm-excel-close aria-label="Cerrar"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             </div>
             <div class="tm-modal-body tm-excel-modal-body">
@@ -260,8 +260,8 @@
                             <div class="tm-excel-dropzone" id="tmExcelDropzone">
                                 <i class="fa-solid fa-cloud-arrow-up"></i>
                                 <p>Arrastra tu archivo aquí o haz clic para buscar</p>
-                                <small>Formatos aceptados: .xlsx, .xls</small>
-                                <input type="file" id="tmExcelFile" accept=".xlsx,.xls" hidden>
+                                <small>Formatos aceptados: .xlsx, .xls, .csv, .pdf</small>
+                                <input type="file" id="tmExcelFile" accept=".xlsx,.xls,.csv,.pdf" hidden>
                             </div>
                             <div id="tmExcelFileName" class="tm-excel-badge badge-header tm-hidden" style="margin-bottom:10px; padding:6px 12px; border-radius:8px;"></div>
 
@@ -1227,7 +1227,17 @@
         csrfFetch(excelPreviewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
             .then(function(r) { return r.json(); })
             .then(function(j) {
-                if (j.success && j.preview_thumbnails) applyExcelPreviewThumbnails(j.preview_thumbnails);
+                if (!j.success) return;
+                if (j.preview_rows && j.preview_rows.length) {
+                    workbookData = j.preview_rows;
+                    renderExcelPreview(workbookData);
+                    var hInput = document.getElementById('tmExcelHeaderRow');
+                    var dInput = document.getElementById('tmExcelDataStartRow');
+                    if (j.header_row && hInput) { hInput.value = j.header_row; }
+                    if (j.data_start_row && dInput) { dInput.value = j.data_start_row; }
+                    updateRowHighlights();
+                }
+                if (j.preview_thumbnails) applyExcelPreviewThumbnails(j.preview_thumbnails);
             })
             .catch(function() { /* silencioso: la tabla de texto ya se ve con SheetJS */ });
     };
@@ -1399,11 +1409,27 @@
 
     const handleExcelFile = (file) => {
         if (!file) return;
+        const isPdf = file.name.toLowerCase().endsWith('.pdf');
         const nameEl = document.getElementById('tmExcelFileName');
         if (nameEl) {
             nameEl.textContent = 'Archivo: ' + file.name;
             nameEl.classList.remove('tm-hidden');
         }
+
+        if (isPdf) {
+            // PDF: no se puede leer con SheetJS, usar previsualización del servidor
+            currentWorkbook = null;
+            currentSheetIdx = 0;
+            const sheetTabsWrap = document.getElementById('tmExcelSheetTabsWrap');
+            if (sheetTabsWrap) sheetTabsWrap.style.display = 'none';
+            const inner = document.querySelector('.tm-excel-sheet-inner');
+            if (inner) inner.innerHTML = '<div style="padding:60px; text-align:center; color:var(--clr-text-light);"><i class="fa-solid fa-file-pdf" style="font-size:2.5rem; margin-bottom:12px; opacity:0.4; color:#e74c3c;"></i><p>Archivo PDF cargado. Las columnas se detectarán automáticamente del servidor.</p></div>';
+            fetchExcelPreviewThumbnails(file);
+            const autoBtn = document.getElementById('tmExcelAutoDetect');
+            if (autoBtn) autoBtn.style.display = 'inline-flex';
+            return;
+        }
+
         const reader = new FileReader();
         reader.onload = function(e) {
             try {
@@ -1890,6 +1916,54 @@
         });
     };
 
+    // Global Drag & Drop for Excel / PDF
+    const globalOverlay = document.getElementById('tmGlobalExcelDropOverlay');
+    let dragCounter = 0;
+
+    window.addEventListener('dragenter', (e) => {
+        if (e.dataTransfer.types.includes('Files')) {
+            dragCounter++;
+            globalOverlay?.classList.add('is-active');
+        }
+    });
+
+    window.addEventListener('dragleave', (e) => {
+        dragCounter--;
+        if (dragCounter <= 0) {
+            globalOverlay?.classList.remove('is-active');
+            dragCounter = 0;
+        }
+    });
+
+    window.addEventListener('dragover', (e) => {
+        e.preventDefault();
+    });
+
+    window.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dragCounter = 0;
+        globalOverlay?.classList.remove('is-active');
+
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+
+        const name = (file.name || '').toLowerCase();
+        if (!name.endsWith('.xlsx') && !name.endsWith('.xls') && !name.endsWith('.csv') && !name.endsWith('.pdf')) return;
+
+        if (excelModal) {
+            if (!excelModal.classList.contains('is-open')) openExcelModal();
+            handleExcelFile(file);
+        }
+    });
+
     });
 </script>
+
+<div id="tmGlobalExcelDropOverlay" class="tm-global-drop-overlay">
+    <div class="tm-global-drop-content">
+        <i class="fa-solid fa-file-arrow-up"></i>
+        <h3>¡Suelta tu archivo aquí!</h3>
+        <p>Arrastra tu archivo Excel o PDF a cualquier área dentro de la página para comenzar la importación.</p>
+    </div>
+</div>
 @endpush

@@ -3081,7 +3081,15 @@
                 csrfFetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
                     .then((r) => r.json())
                     .then((j) => {
-                        if (j.success && j.preview_thumbnails) applyExcelPreviewThumbnails(j.preview_thumbnails);
+                        if (!j.success) return;
+                        if (j.preview_rows && j.preview_rows.length) {
+                            workbookData = j.preview_rows;
+                            renderExcelPreview(workbookData);
+                            if (j.header_row) { headerRowInput.value = j.header_row; }
+                            if (j.data_start_row) { dataStartRowInput.value = j.data_start_row; }
+                            updateRowHighlights();
+                        }
+                        if (j.preview_thumbnails) applyExcelPreviewThumbnails(j.preview_thumbnails);
                     })
                     .catch(() => {});
             };
@@ -3344,6 +3352,20 @@
                     nameEl.textContent = 'Archivo: ' + file.name;
                     nameEl.classList.remove('tm-hidden');
                 }
+
+                if (isPdf) {
+                    // PDF: no se puede leer con SheetJS, usar previsualización del servidor
+                    currentWorkbook = null;
+                    currentSheetIdx = 0;
+                    const sheetTabsWrap = modal.querySelector('.tm-excel-sheet-tabs-wrap-el');
+                    if (sheetTabsWrap) sheetTabsWrap.style.display = 'none';
+                    const inner = modal.querySelector('.tm-excel-sheet-inner-el');
+                    if (inner) inner.innerHTML = '<div style="padding:60px; text-align:center; color:var(--clr-text-light);"><i class="fa-solid fa-file-pdf" style="font-size:2.5rem; margin-bottom:12px; opacity:0.4; color:#e74c3c;"></i><p>Archivo PDF cargado. Las columnas se detectarán automáticamente del servidor.</p></div>';
+                    fetchExcelPreviewThumbnails(file);
+                    modal.querySelector('.tm-excel-auto-detect').style.display = 'inline-flex';
+                    return;
+                }
+
                 const reader = new FileReader();
                 reader.onload = (re) => {
                     try {
@@ -3714,7 +3736,7 @@
             if (!file) return;
 
             const name = (file.name || '').toLowerCase();
-            if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) return;
+            if (!name.endsWith('.xlsx') && !name.endsWith('.xls') && !name.endsWith('.csv') && !name.endsWith('.pdf')) return;
 
             // Encontrar modal de excel abierto
             const openModal = document.querySelector('.tm-excel-import-modal.is-open');
@@ -4143,9 +4165,9 @@
 
 <div id="tmGlobalExcelDropOverlay" class="tm-global-drop-overlay">
     <div class="tm-global-drop-content">
-        <i class="fa-solid fa-file-excel"></i>
-        <h3>¡Suelta tu archivo Excel aquí!</h3>
-        <p>Arrastra el archivo a cualquier área dentro de la página para comenzar la importación.</p>
+        <i class="fa-solid fa-file-arrow-up"></i>
+        <h3>¡Suelta tu archivo aquí!</h3>
+        <p>Arrastra tu archivo Excel o PDF a cualquier área dentro de la página para comenzar la importación.</p>
     </div>
 </div>
 

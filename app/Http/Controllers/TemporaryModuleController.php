@@ -1467,6 +1467,12 @@ class TemporaryModuleController extends Controller
                 'is_required' => (bool) $f->is_required,
             ])->values()->all(),
         ];
+        if (!empty($preview['is_pdf'])) {
+            $out['is_pdf'] = true;
+        }
+        if (!empty($preview['preview_rows'])) {
+            $out['preview_rows'] = $preview['preview_rows'];
+        }
         if ($detected) {
             $out['detection_note'] = $detected['note'];
         }
