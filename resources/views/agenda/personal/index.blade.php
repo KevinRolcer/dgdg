@@ -112,7 +112,7 @@
                          style="background-color: {{ $folder->color ?? 'var(--pa-blue)' }}; position: relative;"
                          data-id="{{ $folder->id }}">
                         <div class="pa-folder-delete" style="position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity 0.2s; cursor: pointer;" onclick="event.stopPropagation(); deleteFolder({{ $folder->id }}, '{{ $folder->name }}')">
-                            <i class="fa-solid fa-xmark" style="font-size: 0.8rem; color: rgba(0,0,0,0.3);"></i>
+                            <i class="fa-solid fa-trash-can" style="font-size: 0.75rem; {{ getContrastClass($folder->color) === 'text-light' ? 'color: rgba(255,255,255,0.6);' : 'color: rgba(0,0,0,0.35);' }}"></i>
                         </div>
                         <div class="pa-folder-icon">
                             <i class="fa-solid {{ $folder->icon ?: 'fa-folder' }}"></i>

@@ -1263,7 +1263,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        showToast('Carpeta eliminada', 'success');
+                        segobToast('success', 'Carpeta eliminada');
                         location.reload();
                     }
                 });
