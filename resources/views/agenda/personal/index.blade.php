@@ -170,6 +170,7 @@
         index: "{{ route('personal-agenda.index') }}",
         store: "{{ route('personal-agenda.store') }}",
         foldersStore: "{{ route('personal-agenda.folders.store') }}",
+        foldersDestroy: "{{ route('personal-agenda.folders.destroy', ['folder' => ':id']) }}",
         attachmentsDestroy: "{{ route('personal-agenda.attachments.destroy', ['attachment' => ':id']) }}",
         attachmentsServe: "{{ route('personal-agenda.attachments.serve', ['attachment' => ':id']) }}",
         decrypt: "{{ route('personal-agenda.decrypt', ['note' => ':id']) }}",

@@ -785,8 +785,12 @@ document.addEventListener('DOMContentLoaded', function() {
         element.style.opacity = '0.3';
         try {
             const response = await fetch(window.paRoutes.attachmentsDestroy.replace(':id', attachmentId), {
-                method: 'DELETE',
-                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ _method: 'DELETE' })
             });
             if (response.ok) {
                 element.closest('.pa-att-item')?.remove();
@@ -887,7 +891,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (result.isConfirmed) {
             try {
-                const response = await fetch(`/personal-agenda/${id}/archive`, {
+                const response = await fetch(window.paRoutes.archive.replace(':id', id), {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
@@ -917,7 +921,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.restoreNote = async function(id) {
         try {
-            const response = await fetch(`/personal-agenda/${id}/restore`, {
+            const response = await fetch(window.paRoutes.restore.replace(':id', id), {
                 method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
@@ -956,13 +960,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (result.isConfirmed) {
             try {
-                const response = await fetch(`/personal-agenda/${id}`, {
-                    method: 'DELETE',
+                const response = await fetch(window.paRoutes.destroy.replace(':id', id), {
+                    method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                         'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ _method: 'DELETE' })
                 });
                 if (response.ok) {
                     segobToast('success', 'Nota eliminada');
@@ -1149,7 +1155,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const targetNoteId = noteId || selectedNoteId;
         if (!targetNoteId) return;
 
-        fetch(`/personal-agenda/${targetNoteId}/move`, {
+        fetch(window.paRoutes.move.replace(':id', targetNoteId), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1246,13 +1252,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }).then((result) => {
             if (result.isConfirmed) {
-                fetch(`/personal-agenda/folders/${id}`, {
-                    method: 'DELETE',
+                fetch(window.paRoutes.foldersDestroy.replace(':id', id), {
+                    method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ delete_notes: result.value.delete_notes })
+                    body: JSON.stringify({ _method: 'DELETE', delete_notes: result.value.delete_notes })
                 })
                 .then(res => res.json())
                 .then(data => {
