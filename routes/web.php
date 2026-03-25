@@ -261,7 +261,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/restore', [\App\Http\Controllers\PersonalNoteController::class, 'restore'])->name('restore');
         Route::post('/{note}/move', [\App\Http\Controllers\PersonalNoteController::class, 'moveToFolder'])->name('move');
         Route::delete('/attachments/{attachment}', [\App\Http\Controllers\PersonalNoteController::class, 'deleteAttachment'])->name('attachments.destroy');
-        
+        Route::get('/attachments/{attachment}/serve', [\App\Http\Controllers\PersonalNoteController::class, 'serveAttachment'])->name('attachments.serve');
+
         Route::post('/folders', [\App\Http\Controllers\PersonalNoteController::class, 'storeFolder'])->name('folders.store');
         Route::delete('/folders/{folder}', [\App\Http\Controllers\PersonalNoteController::class, 'destroyFolder'])->name('folders.destroy');
     });

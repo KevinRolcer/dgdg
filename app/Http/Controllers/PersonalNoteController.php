@@ -70,7 +70,7 @@ class PersonalNoteController extends Controller
             }
 
             foreach ($request->file('attachments') as $file) {
-                $path = $file->store('personal-notes/attachments', 'public');
+                $path = $file->store('personal-notes/attachments', 'secure_shared');
                 $note->attachments()->create([
                     'file_path' => $path,
                     'file_name' => $file->getClientOriginalName(),
@@ -138,7 +138,7 @@ class PersonalNoteController extends Controller
             }
 
             foreach ($request->file('attachments') as $file) {
-                $path = $file->store('personal-notes/attachments', 'public');
+                $path = $file->store('personal-notes/attachments', 'secure_shared');
                 $note->attachments()->create([
                     'file_path' => $path,
                     'file_name' => $file->getClientOriginalName(),
@@ -237,12 +237,28 @@ class PersonalNoteController extends Controller
     {
         abort_unless($attachment->note->user_id === $request->user()->id, 403);
 
-        if (Storage::disk('public')->exists($attachment->file_path)) {
-            Storage::disk('public')->delete($attachment->file_path);
+        foreach (['secure_shared', 'public'] as $disk) {
+            if (Storage::disk($disk)->exists($attachment->file_path)) {
+                Storage::disk($disk)->delete($attachment->file_path);
+                break;
+            }
         }
 
         $attachment->delete();
 
         return response()->json(['success' => true]);
+    }
+
+    public function serveAttachment(Request $request, PersonalNoteAttachment $attachment)
+    {
+        abort_unless($attachment->note->user_id === $request->user()->id, 403);
+
+        foreach (['secure_shared', 'public'] as $disk) {
+            if (Storage::disk($disk)->exists($attachment->file_path)) {
+                return response()->file(Storage::disk($disk)->path($attachment->file_path));
+            }
+        }
+
+        abort(404);
     }
 }

@@ -74,7 +74,7 @@
              'attachments' => $note->attachments->map(fn($a) => [
                  'id' => $a->id,
                  'file_name' => $a->file_name,
-                 'file_path' => asset('storage/' . $a->file_path),
+                 'file_path' => route('personal-agenda.attachments.serve', $a->id),
                  'file_type' => $a->file_type
              ])
          ]) }}"
@@ -118,11 +118,11 @@
         @if(!$note->is_encrypted && $note->attachments->count() > 0)
             <div class="pa-card-attachments" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 8px;">
                 @foreach($note->attachments as $att)
-                    <a href="{{ asset('storage/' . $att->file_path) }}" target="_blank" onclick="event.stopPropagation()"
+                    <a href="{{ route('personal-agenda.attachments.serve', $att->id) }}" target="_blank" onclick="event.stopPropagation()"
                        title="{{ $att->file_name }}"
                        style="width: 32px; height: 32px; background: rgba(0,0,0,0.05); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: inherit; text-decoration: none;">
                         @if($att->file_type === 'image')
-                            <img src="{{ asset('storage/' . $att->file_path) }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;">
+                            <img src="{{ route('personal-agenda.attachments.serve', $att->id) }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;">
                         @else
                             <i class="fa-solid fa-file-lines" style="opacity: 0.7;"></i>
                         @endif

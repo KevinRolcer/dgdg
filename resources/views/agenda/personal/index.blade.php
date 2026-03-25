@@ -171,6 +171,7 @@
         store: "{{ route('personal-agenda.store') }}",
         foldersStore: "{{ route('personal-agenda.folders.store') }}",
         attachmentsDestroy: "{{ route('personal-agenda.attachments.destroy', ['attachment' => ':id']) }}",
+        attachmentsServe: "{{ route('personal-agenda.attachments.serve', ['attachment' => ':id']) }}",
         decrypt: "{{ route('personal-agenda.decrypt', ['note' => ':id']) }}",
         archive: "{{ route('personal-agenda.archive', ['note' => ':id']) }}",
         restore: "{{ route('personal-agenda.restore', ['id' => ':id']) }}",
