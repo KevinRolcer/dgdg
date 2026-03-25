@@ -188,6 +188,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{module}/estado', [TemporaryModuleController::class, 'moduleStatus'])->middleware('can:modulos-temporales-ver')->whereNumber('module')->name('temporary-modules.module-status');
         Route::post('/{module}/importar-excel-preview', [TemporaryModuleController::class, 'importExcelPreview'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.import-excel-preview');
         Route::post('/{module}/importar-excel', [TemporaryModuleController::class, 'importExcel'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.import-excel');
+        Route::post('/{module}/actualizar-desde-excel', [TemporaryModuleController::class, 'updateExistingFromExcel'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.update-from-excel');
         Route::post('/{module}/importar-fila', [TemporaryModuleController::class, 'importSingleRow'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.import-single-row');
         Route::get('/{module}', [TemporaryModuleController::class, 'show'])->middleware('can:modulos-temporales-ver')->whereNumber('module')->name('temporary-modules.show');
         Route::post('/{module}/registros', [TemporaryModuleController::class, 'submit'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.submit');
@@ -248,5 +249,20 @@ Route::middleware('auth')->group(function () {
             Route::get('/{chat}/media', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'media'])->whereNumber('chat')->name('whatsapp-chats.admin.media');
             Route::delete('/{chat}', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'destroy'])->whereNumber('chat')->name('whatsapp-chats.admin.destroy');
         });
+    });
+
+    Route::group(['prefix' => 'personal-agenda', 'as' => 'personal-agenda.'], function () {
+        Route::get('/', [\App\Http\Controllers\PersonalNoteController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\PersonalNoteController::class, 'store'])->name('store');
+        Route::put('/{note}', [\App\Http\Controllers\PersonalNoteController::class, 'update'])->name('update');
+        Route::delete('/{note}', [\App\Http\Controllers\PersonalNoteController::class, 'destroy'])->name('destroy');
+        Route::post('/{note}/decrypt', [\App\Http\Controllers\PersonalNoteController::class, 'decrypt'])->name('decrypt');
+        Route::post('/{note}/archive', [\App\Http\Controllers\PersonalNoteController::class, 'archive'])->name('archive');
+        Route::post('/{id}/restore', [\App\Http\Controllers\PersonalNoteController::class, 'restore'])->name('restore');
+        Route::post('/{note}/move', [\App\Http\Controllers\PersonalNoteController::class, 'moveToFolder'])->name('move');
+        Route::delete('/attachments/{attachment}', [\App\Http\Controllers\PersonalNoteController::class, 'deleteAttachment'])->name('attachments.destroy');
+        
+        Route::post('/folders', [\App\Http\Controllers\PersonalNoteController::class, 'storeFolder'])->name('folders.store');
+        Route::delete('/folders/{folder}', [\App\Http\Controllers\PersonalNoteController::class, 'destroyFolder'])->name('folders.destroy');
     });
 });

@@ -449,6 +449,7 @@
                  aria-labelledby="tmImportarExcelModalLabel-{{ $module->id }}"
                  data-excel-preview-url="{{ route('temporary-modules.import-excel-preview', $module->id) }}"
                  data-excel-import-url="{{ route('temporary-modules.import-excel', $module->id) }}"
+                 data-excel-update-url="{{ route('temporary-modules.update-from-excel', $module->id) }}"
                  data-excel-import-single-url="{{ route('temporary-modules.import-single-row', $module->id) }}">
                 <div class="tm-modal-backdrop" data-close-module-preview></div>
                 <div class="tm-modal-dialog tm-modal-dialog-entry tm-excel-modal-dialog">
@@ -586,6 +587,11 @@
                                         <button type="button" class="tm-btn tm-excel-back">Restablecer</button>
                                         <button type="button" class="tm-btn tm-btn-primary tm-excel-importar">
                                             Importar filas
+                                        </button>
+                                    </div>
+                                    <div class="tm-actions" style="display:grid; grid-template-columns:1fr; gap:10px; margin-top:8px;">
+                                        <button type="button" class="tm-btn tm-btn-outline tm-excel-actualizar-existentes" title="Solo completa campos vacíos (ej: imágenes) en registros que ya existen">
+                                            <i class="fa-solid fa-arrows-rotate"></i> Actualizar registros existentes
                                         </button>
                                     </div>
                                 </div>
@@ -2904,6 +2910,7 @@
             const currentModuleId = String(modal.id || '').replace(/^tmImportarExcelModal-/, '');
             const previewUrl = String(modal.getAttribute('data-excel-preview-url') || '');
             const importUrl = String(modal.getAttribute('data-excel-import-url') || '');
+            const updateUrl = String(modal.getAttribute('data-excel-update-url') || '');
             const importSingleUrl = String(modal.getAttribute('data-excel-import-single-url') || '');
 
             const step1 = modal.querySelector('.tm-excel-step1-inner');
@@ -3660,6 +3667,76 @@
                                 modal.__excelImportedCount = savedCount;
                             }
                         });
+                }).catch(e => {
+                    const errEl = modal.querySelector('.tm-excel-import-err');
+                    if (errEl) { errEl.textContent = e.message; errEl.classList.remove('tm-hidden'); }
+                }).finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                });
+            });
+
+            // Botón "Actualizar registros existentes"
+            modal.querySelector('.tm-excel-actualizar-existentes')?.addEventListener('click', function() {
+                const errSection = modal.querySelector('.tm-excel-errors-section');
+                if (errSection) errSection.classList.add('tm-hidden');
+                const errList = modal.querySelector('.tm-excel-errors-list');
+                if (errList) errList.innerHTML = '';
+
+                const file = fileInput?.files[0];
+                if (!file) return;
+                if (!updateUrl) { alert('Ruta de actualización no configurada.'); return; }
+
+                const mapping = {};
+                modal.querySelectorAll('.tm-excel-map-select').forEach(sel => {
+                    const key = sel.getAttribute('data-field-key');
+                    if (key) mapping[key] = sel.value === '' ? null : parseInt(sel.value, 10);
+                });
+                const fd = new FormData();
+                fd.append('archivo_excel', file);
+                fd.append('header_row', headerRowInput.value || '1');
+                fd.append('data_start_row', dataStartRowInput.value || '2');
+                fd.append('mapping', JSON.stringify(mapping));
+                fd.append('all_microrregions', searchAllCheck?.checked ? '1' : '0');
+                fd.append('selected_microrregion_id', mrInput ? mrInput.value : '');
+                fd.append('sheet_index', currentSheetIdx);
+                fd.append('_token', csrfToken);
+
+                const btn = this;
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Actualizando...';
+
+                csrfFetch(updateUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
+                .then(r => r.json())
+                .then(j => {
+                    const okEl = modal.querySelector('.tm-excel-import-ok');
+                    const errEl = modal.querySelector('.tm-excel-import-err');
+                    if (okEl) okEl.classList.add('tm-hidden');
+                    if (errEl) errEl.classList.add('tm-hidden');
+
+                    if (!j.success) throw new Error(j.message);
+
+                    // Mostrar errores/info de filas no coincidentes
+                    if (j.row_errors && j.row_errors.length > 0) {
+                        const errSection = modal.querySelector('.tm-excel-errors-section');
+                        const errList = modal.querySelector('.tm-excel-errors-list');
+                        errSection?.classList.remove('tm-hidden');
+                        if (errList) {
+                            errList.innerHTML = '';
+                            j.row_errors.forEach((err, idx) => {
+                                const card = document.createElement('div');
+                                card.className = 'tm-error-log-card';
+                                card.style = 'padding:12px; border:1px solid var(--clr-border); border-radius:10px; background:var(--clr-bg); font-size:0.85rem;';
+                                card.innerHTML = '<div style="font-weight:600; color:var(--clr-text-light); margin-bottom:4px;">Fila ' + (err.row || '?') + '</div><div>' + String(err.message || '').replace(/</g, '&lt;') + '</div>';
+                                errList.appendChild(card);
+                            });
+                        }
+                    }
+
+                    if (j.updated > 0) modal.__excelImportedCount = (modal.__excelImportedCount || 0) + j.updated;
+
+                    Swal.fire({ title: '¡Completado!', text: j.message, icon: j.updated > 0 ? 'success' : 'info', confirmButtonText: 'Aceptar' });
                 }).catch(e => {
                     const errEl = modal.querySelector('.tm-excel-import-err');
                     if (errEl) { errEl.textContent = e.message; errEl.classList.remove('tm-hidden'); }

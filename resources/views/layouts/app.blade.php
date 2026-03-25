@@ -19,7 +19,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="{{ asset('assets/js/vendor/simple-expand.min.js') }}"></script>
 </head>
-<body data-export-status-url="{{ route('temporary-modules.admin.export-status', ['exportRequest' => 0]) }}">
+<body @can('Modulos-Temporales-Admin') data-export-status-url="{{ route('temporary-modules.admin.export-status', ['exportRequest' => 0]) }}" @endcan>
     @php
         $topbarNotifications = collect($topbarNotifications ?? []);
         if (auth()->check()) {

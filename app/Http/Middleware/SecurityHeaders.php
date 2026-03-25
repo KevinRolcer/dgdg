@@ -149,6 +149,10 @@ class SecurityHeaders
             ? "media-src 'self' data: blob: https: http:"
             : "media-src 'self' data: blob: https:";
 
+        $connectSrc = $isLocal
+            ? "connect-src 'self' http: https: https://static.cloudflareinsights.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com"
+            : "connect-src 'self' https://static.cloudflareinsights.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com";
+
         $directives = [
             "default-src 'self'",
             "base-uri 'self'",
@@ -161,7 +165,7 @@ class SecurityHeaders
             $mediaSrc,
             "font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
             // source maps y fetch desde los mismos CDNs ya permitidos en script-src/style-src
-            "connect-src 'self' https://static.cloudflareinsights.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com",
+            $connectSrc,
         ];
 
         if ($request->isSecure()) {

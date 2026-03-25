@@ -322,7 +322,7 @@ class TemporaryModuleExcelImportService
         $highestRow = (int) $sheet->getHighestRow();
         $highestColumn = $sheet->getHighestColumn();
         $maxCol = Coordinate::columnIndexFromString($highestColumn);
-        $drawings = $sheet->getDrawingCollection();
+        $drawingIndex = $this->buildDrawingIndex($sheet);
 
         $rowsData = [];
         for ($row = $dataStartRow; $row <= $highestRow; $row++) {
@@ -331,7 +331,7 @@ class TemporaryModuleExcelImportService
                 $letter = Coordinate::stringFromColumnIndex($col);
 
                 // Prioridad a dibujos de Excel si el campo es de tipo imagen/archivo
-                $matchedDrawing = $this->matchDrawingInCell($sheet, $drawings, $letter, $row);
+                $matchedDrawing = $this->matchDrawingInCell($sheet, $drawingIndex, $letter, $row);
                 if ($matchedDrawing) {
                     $savedPath = $this->saveExcelDrawing($matchedDrawing, $module, $letter . $row);
                     $rowData[$col - 1] = $savedPath ?: '';
@@ -692,36 +692,54 @@ class TemporaryModuleExcelImportService
     }
 
     /**
-     * Busca un dibujo en el listado que corresponda a la coordenada de la celda,
-     * considerando celdas combinadas y posibles offsets.
+     * Construye un índice coordenada → dibujo para búsqueda rápida.
+     * Combina getDrawingCollection() e getInCellDrawingCollection() de la hoja.
      */
-    private function matchDrawingInCell(Worksheet $sheet, \ArrayObject|array $drawings, string $letter, int $row): mixed
+    private function buildDrawingIndex(Worksheet $sheet): array
+    {
+        $index = [];
+        foreach ($this->allSheetDrawings($sheet) as $drawing) {
+            if (! method_exists($drawing, 'getCoordinates')) {
+                continue;
+            }
+            $rawCoord = (string) $drawing->getCoordinates();
+            if ($rawCoord === '') {
+                continue;
+            }
+            // Limpiar prefijo de hoja ("Sheet1!G2" → "G2") y rangos ("G2:H3" → "G2")
+            $clean = str_contains($rawCoord, '!') ? explode('!', $rawCoord)[1] : $rawCoord;
+            if (str_contains($clean, ':')) {
+                $clean = explode(':', $clean)[0];
+            }
+            // Solo guardar el primero encontrado por coordenada
+            if (! isset($index[$clean])) {
+                $index[$clean] = $drawing;
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * Busca un dibujo en el índice que corresponda a la coordenada de la celda,
+     * considerando celdas combinadas.
+     */
+    private function matchDrawingInCell(Worksheet $sheet, array $drawingIndex, string $letter, int $row): mixed
     {
         $coord = $letter.$row;
 
         // 1. Caso directo: "G2"
-        if (isset($drawings[$coord])) {
-            return $drawings[$coord];
+        if (isset($drawingIndex[$coord])) {
+            return $drawingIndex[$coord];
         }
 
         // 2. Si la celda es parte de un rango combinado, buscar el dibujo en el inicio del rango
         foreach ($sheet->getMergeCells() as $mergeRange) {
             if ($sheet->getCell($coord)->isInRange($mergeRange)) {
                 [$start] = explode(':', $mergeRange);
-                if (isset($drawings[$start])) {
-                    return $drawings[$start];
+                if (isset($drawingIndex[$start])) {
+                    return $drawingIndex[$start];
                 }
-            }
-        }
-
-        // 3. Búsqueda exhaustiva por si la coordenada tiene prefijos o es un rango incompleto
-        foreach ($drawings as $drwCoord => $drawing) {
-            $cleanDrw = str_contains($drwCoord, '!') ? explode('!', $drwCoord)[1] : $drwCoord;
-            if (str_contains($cleanDrw, ':')) {
-                $cleanDrw = explode(':', $cleanDrw)[0];
-            }
-            if ($cleanDrw === $coord) {
-                return $drawing;
             }
         }
 
@@ -1206,5 +1224,253 @@ class TemporaryModuleExcelImportService
 
         return ['imported' => $imported, 'skipped' => $skipped, 'row_errors' => array_slice($rowErrors, 0, 50)];
     }
-}
 
+    /**
+     * Actualiza registros existentes con datos faltantes (ej. imágenes) desde un Excel.
+     *
+     * Compara los campos de texto/datos del Excel con los registros existentes en la BD.
+     * Si un registro existente coincide y tiene campos vacíos que el Excel sí tiene (especialmente imágenes),
+     * se actualizan solo esos campos vacíos.
+     *
+     * @return array{updated:int, skipped:int, row_errors:list<array>}
+     */
+    public function updateExistingEntries(TemporaryModule $module, UploadedFile $file, array $options): array
+    {
+        $mapping = $options['mapping'] ?? [];
+        $headerRow = (int) ($options['header_row'] ?? 1);
+        $dataStartRow = (int) ($options['data_start_row'] ?? $headerRow + 1);
+        $sheetIndex = (int) ($options['sheet_index'] ?? 0);
+        $allMicrorregions = (bool) ($options['all_microrregions'] ?? false);
+        $microrregionId = $options['selected_microrregion_id'] ? (int) $options['selected_microrregion_id'] : null;
+        $userId = auth()->id();
+        $headerRow = max(1, $headerRow);
+        $dataStartRow = max($headerRow + 1, $dataStartRow);
+        $spreadsheet = $this->loadSpreadsheet($file);
+        $sheetIndex = max(0, min($sheetIndex, count($spreadsheet->getSheetNames()) - 1));
+        $sheet = $spreadsheet->getSheet($sheetIndex);
+        $highestRow = (int) $sheet->getHighestRow();
+        $highestColumn = $sheet->getHighestColumn();
+        $maxCol = Coordinate::columnIndexFromString($highestColumn);
+        $drawingIndex = $this->buildDrawingIndex($sheet);
+
+        // Leer todas las filas del Excel con prioridad a imágenes
+        $rowsData = [];
+        for ($row = $dataStartRow; $row <= $highestRow; $row++) {
+            $rowData = [];
+            for ($col = 1; $col <= $maxCol; $col++) {
+                $letter = Coordinate::stringFromColumnIndex($col);
+                $matchedDrawing = $this->matchDrawingInCell($sheet, $drawingIndex, $letter, $row);
+                if ($matchedDrawing) {
+                    $savedPath = $this->saveExcelDrawing($matchedDrawing, $module, $letter . $row);
+                    $rowData[$col - 1] = $savedPath ?: '';
+                    continue;
+                }
+                $cell = $sheet->getCell($letter . $row);
+                $raw = $cell->getValue();
+                $calculated = $cell->getCalculatedValue();
+                $rowData[$col - 1] = $calculated !== null ? $calculated : $raw;
+            }
+            $rowsData[] = $rowData;
+        }
+
+        return $this->updateFromDataArray($module, $rowsData, array_merge($options, [
+            'mapping' => $mapping,
+            'row_offset' => $dataStartRow,
+        ]));
+    }
+
+    /**
+     * Busca registros existentes que coincidan por campos de texto/datos y completa campos vacíos.
+     */
+    public function updateFromDataArray(TemporaryModule $module, array $rows, array $options): array
+    {
+        $mapping = $options['mapping'] ?? [];
+        $rowOffset = (int) ($options['row_offset'] ?? 1);
+        $allMicrorregions = (bool) ($options['all_microrregions'] ?? false);
+        $microrregionId = $options['selected_microrregion_id'] ? (int) $options['selected_microrregion_id'] : null;
+        $userId = auth()->id();
+
+        $importable = $module->fields->filter(fn ($f) => in_array($f->type, self::IMPORTABLE_TYPES, true));
+        $fieldsByKey = $importable->keyBy('key');
+
+        $municipioField = $importable->firstWhere('type', 'municipio');
+        $municipioKey = $municipioField ? $municipioField->key : null;
+
+        $microrregionesAsignadas = (new TemporaryModuleAccessService())->microrregionesConMunicipiosPorUsuario($userId);
+        $suggestionBaseMunicipios = [];
+        $municipioToMrMap = [];
+        foreach ($microrregionesAsignadas as $micro) {
+            foreach (($micro->municipios ?? []) as $mName) {
+                $norm = $this->normalizeLabel($mName);
+                if ($norm !== '') {
+                    $municipioToMrMap[$norm] = $micro->id;
+                    $suggestionBaseMunicipios[] = $mName;
+                }
+            }
+        }
+
+        // Cargar todos los registros existentes del módulo para las microrregiones permitidas
+        $microsToPreload = $allMicrorregions
+            ? $microrregionesAsignadas->pluck('id')->all()
+            : ($microrregionId ? [$microrregionId] : []);
+
+        $existingEntries = [];
+        if (! empty($microsToPreload)) {
+            $module->entries()
+                ->whereIn('microrregion_id', $microsToPreload)
+                ->orderBy('id')
+                ->chunk(1000, function ($entries) use (&$existingEntries) {
+                    foreach ($entries as $entry) {
+                        $existingEntries[] = $entry;
+                    }
+                });
+        }
+
+        // Campos que se usan como "llave de coincidencia" (todos los campos de texto/datos, no imágenes)
+        $matchFields = $importable->filter(fn ($f) => ! in_array($f->type, ['image', 'file'], true));
+        // Campos que se pueden completar (imágenes y archivos, más cualquier campo vacío)
+        $fillableFields = $importable;
+
+        $updated = 0;
+        $skipped = 0;
+        $rowErrors = [];
+
+        foreach ($rows as $index => $rowData) {
+            $row = $index + $rowOffset;
+            $values = [];
+            $hasAnyMappedData = false;
+
+            foreach ($mapping as $fieldKey => $colIndex) {
+                if ($colIndex === null || ! isset($fieldsByKey[$fieldKey])) {
+                    continue;
+                }
+                $field = $fieldsByKey[$fieldKey];
+                $col = (int) $colIndex;
+                $raw = $rowData[$col] ?? null;
+
+                if (in_array($field->type, ['image', 'file'], true) && is_string($raw) && str_starts_with($raw, 'temporary-modules/')) {
+                    $values[$fieldKey] = $raw;
+                    if ($raw !== '') {
+                        $hasAnyMappedData = true;
+                    }
+                    continue;
+                }
+
+                $str = $this->stringifyCell($raw);
+                if (trim($str) !== '') {
+                    $hasAnyMappedData = true;
+                }
+                $values[$fieldKey] = $this->coerceValue($field, $raw, $raw, $str, $suggestionBaseMunicipios);
+            }
+
+            if (! $hasAnyMappedData) {
+                $skipped++;
+                continue;
+            }
+
+            // Buscar registro existente que coincida por los campos de texto
+            $matchedEntry = $this->findMatchingEntry($existingEntries, $values, $matchFields);
+
+            if ($matchedEntry === null) {
+                $rowErrors[] = [
+                    'row' => $row,
+                    'message' => "Fila {$row}: no se encontró un registro existente que coincida.",
+                    'data' => $values,
+                    'failed_fields' => [['key' => '__no_match__', 'label' => 'Coincidencia', 'reason' => 'No hay registro existente con los mismos datos de texto.', 'received' => '']],
+                    'suggestions' => [],
+                ];
+                $skipped++;
+                continue;
+            }
+
+            // Determinar qué campos del registro existente están vacíos y el Excel los tiene
+            $entryData = (array) ($matchedEntry->data ?? []);
+            $fieldsToUpdate = [];
+
+            foreach ($fillableFields as $field) {
+                $excelVal = $values[$field->key] ?? null;
+                $existingVal = $entryData[$field->key] ?? null;
+
+                // ¿El campo del registro existente está vacío?
+                $existingEmpty = $existingVal === null || $existingVal === ''
+                    || (is_string($existingVal) && trim($existingVal) === '');
+
+                // ¿El Excel tiene un valor para este campo?
+                $excelHasValue = $excelVal !== null && $excelVal !== ''
+                    && (! is_string($excelVal) || trim($excelVal) !== '');
+
+                if ($existingEmpty && $excelHasValue) {
+                    $fieldsToUpdate[$field->key] = $excelVal;
+                }
+            }
+
+            if (empty($fieldsToUpdate)) {
+                $rowErrors[] = [
+                    'row' => $row,
+                    'message' => "Fila {$row}: el registro ya tiene todos los campos completos.",
+                    'data' => $values,
+                    'failed_fields' => [['key' => '__complete__', 'label' => 'Sin cambios', 'reason' => 'No hay campos vacíos que completar.', 'received' => '']],
+                    'suggestions' => [],
+                ];
+                $skipped++;
+                continue;
+            }
+
+            // Aplicar la actualización parcial
+            $newData = array_merge($entryData, $fieldsToUpdate);
+            $matchedEntry->data = $newData;
+            $matchedEntry->save();
+            $updated++;
+        }
+
+        return ['updated' => $updated, 'skipped' => $skipped, 'row_errors' => array_slice($rowErrors, 0, 50)];
+    }
+
+    /**
+     * Busca un registro existente que coincida por los campos de comparación (no-imagen).
+     */
+    private function findMatchingEntry(array $entries, array $excelValues, Collection $matchFields): ?object
+    {
+        $bestMatch = null;
+        $bestScore = 0;
+
+        foreach ($entries as $entry) {
+            $entryData = (array) ($entry->data ?? []);
+            $score = 0;
+            $totalMatchable = 0;
+
+            foreach ($matchFields as $field) {
+                $excelVal = $excelValues[$field->key] ?? null;
+                $entryVal = $entryData[$field->key] ?? null;
+
+                // Saltar campos que no están en el Excel (no mapeados)
+                if ($excelVal === null || ($excelVal === '' && ($entryVal === null || $entryVal === ''))) {
+                    continue;
+                }
+
+                $totalMatchable++;
+
+                $normExcel = $this->normalizeLabel($this->stringifyCell($excelVal));
+                $normEntry = $this->normalizeLabel($this->stringifyCell($entryVal));
+
+                if ($normExcel === $normEntry) {
+                    $score++;
+                }
+            }
+
+            // Necesita al menos 2 campos coincidentes y un 80% de coincidencia
+            if ($totalMatchable >= 2 && $score > 0) {
+                $pct = $score / $totalMatchable;
+                if ($pct >= 0.8 && $score > $bestScore) {
+                    $bestScore = $score;
+                    $bestMatch = $entry;
+                }
+            } elseif ($totalMatchable === 1 && $score === 1 && $bestScore === 0) {
+                $bestMatch = $entry;
+                $bestScore = $score;
+            }
+        }
+
+        return $bestMatch;
+    }
+}

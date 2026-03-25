@@ -323,6 +323,11 @@
                                 <button type="button" class="tm-btn" id="tmExcelVolver">Restablecer</button>
                                 <button type="button" class="tm-btn tm-btn-primary" id="tmExcelImportar">Importar filas</button>
                             </div>
+                            <div class="tm-actions" style="display:grid; grid-template-columns:1fr; gap:10px; margin-top:8px;">
+                                <button type="button" class="tm-btn tm-btn-outline" id="tmExcelActualizarExistentes" title="Solo completa campos vacíos (ej: imágenes) en registros que ya existen">
+                                    <i class="fa-solid fa-arrows-rotate"></i> Actualizar registros existentes
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -937,6 +942,7 @@
     const excelModal = document.getElementById('tmImportarExcelModal');
     const excelPreviewUrl = @json(route('temporary-modules.import-excel-preview', $temporaryModule->id));
     const excelImportUrl = @json(route('temporary-modules.import-excel', $temporaryModule->id));
+    const excelUpdateUrl = @json(route('temporary-modules.update-from-excel', $temporaryModule->id));
     const excelImportSingleUrl = @json(route('temporary-modules.import-single-row', $temporaryModule->id));
     let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json(csrf_token());
 
@@ -1791,6 +1797,73 @@
             }).catch(e => {
                 const err = document.getElementById('tmExcelImportErr');
                 if (err) { err.textContent = e.message; err.classList.remove('tm-hidden'); }
+            });
+    });
+
+    // Botón "Actualizar registros existentes"
+    document.getElementById('tmExcelActualizarExistentes')?.addEventListener('click', function () {
+        const errSection = document.getElementById('tmExcelErrorsSection');
+        if (errSection) errSection.classList.add('tm-hidden');
+        const errList = document.getElementById('tmExcelErrorsList');
+        if (errList) errList.innerHTML = '';
+
+        const file = document.getElementById('tmExcelFile')?.files[0];
+        if (!file) return;
+        const mapping = {};
+        document.querySelectorAll('.tm-excel-map-select').forEach(sel => {
+            const key = sel.getAttribute('data-field-key');
+            if (key) mapping[key] = sel.value === '' ? null : parseInt(sel.value, 10);
+        });
+        const fd = new FormData();
+        fd.append('archivo_excel', file);
+        fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
+        fd.append('data_start_row', document.getElementById('tmExcelDataStartRow')?.value || '2');
+        fd.append('mapping', JSON.stringify(mapping));
+        fd.append('all_microrregions', document.getElementById('tmExcelSearchAll')?.checked ? '1' : '0');
+        fd.append('selected_microrregion_id', document.getElementById('tmExcelMicrorregionId')?.value || '');
+        fd.append('sheet_index', currentSheetIdx);
+        fd.append('_token', csrfToken);
+
+        const btn = this;
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Actualizando...';
+
+        csrfFetch(excelUpdateUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
+            .then(r => r.json())
+            .then(j => {
+                const okEl = document.getElementById('tmExcelImportOk');
+                const errEl = document.getElementById('tmExcelImportErr');
+                if (okEl) okEl.classList.add('tm-hidden');
+                if (errEl) errEl.classList.add('tm-hidden');
+
+                if (!j.success) throw new Error(j.message);
+
+                if (j.row_errors && j.row_errors.length > 0) {
+                    const errSection = document.getElementById('tmExcelErrorsSection');
+                    const errList = document.getElementById('tmExcelErrorsList');
+                    errSection?.classList.remove('tm-hidden');
+                    if (errList) {
+                        errList.innerHTML = '';
+                        j.row_errors.forEach((err) => {
+                            const card = document.createElement('div');
+                            card.className = 'tm-error-log-card';
+                            card.style = 'padding:12px; border:1px solid var(--clr-border); border-radius:10px; background:var(--clr-bg); font-size:0.85rem;';
+                            card.innerHTML = '<div style="font-weight:600; color:var(--clr-text-light); margin-bottom:4px;">Fila ' + (err.row || '?') + '</div><div>' + String(err.message || '').replace(/</g, '&lt;') + '</div>';
+                            errList.appendChild(card);
+                        });
+                    }
+                }
+
+                if (j.updated > 0) excelImportedCount += j.updated;
+
+                Swal.fire({ title: '¡Completado!', text: j.message, icon: j.updated > 0 ? 'success' : 'info', confirmButtonText: 'Aceptar' });
+            }).catch(e => {
+                const err = document.getElementById('tmExcelImportErr');
+                if (err) { err.textContent = e.message; err.classList.remove('tm-hidden'); }
+            }).finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
             });
     });
 

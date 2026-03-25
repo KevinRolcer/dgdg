@@ -1583,6 +1583,89 @@ class TemporaryModuleController extends Controller
     }
 
     /**
+     * Actualizar registros existentes con datos faltantes (ej: imágenes) desde Excel.
+     */
+    public function updateExistingFromExcel(Request $request, int $module): JsonResponse
+    {
+        $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
+        abort_unless($temporaryModule->isAvailable(), 404);
+        abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
+
+        $request->validate([
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:15360'],
+            'header_row' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'data_start_row' => ['nullable', 'integer', 'min:2', 'max:1000'],
+            'mapping' => ['required', 'string'],
+            'selected_microrregion_id' => ['nullable', 'integer'],
+            'all_microrregions' => ['nullable', 'boolean'],
+            'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
+        ]);
+
+        $mapping = json_decode((string) $request->input('mapping'), true);
+        if (! is_array($mapping)) {
+            return response()->json(['success' => false, 'message' => 'Mapeo inválido.'], 422);
+        }
+        $normalizedMap = [];
+        foreach ($mapping as $key => $idx) {
+            if ($idx === '' || $idx === null) {
+                $normalizedMap[(string) $key] = null;
+            } elseif (is_numeric($idx)) {
+                $normalizedMap[(string) $key] = (int) $idx;
+            }
+        }
+
+        $allMicrorregions = $request->boolean('all_microrregions', false);
+        $microrregionId = null;
+
+        $microrregionesInfo = $this->accessService->microrregionesConMunicipiosPorUsuario((int) $request->user()->id);
+
+        if (! $allMicrorregions) {
+            $requestedMicrorregionId = $request->filled('selected_microrregion_id')
+                ? (int) $request->input('selected_microrregion_id')
+                : null;
+            $microrregionIdsPermitidos = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
+            if ($requestedMicrorregionId !== null && ! in_array($requestedMicrorregionId, $microrregionIdsPermitidos, true)) {
+                return response()->json(['success' => false, 'message' => 'Microrregión no permitida.'], 403);
+            }
+            [$microrregionId] = $this->accessService->delegadoMunicipios($request->user()->id, $requestedMicrorregionId);
+        }
+
+        $headerRow = (int) ($request->input('header_row') ?: 1);
+        $dataStartRow = (int) ($request->input('data_start_row') ?: $headerRow + 1);
+        $sheetIndex = (int) ($request->input('sheet_index') ?: 0);
+
+        try {
+            $result = $this->excelImportService->updateExistingEntries(
+                $temporaryModule,
+                $request->file('archivo_excel'),
+                [
+                    'mapping' => $normalizedMap,
+                    'header_row' => $headerRow,
+                    'data_start_row' => $dataStartRow,
+                    'selected_microrregion_id' => $microrregionId,
+                    'all_microrregions' => $allMicrorregions,
+                    'sheet_index' => $sheetIndex,
+                ]
+            );
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al actualizar: '.$e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'updated' => $result['updated'],
+            'skipped' => $result['skipped'],
+            'row_errors' => $result['row_errors'],
+            'message' => $result['updated'] > 0
+                ? "Se actualizaron {$result['updated']} registro(s) existente(s)."
+                : 'No se actualizó ningún registro (no se encontraron coincidencias o todos están completos).',
+        ]);
+    }
+
+    /**
      * Importación manual de una sola fila desde el log de errores.
      */
     public function importSingleRow(Request $request, int $module): JsonResponse

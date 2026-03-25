@@ -149,9 +149,13 @@ document.addEventListener('DOMContentLoaded', function () {
             var id = el.getAttribute('data-export-request-id');
             if (!id || exportPollIntervals[id]) return;
             var url = urlTemplate.replace(/\/0$/, '/' + id);
+            var failCount = 0;
             var intervalId = setInterval(function () {
                 fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
-                    .then(function (res) { return res.json(); })
+                    .then(function (res) {
+                        failCount = 0;
+                        return res.json();
+                    })
                     .then(function (data) {
                         if (data.status === 'completed' || data.status === 'failed') {
                             clearInterval(exportPollIntervals[id]);
@@ -159,7 +163,13 @@ document.addEventListener('DOMContentLoaded', function () {
                             refreshNotifications();
                         }
                     })
-                    .catch(function () {});
+                    .catch(function () {
+                        failCount++;
+                        if (failCount >= 3) {
+                            clearInterval(exportPollIntervals[id]);
+                            delete exportPollIntervals[id];
+                        }
+                    });
             }, 4000);
             exportPollIntervals[id] = intervalId;
         });

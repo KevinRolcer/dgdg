@@ -16,11 +16,6 @@
             margin: 0;
             padding: 0;
         }
-
-        /*
-         * Una ficha = una hoja; hijos absolutos no alargan el flujo (evita 2ª página).
-         * Geometría alineada con agenda-preview-ficha.css (.agenda-ficha-card-body).
-         */
         .ficha {
             width: 210mm;
             height: 297mm;
@@ -68,7 +63,6 @@
             align-items: center;
         }
 
-        /* Poco texto: igual que .agenda-ficha-card--sparse .agenda-ficha-card-body en la vista previa */
         .ficha--sparse .ficha__body-wrap {
             top: 50%;
             left: 14mm;

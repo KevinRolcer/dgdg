@@ -27,6 +27,11 @@ return [
             'permission_any' => ['Modulos-Temporales-Admin', 'Agenda-Directiva', 'Agenda-Seguimiento', 'Agenda-consulta'],
         ],
         [
+            'icon' => 'fa-solid fa-note-sticky',
+            'title' => 'Mi Agenda Personal',
+            'route' => 'personal-agenda.index',
+        ],
+        [
             'icon' => 'fa-solid fa-clipboard-check',
             'title' => 'Seguimiento de Agenda',
             'route' => 'agenda.seguimiento.index',

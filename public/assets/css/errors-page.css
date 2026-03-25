@@ -86,15 +86,15 @@ body.error-page-body {
     display: block;
 }
 
-.error-brand__logo--dark {
+.error-brand .error-brand__logo--dark {
     display: none;
 }
 
-html.theme-dark .error-brand__logo--light {
+html.theme-dark .error-brand .error-brand__logo--light {
     display: none;
 }
 
-html.theme-dark .error-brand__logo--dark {
+html.theme-dark .error-brand .error-brand__logo--dark {
     display: block;
 }
 
