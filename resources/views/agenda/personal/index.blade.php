@@ -68,7 +68,7 @@
     {{-- Contenido Principal --}}
     <main class="pa-main">
         {{-- Cabecera Ultra Compacta - Buscador + Filtros --}}
-        <header class="pa-content-header" style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; position: sticky; top: 0; background: #fcfcfc; z-index: 100; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.03);">
+        <header class="pa-content-header" style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; position: sticky; top: 0; background: var(--clr-bg); z-index: 10; padding: 10px 24px; margin-left: -24px; margin-right: -24px; border-bottom: 1px solid rgba(0,0,0,0.03);">
             <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
                 <div class="pa-search-wrapper" style="margin: 0; width: 220px; flex-shrink: 0;">
                     <i class="fa-solid fa-magnifying-glass"></i>

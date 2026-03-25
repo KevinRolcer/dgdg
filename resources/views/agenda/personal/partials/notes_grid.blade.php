@@ -78,7 +78,7 @@
                  'file_type' => $a->file_type
              ])
          ]) }}"
-         @if($note->is_encrypted && !$isTrashed) onclick="decryptNote({{ $note->id }})" @endif>
+         @if($note->is_encrypted && !$isTrashed) onclick="decryptNote({{ $note->id }})" @elseif(!$isTrashed) onclick="previewNote({{ $note->id }})" @endif>
 
         <div class="pa-card-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
             <div class="pa-card-date">{{ $note->created_at->format('d/m/Y') }}</div>

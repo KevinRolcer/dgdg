@@ -330,7 +330,9 @@
     top: 0;
     z-index: 5;
     background: var(--clr-bg);
-    padding: 10px 0;
+    padding: 10px 24px;
+    margin-left: -24px;
+    margin-right: -24px;
 }
 
 .pa-search-wrapper {
@@ -420,13 +422,13 @@
 .pa-notes-grid {
     display: flex;
     flex-wrap: nowrap;
-    gap: 20px;
+    gap: 14px;
     overflow-x: auto;
     scroll-behavior: smooth;
     padding: 10px 4px;
     margin: 0 -4px;
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 
 .pa-notes-grid::-webkit-scrollbar {
@@ -459,31 +461,32 @@
 }
 
 .pa-card-date {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     font-weight: 600;
-    margin-bottom: 12px;
+    margin-bottom: 6px;
     opacity: 0.6;
 }
 
 .pa-card-title {
-    font-size: 1rem;
+    font-size: 0.85rem;
     font-weight: 800;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 }
 
 .pa-card-body {
-    font-size: 0.85rem;
-    line-height: 1.5;
+    font-size: 0.8rem;
+    line-height: 1.4;
     display: -webkit-box;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
 
 .pa-card--note {
-    min-width: 280px;
-    max-width: 320px;
+    min-width: 240px;
+    max-width: 280px;
+    padding: 12px;
 }
 
 /* Slider Navigation Buttons */
@@ -1063,4 +1066,196 @@
 
 .pa-btn-unlock i {
     font-size: 0.85rem;
+}
+
+/* Note Preview Modal */
+.pa-preview-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: paFadeIn 0.2s ease;
+}
+
+@keyframes paFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.pa-preview-card {
+    background: #fff;
+    border-radius: 16px;
+    max-width: 480px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    position: relative;
+    animation: paSlideUp 0.25s ease;
+}
+
+@keyframes paSlideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.pa-preview-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.06);
+    color: #666;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    transition: all 0.15s;
+}
+
+.pa-preview-close:hover {
+    background: rgba(0,0,0,0.12);
+    color: #333;
+}
+
+.pa-preview-card .pa-preview-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin-bottom: 4px;
+    padding-right: 30px;
+}
+
+.pa-preview-card .pa-preview-date {
+    font-size: 0.7rem;
+    opacity: 0.5;
+    margin-bottom: 14px;
+}
+
+.pa-preview-card .pa-preview-body {
+    font-size: 0.85rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--clr-text-main);
+}
+
+.pa-preview-card .pa-preview-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+.pa-preview-card .pa-preview-att-item {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,0.08);
+}
+
+.pa-preview-card .pa-preview-att-item img {
+    max-width: 160px;
+    max-height: 120px;
+    object-fit: cover;
+    display: block;
+}
+
+/* Modal Attachment redesign */
+.pa-att-zone {
+    position: relative;
+    margin-top: 12px;
+}
+
+.pa-att-zone .pa-att-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px dashed var(--clr-border);
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--clr-text-light);
+    font-size: 0.75rem;
+    transition: all 0.2s;
+}
+
+.pa-att-zone .pa-att-trigger:hover {
+    border-color: var(--clr-primary);
+    color: var(--clr-primary);
+    background: rgba(134,30,52,0.03);
+}
+
+.pa-att-zone .pa-att-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.pa-att-zone .pa-att-item {
+    position: relative;
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.08);
+    overflow: hidden;
+    background: #fafafa;
+    max-width: 110px;
+}
+
+.pa-att-zone .pa-att-item img {
+    width: 110px;
+    height: 70px;
+    object-fit: cover;
+    display: block;
+}
+
+.pa-att-zone .pa-att-item .pa-att-file-icon {
+    width: 110px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: #aaa;
+    background: #f5f5f5;
+}
+
+.pa-att-zone .pa-att-item .pa-att-name {
+    padding: 4px 6px;
+    font-size: 0.6rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--clr-text-light);
+}
+
+.pa-att-zone .pa-att-item .pa-att-remove {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.5);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.55rem;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.pa-att-zone .pa-att-item:hover .pa-att-remove {
+    opacity: 1;
 }

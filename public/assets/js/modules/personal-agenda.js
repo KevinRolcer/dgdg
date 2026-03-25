@@ -77,14 +77,19 @@ window.openPersonalNoteModal = function(noteData = null) {
                     <textarea id="note-content" class="swal2-textarea" placeholder="Escribe aquí los detalles..." style="height: 100px;">${noteData?.content || ''}</textarea>
                 </div>
 
-                <div style="margin-top: 12px;">
-                    <label class="swal2-label"><i class="fa-solid fa-paperclip"></i> Adjuntos (Imágenes o documentos)</label>
-                    <input type="file" id="note-attachments" class="swal2-input" multiple style="font-size: 0.8rem; padding: 4px;">
-                    <div id="attachments-preview" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">
+                <div class="pa-att-zone">
+                    <label class="pa-att-trigger" onclick="document.getElementById('note-attachments').click()">
+                        <i class="fa-solid fa-paperclip"></i> Adjuntar archivo
+                    </label>
+                    <input type="file" id="note-attachments" multiple style="display:none;" onchange="previewNewAttachments(this)">
+                    <div class="pa-att-list" id="attachments-preview">
                         ${(noteData?.attachments || []).map(att => `
-                            <div class="att-item" data-id="${att.id}" style="position: relative; border: 1px solid #eee; padding: 4px; border-radius: 4px; background: #fff;">
-                                <div style="max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px;">${att.file_name}</div>
-                                <i class="fa-solid fa-circle-xmark" style="position: absolute; top: -5px; right: -5px; color: #dc3545; cursor: pointer;" onclick="removeAttachment(${att.id}, this)"></i>
+                            <div class="pa-att-item" data-id="${att.id}">
+                                ${att.file_type === 'image'
+                                    ? `<img src="${att.file_path}" alt="${att.file_name}">`
+                                    : `<div class="pa-att-file-icon"><i class="fa-solid fa-file-lines"></i></div>`}
+                                <div class="pa-att-name" title="${att.file_name}">${att.file_name}</div>
+                                <button class="pa-att-remove" onclick="removeAttachment(${att.id}, this.closest('.pa-att-item'))"><i class="fa-solid fa-xmark"></i></button>
                             </div>
                         `).join('')}
                     </div>
@@ -235,7 +240,7 @@ async function saveFolder(data) {
         });
         if (response.ok) location.reload();
     } catch (error) {
-        swalAlert.fire('Error', 'Fallo de conexión', 'error');
+        segobToast('error', 'Fallo de conexión');
     }
 }
 
@@ -409,7 +414,16 @@ document.addEventListener('DOMContentLoaded', function() {
             card.onclick = function(e) {
                 if (e.target.closest('.pa-folder-delete')) return;
                 const folderId = this.dataset.id;
-                if (folderId) navigateToFolder(folderId);
+                if (!folderId) return;
+
+                // Switch sidebar to "Carpetas"
+                const foldersNavItem = document.querySelector('.pa-nav-item[data-filter="folders"]');
+                if (foldersNavItem && !foldersNavItem.classList.contains('is-active')) {
+                    foldersNavItem.click();
+                }
+
+                // Navigate into the folder
+                navigateToFolder(folderId);
             };
         });
     }
@@ -474,6 +488,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         notesTitle.textContent = 'Notas Recientes';
                     }
                 }
+
+                // Archive & Trash: full grid, no slider arrows
+                toggleNotesGrid(filter === 'archive' || filter === 'trash');
             }
 
             loadNotes(filter);
@@ -519,11 +536,16 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             let html;
+            const text = await response.text();
             if (window.paCurrentFolderId) {
-                const data = await response.json();
-                html = data.html;
+                try {
+                    const data = JSON.parse(text);
+                    html = data.html;
+                } catch (_) {
+                    html = text;
+                }
             } else {
-                html = await response.text();
+                html = text;
             }
             container.innerHTML = html;
 
@@ -595,6 +617,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             if (response.ok) {
+                segobToast('success', isEdit ? 'Nota actualizada' : 'Nota creada');
                 if (window.paCurrentFolderId) {
                     navigateToFolder(window.paCurrentFolderId);
                 } else {
@@ -602,12 +625,45 @@ document.addEventListener('DOMContentLoaded', function() {
                     window.loadNotes(currentFilter);
                 }
             } else {
-                swalAlert.fire('Error', 'No se pudo guardar la nota', 'error');
+                segobToast('error', 'No se pudo guardar la nota');
             }
         } catch (error) {
-            swalAlert.fire('Error', 'Fallo de conexión', 'error');
+            console.error('Save error:', error);
+            segobToast('error', 'Fallo de conexión');
         }
     }
+
+    // Note Preview (read-only full content view)
+    window.previewNote = function(id) {
+        const card = document.querySelector(`.pa-card--note[data-id="${id}"]`);
+        if (!card) return;
+        const noteData = JSON.parse(card.dataset.noteData);
+        if (noteData.is_encrypted) { decryptNote(id, 'preview'); return; }
+
+        const attachmentsHtml = (noteData.attachments || []).map(att => {
+            if (att.file_type === 'image') {
+                return `<div class="pa-preview-att-item"><img src="${att.file_path}" alt="${att.file_name}" onclick="window.open('${att.file_path}','_blank');" style="cursor:pointer;"></div>`;
+            }
+            return `<a href="${att.file_path}" target="_blank" class="pa-preview-att-item" style="padding:10px 14px;text-decoration:none;color:inherit;display:flex;align-items:center;gap:6px;font-size:0.75rem;"><i class="fa-solid fa-file-lines"></i>${att.file_name}</a>`;
+        }).join('');
+
+        const overlay = document.createElement('div');
+        overlay.className = 'pa-preview-overlay';
+        overlay.innerHTML = `
+            <div class="pa-preview-card" style="border-left: 5px solid ${noteData.color || '#eee'};">
+                <button class="pa-preview-close" onclick="this.closest('.pa-preview-overlay').remove()"><i class="fa-solid fa-xmark"></i></button>
+                <div class="pa-preview-title">${noteData.title || 'Sin título'}</div>
+                <div class="pa-preview-date">${card.querySelector('.pa-card-date')?.textContent || ''}</div>
+                <div class="pa-preview-body">${noteData.content ? noteData.content.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') : ''}</div>
+                ${attachmentsHtml ? `<div class="pa-preview-attachments">${attachmentsHtml}</div>` : ''}
+                <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+                    <button onclick="this.closest('.pa-preview-overlay').remove(); editNote(${id});" style="padding:6px 14px;border-radius:8px;border:1px solid var(--clr-border);background:#fff;cursor:pointer;font-size:0.75rem;font-weight:600;"><i class="fa-regular fa-pen-to-square"></i> Editar</button>
+                </div>
+            </div>
+        `;
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    };
 
     window.editNote = function(id) {
         const card = document.querySelector(`.pa-card--note[data-id="${id}"]`);
@@ -615,16 +671,32 @@ document.addEventListener('DOMContentLoaded', function() {
         const noteData = JSON.parse(card.dataset.noteData);
 
         if (noteData.is_encrypted) {
-            decryptNote(id);
+            decryptNote(id, 'edit');
         } else {
             window.openPersonalNoteModal(noteData);
         }
     };
 
-    window.decryptNote = async function(id) {
+    // Session cache for decrypted notes { noteId: { content, password } }
+    if (!window._decryptedNotes) window._decryptedNotes = {};
+
+    window.decryptNote = async function(id, action) {
+        action = action || 'preview'; // 'preview' or 'edit'
         const card = document.querySelector(`.pa-card--note[data-id="${id}"]`);
         if (!card) return;
         const noteData = JSON.parse(card.dataset.noteData);
+
+        // If already decrypted this session, use cached content
+        if (window._decryptedNotes[id]) {
+            noteData.content = window._decryptedNotes[id].content;
+            noteData.password = window._decryptedNotes[id].password;
+            if (action === 'edit') {
+                window.openPersonalNoteModal(noteData);
+            } else {
+                showDecryptedPreview(noteData, card);
+            }
+            return;
+        }
 
         const { value: password } = await swalAlert.fire({
             title: 'Nota Cifrada',
@@ -658,17 +730,50 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await response.json();
                 if (data.success) {
                     noteData.content = data.content;
-                    noteData.password = password; // Almacenar para que el modal ya la tenga si se edita
-                    window.openPersonalNoteModal(noteData);
+                    noteData.password = password;
+                    // Cache for session
+                    window._decryptedNotes[id] = { content: data.content, password: password };
+                    if (action === 'edit') {
+                        window.openPersonalNoteModal(noteData);
+                    } else {
+                        showDecryptedPreview(noteData, card);
+                    }
                 } else {
-                    swalAlert.fire('Error', data.message || 'Contraseña incorrecta', 'error');
+                    segobToast('error', data.message || 'Contraseña incorrecta');
                 }
             } catch (error) {
                 console.error(error);
-                swalAlert.fire('Error', 'Fallo de conexión', 'error');
+                segobToast('error', 'Fallo de conexión');
             }
         }
     };
+
+    function showDecryptedPreview(noteData, card) {
+        const attachmentsHtml = (noteData.attachments || []).map(att => {
+            if (att.file_type === 'image') {
+                return `<div class="pa-preview-att-item"><img src="${att.file_path}" alt="${att.file_name}" onclick="window.open('${att.file_path}','_blank');" style="cursor:pointer;"></div>`;
+            }
+            return `<a href="${att.file_path}" target="_blank" class="pa-preview-att-item" style="padding:10px 14px;text-decoration:none;color:inherit;display:flex;align-items:center;gap:6px;font-size:0.75rem;"><i class="fa-solid fa-file-lines"></i>${att.file_name}</a>`;
+        }).join('');
+
+        const overlay = document.createElement('div');
+        overlay.className = 'pa-preview-overlay';
+        overlay.innerHTML = `
+            <div class="pa-preview-card" style="border-left: 5px solid ${noteData.color || '#eee'};">
+                <button class="pa-preview-close" onclick="this.closest('.pa-preview-overlay').remove()"><i class="fa-solid fa-xmark"></i></button>
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><i class="fa-solid fa-lock" style="font-size:0.7rem;opacity:0.5;"></i><span style="font-size:0.65rem;opacity:0.5;">Descifrada</span></div>
+                <div class="pa-preview-title">${noteData.title || 'Sin título'}</div>
+                <div class="pa-preview-date">${card.querySelector('.pa-card-date')?.textContent || ''}</div>
+                <div class="pa-preview-body">${noteData.content ? noteData.content.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') : ''}</div>
+                ${attachmentsHtml ? `<div class="pa-preview-attachments">${attachmentsHtml}</div>` : ''}
+                <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+                    <button onclick="this.closest('.pa-preview-overlay').remove(); editNote(${noteData.id});" style="padding:6px 14px;border-radius:8px;border:1px solid var(--clr-border);background:#fff;cursor:pointer;font-size:0.75rem;font-weight:600;"><i class="fa-regular fa-pen-to-square"></i> Editar</button>
+                </div>
+            </div>
+        `;
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
 
     window.removeAttachment = async function(attachmentId, element) {
         element.style.opacity = '0.3';
@@ -678,11 +783,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
             });
             if (response.ok) {
-                element.closest('.att-item').remove();
+                element.closest('.pa-att-item')?.remove();
             }
         } catch (e) {
             element.style.opacity = '1';
         }
+    };
+
+    window.previewNewAttachments = function(input) {
+        const container = document.getElementById('attachments-preview');
+        if (!container) return;
+        Array.from(input.files).forEach(file => {
+            const item = document.createElement('div');
+            item.className = 'pa-att-item pa-att-item--new';
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    item.innerHTML = `<img src="${e.target.result}" alt="${file.name}"><div class="pa-att-name" title="${file.name}">${file.name}</div><button class="pa-att-remove" onclick="this.closest('.pa-att-item').remove()"><i class="fa-solid fa-xmark"></i></button>`;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                item.innerHTML = `<div class="pa-att-file-icon"><i class="fa-solid fa-file-lines"></i></div><div class="pa-att-name" title="${file.name}">${file.name}</div><button class="pa-att-remove" onclick="this.closest('.pa-att-item').remove()"><i class="fa-solid fa-xmark"></i></button>`;
+            }
+            container.appendChild(item);
+        });
     };
 
     async function saveFolder(data) {
@@ -698,7 +822,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             if (response.ok) location.reload();
         } catch (error) {
-            swalAlert.fire('Error', 'Fallo de conexión', 'error');
+            segobToast('error', 'Fallo de conexión');
         }
     }
 
@@ -727,13 +851,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 });
                 if (response.ok) {
-                    loadNotes(document.querySelector('.pa-nav-item.is-active').dataset.filter);
-                    toastr.success('Nota archivada');
+                    segobToast('success', 'Nota archivada');
                 } else {
-                    swalAlert.fire('Error', 'No se pudo archivar', 'error');
+                    console.warn('Archive response:', response.status);
+                    segobToast('warning', 'Posible error al archivar');
                 }
             } catch (error) {
-                swalAlert.fire('Error', 'No se pudo archivar', 'error');
+                console.error('Archive fetch error:', error);
+            }
+            const activeNav = document.querySelector('.pa-nav-item.is-active');
+            if (window.paCurrentFolderId) {
+                navigateToFolder(window.paCurrentFolderId);
+            } else if (activeNav) {
+                loadNotes(activeNav.dataset.filter);
+            } else {
+                loadNotes();
             }
         }
     };
@@ -749,11 +881,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             if (response.ok) {
-                loadNotes(document.querySelector('.pa-nav-item.is-active').dataset.filter);
-                toastr.success('Nota restaurada');
+                segobToast('success', 'Nota restaurada');
+            } else {
+                console.warn('Restore response:', response.status);
+                segobToast('warning', 'Posible error al restaurar');
             }
         } catch (error) {
-            swalAlert.fire('Error', 'No se pudo restaurar', 'error');
+            console.error('Restore fetch error:', error);
+        }
+        const activeNav = document.querySelector('.pa-nav-item.is-active');
+        if (window.paCurrentFolderId) {
+            navigateToFolder(window.paCurrentFolderId);
+        } else if (activeNav) {
+            loadNotes(activeNav.dataset.filter);
+        } else {
+            loadNotes();
         }
     };
 
@@ -778,11 +920,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 });
                 if (response.ok) {
-                    loadNotes(document.querySelector('.pa-nav-item.is-active').dataset.filter);
-                    toastr.success('Operación exitosa');
+                    segobToast('success', 'Nota eliminada');
+                } else {
+                    console.warn('Delete response:', response.status);
+                    segobToast('error', 'Error al eliminar');
                 }
             } catch (error) {
-                swalAlert.fire('Error', 'Error al eliminar', 'error');
+                console.error('Delete fetch error:', error);
+                segobToast('error', 'Fallo de conexión');
+            }
+            const activeNav = document.querySelector('.pa-nav-item.is-active');
+            if (window.paCurrentFolderId) {
+                navigateToFolder(window.paCurrentFolderId);
+            } else if (activeNav) {
+                loadNotes(activeNav.dataset.filter);
+            } else {
+                loadNotes();
             }
         }
     };
@@ -1003,9 +1156,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     const currentFilter = document.querySelector('.pa-nav-item.is-active')?.dataset.filter || 'all';
                     loadNotes(currentFilter);
                 }
-                toastr.success('Nota movida correctamente');
+                segobToast('success', 'Nota movida correctamente');
             } else {
-                toastr.error('Error al mover la nota');
+                segobToast('error', 'Error al mover la nota');
             }
         });
     };
