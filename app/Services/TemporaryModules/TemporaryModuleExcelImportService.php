@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
@@ -37,7 +38,12 @@ class TemporaryModuleExcelImportService
     public function preview(UploadedFile $file, int $headerRow = 1, bool $includeDrawingThumbnails = false, int $sheetIndex = 0): array
     {
         $headerRow = max(1, $headerRow);
-        $spreadsheet = $this->loadSpreadsheet($file);
+
+        if ($includeDrawingThumbnails) {
+            $spreadsheet = $this->loadSpreadsheet($file);
+        } else {
+            $spreadsheet = $this->loadSpreadsheetLightweight($file, $headerRow + 5);
+        }
 
         $sheetNames = $spreadsheet->getSheetNames();
         $sheetIndex = max(0, min($sheetIndex, count($sheetNames) - 1));
@@ -69,7 +75,7 @@ class TemporaryModuleExcelImportService
 
         if ($includeDrawingThumbnails) {
             try {
-                $result['preview_thumbnails'] = $this->buildDrawingPreviewThumbnails($sheet, 80, 88);
+                $result['preview_thumbnails'] = $this->buildDrawingPreviewThumbnails($sheet, 40, 72);
             } catch (\Throwable $e) {
                 Log::warning('Vista previa Excel: miniaturas de dibujos omitidas: '.$e->getMessage());
                 $result['preview_thumbnails'] = [];
@@ -360,6 +366,31 @@ class TemporaryModuleExcelImportService
         // Aseguramos que cargue dibujos y metadatos
         if (method_exists($reader, 'setReadDataOnly')) {
             $reader->setReadDataOnly(false);
+        }
+
+        return $reader->load($path);
+    }
+
+    /**
+     * Carga ligera: solo datos (sin dibujos/estilos), opcionalmente limitada a N filas.
+     */
+    private function loadSpreadsheetLightweight(UploadedFile $file, ?int $maxRow = null): Spreadsheet
+    {
+        $path = $file->getRealPath();
+        $reader = IOFactory::createReaderForFile($path);
+
+        if (method_exists($reader, 'setReadDataOnly')) {
+            $reader->setReadDataOnly(true);
+        }
+
+        if ($maxRow !== null && method_exists($reader, 'setReadFilter')) {
+            $reader->setReadFilter(new class($maxRow) implements IReadFilter {
+                public function __construct(private int $maxRow) {}
+                public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool
+                {
+                    return $row <= $this->maxRow;
+                }
+            });
         }
 
         return $reader->load($path);

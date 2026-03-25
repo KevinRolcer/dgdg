@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 /**
@@ -36,7 +37,25 @@ class TemporaryModuleAdminSeedService
      */
     public function detectTableLayout(UploadedFile $file, int $maxScanRow = 80, int $sheetIndex = 0): ?array
     {
-        $spreadsheet = IOFactory::load($file->getRealPath());
+        $path = $file->getRealPath();
+        $reader = IOFactory::createReaderForFile($path);
+
+        if (method_exists($reader, 'setReadDataOnly')) {
+            $reader->setReadDataOnly(true);
+        }
+        // Solo leemos las primeras filas necesarias para detección
+        $scanLimit = $maxScanRow + 200; // margen para detectFirstDataRow
+        if (method_exists($reader, 'setReadFilter')) {
+            $reader->setReadFilter(new class($scanLimit) implements IReadFilter {
+                public function __construct(private int $maxRow) {}
+                public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool
+                {
+                    return $row <= $this->maxRow;
+                }
+            });
+        }
+
+        $spreadsheet = $reader->load($path);
         $sheetNames = $spreadsheet->getSheetNames();
         $sheetIndex = max(0, min($sheetIndex, count($sheetNames) - 1));
         $sheet = $spreadsheet->getSheet($sheetIndex);
