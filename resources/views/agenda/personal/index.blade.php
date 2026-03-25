@@ -164,6 +164,21 @@
 <script id="pa-folders-json" type="application/json">
     @json($folders)
 </script>
+
+<script>
+    window.paRoutes = {
+        index: "{{ route('personal-agenda.index') }}",
+        store: "{{ route('personal-agenda.store') }}",
+        foldersStore: "{{ route('personal-agenda.folders.store') }}",
+        attachmentsDestroy: "{{ route('personal-agenda.attachments.destroy', ['attachment' => ':id']) }}",
+        decrypt: "{{ route('personal-agenda.decrypt', ['note' => ':id']) }}",
+        archive: "{{ route('personal-agenda.archive', ['note' => ':id']) }}",
+        restore: "{{ route('personal-agenda.restore', ['id' => ':id']) }}",
+        move: "{{ route('personal-agenda.move', ['note' => ':id']) }}",
+        update: "{{ route('personal-agenda.update', ['note' => ':id']) }}",
+        destroy: "{{ route('personal-agenda.destroy', ['note' => ':id']) }}",
+    };
+</script>
 @endsection
 
 @push('scripts')

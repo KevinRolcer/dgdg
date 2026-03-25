@@ -232,7 +232,7 @@ window.openFolderModal = function() {
 
 async function saveFolder(data) {
     try {
-        const response = await fetch('/personal-agenda/folders', {
+        const response = await fetch(window.paRoutes.foldersStore, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -367,7 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (container) container.style.opacity = '0.5';
 
         try {
-            const response = await fetch(`/personal-agenda?folder_id=${folderId}`, {
+            const response = await fetch(`${window.paRoutes.index}?folder_id=${folderId}`, {
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json'
@@ -526,7 +526,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const activeTab = document.querySelector('.pa-tab-pill.is-active');
         timeFilter = timeFilter || (activeTab ? activeTab.dataset.tab : 'all');
 
-        let url = `/personal-agenda?filter=${filter}&time_filter=${timeFilter}&month=${window.paCurrentMonth}&year=${window.paCurrentYear}`;
+        let url = `${window.paRoutes.index}?filter=${filter}&time_filter=${timeFilter}&month=${window.paCurrentMonth}&year=${window.paCurrentYear}`;
 
         if (window.paCurrentFolderId) {
             url += `&folder_id=${window.paCurrentFolderId}`;
@@ -594,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.saveNote = async function(data) {
         const isEdit = !!data.id;
-        const url = isEdit ? `/personal-agenda/${data.id}` : '/personal-agenda';
+        const url = isEdit ? window.paRoutes.update.replace(':id', data.id) : window.paRoutes.store;
 
         const formData = new FormData();
         if (isEdit) formData.append('_method', 'PUT');
@@ -724,7 +724,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (password) {
             try {
-                const response = await fetch(`/personal-agenda/${id}/decrypt`, {
+                const response = await fetch(window.paRoutes.decrypt.replace(':id', id), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -784,7 +784,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.removeAttachment = async function(attachmentId, element) {
         element.style.opacity = '0.3';
         try {
-            const response = await fetch(`/personal-agenda/attachments/${attachmentId}`, {
+            const response = await fetch(window.paRoutes.attachmentsDestroy.replace(':id', attachmentId), {
                 method: 'DELETE',
                 headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
             });
