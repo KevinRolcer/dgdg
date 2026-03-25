@@ -1768,6 +1768,58 @@
             });
     });
 
+    function renderShowErrorCardHtml(err, idx, moduleId, cardId) {
+        const escapeH = (v) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+        const failedFields = Array.isArray(err?.failed_fields) && err.failed_fields.length > 0 ? err.failed_fields : [];
+        let failedFieldsHtml = '';
+        if (failedFields.length > 0) {
+            failedFieldsHtml = '<div style="margin-top:8px;"><strong style="font-size:0.75rem;">Campos con fallo:</strong><ul style="margin:6px 0 0 16px; padding:0; font-size:0.8rem; color:var(--clr-text-light);">' +
+                failedFields.map(f => {
+                    let fieldSugg = '';
+                    if (Array.isArray(f.suggestions) && f.suggestions.length > 0) {
+                        fieldSugg = '<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:4px;">' +
+                            '<span style="width:100%; font-size:0.65rem; color:var(--clr-primary); font-weight:700;">VALORES DISPONIBLES:</span>' +
+                            f.suggestions.map(s => {
+                                const val = String(s).replace(/'/g, "\\'");
+                                return `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
+                                    onclick="retryImportRow(${idx}, null, '${val}', null, ${moduleId}, '${cardId}', this, ${err.row || 0}, '${String(f.key).replace(/'/g, "\\'")}')"
+                                    style="font-size:0.68rem; padding:3px 6px; font-weight:600; text-transform:uppercase;">
+                                    ${escapeH(s)}
+                                </button>`;
+                            }).join('') +
+                        '</div>';
+                    }
+                    return `<li style="margin-bottom:8px;"><strong>${escapeH(f.label || f.key || 'Campo')}</strong>: ${escapeH(f.reason || 'No válido')}${f.received ? ` <span style="color:var(--clr-primary); font-weight:600;">(ingresó: "${escapeH(f.received)}")</span>` : ''}${fieldSugg}</li>`;
+                }).join('') +
+            '</ul></div>';
+        }
+        let suggHtml = '';
+        if (!failedFields.some(f => f.suggestions && f.suggestions.length > 0) && err.suggestions && err.suggestions.length > 0) {
+            suggHtml = '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">' +
+                '<span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">¿Quisiste decir?</span>' +
+                err.suggestions.map(s => {
+                    if (typeof s === 'string') {
+                        const val = s.replace(/'/g, "\\'");
+                        return `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
+                            onclick="retryImportRow(${idx}, null, '${val}', null, ${moduleId}, '${cardId}', this, ${err.row || 0})"
+                            style="font-size:0.7rem; padding:4px 8px;">${escapeH(s)}</button>`;
+                    }
+                    return `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
+                        onclick="retryImportRow(${idx}, ${s.microrregion_id}, '${s.municipio.replace(/'/g, "\\'")}'  , null, ${moduleId}, '${cardId}', this, ${err.row || 0})"
+                        style="font-size:0.7rem; padding:4px 8px;">${escapeH(s.municipio)}</button>`;
+                }).join('') +
+            '</div>';
+        }
+        return `
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div style="color:var(--clr-primary); font-weight:700;">Fila ${err.row}</div>
+                <div style="font-size:0.75rem; color:var(--clr-text-light); text-align:right;">${escapeH(err.message)}</div>
+            </div>
+            ${failedFieldsHtml}
+            ${suggHtml}
+        `;
+    }
+
     window.retryImportRow = function(errIdx, microrregionId, correctedValue, singleUrl, moduleId, cardId, buttonEl, rowNumber, fieldKey) {
         const card = document.getElementById(cardId || ('tmErrRow_' + errIdx));
         if (!card) return;
@@ -1816,6 +1868,17 @@
                         saveImportErrors(moduleId, parsed.errors, parsed.singleUrl);
                     }
                 }
+            } else if (j.error && j.error.failed_fields && j.error.failed_fields.length > 0) {
+                btn.disabled = false;
+                btn.innerText = oldText;
+                j.error.row = rowNumber || j.error.row || 'Manual';
+                card.dataset.rowData = JSON.stringify(j.error.data || rowData);
+                if (j.error.municipio_key) card.dataset.municipioKey = j.error.municipio_key;
+                const mid = moduleId || '{{ $temporaryModule->id }}';
+                const cid = cardId || ('tmErrRow_' + errIdx);
+                card.innerHTML = renderShowErrorCardHtml(j.error, errIdx, mid, cid);
+                card.style.opacity = '1';
+                card.style.pointerEvents = 'auto';
             } else {
                 throw new Error(j.message || 'Error al reintentar');
             }

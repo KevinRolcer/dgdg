@@ -32,7 +32,7 @@
         background: rgba(0,0,0,0.02) !important;
     }
     .tm-error-log-card.is-active-row {
-        border-color: #8e44ad !important;
+        border-color: #246257 !important;
         box-shadow: 0 0 8px rgba(142,68,173,0.3) !important;
     }
 </style>
@@ -453,7 +453,7 @@
                 <div class="tm-modal-backdrop" data-close-module-preview></div>
                 <div class="tm-modal-dialog tm-modal-dialog-entry tm-excel-modal-dialog">
                     <div class="tm-modal-head">
-                        <h3 id="tmImportarExcelModalLabel-{{ $module->id }}">Importar desde Excel</h3>
+                        <h3 id="tmImportarExcelModalLabel-{{ $module->id }}">Importar desde Excel / PDF</h3>
                         <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
                             <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                         </button>
@@ -484,9 +484,9 @@
                                 <div class="tm-excel-sheet-wrapper tm-excel-preview-table-wrap">
                                     <div class="tm-excel-sheet-inner tm-excel-sheet-inner-el">
                                         <div style="padding:60px; text-align:center; color:var(--clr-text-light);">
-                                            <i class="fa-solid fa-file-excel" style="font-size:4rem; margin-bottom:16px; opacity:0.2;"></i>
+                                            <i class="fa-solid fa-file-import" style="font-size:4rem; margin-bottom:16px; opacity:0.2;"></i>
                                             <p style="font-weight:600;">Vista previa del documento</p>
-                                            <p style="font-size:0.85rem; opacity:0.7;">Carga un archivo Excel para comenzar a marcar las columnas.</p>
+                                            <p style="font-size:0.85rem; opacity:0.7;">Carga un archivo Excel o PDF para comenzar a marcar las columnas.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -500,8 +500,8 @@
                                         <div class="tm-excel-dropzone tm-excel-dropzone-el">
                                             <i class="fa-solid fa-cloud-arrow-up"></i>
                                             <p>Arrastra tu archivo aquí o haz clic para buscar</p>
-                                            <small>Formatos aceptados: .xlsx, .xls</small>
-                                            <input type="file" class="tm-excel-file-input tm-input" accept=".xlsx,.xls" hidden>
+                                            <small>Formatos aceptados: .xlsx, .xls, .csv, .pdf</small>
+                                            <input type="file" class="tm-excel-file-input tm-input" accept=".xlsx,.xls,.csv,.pdf" hidden>
                                         </div>
                                         <div class="tm-excel-badge badge-header tm-excel-file-name tm-hidden" style="margin-bottom:10px; padding:6px 12px; border-radius:8px;"></div>
 
@@ -1192,6 +1192,7 @@
             const cleaned = raw.replace(/^fila\s+\d+\s*:\s*/i, '').trim();
             return cleaned || raw;
         };
+        window.normalizeRowErrorMessage = normalizeRowErrorMessage;
 
         const escapeHtml = (value) => String(value ?? '')
             .replace(/&/g, '&amp;')
@@ -1209,6 +1210,7 @@
 
             return `Módulo ${moduleId}`;
         };
+        window.getModuleNameById = getModuleNameById;
 
         const getFailedFields = (err) => {
             if (Array.isArray(err?.failed_fields) && err.failed_fields.length > 0) {
@@ -1228,6 +1230,7 @@
 
             return [];
         };
+        window.getFailedFields = getFailedFields;
 
         const getFieldLabel = (moduleId, key) => {
             const entryModal = document.getElementById('delegate-preview-' + moduleId);
@@ -1239,6 +1242,7 @@
             }
             return key;
         };
+        window.getFieldLabel = getFieldLabel;
 
         const renderErrorCardHtml = (err, idx, moduleId, singleUrl, cardId, isLogModal = false) => {
             const moduleName = isLogModal ? getModuleNameById(moduleId) : '';
@@ -1338,7 +1342,7 @@
                 ${failedFieldsHtml}
                 ${conflictPreviewHtml}
                 <div style="margin-top:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                    <button type="button" class="tm-btn tm-btn-sm tm-btn-primary" 
+                    <button type="button" class="tm-btn tm-btn-sm tm-btn-primary"
                         onclick="openErrorModifyModal('${cardId}')"
                         style="padding:4px 10px; font-size:0.75rem;">
                         <i class="fa-solid fa-pen"></i> Corregir datos manualmente
@@ -1347,6 +1351,7 @@
                 </div>
             `;
         };
+        window.renderErrorCardHtml = renderErrorCardHtml;
 
         window.__tmSaveImportErrors = saveImportErrors;
 
@@ -3326,6 +3331,9 @@
             const handleExcelFile = (file, isFromInput = false) => {
                 if (!file) return;
 
+                const isPdf = file.name.toLowerCase().endsWith('.pdf');
+                modal.classList.toggle('tm-pdf-theme', isPdf);
+
                 if (!isFromInput && fileInput) {
                     setSelectedFileOnInput(fileInput, file);
                     return;
@@ -3788,6 +3796,15 @@
                 if (openExcelModal) {
                     openExcelModal.__excelImportedCount = (openExcelModal.__excelImportedCount || 0) + 1;
                 }
+            } else if (j.error && j.error.failed_fields && j.error.failed_fields.length > 0) {
+                // El servidor devolvió errores restantes con sugerencias — actualizar la tarjeta
+                btn.disabled = false;
+                btn.innerText = oldText;
+                j.error.row = rowNumber || j.error.row || 'Manual';
+                card.dataset.rowData = JSON.stringify(j.error.data || rowData);
+                if (j.error.municipio_key) card.dataset.municipioKey = j.error.municipio_key;
+                if (j.error.data_urls) card.dataset.dataUrls = JSON.stringify(j.error.data_urls);
+                card.innerHTML = renderErrorCardHtml(j.error, errIdx, moduleId, singleUrl, cardId, false);
             } else {
                 throw new Error(j.message || 'Error al reintentar');
             }
@@ -3812,7 +3829,7 @@
         // Soportar ambos formatos: tmErrRow y tmErrLogRow
         const isLogCard = cardId.startsWith('tmErrLogRow_');
         const moduleId = card.dataset.moduleId || cardId.split('_')[1];
-        
+
         // URL de importación individual
         const exModal = document.getElementById('tmImportarExcelModal-' + moduleId);
         const singleUrl = card.dataset.singleUrl || (exModal ? exModal.dataset.excelImportSingleUrl : ('/modulos-temporales/' + moduleId + '/importar-fila'));
@@ -4072,7 +4089,7 @@
                 });
                 var j = await r.json();
                 if (j.success) {
-                    Swal.fire({ title: 'Éxito', text: 'Registro corregido e importado.', icon: 'success' });
+                    Swal.fire({ title: 'Éxito', text: 'Registro corregido e importado.', icon: 'success', toast: true, position: 'top-end', timer: 3000, showConfirmButton: false });
                     // Si es tarjeta del modal de log, eliminar del sessionStorage
                     if (isLogCard && card.dataset.errorIndex !== undefined) {
                         var eidx = parseInt(card.dataset.errorIndex, 10);
@@ -4093,14 +4110,32 @@
                             if (sec) sec.classList.add('tm-hidden');
                         }
                     }, 400);
+                } else if (j.error) {
+                    // Si el backend devuelve un nuevo objeto de error (por ejemplo, aún falta el municipio)
+                    Swal.fire({ title: 'Atención', text: 'El registro aún tiene errores: ' + j.message, icon: 'warning', toast: true, position: 'top-end', timer: 4000 });
+
+                    // Actualizar dataset con los nuevos datos (incluyendo data_urls para imágenes)
+                    card.dataset.rowData = JSON.stringify(j.error.data || data);
+                    if (j.error.data_urls) card.dataset.dataUrls = JSON.stringify(j.error.data_urls);
+                    if (j.error.conflict_data) card.dataset.conflictData = JSON.stringify(j.error.conflict_data);
+
+                    // Re-renderizar el interior de la tarjeta
+                    card.innerHTML = renderErrorCardHtml(j.error, card.dataset.errorIndex || 0, moduleId, singleUrl, cardId, isLogCard);
+
+                    // AUTO-REABRIR el formulario de edición (Sequential Correction)
+                    setTimeout(() => {
+                        window.openErrorModifyModal(cardId);
+                    }, 500);
                 } else {
                     throw new Error(j.message || 'Error al guardar');
                 }
             } catch (err) {
                 Swal.fire('Error', err.message, 'error');
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = oldT;
+                if (btn && btn.parentNode) {
+                    btn.disabled = false;
+                    btn.innerHTML = oldT;
+                }
             }
         });
     };

@@ -10,6 +10,7 @@ use App\Services\TemporaryModules\TemporaryModuleAdminSeedService;
 use App\Services\TemporaryModules\TemporaryModuleAnalysisWordService;
 use App\Services\TemporaryModules\TemporaryModuleEntryDataService;
 use App\Services\TemporaryModules\TemporaryModuleExcelImportService;
+use App\Services\TemporaryModules\TemporaryModulePdfImportService;
 use App\Services\TemporaryModules\TemporaryModuleExportService;
 use App\Services\TemporaryModules\TemporaryModuleFieldService;
 use App\Services\TemporaryModules\TemporaryModuleSlugService;
@@ -36,6 +37,7 @@ class TemporaryModuleController extends Controller
         private readonly TemporaryModuleEntryDataService $entryDataService,
         private readonly TemporaryModuleExportService $exportService,
         private readonly TemporaryModuleExcelImportService $excelImportService,
+        private readonly TemporaryModulePdfImportService $pdfImportService,
         private readonly TemporaryModuleAdminSeedService $adminSeedService,
         private readonly TemporaryModuleSlugService $slugService,
     ) {}
@@ -1403,13 +1405,14 @@ class TemporaryModuleController extends Controller
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
 
         $request->validate([
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:15360'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls,pdf', 'max:15360'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:200'],
             'auto_detect' => ['nullable', 'boolean'],
             'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
         ]);
 
         $file = $request->file('archivo_excel');
+        $isPdf = $file->getClientOriginalExtension() === 'pdf';
         $headerRow = (int) ($request->input('header_row') ?: 1);
         $sheetIndex = (int) ($request->input('sheet_index') ?: 0);
         $detected = null;
@@ -1432,21 +1435,30 @@ class TemporaryModuleController extends Controller
         }
 
         try {
-            $preview = $this->excelImportService->preview($file, $headerRow, true, $sheetIndex);
-            $preview['suggested_map'] = $this->excelImportService->suggestMap($importable, $preview['headers']);
+            if ($isPdf) {
+                $preview = $this->pdfImportService->preview($temporaryModule, $file->getRealPath(), $headerRow);
+            } else {
+                $preview = $this->excelImportService->preview($file, $headerRow, true, $sheetIndex);
+            }
+
+            if (!$preview['success']) {
+                return response()->json($preview, 422);
+            }
+
+            $preview['suggested_map'] = $this->excelImportService->suggestMap($importable, $preview['headers'] ?? []);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'No se pudo leer el Excel: '.$e->getMessage(),
+                'message' => 'No se pudo leer el archivo: '.$e->getMessage(),
             ], 422);
         }
 
         $out = [
             'success' => true,
             'header_row' => $headerRow,
-            'data_start_row' => $detected['data_start_row'] ?? ($headerRow + 1),
-            'headers' => $preview['headers'],
-            'suggested_map' => $preview['suggested_map'],
+            'data_start_row' => ($detected['data_start_row'] ?? null) ?: ($headerRow + 1),
+            'headers' => $preview['headers'] ?? [],
+            'suggested_map' => $preview['suggested_map'] ?? [],
             'preview_thumbnails' => $preview['preview_thumbnails'] ?? [],
             'fields' => $importable->map(fn ($f) => [
                 'key' => $f->key,
@@ -1472,7 +1484,7 @@ class TemporaryModuleController extends Controller
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
 
         $request->validate([
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:15360'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls,pdf', 'max:15360'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:50'],
             'data_start_row' => ['nullable', 'integer', 'min:2', 'max:1000'],
             'mapping' => ['required', 'string'],
@@ -1527,23 +1539,25 @@ class TemporaryModuleController extends Controller
         $headerRow = (int) ($request->input('header_row') ?: 1);
         $dataStartRow = (int) ($request->input('data_start_row') ?: $headerRow + 1);
         $sheetIndex = (int) ($request->input('sheet_index') ?: 0);
-        $fieldsByKey = $temporaryModule->fields->keyBy('key');
+        $file = $request->file('archivo_excel');
+        $isPdf = $file->getClientOriginalExtension() === 'pdf';
 
         try {
-            $result = $this->excelImportService->importRows(
-                $temporaryModule,
-                (int) $request->user()->id,
-                $microrregionId ? (int) $microrregionId : null,
-                $request->file('archivo_excel'),
-                $headerRow,
-                $dataStartRow,
-                $normalizedMap,
-                $fieldsByKey,
-                $allowedMunicipioNames,
-                $municipioToMrMap,
-                $suggestionMunicipioNames,
-                $sheetIndex,
-            );
+            $options = [
+                'mapping' => $normalizedMap,
+                'header_row' => $headerRow,
+                'data_start_row' => $dataStartRow,
+                'selected_microrregion_id' => $microrregionId,
+                'all_microrregions' => $allMicrorregions,
+                'sheet_index' => $sheetIndex,
+                'file_path' => $file->getRealPath(),
+            ];
+
+            if ($isPdf) {
+                $result = $this->pdfImportService->import($temporaryModule, $options);
+            } else {
+                $result = $this->excelImportService->importRows($temporaryModule, $file, $options);
+            }
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -1577,6 +1591,7 @@ class TemporaryModuleController extends Controller
         ]);
 
         $microrregionId = ! empty($validated['microrregion_id']) ? (int) $validated['microrregion_id'] : null;
+        $userId = (int) $request->user()->id;
 
         // Si no se proporcionó microrregion_id, resolverlo desde el municipio en los datos
         if ($microrregionId === null) {
@@ -1589,25 +1604,20 @@ class TemporaryModuleController extends Controller
             }
         }
 
-        if ($microrregionId === null) {
+        // Validar todos los campos (select, requeridos, microrregión) y devolver errores con sugerencias
+        $error = $this->excelImportService->validateSingleRow($temporaryModule, $validated['data'], $microrregionId, $userId);
+        if ($error !== null) {
             return response()->json([
                 'success' => false,
-                'message' => 'No se pudo determinar la microrregión.',
+                'message' => $error['message'],
+                'error' => $error,
             ], 422);
         }
 
         abort_unless(
-            $this->accessService->userCanAccessEntryByMicrorregion((int) $request->user()->id, $microrregionId),
+            $this->accessService->userCanAccessEntryByMicrorregion($userId, $microrregionId),
             403
         );
-
-        $duplicateEntryId = $this->findDuplicateEntryId($temporaryModule, $microrregionId, (array) $validated['data']);
-        if ($duplicateEntryId !== null) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Registro duplicado: ya existe una captura con los mismos datos.',
-            ], 422);
-        }
 
         $temporaryModule->entries()->create([
             'user_id' => $request->user()->id,

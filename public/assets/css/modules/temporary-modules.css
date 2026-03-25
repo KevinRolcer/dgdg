@@ -5370,3 +5370,37 @@ html.theme-dark .tm-date-input {
 .tm-excel-errors-list::-webkit-scrollbar-thumb:hover {
     background: rgba(var(--clr-primary-rgb, 134, 30, 52), 0.4);
 }
+
+/* PDF Import - Red Theme */
+.tm-excel-import-modal.tm-pdf-theme {
+    --clr-accent: #c62828 !important; /* Material Red 800 */
+    --clr-accent-hover: #b71c1c !important;
+}
+
+.tm-pdf-theme .tm-excel-dropzone-el {
+    border-color: rgba(198, 40, 40, 0.4) !important;
+}
+
+.tm-pdf-theme .tm-excel-dropzone-el:hover,
+.tm-pdf-theme .tm-excel-dropzone-el.is-dragover {
+    border-color: #c62828 !important;
+    background: rgba(198, 40, 40, 0.04) !important;
+}
+
+.tm-pdf-theme .tm-excel-dropzone-el i {
+    color: #c62828 !important;
+}
+
+.tm-pdf-theme .tm-excel-badge-header { background: #fee2e2 !important; color: #991b1b !important; }
+.tm-pdf-theme .tm-excel-badge-data { background: #fee2e2 !important; color: #991b1b !important; }
+
+.tm-pdf-theme .tm-excel-preview-table tr.is-header-row { background-color: rgba(198, 40, 40, 0.12) !important; }
+.tm-pdf-theme .tm-excel-preview-table tr.is-data-row { background-color: rgba(198, 40, 40, 0.05) !important; }
+
+.tm-pdf-theme .tm-btn-primary {
+    background: #c62828 !important;
+    border-color: #c62828 !important;
+}
+.tm-pdf-theme .tm-btn-primary:hover {
+    background: #b71c1c !important;
+}

@@ -59,6 +59,7 @@ class TemporaryModuleExcelImportService
         }
 
         $result = [
+            'success' => true,
             'headers' => $headers,
             'suggested_map' => [],
             'header_row' => $headerRow,
@@ -304,361 +305,51 @@ class TemporaryModuleExcelImportService
      * @param  list<string>  $suggestionMunicipioNames  nombres para sugerencias de coincidencia
      * @return array{imported:int, skipped:int, row_errors:list<array{row:int,message:string,data:array,suggestions:array}>}
      */
-    public function importRows(
-        TemporaryModule $module,
-        int $userId,
-        ?int $microrregionId,
-        UploadedFile $file,
-        int $headerRow,
-        int $dataStartRow,
-        array $mapping,
-        Collection $fieldsByKey,
-        array $allowedMunicipioNames,
-        array $municipioToMrMap = [],
-        array $suggestionMunicipioNames = [],
-        int $sheetIndex = 0,
-    ): array {
+    public function importRows(TemporaryModule $module, UploadedFile $file, array $options): array
+    {
+        $mapping = $options['mapping'] ?? [];
+        $headerRow = (int) ($options['header_row'] ?? 1);
+        $dataStartRow = (int) ($options['data_start_row'] ?? $headerRow + 1);
+        $sheetIndex = (int) ($options['sheet_index'] ?? 0);
+        $allMicrorregions = (bool) ($options['all_microrregions'] ?? false);
+        $microrregionId = $options['selected_microrregion_id'] ? (int) $options['selected_microrregion_id'] : null;
+        $userId = auth()->id();
         $headerRow = max(1, $headerRow);
         $dataStartRow = max($headerRow + 1, $dataStartRow);
         $spreadsheet = $this->loadSpreadsheet($file);
         $sheetIndex = max(0, min($sheetIndex, count($spreadsheet->getSheetNames()) - 1));
         $sheet = $spreadsheet->getSheet($sheetIndex);
-        $highestRow = (int) $sheet->getHighestDataRow();
-        $highestCol = $sheet->getHighestDataColumn($headerRow);
-        $maxCol = Coordinate::columnIndexFromString($highestCol);
+        $highestRow = (int) $sheet->getHighestRow();
+        $highestColumn = $sheet->getHighestColumn();
+        $maxCol = Coordinate::columnIndexFromString($highestColumn);
+        $drawings = $sheet->getDrawingCollection();
 
-        // --- EXTRAER IMÁGENES DEL EXCEL ---
-        // Imágenes flotantes vs "en celda" (Excel 365): PhpSpreadsheet usa colecciones distintas.
-        $drawings = [];
-        try {
-            $allDrawings = $this->allSheetDrawings($sheet);
-            Log::info("Importación módulo {$module->id}: se encontraron ".count($allDrawings).' dibujo(s) en la hoja (incl. en celda).');
-            foreach ($allDrawings as $drawing) {
-                if (method_exists($drawing, 'getCoordinates')) {
-                    $coord = $drawing->getCoordinates();
-                    if ($coord) {
-                        // Limpiar coordenadas si vienen con nombre de hoja (ej: 'Hoja1!A1')
-                        if (str_contains($coord, '!')) {
-                            $coord = explode('!', $coord)[1];
-                        }
-                        $drawings[$coord] = $drawing;
-                        // Log::debug("Dibujo mapeado en: " . $coord);
-                    }
-                }
-            }
-        } catch (\Throwable $e) {
-            Log::error('Error extrayendo dibujos de Excel: '.$e->getMessage());
-        }
-        // -----------------------------------
-
-        $importable = $this->importableFields($fieldsByKey->values());
-        $requiredKeys = $importable->where('is_required', true)->pluck('key')->all();
-        $municipioField = $fieldsByKey->firstWhere('type', 'municipio');
-        $municipioKey = $municipioField ? $municipioField->key : null;
-        $suggestionBaseMunicipios = ! empty($suggestionMunicipioNames) ? $suggestionMunicipioNames : $allowedMunicipioNames;
-
-        $imported = 0;
-        $skipped = 0;
-        $rowErrors = [];
-        $existingSignaturesByMicro = [];
-
-        $module->entries()
-            ->select(['id', 'microrregion_id', 'data'])
-            ->orderBy('id')
-            ->chunk(500, function ($entries) use (&$existingSignaturesByMicro) {
-                foreach ($entries as $entry) {
-                    $microId = (int) ($entry->microrregion_id ?? 0);
-                    $signature = $this->buildDuplicateSignature((array) ($entry->data ?? []));
-                    // Guardamos la data completa para mostrarla en caso de conflicto
-                    $existingSignaturesByMicro[$microId][$signature] = (array) ($entry->data ?? []);
-                }
-            });
-
-        $pendingSignaturesByMicro = [];
-        $firstOccurrenceRowByMicro = []; // microId => signature => first_row_number
-        $firstOccurrenceDataByMicro = []; // microId => signature => data
-
+        $rowsData = [];
         for ($row = $dataStartRow; $row <= $highestRow; $row++) {
-            $values = [];
-            $rawValues = [];
-            $hasAny = false;
-            foreach ($mapping as $fieldKey => $colIndex) {
-                if ($colIndex === null || ! isset($fieldsByKey[$fieldKey])) {
-                    continue;
-                }
-                $field = $fieldsByKey[$fieldKey];
-                if (! in_array($field->type, self::IMPORTABLE_TYPES, true)) {
-                    continue;
-                }
-                $col = (int) $colIndex + 1;
-                if ($col < 1 || $col > $maxCol) {
-                    continue;
-                }
+            $rowData = [];
+            for ($col = 1; $col <= $maxCol; $col++) {
                 $letter = Coordinate::stringFromColumnIndex($col);
 
                 // Prioridad a dibujos de Excel si el campo es de tipo imagen/archivo
-                if (in_array($field->type, ['image', 'file'], true)) {
-                    $coord = $letter.$row;
-                    $matchedDrawing = $this->matchDrawingInCell($sheet, $drawings, $letter, $row);
-
-                    if ($matchedDrawing) {
-                        $savedPath = $this->saveExcelDrawing($matchedDrawing, $module, $coord);
-                        if ($savedPath) {
-                            $values[$fieldKey] = $savedPath;
-                            $rawValues[$fieldKey] = '[Imagen extraída de Excel]';
-                            $hasAny = true;
-
-                            continue; // No procesamos como texto
-                        }
-                    }
-                }
-
-                $cell = $sheet->getCell($letter.$row);
-                $raw = $cell->getValue();
-                $calculated = $cell->getCalculatedValue();
-                $str = $this->stringifyCell($calculated !== null ? $calculated : $raw);
-                $rawValues[$fieldKey] = $str;
-                if (trim($str) !== '') {
-                    $hasAny = true;
-                }
-                $values[$fieldKey] = $this->coerceValue($field, $raw, $calculated, $str, $allowedMunicipioNames);
-            }
-
-            if (! $hasAny) {
-                // Check if the row has ANY data at all (even in unmapped columns)
-                $rowHasAnyData = false;
-                for ($c = 1; $c <= $maxCol; $c++) {
-                    $cellValue = $sheet->getCell(Coordinate::stringFromColumnIndex($c).$row)->getValue();
-                    if ($cellValue !== null && trim((string) $cellValue) !== '') {
-                        $rowHasAnyData = true;
-                        break;
-                    }
-                }
-
-                if ($rowHasAnyData) {
-                    $rowErrors[] = [
-                        'row' => $row,
-                        'message' => "Fila {$row}: las columnas mapeadas están vacías, pero la fila contiene otros datos.",
-                        'data' => $values,
-                        'failed_fields' => [[
-                            'key' => '__empty_mapped__',
-                            'label' => 'Columnas mapeadas',
-                            'reason' => 'Ninguna de las columnas asignadas tiene datos en esta fila.',
-                            'received' => '',
-                        ]],
-                        'suggestions' => [],
-                    ];
-                }
-                $skipped++;
-
-                continue;
-            }
-
-            // --- VALIDACIÓN DE CAMPOS (Lista, Lista Múltiple, etc.) ---
-            $failedFields = [];
-            foreach ($importable as $f) {
-                $val = $values[$f->key] ?? null;
-                if ($val === null || $val === '' || (is_array($val) && empty($val))) {
+                $matchedDrawing = $this->matchDrawingInCell($sheet, $drawings, $letter, $row);
+                if ($matchedDrawing) {
+                    $savedPath = $this->saveExcelDrawing($matchedDrawing, $module, $letter . $row);
+                    $rowData[$col - 1] = $savedPath ?: '';
                     continue;
                 }
 
-                if ($f->type === 'select') {
-                    $opts = array_map('strval', $f->options ?? []);
-                    if (! empty($opts) && ! in_array((string) $val, $opts, true)) {
-                        $failedFields[] = [
-                            'key' => $f->key,
-                            'label' => $f->label,
-                            'reason' => 'La opción no coincide con la lista permitida.',
-                            'received' => (string) ($rawValues[$f->key] ?? ''),
-                            'suggestions' => $opts,
-                        ];
-                    }
-                } elseif ($f->type === 'multiselect') {
-                    $opts = array_map('strval', $f->options ?? []);
-                    $valArray = is_array($val) ? $val : [$val];
-                    $invalidOnes = array_diff($valArray, $opts);
-                    if (! empty($opts) && ! empty($invalidOnes)) {
-                        $failedFields[] = [
-                            'key' => $f->key,
-                            'label' => $f->label,
-                            'reason' => 'Contiene elementos que no están en la lista.',
-                            'received' => (string) ($rawValues[$f->key] ?? ''),
-                            'suggestions' => $opts,
-                        ];
-                    }
-                }
+                $cell = $sheet->getCell($letter . $row);
+                $raw = $cell->getValue();
+                $calculated = $cell->getCalculatedValue();
+                $rowData[$col - 1] = $calculated !== null ? $calculated : $raw;
             }
-
-            if (! empty($failedFields)) {
-                $rowErrors[] = [
-                    'row' => $row,
-                    'message' => "Fila {$row}: contiene datos no válidos en ".count($failedFields).' campo(s).',
-                    'data' => $values,
-                    'failed_fields' => $failedFields,
-                    'suggestions' => (count($failedFields) === 1 && ! empty($failedFields[0]['suggestions'])) ? $failedFields[0]['suggestions'] : [],
-                ];
-                $skipped++;
-
-                continue;
-            }
-            // ---------------------------------------------------------
-
-            foreach ($requiredKeys as $rk) {
-                $v = $values[$rk] ?? null;
-                $empty = $v === null || $v === '' || (is_string($v) && trim($v) === '');
-                if ($empty) {
-                    $suggestions = [];
-                    if ($municipioKey !== null && $rk === $municipioKey) {
-                        $rawMunicipio = trim((string) ($rawValues[$rk] ?? ''));
-                        if ($rawMunicipio !== '') {
-                            $suggestions = $this->suggestMunicipios($rawMunicipio, $suggestionBaseMunicipios, $municipioToMrMap);
-                        }
-                    }
-
-                    $rowErrors[] = [
-                        'row' => $row,
-                        'message' => "Fila {$row}: falta campo obligatorio ({$fieldsByKey[$rk]->label}).",
-                        'data' => $values,
-                        'municipio_key' => $rk === $municipioKey ? $rk : null,
-                        'failed_fields' => [[
-                            'key' => $rk,
-                            'label' => (string) ($fieldsByKey[$rk]->label ?? $rk),
-                            'reason' => 'Campo obligatorio vacío o no reconocido.',
-                            'received' => (string) ($rawValues[$rk] ?? ''),
-                        ]],
-                        'suggestions' => $suggestions,
-                    ];
-                    $skipped++;
-
-                    continue 2;
-                }
-            }
-
-            $rowMrId = $microrregionId;
-            if ($rowMrId === null && $municipioKey) {
-                $munVal = $values[$municipioKey] ?? null;
-                if ($munVal) {
-                    $rowMrId = $municipioToMrMap[$this->normalizeLabel($munVal)] ?? null;
-                }
-            }
-
-            if ($rowMrId === null || $rowMrId <= 0) {
-                $munVal = $municipioKey ? ($values[$municipioKey] ?? '') : '';
-                $rawMunVal = $municipioKey ? trim((string) ($rawValues[$municipioKey] ?? '')) : '';
-                $displayMun = $rawMunVal !== '' ? $rawMunVal : $munVal;
-                $suggestions = [];
-                if ($rawMunVal !== '') {
-                    $suggestions = $this->suggestMunicipios($rawMunVal, $suggestionBaseMunicipios, $municipioToMrMap);
-                }
-
-                $rowErrors[] = [
-                    'row' => $row,
-                    'message' => "Fila {$row}: No se pudo determinar la microrregión para el municipio '{$displayMun}'.",
-                    'data' => $values,
-                    'municipio_key' => $municipioKey,
-                    'failed_fields' => $municipioKey ? [[
-                        'key' => $municipioKey,
-                        'label' => (string) ($fieldsByKey[$municipioKey]->label ?? $municipioKey),
-                        'reason' => 'El municipio no coincide con una microrregión asignada.',
-                        'received' => (string) $displayMun,
-                    ]] : [],
-                    'suggestions' => $suggestions,
-                ];
-                $skipped++;
-
-                continue;
-            }
-
-            // Defaults para campos no mapeados (evitar nulls en JSON)
-            foreach ($importable as $field) {
-                if (! array_key_exists($field->key, $values)) {
-                    $values[$field->key] = $field->type === 'boolean' ? false : null;
-                }
-            }
-            $rowSignature = $this->buildDuplicateSignature($values);
-            $microKey = (int) $rowMrId;
-
-            $existingDuplicate = isset($existingSignaturesByMicro[$microKey][$rowSignature]);
-            $excelDuplicate = isset($pendingSignaturesByMicro[$microKey][$rowSignature]);
-
-            if ($existingDuplicate || $excelDuplicate) {
-                $duplicateRef = $excelDuplicate ? ($firstOccurrenceRowByMicro[$microKey][$rowSignature] ?? null) : 'db';
-                $conflictData = $excelDuplicate ? ($firstOccurrenceDataByMicro[$microKey][$rowSignature] ?? []) : ($existingSignaturesByMicro[$microKey][$rowSignature] ?? []);
-
-                // Si tiene imágenes, generar data URLs para la previsualización del conflicto
-                foreach ($conflictData as $k => $v) {
-                    if (is_string($v) && str_starts_with($v, 'temporary-modules/images/')) {
-                        try {
-                            $disk = ! empty(config('filesystems.disks.secure_shared')) ? 'secure_shared' : 'public';
-                            if (Storage::disk($disk)->exists($v)) {
-                                $mime = Storage::disk($disk)->mimeType($v) ?: 'image/jpeg';
-                                $base64 = base64_encode(Storage::disk($disk)->get($v));
-                                $conflictData[$k] = "data:{$mime};base64,{$base64}";
-                            }
-                        } catch (\Throwable $e) {
-                        }
-                    }
-                }
-
-                $rowErrors[] = [
-                    'row' => $row,
-                    'is_duplicate' => true,
-                    'duplicate_type' => $excelDuplicate ? 'excel' : 'database',
-                    'original_row' => $duplicateRef,
-                    'conflict_data' => $conflictData,
-                    'message' => "Fila {$row}: registro duplicado (".($excelDuplicate ? "coincide con fila {$duplicateRef}" : 'ya existe en el sistema').').',
-                    'data' => $values,
-                    'failed_fields' => [[
-                        'key' => '__duplicate__',
-                        'label' => 'Registro duplicado',
-                        'reason' => $excelDuplicate ? "Esta fila es idéntica a la fila {$duplicateRef} del mismo Excel." : 'Este registro ya existe en el sistema para esta microrregión.',
-                        'received' => '',
-                    ]],
-                    'suggestions' => [],
-                ];
-
-                // Si hay imágenes extraídas, incluir su data_url para evitar problemas de permisos (403) en la previsualización del error
-                foreach ($values as $k => $v) {
-                    if (is_string($v) && str_starts_with($v, 'temporary-modules/images/')) {
-                        try {
-                            $disk = ! empty(config('filesystems.disks.secure_shared')) ? 'secure_shared' : 'public';
-                            if (Storage::disk($disk)->exists($v)) {
-                                $mime = Storage::disk($disk)->mimeType($v) ?: 'image/jpeg';
-                                $base64 = base64_encode(Storage::disk($disk)->get($v));
-                                $rowErrors[count($rowErrors) - 1]['data_urls'][$k] = "data:{$mime};base64,{$base64}";
-                            }
-                        } catch (\Throwable $e) {
-                        }
-                    }
-                }
-                $skipped++;
-
-                continue;
-            }
-
-            // Si llegamos aquí, es la "primera ocurrencia" (o única) de este registro
-            if (! isset($firstOccurrenceRowByMicro[$microKey][$rowSignature])) {
-                $firstOccurrenceRowByMicro[$microKey][$rowSignature] = $row;
-                $firstOccurrenceDataByMicro[$microKey][$rowSignature] = $values;
-            }
-            $pendingSignaturesByMicro[$microKey][$rowSignature] = true;
-
-            $module->entries()->create([
-                'user_id' => $userId,
-                'microrregion_id' => $rowMrId,
-                'data' => $values,
-                'main_image_field_key' => null,
-                'submitted_at' => Carbon::now(),
-            ]);
-            $pendingSignaturesByMicro[$microKey][$rowSignature] = true;
-            $imported++;
+            $rowsData[] = $rowData;
         }
 
-        return [
-            'imported' => $imported,
-            'skipped' => $skipped,
-            'row_errors' => array_slice($rowErrors, 0, 50),
-        ];
+        return $this->importFromDataArray($module, $rowsData, array_merge($options, [
+            'mapping' => $mapping,
+            'row_offset' => $dataStartRow
+        ]));
     }
 
     private function loadSpreadsheet(UploadedFile $file): Spreadsheet
@@ -940,9 +631,9 @@ class TemporaryModuleExcelImportService
                 }
             }
 
-            // Si el municipio no pertenece a la microregión seleccionada, lo dejamos vacío
-            // para que el registro no se asigne incorrectamente.
-            return null;
+            // Conservar el texto original para que se puedan generar sugerencias
+            // al reintentar la importación de este registro.
+            return $str;
         }
 
         return $str === '' ? null : $str;
@@ -1004,7 +695,7 @@ class TemporaryModuleExcelImportService
      * Busca un dibujo en el listado que corresponda a la coordenada de la celda,
      * considerando celdas combinadas y posibles offsets.
      */
-    private function matchDrawingInCell(Worksheet $sheet, array $drawings, string $letter, int $row): mixed
+    private function matchDrawingInCell(Worksheet $sheet, \ArrayObject|array $drawings, string $letter, int $row): mixed
     {
         $coord = $letter.$row;
 
@@ -1109,4 +800,411 @@ class TemporaryModuleExcelImportService
 
         return trim((string) $value);
     }
+
+    /**
+     * Asegura que si hay imágenes en la data del error, se incluyan sus data_urls base64.
+     */
+    public function hydrateErrorWithImages(array $error): array
+    {
+        if (empty($error['data']) || ! is_array($error['data'])) {
+            return $error;
+        }
+
+        if (! isset($error['data_urls'])) {
+            $error['data_urls'] = [];
+        }
+
+        foreach ($error['data'] as $k => $v) {
+            if (is_string($v) && str_starts_with($v, 'temporary-modules/images/')) {
+                try {
+                    $disk = ! empty(config('filesystems.disks.secure_shared')) ? 'secure_shared' : 'public';
+                    if (Storage::disk($disk)->exists($v)) {
+                        $mime = Storage::disk($disk)->mimeType($v) ?: 'image/jpeg';
+                        $base64 = base64_encode(Storage::disk($disk)->get($v));
+                        $error['data_urls'][$k] = "data:{$mime};base64,{$base64}";
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+        }
+
+        return $error;
+    }
+
+    /**
+     * Valida una sola fila (útil para correcciones manuales).
+     * Recopila TODOS los errores (select/multiselect, requeridos, microrregión) con sugerencias.
+     *
+     * @return array|null El objeto de error si falla, null si es válido.
+     */
+    public function validateSingleRow($module, array $data, ?int $microrregionId, ?int $userId = null): ?array
+    {
+        $fields = $module->fields;
+        $fieldsByKey = $fields->keyBy('key');
+        $municipioField = $fields->firstWhere('type', 'municipio');
+        $municipioKey = $municipioField ? $municipioField->key : null;
+
+        // Limpiar datos: asegurar que existen todas las llaves para evitar offsets
+        foreach ($fields as $field) {
+            if (! array_key_exists($field->key, $data)) {
+                $data[$field->key] = $field->type === 'boolean' ? false : null;
+            }
+        }
+
+        $failedFields = [];
+
+        // 1. Validar valores de select/multiselect
+        foreach ($fields as $f) {
+            $val = $data[$f->key] ?? null;
+            if ($val === null || $val === '' || (is_array($val) && empty($val))) {
+                continue;
+            }
+            if ($f->type === 'select') {
+                $opts = array_map('strval', $f->options ?? []);
+                if (! empty($opts) && ! in_array((string) $val, $opts, true)) {
+                    $failedFields[] = [
+                        'key' => $f->key,
+                        'label' => (string) $f->label,
+                        'reason' => 'No coincide con la lista.',
+                        'received' => (string) $val,
+                        'suggestions' => $opts,
+                    ];
+                }
+            } elseif ($f->type === 'multiselect') {
+                $opts = array_map('strval', $f->options ?? []);
+                $valArray = is_array($val) ? $val : [$val];
+                $invalidOnes = array_diff($valArray, $opts);
+                if (! empty($opts) && ! empty($invalidOnes)) {
+                    $failedFields[] = [
+                        'key' => $f->key,
+                        'label' => (string) $f->label,
+                        'reason' => 'Contiene elementos inválidos.',
+                        'received' => is_array($val) ? implode(', ', $val) : (string) $val,
+                        'suggestions' => $opts,
+                    ];
+                }
+            }
+        }
+
+        // 2. Validar requeridos (si no están ya en failedFields)
+        $failedKeys = array_column($failedFields, 'key');
+        foreach ($fields as $field) {
+            if ($field->is_required && ! in_array($field->key, $failedKeys, true)) {
+                $val = $data[$field->key] ?? null;
+                $isEmpty = $val === null || $val === '' || (is_string($val) && trim($val) === '');
+                if ($isEmpty) {
+                    $failedFields[] = [
+                        'key' => $field->key,
+                        'label' => (string) $field->label,
+                        'reason' => 'Campo obligatorio vacío.',
+                        'received' => '',
+                    ];
+                }
+            }
+        }
+
+        // 3. Validar microrregión — si no se pudo resolver, generar sugerencias de municipio
+        $suggestions = [];
+        if ($microrregionId === null || $microrregionId <= 0) {
+            if ($userId !== null && $municipioKey) {
+                $micros = (new TemporaryModuleAccessService())->microrregionesConMunicipiosPorUsuario($userId);
+                $suggBase = [];
+                $munToMrMap = [];
+                foreach ($micros as $m) {
+                    foreach ($m->municipios ?? [] as $mun) {
+                        $norm = $this->normalizeLabel($mun);
+                        if ($norm !== '') {
+                            $munToMrMap[$norm] = $m->id;
+                            $suggBase[] = $mun;
+                        }
+                    }
+                }
+                $rawMunVal = trim((string) ($data[$municipioKey] ?? ''));
+                if ($rawMunVal !== '') {
+                    $suggestions = $this->suggestMunicipios($rawMunVal, $suggBase, $munToMrMap);
+                }
+            }
+            $failedKeys = array_column($failedFields, 'key');
+            if ($municipioKey && ! in_array($municipioKey, $failedKeys, true)) {
+                $failedFields[] = [
+                    'key' => $municipioKey,
+                    'label' => $municipioField ? (string) $municipioField->label : 'Municipio',
+                    'reason' => 'No coincide con la microrregión asignada.',
+                    'received' => trim((string) ($data[$municipioKey] ?? '')),
+                ];
+            }
+        }
+
+        if (! empty($failedFields)) {
+            return $this->hydrateErrorWithImages([
+                'row' => 'Manual',
+                'message' => 'datos no válidos en ' . count($failedFields) . ' campos.',
+                'data' => $data,
+                'municipio_key' => $municipioKey,
+                'failed_fields' => $failedFields,
+                'suggestions' => $suggestions,
+            ]);
+        }
+
+        // 4. Validar duplicados en DB
+        $targetSignature = $this->buildDuplicateSignature($data);
+        $duplicateId = null;
+        $module->entries()
+            ->select(['id', 'data'])
+            ->where('microrregion_id', $microrregionId)
+            ->orderBy('id')
+            ->chunk(500, function ($entries) use ($targetSignature, &$duplicateId) {
+                foreach ($entries as $entry) {
+                    $entrySignature = $this->buildDuplicateSignature((array) ($entry->data ?? []));
+                    if (hash_equals($targetSignature, $entrySignature)) {
+                        $duplicateId = (int) $entry->id;
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+        if ($duplicateId !== null) {
+            // Obtener datos del conflicto
+            $conflictEntry = \App\Models\TemporaryModuleEntry::find($duplicateId);
+            $conflictData = (array) ($conflictEntry->data ?? []);
+            // Hydrate conflict images
+            foreach ($conflictData as $k => $v) {
+                if (is_string($v) && str_starts_with($v, 'temporary-modules/images/')) {
+                    try {
+                        $disk = ! empty(config('filesystems.disks.secure_shared')) ? 'secure_shared' : 'public';
+                        if (Storage::disk($disk)->exists($v)) {
+                            $mime = Storage::disk($disk)->mimeType($v) ?: 'image/jpeg';
+                            $base64 = base64_encode(Storage::disk($disk)->get($v));
+                            $conflictData[$k] = "data:{$mime};base64,{$base64}";
+                        }
+                    } catch (\Throwable $e) {}
+                }
+            }
+
+            return $this->hydrateErrorWithImages([
+                'row' => 'Manual',
+                'is_duplicate' => true,
+                'duplicate_type' => 'database',
+                'original_row' => 'db',
+                'conflict_data' => $conflictData,
+                'message' => 'Registro duplicado: ya existe en el sistema.',
+                'data' => $data,
+                'failed_fields' => [[
+                    'key' => '__duplicate__',
+                    'label' => 'Registro duplicado',
+                    'reason' => 'Este registro ya existe en el sistema para esta microrregión.',
+                    'received' => '',
+                ]],
+                'suggestions' => [],
+            ]);
+        }
+
+        return null; // Todo OK
+    }
+
+    /**
+     * Generalized importer from a 2D array of data.
+     */
+    public function importFromDataArray(TemporaryModule $module, array $rows, array $options): array
+    {
+        $mapping = $options['mapping'] ?? [];
+        $rowOffset = (int) ($options['row_offset'] ?? 1);
+        $allMicrorregions = (bool) ($options['all_microrregions'] ?? false);
+        $microrregionId = $options['selected_microrregion_id'] ? (int) $options['selected_microrregion_id'] : null;
+        $userId = auth()->id();
+
+        $importable = $module->fields->filter(fn ($f) => in_array($f->type, self::IMPORTABLE_TYPES, true));
+        $fieldsByKey = $importable->keyBy('key');
+        $requiredKeys = $importable->filter(fn ($f) => $f->is_required)->pluck('key')->all();
+
+        $municipioField = $importable->firstWhere('type', 'municipio');
+        $municipioKey = $municipioField ? $municipioField->key : null;
+
+        $microrregionesAsignadas = (new TemporaryModuleAccessService())->microrregionesConMunicipiosPorUsuario($userId);
+        $suggestionBaseMunicipios = [];
+        $municipioToMrMap = [];
+        foreach ($microrregionesAsignadas as $micro) {
+            foreach (($micro->municipios ?? []) as $mName) {
+                $norm = $this->normalizeLabel($mName);
+                if ($norm !== '') {
+                    $municipioToMrMap[$norm] = $micro->id;
+                    $suggestionBaseMunicipios[] = $mName;
+                }
+            }
+        }
+
+        $existingSignaturesByMicro = [];
+        $microsToPreload = $allMicrorregions ? $microrregionesAsignadas->pluck('id')->all() : ($microrregionId ? [$microrregionId] : []);
+
+        if (! empty($microsToPreload)) {
+            $module->entries()
+                ->select(['id', 'microrregion_id', 'data'])
+                ->whereIn('microrregion_id', $microsToPreload)
+                ->orderBy('id')
+                ->chunk(1000, function ($entries) use (&$existingSignaturesByMicro) {
+                    foreach ($entries as $e) {
+                        $sig = $this->buildDuplicateSignature((array) ($e->data ?? []));
+                        $existingSignaturesByMicro[(int) $e->microrregion_id][$sig] = (array) ($e->data ?? []);
+                    }
+                });
+        }
+
+        $imported = 0;
+        $skipped = 0;
+        $rowErrors = [];
+        $pendingSignaturesByMicro = [];
+        $firstOccurrenceRowByMicro = [];
+        $firstOccurrenceDataByMicro = [];
+
+        foreach ($rows as $index => $rowData) {
+            $row = $index + $rowOffset;
+            $values = [];
+            $rawValues = [];
+            $hasAnyMappedData = false;
+            $hasAnyOverallData = false;
+
+            foreach ($rowData as $val) {
+                if ($val !== null && trim((string)$val) !== '') {
+                    $hasAnyOverallData = true;
+                    break;
+                }
+            }
+
+            foreach ($mapping as $fieldKey => $colIndex) {
+                if ($colIndex === null || !isset($fieldsByKey[$fieldKey])) continue;
+
+                $field = $fieldsByKey[$fieldKey];
+                $col = (int) $colIndex;
+                $raw = $rowData[$col] ?? null;
+
+                if (in_array($field->type, ['image', 'file'], true) && is_string($raw) && str_starts_with($raw, 'temporary-modules/')) {
+                    $values[$fieldKey] = $raw;
+                    $rawValues[$fieldKey] = '[Imagen]';
+                    if ($raw !== '') $hasAnyMappedData = true;
+                    continue;
+                }
+
+                $str = $this->stringifyCell($raw);
+                $rawValues[$fieldKey] = $str;
+                if (trim($str) !== '') $hasAnyMappedData = true;
+
+                $values[$fieldKey] = $this->coerceValue($field, $raw, $raw, $str, $suggestionBaseMunicipios);
+            }
+
+            if (!$hasAnyMappedData) {
+                if ($hasAnyOverallData) {
+                    $rowErrors[] = [
+                        'row' => $row,
+                        'message' => "Fila {$row}: las columnas mapeadas están vacías, pero la fila contiene otros datos.",
+                        'data' => $values,
+                        'failed_fields' => [['key' => '__empty_mapped__', 'label' => 'Columnas mapeadas', 'reason' => 'Ninguna de las columnas asignadas tiene datos.', 'received' => '']],
+                        'suggestions' => [],
+                    ];
+                }
+                $skipped++;
+                continue;
+            }
+
+            $failedFields = [];
+            foreach ($importable as $f) {
+                $val = $values[$f->key] ?? null;
+                if ($val === null || $val === '' || (is_array($val) && empty($val))) continue;
+
+                if ($f->type === 'select') {
+                    $opts = array_map('strval', $f->options ?? []);
+                    if (!empty($opts) && !in_array((string)$val, $opts, true)) {
+                        $failedFields[] = ['key' => $f->key, 'label' => $f->label, 'reason' => 'No coincide con la lista.', 'received' => (string)($rawValues[$f->key] ?? ''), 'suggestions' => $opts];
+                    }
+                } elseif ($f->type === 'multiselect') {
+                    $opts = array_map('strval', $f->options ?? []);
+                    $valArray = is_array($val) ? $val : [$val];
+                    $invalidOnes = array_diff($valArray, $opts);
+                    if (!empty($opts) && !empty($invalidOnes)) {
+                        $failedFields[] = ['key' => $f->key, 'label' => $f->label, 'reason' => 'Contiene elementos inválidos.', 'received' => (string)($rawValues[$f->key] ?? ''), 'suggestions' => $opts];
+                    }
+                }
+            }
+
+            if (!empty($failedFields)) {
+                $rowErrors[] = ['row' => $row, 'message' => "Fila {$row}: datos no válidos en " . count($failedFields) . " campos.", 'data' => $values, 'failed_fields' => $failedFields, 'suggestions' => (count($failedFields) === 1) ? ($failedFields[0]['suggestions'] ?? []) : []];
+                $skipped++;
+                continue;
+            }
+
+            foreach ($requiredKeys as $rk) {
+                $v = $values[$rk] ?? null;
+                if ($v === null || $v === '' || (is_string($v) && trim($v) === '')) {
+                    $suggestions = [];
+                    if ($municipioKey && $rk === $municipioKey) {
+                        $suggestions = $this->suggestMunicipios(trim((string)($rawValues[$rk] ?? '')), $suggestionBaseMunicipios, $municipioToMrMap);
+                    }
+                    $rowErrors[] = $this->hydrateErrorWithImages(['row' => $row, 'message' => "Fila {$row}: falta campo obligatorio ({$fieldsByKey[$rk]->label}).", 'data' => $values, 'municipio_key' => $rk === $municipioKey ? $rk : null, 'failed_fields' => [['key' => $rk, 'label' => (string)$fieldsByKey[$rk]->label, 'reason' => 'Falta dato.', 'received' => (string)($rawValues[$rk] ?? '')]], 'suggestions' => $suggestions]);
+                    $skipped++;
+                    continue 2;
+                }
+            }
+
+            $rowMrId = $microrregionId;
+            if ($rowMrId === null && $municipioKey) {
+                $munVal = $values[$municipioKey] ?? null;
+                if ($munVal) $rowMrId = $municipioToMrMap[$this->normalizeLabel($munVal)] ?? null;
+            }
+
+            if ($rowMrId === null || $rowMrId <= 0) {
+                $rawMunVal = $municipioKey ? trim((string)($rawValues[$municipioKey] ?? '')) : '';
+                $suggestions = $rawMunVal !== '' ? $this->suggestMunicipios($rawMunVal, $suggestionBaseMunicipios, $municipioToMrMap) : [];
+                $rowErrors[] = $this->hydrateErrorWithImages(['row' => $row, 'message' => "Fila {$row}: No se pudo determinar la microrregión.", 'data' => $values, 'municipio_key' => $municipioKey, 'failed_fields' => [['key' => $municipioKey, 'label' => 'Municipio', 'reason' => 'No coincide con MR asignada.', 'received' => $rawMunVal]], 'suggestions' => $suggestions]);
+                $skipped++;
+                continue;
+            }
+
+            foreach ($importable as $field) {
+                if (!array_key_exists($field->key, $values)) $values[$field->key] = $field->type === 'boolean' ? false : null;
+            }
+            $rowSignature = $this->buildDuplicateSignature($values);
+            $microKey = (int)$rowMrId;
+
+            $existingDuplicate = isset($existingSignaturesByMicro[$microKey][$rowSignature]);
+            $excelDuplicate = isset($pendingSignaturesByMicro[$microKey][$rowSignature]);
+
+            if ($existingDuplicate || $excelDuplicate) {
+                $duplicateRef = $excelDuplicate ? ($firstOccurrenceRowByMicro[$microKey][$rowSignature] ?? null) : 'db';
+                $conflictData = $excelDuplicate ? ($firstOccurrenceDataByMicro[$microKey][$rowSignature] ?? []) : ($existingSignaturesByMicro[$microKey][$rowSignature] ?? []);
+
+                foreach ($conflictData as $k => $v) {
+                    if (is_string($v) && str_starts_with($v, 'temporary-modules/images/')) {
+                        try {
+                            $disk = !empty(config('filesystems.disks.secure_shared')) ? 'secure_shared' : 'public';
+                            if (\Storage::disk($disk)->exists($v)) {
+                                $mime = \Storage::disk($disk)->mimeType($v) ?: 'image/jpeg';
+                                $base64 = base64_encode(\Storage::disk($disk)->get($v));
+                                $conflictData[$k] = "data:{$mime};base64,{$base64}";
+                            }
+                        } catch (\Throwable) {}
+                    }
+                }
+
+                $rowErrors[] = $this->hydrateErrorWithImages([
+                    'row' => $row, 'is_duplicate' => true, 'duplicate_type' => $excelDuplicate ? 'excel' : 'database', 'original_row' => $duplicateRef, 'conflict_data' => $conflictData,
+                    'message' => "Fila {$row}: registro duplicado (" . ($excelDuplicate ? "fila {$duplicateRef}" : 'ya existe') . ').',
+                    'data' => $values, 'failed_fields' => [['key' => '__duplicate__', 'label' => 'Duplicado', 'reason' => 'Ya existe en el sistema o archivo.', 'received' => '']], 'suggestions' => []
+                ]);
+                $skipped++;
+                continue;
+            }
+
+            if (!isset($firstOccurrenceRowByMicro[$microKey][$rowSignature])) {
+                $firstOccurrenceRowByMicro[$microKey][$rowSignature] = $row;
+                $firstOccurrenceDataByMicro[$microKey][$rowSignature] = $values;
+            }
+            $pendingSignaturesByMicro[$microKey][$rowSignature] = true;
+
+            $module->entries()->create(['user_id' => $userId, 'microrregion_id' => $rowMrId, 'data' => $values, 'submitted_at' => \Carbon\Carbon::now()]);
+            $imported++;
+        }
+
+        return ['imported' => $imported, 'skipped' => $skipped, 'row_errors' => array_slice($rowErrors, 0, 50)];
+    }
 }
+
