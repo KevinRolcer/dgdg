@@ -247,7 +247,7 @@ class TemporaryModuleController extends Controller
     public function seedPreview(Request $request): JsonResponse
     {
         $request->validate([
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:51200'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:153600'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:200'],
             'auto_detect' => ['nullable', 'boolean'],
             'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
@@ -303,7 +303,7 @@ class TemporaryModuleController extends Controller
             'description' => ['nullable', 'string', 'max:1000'],
             'expires_at' => ['nullable', 'date', 'after_or_equal:today'],
             'is_indefinite' => ['nullable', 'boolean'],
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:51200'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:153600'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:50'],
             'data_start_row' => ['nullable', 'integer', 'min:2', 'max:50000'],
             'col_microrregion' => ['nullable', 'integer', 'min:-1'],
@@ -1410,7 +1410,7 @@ class TemporaryModuleController extends Controller
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
 
         $request->validate([
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls,pdf', 'max:51200'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls,pdf', 'max:153600'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:200'],
             'auto_detect' => ['nullable', 'boolean'],
             'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
@@ -1495,7 +1495,7 @@ class TemporaryModuleController extends Controller
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
 
         $request->validate([
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls,pdf', 'max:51200'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls,pdf', 'max:153600'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:50'],
             'data_start_row' => ['nullable', 'integer', 'min:2', 'max:1000'],
             'mapping' => ['required', 'string'],
@@ -1597,7 +1597,7 @@ class TemporaryModuleController extends Controller
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
 
         $request->validate([
-            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:51200'],
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:153600'],
             'header_row' => ['nullable', 'integer', 'min:1', 'max:50'],
             'data_start_row' => ['nullable', 'integer', 'min:2', 'max:1000'],
             'mapping' => ['required', 'string'],

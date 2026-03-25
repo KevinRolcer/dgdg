@@ -40,6 +40,16 @@ class TemporaryModuleAdminSeedService
         $path = $file->getRealPath();
         $reader = IOFactory::createReaderForFile($path);
 
+        // Subir memoria para archivos grandes
+        $sizeMb = $file->getSize() / 1_048_576;
+        if ($sizeMb > 80) {
+            @ini_set('memory_limit', '1G');
+            @set_time_limit(300);
+        } elseif ($sizeMb > 20) {
+            @ini_set('memory_limit', '512M');
+            @set_time_limit(180);
+        }
+
         if (method_exists($reader, 'setReadDataOnly')) {
             $reader->setReadDataOnly(true);
         }
@@ -194,6 +204,17 @@ class TemporaryModuleAdminSeedService
 
         $headerRow = max(1, $headerRow);
         $dataStartRow = max($headerRow + 1, $dataStartRow);
+
+        // Subir memoria para archivos grandes
+        $sizeMb = $file->getSize() / 1_048_576;
+        if ($sizeMb > 80) {
+            @ini_set('memory_limit', '1G');
+            @set_time_limit(300);
+        } elseif ($sizeMb > 20) {
+            @ini_set('memory_limit', '512M');
+            @set_time_limit(180);
+        }
+
         $spreadsheet = IOFactory::load($file->getRealPath());
         $sheetNames = $spreadsheet->getSheetNames();
         $sheetIndex = max(0, min($sheetIndex, count($sheetNames) - 1));

@@ -237,13 +237,13 @@ class TemporaryModuleExcelImportService
         }
         $nw = min($maxWidthPx, $w);
         $nh = (int) round($h * ($nw / $w));
-        $dst = imagescale($src, $nw, $nh, IMG_BILINEAR_FIXED);
+        $dst = imagescale($src, $nw, $nh, IMG_NEAREST_NEIGHBOUR);
         imagedestroy($src);
         if ($dst === false) {
             return null;
         }
         ob_start();
-        imagejpeg($dst, null, 62);
+        imagejpeg($dst, null, 40);
         imagedestroy($dst);
         $jpg = ob_get_clean();
         if ($jpg === false || $jpg === '') {
@@ -360,6 +360,7 @@ class TemporaryModuleExcelImportService
 
     private function loadSpreadsheet(UploadedFile $file): Spreadsheet
     {
+        $this->ensureMemoryForLargeFile($file);
         $path = $file->getRealPath();
         $reader = IOFactory::createReaderForFile($path);
 
@@ -376,6 +377,7 @@ class TemporaryModuleExcelImportService
      */
     private function loadSpreadsheetLightweight(UploadedFile $file, ?int $maxRow = null): Spreadsheet
     {
+        $this->ensureMemoryForLargeFile($file);
         $path = $file->getRealPath();
         $reader = IOFactory::createReaderForFile($path);
 
@@ -394,6 +396,21 @@ class TemporaryModuleExcelImportService
         }
 
         return $reader->load($path);
+    }
+
+    /**
+     * Sube el memory_limit de PHP si el archivo es grande (>20MB → 512M, >80MB → 1G).
+     */
+    private function ensureMemoryForLargeFile(UploadedFile $file): void
+    {
+        $sizeMb = $file->getSize() / 1_048_576;
+        if ($sizeMb > 80) {
+            @ini_set('memory_limit', '1G');
+            @set_time_limit(300);
+        } elseif ($sizeMb > 20) {
+            @ini_set('memory_limit', '512M');
+            @set_time_limit(180);
+        }
     }
 
     public function normalizeLabel(string $s): string
@@ -799,8 +816,10 @@ class TemporaryModuleExcelImportService
             return null;
         }
 
-        $filename = 'imp_'.$module->id.'_'.bin2hex(random_bytes(8)).'.'.($extension ?: 'png');
-        // Usar carpeta compartida si existe configuración, de lo contrario public
+        // Comprimir imagen antes de guardar para reducir espacio en disco
+        $contents = $this->compressImageBinary($contents, $extension);
+
+        $filename = 'imp_'.$module->id.'_'.bin2hex(random_bytes(8)).'.jpg';
         $secureDiskCfg = config('filesystems.disks.secure_shared');
         $storageDisk = ! empty($secureDiskCfg) ? 'secure_shared' : 'public';
         $storagePath = "temporary-modules/images/{$filename}";
@@ -814,6 +833,38 @@ class TemporaryModuleExcelImportService
         }
 
         return $storagePath;
+    }
+
+    /**
+     * Comprime un binario de imagen a JPEG redimensionado (max 1200px) con calidad 65%.
+     */
+    private function compressImageBinary(string $binary, string $extension): string
+    {
+        if (! extension_loaded('gd')) {
+            return $binary;
+        }
+        $src = @imagecreatefromstring($binary);
+        if ($src === false) {
+            return $binary;
+        }
+        $w = imagesx($src);
+        $h = imagesy($src);
+        $maxDim = 1200;
+        if ($w > $maxDim || $h > $maxDim) {
+            $ratio = min($maxDim / $w, $maxDim / $h);
+            $nw = (int) round($w * $ratio);
+            $nh = (int) round($h * $ratio);
+            $dst = imagecreatetruecolor($nw, $nh);
+            imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+            imagedestroy($src);
+            $src = $dst;
+        }
+        ob_start();
+        imagejpeg($src, null, 65);
+        imagedestroy($src);
+        $compressed = ob_get_clean();
+
+        return ($compressed !== false && $compressed !== '') ? $compressed : $binary;
     }
 
     public function buildDuplicateSignature(array $values): string
