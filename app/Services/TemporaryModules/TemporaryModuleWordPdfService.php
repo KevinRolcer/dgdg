@@ -71,6 +71,7 @@ class TemporaryModuleWordPdfService
                 'key' => $key,
                 'label' => $label,
                 'color' => (string) ($col['color'] ?? ''),
+                'group' => (string) ($col['group'] ?? ''),
             ];
         }
         $columns = array_values($columnMap);
@@ -270,7 +271,39 @@ class TemporaryModuleWordPdfService
                 $dynTwips = (int) round(9000 / $totalCols);
             }
 
-            // Encabezados
+            // Encabezados con Grupos
+            $groupSpans = [];
+            foreach ($columns as $col) {
+                $g = $col['group'] ?? '';
+                if (!empty($groupSpans) && $groupSpans[count($groupSpans) - 1]['label'] === $g) {
+                    $groupSpans[count($groupSpans) - 1]['span']++;
+                } else {
+                    $groupSpans[] = ['label' => $g, 'span' => 1];
+                }
+            }
+
+            $hasAnyGroup = false;
+            foreach ($groupSpans as $gs) { if ($gs['label'] !== '') $hasAnyGroup = true; }
+
+            if ($hasAnyGroup) {
+                $table->addRow();
+                foreach ($groupSpans as $gs) {
+                    if ($gs['label'] !== '') {
+                        $table->addCell($dynTwips ? ($dynTwips * $gs['span']) : null, [
+                            'gridSpan' => $gs['span'],
+                            'bgColor' => '64748B',
+                            'valign' => 'center'
+                        ])->addText((string) $gs['label'], ['bold' => true, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                    } else {
+                        // Celda vacía sin grupo
+                        $table->addCell($dynTwips ? ($dynTwips * $gs['span']) : null, [
+                            'gridSpan' => $gs['span'],
+                            'valign' => 'center'
+                        ]);
+                    }
+                }
+            }
+
             $table->addRow();
             foreach ($columns as $idx => $col) {
                 // Determinar color de fondo para encabezados dinámicos

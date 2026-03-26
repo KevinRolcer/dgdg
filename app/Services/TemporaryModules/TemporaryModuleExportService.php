@@ -489,6 +489,13 @@ class TemporaryModuleExportService
                 if ($label !== '' && $label !== $key) {
                     $col['header2'] = $label;
                 }
+                
+                // Aplicar grupo personalizado si existe
+                $group = (string) ($cfgCol['group'] ?? '');
+                if ($group !== '') {
+                    $col['header1'] = $group;
+                }
+
                 $ordered[] = $col;
             }
         }

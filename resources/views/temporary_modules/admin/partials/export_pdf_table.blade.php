@@ -161,6 +161,18 @@
     $tempEntries = $entries instanceof \Illuminate\Support\Collection ? $entries->values()->all() : array_values($entries);
     $colHeaders = $columns;
     $itemNumber = 1;
+
+    $groupSpans = [];
+    foreach ($colHeaders as $col) {
+        $g = $col['group'] ?? '';
+        if (!empty($groupSpans) && $groupSpans[count($groupSpans) - 1]['label'] === $g) {
+            $groupSpans[count($groupSpans) - 1]['span']++;
+        } else {
+            $groupSpans[] = ['label' => $g, 'span' => 1];
+        }
+    }
+    $hasAnyGroup = false;
+    foreach ($groupSpans as $gs) { if ($gs['label'] !== '') $hasAnyGroup = true; }
 @endphp
 
 @if (count($tempEntries) === 0)
@@ -168,6 +180,15 @@
 @else
     <table class="data-table">
         <thead>
+        @if($hasAnyGroup)
+            <tr>
+                @foreach($groupSpans as $gs)
+                    <th colspan="{{ $gs['span'] }}" style="background-color: {{ $gs['label'] !== '' ? '#64748b' : 'transparent' }}; color: #fff; border: {{ $gs['label'] !== '' ? '1px solid #000' : 'none' }};">
+                        {{ $gs['label'] }}
+                    </th>
+                @endforeach
+            </tr>
+        @endif
         <tr>
             @foreach ($colHeaders as $col)
                 @php

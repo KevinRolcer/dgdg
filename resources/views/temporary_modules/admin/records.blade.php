@@ -416,35 +416,28 @@
                             </div>
                         </div>
                     </div>
-                        <p class="tm-export-personalize-hint">Arrastra las columnas para cambiar el orden. Usa &times; para omitir una columna del reporte.</p>
+                        <div class="tm-export-groups-wrap" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <span class="tm-export-label-inline">Grupos de Columnas (fila superior):</span>
+                                <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmExportAddGroupBtn" style="font-size: 0.75rem;">+ Añadir Grupo</button>
+                            </div>
+                            <div id="tmExportGroupsList" class="tm-export-groups-list" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;">
+                                <p class="tm-analysis-hint" id="tmExportNoGroupsHint">No hay grupos creados. Define grupos para agrupar campos bajo un mismo título.</p>
+                            </div>
+                        </div>
+
+                        <p class="tm-export-personalize-hint" style="margin-top: 15px;">Arrastra columnas para reordenar. Usa &times; para omitir. Elige un grupo de la lista arriba para cada columna.</p>
                         <div class="tm-export-personalize-columns" id="tmExportPersonalizeColumns" role="list"></div>
                         <p class="tm-export-restore-wrap" id="tmExportRestoreWrap" hidden>
                             <button type="button" class="tm-export-restore-btn" id="tmExportRestoreBtn">Restaurar todas las columnas</button>
                         </p>
-                        <div class="tm-export-format-sections" id="tmExportFormatSections">
-                            <div class="tm-export-format-section tm-export-format-section--excel">
-                                <h4 class="tm-export-format-section__title">Excel</h4>
-                                <p class="tm-export-format-section__hint">Archivo .xlsx con la tabla de registros.</p>
-                                <div class="tm-export-format-section__actions">
-                                    <button type="button" class="tm-btn tm-export-cta-excel tm-export-format-cta" id="tmExportApplyExcelSingle">Excel — Una sola hoja</button>
-                                    <button type="button" class="tm-btn tm-export-cta-excel tm-export-cta-excel--secondary tm-export-format-cta" id="tmExportApplyExcelMr">Excel — 1 hoja por microregión</button>
-                                </div>
-                            </div>
-                            <div class="tm-export-format-section tm-export-format-section--word">
-                                <h4 class="tm-export-format-section__title">Word — Tabla de registros</h4>
-                                <p class="tm-export-format-section__hint">.docx con los mismos datos que el Excel (una tabla).</p>
-                                <div class="tm-export-format-section__actions">
-                                    <button type="button" class="tm-btn tm-btn-word tm-export-format-cta" id="tmExportApplyWordTable">Word — Tabla de registros</button>
-                                </div>
-                            </div>
-                            <div class="tm-export-format-section tm-export-format-section--pdf">
-                                <h4 class="tm-export-format-section__title">PDF — Tabla de registros</h4>
-                                <p class="tm-export-format-section__hint">.pdf con la tabla de registros.</p>
-                                <div class="tm-export-format-section__actions">
-                                    <button type="button" class="tm-btn tm-export-cta-pdf tm-export-format-cta" id="tmExportApplyPdfTable">PDF — Tabla de registros</button>
-                                </div>
-                            </div>
+
+                        <div class="tm-export-actions-footer" style="margin-top: 25px; display: flex; gap: 12px; justify-content: flex-end; border-top: 1px solid #eee; padding-top: 20px;">
+                            <button type="button" class="tm-btn tm-btn-success" id="tmExportApplyExcelSingle">Expo</button>
+                            <button type="button" class="tm-btn tm-btn-primary" id="tmExportApplyWordTable">Word</button>
+                            <button type="button" class="tm-btn tm-btn-danger" id="tmExportApplyPdfTable">PDF</button>
                         </div>
+                    </div>
                     </div>
                     <div class="tm-export-personalize-preview-wrap">
                         <div class="tm-export-preview-toolbar">
@@ -1560,8 +1553,35 @@
             });
         }
 
+        function renderExportGroups() {
+            var listEl = document.getElementById('tmExportGroupsList');
+            var hintEl = document.getElementById('tmExportNoGroupsHint');
+            if (!listEl) return;
+            var groups = (personalizeModal && personalizeModal._exportGroups) || [];
+            listEl.innerHTML = '';
+            if (groups.length === 0) {
+                if (hintEl) hintEl.hidden = false;
+                return;
+            }
+            if (hintEl) hintEl.hidden = true;
+            groups.forEach(function (g) {
+                var tag = document.createElement('div');
+                tag.className = 'tm-export-group-tag';
+                tag.style.cssText = 'background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 16px; display: flex; align-items: center; gap: 8px; font-size: 0.8rem;';
+                tag.innerHTML = '<strong>' + escapeHtml(g) + '</strong>' +
+                    '<button type="button" class="tm-export-group-remove" data-group="' + escapeHtml(g) + '" style="border:none; background:none; cursor:pointer; color:#ef4444; font-weight:bold; padding:0 4px;">&times;</button>';
+                listEl.appendChild(tag);
+            });
+            // Re-render columns list to update selects
+            var columnsEl = document.getElementById('tmExportPersonalizeColumns');
+            if (columnsEl && personalizeModal && personalizeModal._personalizeColumns) {
+                buildPersonalizeColumnsList(reorderColumnsList(columnsEl, personalizeModal._personalizeColumns), columnsEl);
+            }
+        }
+
         function buildPersonalizeColumnsList(columns, container) {
             container.innerHTML = '';
+            var groups = (personalizeModal && personalizeModal._exportGroups) || [];
             var colorMenuHtml = TEMPLATE_COLORS.map(function (c, i) {
                 return '<button type="button" class="tm-export-color-option' + (i === 0 ? ' is-active' : '') + '" data-color="' + escapeHtml(c.value) + '">' +
                     '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c.value) + '"></span>' +
@@ -1574,10 +1594,18 @@
                 item.dataset.key = col.key;
                 item.dataset.index = String(index);
                 item.draggable = true;
+                
+                var groupSelect = '<select class="tm-export-col-group-select" data-key="' + escapeHtml(col.key) + '" style="font-size: 0.75rem; padding: 2px 4px; border: 1px solid #ddd; border-radius: 4px; max-width: 120px;">' +
+                    '<option value="">Sin grupo</option>' +
+                    groups.map(function(g) {
+                        return '<option value="' + escapeHtml(g) + '"' + (col.group === g ? ' selected' : '') + '>' + escapeHtml(g) + '</option>';
+                    }).join('') +
+                    '</select>';
+
                 var mid = '';
                 if (col.is_image) {
                     mid = '<div class="tm-export-col-image-opts">' +
-                        '<label>Ancho <input type="number" min="40" max="400" value="120" class="tm-export-image-width" data-key="' + escapeHtml(col.key) + '"></label>' +
+                        '<label>Ancho <input type="number" min="40" max="400" value="' + String(col.image_width || 120) + '" class="tm-export-image-width" data-key="' + escapeHtml(col.key) + '"></label>' +
                         '<label>Alto <input type="number" min="30" max="300" value="' + String(col.image_height || 80) + '" class="tm-export-image-height" data-key="' + escapeHtml(col.key) + '"></label></div>';
                 } else {
                     var approx = col.max_width_chars || 24;
@@ -1590,10 +1618,15 @@
                 }
                 item.innerHTML =
                     '<span class="tm-export-drag-handle" aria-hidden="true">&#9776;</span>' +
-                    '<span class="tm-export-col-label">' + escapeHtml(col.label) + '</span>' +
+                    '<div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">' +
+                        '<span class="tm-export-col-label" style="font-weight: 600;">' + escapeHtml(col.label) + '</span>' +
+                        '<div style="display: flex; align-items: center; gap: 8px;">' +
+                            '<span style="font-size: 0.7rem; color: #666;">Grupo:</span>' + groupSelect +
+                        '</div>' +
+                    '</div>' +
                     '<div class="tm-export-col-color">' +
-                    '<button type="button" class="tm-export-color-trigger" data-color="' + escapeHtml(TEMPLATE_COLORS[0].value) + '" aria-haspopup="listbox" aria-expanded="false">' +
-                    '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(TEMPLATE_COLORS[0].value) + '"></span></button>' +
+                    '<button type="button" class="tm-export-color-trigger" data-color="' + escapeHtml(col.color || TEMPLATE_COLORS[0].value) + '" aria-haspopup="listbox" aria-expanded="false">' +
+                    '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(col.color || TEMPLATE_COLORS[0].value) + '"></span></button>' +
                     '<div class="tm-export-color-menu" role="listbox" hidden>' + colorMenuHtml + '</div></div>' +
                     mid +
                     '<button type="button" class="tm-export-omit-btn" title="Omitir en el reporte" aria-label="Omitir">&times;</button>';
@@ -1623,6 +1656,8 @@
                         opt.classList.toggle('is-active', (opt.getAttribute('data-color') || '') === sc.color);
                     });
                 }
+                var gSel = item.querySelector('.tm-export-col-group-select');
+                if (gSel && sc.group) { gSel.value = sc.group; }
                 var iw = item.querySelector('.tm-export-image-width');
                 var ih = item.querySelector('.tm-export-image-height');
                 if (iw && sc.image_width != null) { iw.value = String(sc.image_width); }
@@ -1760,6 +1795,8 @@
                 const key = item.dataset.key || '';
                 const colorTrigger = item.querySelector('.tm-export-color-trigger');
                 const color = colorTrigger ? (colorTrigger.getAttribute('data-color') || 'var(--clr-primary)') : 'var(--clr-primary)';
+                const groupSel = item.querySelector('.tm-export-col-group-select');
+                const group = groupSel ? groupSel.value : '';
                 let imageWidth = 120, imageHeight = 80;
                 const w = item.querySelector('.tm-export-image-width');
                 const h = item.querySelector('.tm-export-image-height');
@@ -1767,7 +1804,7 @@
                     imageWidth = parseInt(w.value, 10) || 120;
                     imageHeight = parseInt(h.value, 10) || 80;
                 }
-                return { key, color, imageWidth, imageHeight };
+                return { key, color, imageWidth, imageHeight, group };
             });
             var countTableColors = {};
             var countColorList = modal ? modal.querySelector('#tmExportCountTableColorList') : document.getElementById('tmExportCountTableColorList');
@@ -1795,7 +1832,8 @@
             }
             var countTableCellWidthEl = modal ? modal.querySelector('#tmExportCountTableCellWidth') : document.getElementById('tmExportCountTableCellWidth');
             var countTableCellWidth = (countTableCellWidthEl && countTableCellWidthEl.value) ? (parseInt(countTableCellWidthEl.value, 10) || 12) : 12;
-            return { title: titleEl ? titleEl.value : '', titleAlign: titleAlign, columns: columns, countTableColors: countTableColors, countTableCellWidth: countTableCellWidth };
+            var groups = (personalizeModal && personalizeModal._exportGroups) || [];
+            return { title: titleEl ? titleEl.value : '', titleAlign: titleAlign, columns: columns, countTableColors: countTableColors, countTableCellWidth: countTableCellWidth, groups: groups };
         }
 
         function readSampleRowFromPreview(previewEl) {
@@ -1964,7 +2002,27 @@
             html += '<td class="tm-export-preview-cell tm-export-preview-desglose-label" style="font-weight:600;padding:12px 0 6px 0;border-left:0;border-right:0;border-bottom:0;" colspan="' + totalColSpan + '">Desglose</td>';
             html += '</tr>';
 
-            // Encabezados
+            // Encabezados (con Grupos si aplica)
+            var groupSpans = [];
+            columns.forEach(function (col) {
+                var g = col.group || '';
+                if (groupSpans.length > 0 && groupSpans[groupSpans.length - 1].label === g) {
+                    groupSpans[groupSpans.length - 1].span++;
+                } else {
+                    groupSpans.push({ label: g, span: 1 });
+                }
+            });
+
+            var hasAnyGroup = groupSpans.some(function (gs) { return gs.label !== ''; });
+            if (hasAnyGroup) {
+                html += '<tr class="tm-export-preview-row tm-export-preview-group-header">';
+                groupSpans.forEach(function (gs) {
+                    var style = gs.label ? 'background-color:#64748b; color:white; border:1px solid #475569; font-weight:bold; border-bottom:none;' : 'border:none;';
+                    html += '<th class="tm-export-preview-cell" colspan="' + gs.span + '" style="' + style + '">' + (gs.label ? escapeHtml(gs.label) : '') + '</th>';
+                });
+                html += '</tr>';
+            }
+
             html += '<tr class="tm-export-preview-row tm-export-preview-header">';
             columns.forEach(function (col) {
                 const color = colorMap[col.key] || '#861e34';
@@ -2032,6 +2090,10 @@
                 const base = map[key];
                 if (!base) { return; }
                 const col = Object.assign({}, base);
+                
+                const groupSel = item.querySelector('.tm-export-col-group-select');
+                if (groupSel) { col.group = groupSel.value; }
+
                 if (!col.is_image) {
                     const widthInput = item.querySelector('.tm-export-col-width-input');
                     if (widthInput) {
@@ -2041,6 +2103,9 @@
                         }
                     }
                 }
+                const colorTrigger = item.querySelector('.tm-export-color-trigger');
+                if (colorTrigger) { col.color = colorTrigger.getAttribute('data-color') || 'var(--clr-primary)'; }
+                
                 ordered.push(col);
             });
             return ordered.length ? ordered : columns.slice();
@@ -2292,6 +2357,10 @@
                                 cb.checked = draftCfg.count_by_fields.indexOf(ck) !== -1;
                             });
                         }
+                        if (personalizeModal) {
+                            personalizeModal._exportGroups = Array.isArray(draftCfg.groups) ? draftCfg.groups.slice() : [];
+                        }
+                        renderExportGroups();
                         var cwEl = document.getElementById('tmExportCountTableCellWidth');
                         if (cwEl && draftCfg.count_table_cell_width != null) {
                             var cwn = parseInt(draftCfg.count_table_cell_width, 10);
@@ -2413,6 +2482,7 @@
                             count_by_fields: countByFields,
                             count_table_colors: state.countTableColors || {},
                             count_table_cell_width: state.countTableCellWidth || 12,
+                            groups: state.groups || [],
                             columns: orderedCols.map(function (col) {
                                 const colState = state.columns.find(function (c) { return c.key === col.key; }) || {};
                                 return {
@@ -2421,7 +2491,8 @@
                                     color: colState.color || 'var(--clr-primary)',
                                     image_width: colState.imageWidth || null,
                                     image_height: colState.imageHeight || null,
-                                    max_width_chars: col.max_width_chars || null
+                                    max_width_chars: col.max_width_chars || null,
+                                    group: col.group || ''
                                 };
                             })
                         };
@@ -2452,17 +2523,70 @@
                     if (applyExcelSingleBtn && exportUrl) {
                         applyExcelSingleBtn.onclick = function () { applyExport('excel', 'single'); };
                     }
-                    if (applyExcelMrBtn && exportUrl) {
-                        applyExcelMrBtn.onclick = function () { applyExport('excel', 'mr'); };
-                    }
                     if (applyWordTableBtn && exportUrl) {
                         applyWordTableBtn.onclick = function () { applyExport('word', 'single'); };
                     }
                     if (applyPdfTableBtn && exportUrl) {
                         applyPdfTableBtn.onclick = function () { applyExport('pdf', 'single'); };
                     }
+
+                    // Listeners para Grupos
+                    var addGroupBtn = document.getElementById('tmExportAddGroupBtn');
+                    if (addGroupBtn) {
+                        addGroupBtn.onclick = function() {
+                            if (typeof Swal !== 'undefined') {
+                                Swal.fire({
+                                    title: 'Nuevo Grupo',
+                                    input: 'text',
+                                    inputLabel: 'Nombre del grupo de columnas',
+                                    showCancelButton: true,
+                                    confirmButtonText: 'Crear',
+                                    cancelButtonText: 'Cancelar'
+                                }).then(function(res) {
+                                    if (res.isConfirmed && res.value) {
+                                        var name = res.value.trim();
+                                        if (name && personalizeModal._exportGroups.indexOf(name) === -1) {
+                                            personalizeModal._exportGroups.push(name);
+                                            renderExportGroups();
+                                            buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                                        }
+                                    }
+                                });
+                            } else {
+                                var name = prompt('Nombre del grupo:');
+                                if (name && (name = name.trim()) !== '') {
+                                    if (personalizeModal._exportGroups.indexOf(name) === -1) {
+                                        personalizeModal._exportGroups.push(name);
+                                        renderExportGroups();
+                                        buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                                    }
+                                }
+                            }
+                        };
+                    }
+                    if (countTableColorListEl) {
+                        // Usar event delegation para los remove de grupos
+                        var groupsListEl = document.getElementById('tmExportGroupsList');
+                        if (groupsListEl) {
+                            groupsListEl.onclick = function(e) {
+                                var removeBtn = e.target.closest('.tm-export-group-remove');
+                                if (removeBtn) {
+                                    var gName = removeBtn.getAttribute('data-group');
+                                    personalizeModal._exportGroups = personalizeModal._exportGroups.filter(function(g) { return g !== gName; });
+                                    // Limpiar grupo de las columnas
+                                    columnsEl.querySelectorAll('.tm-export-col-group-select').forEach(function(sel) {
+                                        if (sel.value === gName) sel.value = '';
+                                    });
+                                    renderExportGroups();
+                                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                                }
+                            };
+                        }
+                    }
+
                 })
-                .catch(function () {
+                .catch(function (err) {
+                    console.error(err);
                     if (loadingEl) { loadingEl.textContent = 'No se pudo cargar la estructura.'; }
                 })
                 .finally(function () {
@@ -2488,23 +2612,11 @@
                 html: '<div class="tm-swal-export-options" style="text-align:left">'
                     + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
                     + '<input type="radio" name="tm-export-choice" value="single" checked style="margin-top:.2rem;"> '
-                    + '<span><strong>Excel — Una sola hoja</strong><br><small style="color:#64748b">Todos los registros en una hoja.</small></span>'
-                    + '</label>'
-                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
-                    + '<input type="radio" name="tm-export-choice" value="mr" style="margin-top:.2rem;"> '
-                    + '<span><strong>Excel — 1 hoja por microregión</strong><br><small style="color:#64748b">Una página por microregión.</small></span>'
-                    + '</label>'
-                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
-                    + '<input type="radio" name="tm-export-choice" value="word_table" style="margin-top:.2rem;"> '
-                    + '<span><strong>Word — Tabla de registros</strong><br><small style="color:#64748b">.docx con los mismos datos que el Excel (una tabla).</small></span>'
-                    + '</label>'
-                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
-                    + '<input type="radio" name="tm-export-choice" value="pdf_table" style="margin-top:.2rem;"> '
-                    + '<span><strong>PDF — Tabla de registros</strong><br><small style="color:#64748b">.pdf con la tabla de registros.</small></span>'
+                    + '<span><strong>Expo</strong><br><small style="color:#64748b">Excel con todos los registros en una hoja.</small></span>'
                     + '</label>'
                     + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.65rem;cursor:pointer;">'
                     + '<input type="radio" name="tm-export-choice" value="analysis_word" style="margin-top:.2rem;"> '
-                    + '<span><strong>Informe de análisis (Word)</strong><br><small style="color:#64748b">Documento .docx con resumen y tablas de análisis (distinto a la tabla simple).</small></span>'
+                    + '<span><strong>Informe de análisis (Word)</strong><br><small style="color:#64748b">Documento .docx con resumen y tablas de análisis.</small></span>'
                     + '</label>'
                     + '<hr style="margin:.65rem 0;border:none;border-top:1px solid #e2e8f0;">'
                     + '<p style="margin:0;"><button type="button" class="tm-btn tm-btn-outline tm-swal-personalize-btn">Personalizar columnas y diseño</button></p>'

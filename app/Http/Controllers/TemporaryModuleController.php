@@ -1648,7 +1648,12 @@ class TemporaryModuleController extends Controller
     {
         $temporaryModule = TemporaryModule::query()->findOrFail($module);
         abort_unless($temporaryModule->isAvailable(), 404);
-        abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
+        if (! $this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes acceso a este módulo temporal.',
+            ], 403);
+        }
 
         $validated = $request->validate([
             'data' => ['required', 'array'],
@@ -1682,6 +1687,12 @@ class TemporaryModuleController extends Controller
                     }
                 }
             }
+        }
+
+        // No usar una microrregión (explícita o resuelta por catálogo) si el usuario no la tiene asignada;
+        // si no, validateSingleRow la acepta y abort_unless devolvía 403 sin mensaje útil.
+        if ($microrregionId !== null && ! $this->accessService->userCanAccessEntryByMicrorregion($userId, $microrregionId)) {
+            $microrregionId = null;
         }
 
         // Normalizar valores de multiselect: convertir strings a arrays
@@ -1728,10 +1739,13 @@ class TemporaryModuleController extends Controller
             ], 422);
         }
 
-        abort_unless(
-            $this->accessService->userCanAccessEntryByMicrorregion($userId, $microrregionId),
-            403
-        );
+        if ($microrregionId === null || $microrregionId < 1
+            || ! $this->accessService->userCanAccessEntryByMicrorregion($userId, $microrregionId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo confirmar la microrregión para este registro. Revisa el municipio o tu asignación de microrregión.',
+            ], 422);
+        }
 
         $temporaryModule->entries()->create([
             'user_id' => $request->user()->id,

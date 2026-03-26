@@ -808,12 +808,24 @@
             throw new Error('Tu sesión ha expirado. Recarga la página para continuar.');
         }
         var ct = response.headers.get('content-type') || '';
-        if (!response.ok || !ct.includes('application/json')) {
+        if (!response.ok) {
+            if (ct.includes('application/json')) {
+                var errJson = await response.json().catch(function() { return {}; });
+                var msg = errJson.message || '';
+                if (!msg && errJson.errors) {
+                    msg = Object.values(errJson.errors).flat().join(' ');
+                }
+                throw new Error((msg && String(msg).trim()) || ('Error del servidor: HTTP ' + response.status));
+            }
             var text = await response.text().catch(function() { return ''; });
             if (text.includes('<!DOCTYPE') || text.includes('<html')) {
                 throw new Error('El servidor no pudo procesar la solicitud (posible límite de memoria o tiempo). Intenta con un archivo más pequeño.');
             }
             throw new Error(text.substring(0, 200) || ('Error del servidor: HTTP ' + response.status));
+        }
+        if (!ct.includes('application/json')) {
+            var text2 = await response.text().catch(function() { return ''; });
+            throw new Error(text2.substring(0, 200) || ('Respuesta inesperada: HTTP ' + response.status));
         }
         return response.json();
     }
@@ -3724,9 +3736,10 @@
         const exModal = document.getElementById('tmImportarExcelModal-' + moduleId);
         const singleUrl = card.dataset.singleUrl || (exModal ? exModal.dataset.excelImportSingleUrl : ('/modulos-temporales/' + moduleId + '/importar-fila'));
 
-        // Microrregión del formulario de excel
-        const mrInput = exModal ? exModal.querySelector('.tm-excel-mr-input') : null;
-        const mrId = mrInput ? mrInput.value : '';
+        // Microrregión del formulario de excel (modal puede existir aunque no esté abierto)
+        const mrInput = document.querySelector('#tmImportarExcelModal-' + moduleId + ' .tm-excel-mr-input')
+            || (exModal ? exModal.querySelector('.tm-excel-mr-input') : null);
+        const mrId = mrInput && mrInput.value !== '' ? mrInput.value : '';
 
         // Formulario original para obtener labels y selects
         const entryModal = document.getElementById('delegate-preview-' + moduleId);
@@ -3948,8 +3961,10 @@
             btn.disabled = true;
             btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Guardando...';
 
-            var data = {};
-            // Campos simples (text, select, hidden, etc.)
+            // Partir de rowData: el clon del formulario suele quitar municipio/microrregión;
+            // si no fusionamos, el POST llega sin municipio y falla la resolución de MR.
+            var data = Object.assign({}, rowData);
+            // Campos simples (text, select, hidden, etc.) — sobrescriben rowData
             formDiv.querySelectorAll('[data-field-key]').forEach(function(el) {
                 var k = el.dataset.fieldKey;
                 if (k.includes('__')) {
