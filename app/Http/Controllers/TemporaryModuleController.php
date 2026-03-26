@@ -653,7 +653,11 @@ class TemporaryModuleController extends Controller
                 $isSelectToMultiselect = $oldType === 'select'
                     && $this->fieldService->canonicalFieldType((string) $normalized['type']) === 'multiselect'
                     && $normalized['key'] === $oldKey;
-                if (! $isSelectToMultiselect) {
+                // text → textarea: mismo valor en JSON (string); solo cambia límite de validación (255 → 5000)
+                $isTextToTextarea = $oldType === 'text'
+                    && $this->fieldService->canonicalFieldType((string) $normalized['type']) === 'textarea'
+                    && $normalized['key'] === $oldKey;
+                if (! $isSelectToMultiselect && ! $isTextToTextarea) {
                     $destructiveKeys[] = $oldKey;
                 }
             }
