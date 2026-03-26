@@ -5,9 +5,10 @@
 const swalAlert = window.Swal || Swal;
 
 function paBuildUrl(path, params = {}) {
-    const base = new URL(window.location.origin);
-    const routeUrl = new URL(path, base);
-    const url = new URL(routeUrl.pathname + routeUrl.search, base);
+    // Rutas absolutas (http/https) o relativas al origen; evitar solo "/ruta" sin prefijo de app en subcarpetas.
+    const url = /^https?:\/\//i.test(path)
+        ? new URL(path)
+        : new URL(path, window.location.origin);
 
     Object.entries(params).forEach(([key, value]) => {
         if (value !== null && value !== undefined && value !== '') {
@@ -571,6 +572,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const wasGrid = container.classList.contains('is-grid');
             const response = await paFetch(url);
 
+            if (!response.ok) {
+                console.error('loadNotes HTTP', response.status, url);
+                if (typeof segobToast === 'function') {
+                    segobToast('error', response.status === 404 ? 'No se encontró la agenda (revisa la URL de la aplicación).' : 'No se pudieron cargar las notas.');
+                }
+                return;
+            }
+
             let html;
             const text = await response.text();
             if (window.paCurrentFolderId) {
@@ -893,7 +902,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function saveFolder(data) {
         try {
-            const response = await fetch('/personal-agenda/folders', {
+            const response = await fetch(window.paRoutes.foldersStore, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -167,7 +167,8 @@
 
 <script>
     window.paRoutes = {
-        index: "{{ route('personal-agenda.index', [], false) }}",
+        {{-- URL absoluta: si solo se usa /personal-agenda, fetch apunta al dominio raíz y falla (404) con la app en subcarpeta. --}}
+        index: @json(route('personal-agenda.index')),
         store: "{{ route('personal-agenda.store') }}",
         foldersStore: "{{ route('personal-agenda.folders.store') }}",
         foldersDestroy: "{{ route('personal-agenda.folders.destroy', ['folder' => ':id']) }}",
