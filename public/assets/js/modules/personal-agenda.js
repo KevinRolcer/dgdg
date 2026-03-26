@@ -4,6 +4,40 @@
 // Global functions first to avoid reference errors
 const swalAlert = window.Swal || Swal;
 
+function paBuildUrl(path, params = {}) {
+    const base = new URL(window.location.origin);
+    const routeUrl = new URL(path, base);
+    const url = new URL(routeUrl.pathname + routeUrl.search, base);
+
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== null && value !== undefined && value !== '') {
+            url.searchParams.set(key, value);
+        }
+    });
+
+    return url.toString();
+}
+
+async function paFetch(url, options = {}) {
+    const headers = {
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(options.headers || {}),
+    };
+
+    const response = await fetch(url, {
+        credentials: 'same-origin',
+        ...options,
+        headers,
+    });
+
+    if (response.status === 401) {
+        window.location.href = url;
+        throw new Error('Unauthenticated');
+    }
+
+    return response;
+}
+
 window.openPersonalNoteModal = function(noteData = null) {
     window._pendingAttachments = [];
     const foldersContainer = document.getElementById('pa-folders-json');
@@ -367,9 +401,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (container) container.style.opacity = '0.5';
 
         try {
-            const response = await fetch(`${window.paRoutes.index}?folder_id=${folderId}`, {
+            const response = await paFetch(paBuildUrl(window.paRoutes.index, { folder_id: folderId }), {
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json'
                 }
             });
@@ -526,17 +559,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const activeTab = document.querySelector('.pa-tab-pill.is-active');
         timeFilter = timeFilter || (activeTab ? activeTab.dataset.tab : 'all');
 
-        let url = `${window.paRoutes.index}?filter=${filter}&time_filter=${timeFilter}&month=${window.paCurrentMonth}&year=${window.paCurrentYear}`;
-
-        if (window.paCurrentFolderId) {
-            url += `&folder_id=${window.paCurrentFolderId}`;
-        }
+        const url = paBuildUrl(window.paRoutes.index, {
+            filter,
+            time_filter: timeFilter,
+            month: window.paCurrentMonth,
+            year: window.paCurrentYear,
+            folder_id: window.paCurrentFolderId || ''
+        });
 
         try {
             const wasGrid = container.classList.contains('is-grid');
-            const response = await fetch(url, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            });
+            const response = await paFetch(url);
 
             let html;
             const text = await response.text();

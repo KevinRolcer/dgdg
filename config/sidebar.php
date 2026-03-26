@@ -28,7 +28,7 @@ return [
         ],
         [
             'icon' => 'fa-solid fa-note-sticky',
-            'title' => 'Mi Agenda Personal',
+            'title' => 'Agenda Personal',
             'route' => 'personal-agenda.index',
         ],
         [

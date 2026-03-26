@@ -167,7 +167,7 @@
 
 <script>
     window.paRoutes = {
-        index: "{{ route('personal-agenda.index') }}",
+        index: "{{ route('personal-agenda.index', [], false) }}",
         store: "{{ route('personal-agenda.store') }}",
         foldersStore: "{{ route('personal-agenda.folders.store') }}",
         foldersDestroy: "{{ route('personal-agenda.folders.destroy', ['folder' => ':id']) }}",

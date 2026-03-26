@@ -22,19 +22,23 @@ class TemporaryModuleWordPdfService
     {
         $temporaryModule = TemporaryModule::query()->findOrFail($moduleId);
         $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$moduleId;
-        
+
         $columnsCfg = is_array($exportConfig) && isset($exportConfig['columns']) && is_array($exportConfig['columns'])
             ? $exportConfig['columns']
             : [];
-            
+
         // Si no hay configuracion de columnas, tomar todas como es el caso por defecto.
         $dbFieldLabels = $temporaryModule->fields->pluck('label', 'key')->all();
 
         if ($columnsCfg === []) {
              $cols = [];
+             // Agregar columna virtual de Ítem
+             $cols[] = ['key' => 'item', 'label' => 'Ítem', 'color' => ''];
+             // Agregar columna virtual de Microrregión
+             $cols[] = ['key' => 'microrregion', 'label' => 'Microrregión', 'color' => ''];
              foreach ($temporaryModule->fields as $field) {
                  $cols[] = [
-                     'key' => $field->key, 
+                     'key' => $field->key,
                      'label' => (string) ($field->label ?? $field->key),
                      'color' => ''
                  ];
@@ -55,8 +59,8 @@ class TemporaryModuleWordPdfService
             if ($key === '') {
                 continue;
             }
-            
-            // Preferir etiqueta del config si no es el mismo key y no está vacía, 
+
+            // Preferir etiqueta del config si no es el mismo key y no está vacía,
             // de lo contrario usar la de la DB.
             $label = (string) ($col['label'] ?? '');
             if ($label === '' || $label === $key) {
@@ -108,7 +112,9 @@ class TemporaryModuleWordPdfService
 
         $entries = $temporaryModule->entries()
             ->withoutGlobalScopes()
-            ->orderBy('submitted_at')
+            ->leftJoin('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
+            ->orderByRaw('CASE WHEN microrregion_id IS NULL THEN 1 ELSE 0 END, CAST(microrregiones.microrregion AS UNSIGNED) ASC, submitted_at DESC')
+            ->select('temporary_module_entries.*')
             ->get(['microrregion_id', 'data', 'submitted_at']);
 
         $baseSlug = Str::slug($fileName, '_') ?: 'modulo_temporal_'.$temporaryModule->id;
@@ -158,10 +164,10 @@ class TemporaryModuleWordPdfService
                 default => \PhpOffice\PhpWord\SimpleType\Jc::CENTER,
             };
             $section->addText($title, ['bold' => true, 'size' => 14, 'color' => '861E34'], ['alignment' => $jc, 'spaceAfter' => 100]);
-            
+
             $fechaCorteStr = now()->format('d/m/Y H:i');
             $section->addText('Fecha y hora de corte: ' . $fechaCorteStr, ['size' => 9], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::END, 'spaceAfter' => 200]);
-            
+
             $section->addTextBreak(1);
 
             if ($countTable !== null && isset($countTable['groups'])) {
@@ -195,12 +201,12 @@ class TemporaryModuleWordPdfService
                     $numValues = count($group['values']);
                     $span = $includePct ? $numValues * 2 : $numValues;
                     $isRedundant = ($gi === 0 || ($numValues === 1 && (trim((string)($group['values'][0]['label'] ?? '')) === '' || trim((string)($group['values'][0]['label'] ?? '')) === trim((string)($group['label'] ?? '')))));
-                    
+
                     $cellStyle = ['gridSpan' => $span, 'bgColor' => $bgHex, 'valign' => 'center'];
                     if ($isRedundant && !$includePct) {
                         $cellStyle['vMerge'] = 'restart';
                     }
-                    
+
                     $cell = $countTbl->addCell(null, $cellStyle);
                     $cell->addText((string) $group['label'], ['bold' => true, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
                 }
@@ -208,13 +214,13 @@ class TemporaryModuleWordPdfService
                 foreach ($countTable['groups'] as $gi => $group) {
                     $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
                     $includePct = !empty($countTableColors[$key]['showPct']);
-                    
+
                     foreach ($group['values'] as $v) {
                         $subLabel = $v['label'] !== '' ? $v['label'] : $group['label'];
                         $bgHex = $resolveCountColor($key, 2, $subLabel);
-                        
+
                         $isRedundant = ($gi === 0 || (count($group['values']) === 1 && (trim((string)$v['label']) === '' || trim((string)$v['label']) === trim((string)$group['label']))));
-                        
+
                         if ($includePct) {
                             $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText($isRedundant ? 'Cantidad' : (string) $subLabel, ['bold' => true, 'size' => 8, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
                             $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText('%', ['bold' => true, 'size' => 8, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
@@ -250,12 +256,12 @@ class TemporaryModuleWordPdfService
                 'borderColor' => '444444',
                 'cellMargin' => 80,
             ];
-            
+
             if ($stretch) {
                 $tblStyle['width'] = 100;
                 $tblStyle['unit'] = 'pct';
             }
-            
+
             $table = $section->addTable($tblStyle);
 
             $dynTwips = null;
@@ -333,7 +339,8 @@ class TemporaryModuleWordPdfService
         ])->render();
 
         $dompdf = new Dompdf([
-            'defaultPaperSize' => 'a4',
+            'defaultPaperSize' => 'A4',
+            'isRemoteEnabled' => true,
         ]);
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper('A4', $orientationConfig === 'landscape' ? 'landscape' : 'portrait');

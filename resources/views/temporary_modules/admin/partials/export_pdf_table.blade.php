@@ -1,8 +1,9 @@
 @php
-    use App\Services\TemporaryModules\TemporaryModuleFieldService;
-    use Illuminate\Support\Arr;
-
     $fieldTypesByKey = $fieldTypesByKey ?? [];
+    $varsCss = ['var(--clr-primary)' => '#861E34', 'var(--clr-secondary)' => '#2d5a27', 'var(--clr-accent)' => '#c9a227'];
+    $resolveCss = function ($css) use ($varsCss) {
+        return isset($varsCss[$css]) ? $varsCss[$css] : (str_starts_with($css ?? '', '#') ? $css : '#861E34');
+    };
 @endphp
 <!DOCTYPE html>
 <html lang="es">
@@ -23,19 +24,31 @@
             text-align: center;
             margin: 0 0 8px 0;
         }
-        table {
+        table.data-table {
             width: 100% !important;
-            max-width: 100% !important;
             border-collapse: collapse;
-            table-layout: fixed; /* Forzamos fixed para evitar que las celdas empujen la tabla fuera de la hoja */
+            table-layout: fixed;
+        }
+        /* Repetir encabezados del desglose en cada página impresa (Dompdf) */
+        table.data-table thead {
+            display: table-header-group;
+        }
+        table.data-table tbody {
+            display: table-row-group;
         }
         th, td {
-            border: 1px solid #999;
-            padding: 3px 4px;
-            vertical-align: top;
+            border: 1px solid #000;
+            padding: 5px;
+            vertical-align: middle;
             word-wrap: break-word;
-            word-break: break-all;
-            overflow: hidden;
+            overflow: visible;
+        }
+        /*
+         * Evitar page-break-inside: avoid en todas las filas: con Dompdf provoca saltos
+         * prematuros y páginas medio vacías. Las filas altas pueden partirse si hace falta.
+         */
+        table.data-table tbody tr {
+            page-break-inside: auto;
         }
         th {
             background: #861E34;
@@ -43,12 +56,18 @@
             font-weight: bold;
             text-align: center;
         }
-        tbody tr:nth-child(even) td {
+        table.data-table tbody tr:nth-child(even) td {
             background: #fdfdfd;
         }
+        /* Tabla de conteo: misma regla que antes (selector global `table` + `.count-table`) */
         .count-table {
-            table-layout: auto; /* La tabla de conteo suele ser pequeña, auto está bien */
+            width: 100% !important;
+            border-collapse: collapse;
+            table-layout: auto;
             margin-bottom: 20px;
+        }
+        .count-table tr {
+            page-break-inside: avoid;
         }
         .count-table th { background: #861E34; color: #fff; text-align: center; font-size: 8px; }
         .count-table td { text-align: center; color: #c00; font-weight: bold; font-size: 10px; }
@@ -64,10 +83,6 @@
 @php
     $countTableColorKeys = $countTableColorKeys ?? [];
     $countTableColors = $countTableColors ?? [];
-    $vars = ['var(--clr-primary)' => '#861E34', 'var(--clr-secondary)' => '#2d5a27', 'var(--clr-accent)' => '#c9a227'];
-    $resolveCss = function ($css) use ($vars) {
-        return isset($vars[$css]) ? $vars[$css] : (str_starts_with($css ?? '', '#') ? $css : '#861E34');
-    };
     $countTableResolveColor = function ($index, $rowNum, $valueLabel = null) use ($countTableColorKeys, $countTableColors, $resolveCss) {
         $key = $countTableColorKeys[$index] ?? null;
         if ($key === null) return $rowNum === 1 ? '#861E34' : '#2d5a27';
@@ -101,7 +116,7 @@
     </tr>
     <tr>
         @foreach ($countTable['groups'] as $gi => $group)
-            @php 
+            @php
                 $key = $countTableColorKeys[$gi] ?? '';
                 $includePct = !empty($countTableColors[$key]['showPct']);
                 $numValues = count($group['values']);
@@ -141,61 +156,75 @@
 </table>
 <p style="font-weight: bold; margin: 8px 0 4px 0;">Desglose</p>
 @endif
-<table>
-    <thead>
-    <tr>
-        @foreach ($columns as $idx => $col)
-            @php
-                $bg = !empty($col['color']) ? $resolveCss($col['color']) : '#861E34';
-                $key = $col['key'] ?? '';
-                $wStyle = '';
-                if ($key === 'item') $wStyle = 'width: 30px;';
-                elseif ($key === 'microrregion') $wStyle = 'width: 80px;';
-                elseif ($key === 'municipio') $wStyle = 'width: 80px;';
-            @endphp
-            <th style="background-color: {{ $bg }}; color: #fff; text-align: center; vertical-align: middle; {{ $wStyle }}">
-                {{ $col['label'] }}
-            </th>
-        @endforeach
-    </tr>
-    </thead>
-    <tbody>
-    @php $itemNumber = 1; @endphp
-    @foreach ($entries as $entry)
+
+@php
+    $tempEntries = $entries instanceof \Illuminate\Support\Collection ? $entries->values()->all() : array_values($entries);
+    $colHeaders = $columns;
+    $itemNumber = 1;
+@endphp
+
+@if (count($tempEntries) === 0)
+    <p style="margin-top: 8px;">Sin registros.</p>
+@else
+    <table class="data-table">
+        <thead>
         <tr>
-            @foreach ($columns as $col)
-                @php $key = $col['key']; @endphp
-                @if ($key === 'item')
-                    <td>{{ $itemNumber }}</td>
-                    @php $itemNumber++; @endphp
-                @elseif ($key === 'microrregion')
-                    @php
-                        $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
-                        $text = $meta['label'] ?? ($meta->label ?? 'Sin microrregión');
-                    @endphp
-                    <td>{{ $text }}</td>
-                @else
-                    @php
-                        $val = $entry->data[$key] ?? null;
-                        if (is_bool($val)) {
-                            $text = $val ? 'Sí' : 'No';
-                        } elseif (is_array($val)) {
-                            $text = implode(', ', array_map(static fn ($v) => is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE), $val));
-                        } elseif (is_scalar($val)) {
-                            $text = (($fieldTypesByKey[$key] ?? '') === 'semaforo')
-                                ? (TemporaryModuleFieldService::labelForSemaforo((string) $val) ?: (string) $val)
-                                : (string) $val;
-                        } else {
-                            $text = '';
-                        }
-                    @endphp
-                    <td>{{ $text }}</td>
-                @endif
+            @foreach ($colHeaders as $col)
+                @php
+                    $bg    = !empty($col['color']) ? $resolveCss($col['color']) : '#861E34';
+                    $key   = $col['key'] ?? '';
+                    $wStyle = '';
+                    if ($key === 'item')         $wStyle = 'width: 30pt;';
+                    elseif ($key === 'microrregion') $wStyle = 'width: 90pt;';
+                    elseif ($key === 'municipio')    $wStyle = 'width: 90pt;';
+                    elseif ($key === 'estatus')      $wStyle = 'width: 60pt;';
+                @endphp
+                <th style="background-color: {{ $bg }}; color: #fff; text-align: center; vertical-align: middle; {{ $wStyle }}">
+                    {{ $col['label'] }}
+                </th>
             @endforeach
         </tr>
-    @endforeach
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+        @foreach ($tempEntries as $entry)
+            <tr>
+                @foreach ($colHeaders as $col)
+                    @php $key = $col['key']; @endphp
+                    @if ($key === 'item')
+                        <td style="width: 30pt; text-align: center;">{{ $itemNumber }}</td>
+                        @php $itemNumber++; @endphp
+                    @elseif ($key === 'microrregion')
+                        @php
+                            $lMeta  = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+                            $lMrTxt = $lMeta['label'] ?? ($lMeta->label ?? 'Sin microrregión');
+                        @endphp
+                        {{-- Sin rowspan: Dompdf al partir la tabla entre páginas rompía columnas --}}
+                        <td style="vertical-align: middle; text-align: center; width: 90pt;">{{ $lMrTxt }}</td>
+                    @else
+                        @php
+                            $val = $entry->data[$key] ?? null;
+                            if (is_bool($val)) {
+                                $cellText = $val ? 'Sí' : 'No';
+                            } elseif (is_array($val)) {
+                                $cellText = implode(', ', array_map(static fn ($v) => is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE), $val));
+                            } elseif (is_scalar($val)) {
+                                $cellText = (($fieldTypesByKey[$key] ?? '') === 'semaforo')
+                                    ? (\App\Services\TemporaryModules\TemporaryModuleFieldService::labelForSemaforo((string) $val) ?: (string) $val)
+                                    : (string) $val;
+                            } else {
+                                $cellText = '';
+                            }
+                            $tdW = '';
+                            if ($key === 'municipio') $tdW = 'width: 90pt; text-align: left;';
+                            if ($key === 'estatus')   $tdW = 'width: 60pt; text-align: center;';
+                        @endphp
+                        <td style="{{ $tdW }}">{{ $cellText }}</td>
+                    @endif
+                @endforeach
+            </tr>
+        @endforeach
+        </tbody>
+    </table>
+@endif
 </body>
 </html>
-

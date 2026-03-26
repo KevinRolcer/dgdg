@@ -316,6 +316,42 @@
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
+
+/* Large screens support (> 14 inches approx 1440px) */
+@media screen and (min-width: 1440px) {
+    .pa-main {
+        padding: 0 40px;
+    }
+
+    /* Remove slider constraint and show as grid */
+    .pa-slider-container {
+        padding: 0;
+    }
+
+    .pa-slider-btn {
+        display: none !important;
+    }
+
+    .pa-notes-grid {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+        flex-wrap: wrap !important;
+        overflow-x: visible !important;
+        gap: 20px !important;
+    }
+
+    .pa-card--note {
+        min-width: 0 !important;
+        max-width: none !important;
+    }
+
+    /* Expand folders as well if they are in horizontal scroll usually */
+    .pa-folder-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
+        max-height: none !important;
+    }
+}
+
 .pa-main::-webkit-scrollbar {
     display: none;
 }

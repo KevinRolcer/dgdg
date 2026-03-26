@@ -602,320 +602,6 @@
             </div>
         @endif
 
-        @foreach ($module->getRelation('myEntries') as $entry)
-            @php
-                $entryMicrorregion = ($microrregionesAsignadas ?? collect())->firstWhere('id', $entry->microrregion_id);
-                $entryMunicipios = $entryMicrorregion && isset($entryMicrorregion->municipios) ? array_values($entryMicrorregion->municipios) : ($municipios ?? []);
-            @endphp
-            <div class="tm-modal" id="delegate-edit-{{ $entry->id }}" aria-hidden="true" role="dialog" aria-modal="true">
-                <div class="tm-modal-backdrop" data-close-module-preview></div>
-                <div class="tm-modal-dialog tm-modal-dialog-entry">
-                    <div class="tm-modal-head">
-                        <div class="tm-modal-head-stack">
-                            <h3>Editar registro</h3>
-                            <p class="tm-modal-subtitle">{{ $module->name }}</p>
-                        </div>
-                        <div style="display:flex;align-items:center;gap:10px;">
-                            @if ($tmImportable->isNotEmpty())
-                                <a href="{{ route('temporary-modules.download-template', $module->id) }}"
-                                   class="tm-btn tm-btn-outline"
-                                   aria-label="Descargar plantilla Excel">
-                                    <i class="fa-solid fa-download" aria-hidden="true"></i> Plantilla
-                                </a>
-                                <button type="button"
-                                        class="tm-btn tm-btn-outline"
-                                        data-open-excel-import="tmImportarExcelModal-{{ $module->id }}"
-                                        aria-label="Importar Excel">
-                                    <i class="fa-regular fa-file-excel" aria-hidden="true"></i> Importar Excel
-                                </button>
-                            @endif
-                            <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
-                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="tm-modal-body">
-                        @php
-                            $orderedFields = $module->fields
-                                ->sortBy(function ($field) {
-                                    return in_array($field->type, ['image', 'file'], true) ? 1 : 0;
-                                })
-                                ->values();
-                            $mediaDividerPrinted = false;
-                        @endphp
-
-                        <form action="{{ route('temporary-modules.submit', $module->id) }}" method="POST" enctype="multipart/form-data" class="tm-form tm-entry-form">
-                            @csrf
-                            @if ($microsAsignadas->isNotEmpty() && !$mostrarSelectorMicrorregion)
-                                <input type="hidden" name="selected_microrregion_id" value="{{ $entry->microrregion_id ?? $microsAsignadas->first()->id }}">
-                            @endif
-                            <input type="hidden" name="entry_id" value="{{ $entry->id }}">
-
-                            <div class="tm-grid tm-grid-2 tm-entry-grid">
-                                @if ($mostrarSelectorMicrorregion)
-                                    <label class="tm-entry-field">
-                                        Microrregion de captura *
-                                        <select name="selected_microrregion_id" class="tm-mr-selector" required>
-                                            @foreach ($microsAsignadas as $micro)
-                                                <option value="{{ $micro->id }}" @selected((int) ($entry->microrregion_id ?? 0) === (int) $micro->id)>
-                                                    MR {{ $micro->microrregion }} - {{ $micro->cabecera }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                    </label>
-                                @endif
-                                @foreach ($orderedFields as $field)
-                                    @php
-                                        $name = 'values['.$field->key.']';
-                                        $id = 'edit_'.$entry->id.'_'.$field->key;
-                                        $value = old('values.'.$field->key, $entry->data[$field->key] ?? null);
-                                        $isMediaField = in_array($field->type, ['image', 'file'], true);
-                                        $hasExistingImage = is_string($entry->data[$field->key] ?? null) && trim((string) ($entry->data[$field->key] ?? '')) !== '';
-                                    @endphp
-                                    @if ($field->type === 'seccion')
-                                        @php
-                                            $secOpts = is_array($field->options) ? $field->options : [];
-                                            $secTitle = $secOpts['title'] ?? $field->label;
-                                            $secSubs = $secOpts['subsections'] ?? [];
-                                        @endphp
-                                        <div class="tm-entry-section-header tm-col-full" role="group" aria-label="{{ $secTitle }}">
-                                            <h4 class="tm-section-title">{{ $secTitle }}</h4>
-                                            @if (count($secSubs) > 0)
-                                                <div class="tm-section-subsections">
-                                                    @foreach ($secSubs as $sub)
-                                                        <span class="tm-section-sub">{{ is_scalar($sub) ? $sub : '' }}</span>
-                                                    @endforeach
-                                                </div>
-                                            @endif
-                                        </div>
-                                        @continue
-                                    @endif
-                                    @if ($isMediaField && !$mediaDividerPrinted)
-                                        <div class="tm-form-divider tm-col-full">
-                                            <span>Evidencias</span>
-                                        </div>
-                                        @php $mediaDividerPrinted = true; @endphp
-                                    @endif
-
-                                    <label class="tm-entry-field {{ $isMediaField ? 'is-media' : '' }}">
-                                        {{ $field->label }} {{ $field->is_required ? '*' : '' }}
-                                        @if (!empty($field->comment))
-                                            <small class="tm-field-help">{{ $field->comment }}</small>
-                                        @endif
-
-                                        @if ($field->type === 'categoria')
-                                            @php
-                                                $catOpts = is_array($field->options) ? $field->options : [];
-                                            @endphp
-                                            <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }} data-categoria-select>
-                                                <option value="">Selecciona categoría</option>
-                                                @foreach ($catOpts as $cat)
-                                                    @php
-                                                        $catName = $cat['name'] ?? '';
-                                                        $subs = $cat['sub'] ?? [];
-                                                    @endphp
-                                                    @if ($catName !== '')
-                                                        <option value="{{ $catName }}" @selected($value === $catName)>{{ $catName }}</option>
-                                                        @foreach ($subs as $sub)
-                                                            @php $subVal = $catName.' > '.(is_scalar($sub) ? $sub : ''); @endphp
-                                                            <option value="{{ $subVal }}" @selected($value === $subVal)>{{ $catName }} &rarr; {{ is_scalar($sub) ? $sub : '' }}</option>
-                                                        @endforeach
-                                                    @endif
-                                                @endforeach
-                                            </select>
-                                        @elseif ($field->type === 'multiselect')
-                                            @php
-                                                $msOpts = is_array($field->options) ? $field->options : [];
-                                                $msSelected = is_array($value) ? $value : [];
-                                            @endphp
-                                            <div class="tm-multiselect-wrap" role="group" aria-label="{{ $field->label }}">
-                                                @foreach ($msOpts as $msOpt)
-                                                    @if (! is_scalar($msOpt))
-                                                        @continue
-                                                    @endif
-                                                    <label class="tm-multiselect-option">
-                                                        <input type="checkbox"
-                                                               name="{{ $name }}[]"
-                                                               value="{{ $msOpt }}"
-                                                               @checked(in_array($msOpt, $msSelected, true))>
-                                                        <span>{{ $msOpt }}</span>
-                                                    </label>
-                                                @endforeach
-                                            </div>
-                                        @elseif ($field->type === 'linked')
-                                            @php
-                                                $linkedOpts = is_array($field->options) ? $field->options : [];
-                                                $primaryType     = $linkedOpts['primary_type'] ?? 'text';
-                                                $primaryLabel    = $linkedOpts['primary_label'] ?? $field->label.' (principal)';
-                                                $primaryOptions  = $linkedOpts['primary_options'] ?? [];
-                                                $secondaryType   = $linkedOpts['secondary_type'] ?? 'text';
-                                                $secondaryLabel  = $linkedOpts['secondary_label'] ?? $field->label.' (dependiente)';
-                                                $secondaryOptions = $linkedOpts['secondary_options'] ?? [];
-                                                $existingLinked  = is_array($value) ? $value : [];
-                                                $primaryValue    = $existingLinked['primary'] ?? null;
-                                                $secondaryValue  = $existingLinked['secondary'] ?? null;
-                                                $primaryId       = $id.'__primary';
-                                                $secondaryId     = $id.'__secondary';
-                                                $primaryName     = 'values['.$field->key.'__primary]';
-                                                $secondaryName   = 'values['.$field->key.'__secondary]';
-                                            @endphp
-                                            <div class="tm-linked-field-wrap" data-linked-field-group>
-                                                <label class="tm-linked-primary-label">{{ $primaryLabel }} {{ $field->is_required ? '*' : '' }}</label>
-                                                @if ($primaryType === 'select')
-                                                    <select id="{{ $primaryId }}" name="{{ $primaryName }}"
-                                                            data-linked-primary
-                                                            {{ $field->is_required ? 'required' : '' }}>
-                                                        <option value="">Selecciona una opción</option>
-                                                        @foreach ($primaryOptions as $opt)
-                                                            @if (! is_scalar($opt))
-                                                                @continue
-                                                            @endif
-                                                            <option value="{{ $opt }}" @selected($primaryValue === $opt)>{{ $opt }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                @elseif ($primaryType === 'textarea')
-                                                    <textarea id="{{ $primaryId }}" name="{{ $primaryName }}"
-                                                              rows="2" data-linked-primary
-                                                              {{ $field->is_required ? 'required' : '' }}>{{ is_scalar($primaryValue) ? $primaryValue : '' }}</textarea>
-                                                @elseif ($primaryType === 'semaforo')
-                                                    <select id="{{ $primaryId }}" name="{{ $primaryName }}"
-                                                            data-linked-primary
-                                                            {{ $field->is_required ? 'required' : '' }}>
-                                                        <option value="">Selecciona nivel</option>
-                                                        @foreach (\App\Services\TemporaryModules\TemporaryModuleFieldService::semaforoLabels() as $semVal => $semLabel)
-                                                            <option value="{{ $semVal }}" @selected($primaryValue === $semVal)>{{ $semLabel }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                @else
-                                                    <input id="{{ $primaryId }}"
-                                                           type="{{ $primaryType === 'number' ? 'number' : ($primaryType === 'date' ? 'date' : 'text') }}"
-                                                           name="{{ $primaryName }}"
-                                                           value="{{ is_scalar($primaryValue) ? $primaryValue : '' }}"
-                                                           data-linked-primary
-                                                           {{ $field->is_required ? 'required' : '' }}>
-                                                @endif
-
-                                                <div class="tm-linked-secondary-wrap" data-linked-secondary-wrap
-                                                     {{ $primaryValue ? '' : 'hidden' }}>
-                                                    <label class="tm-linked-secondary-label">{{ $secondaryLabel }} *</label>
-                                                    @if ($secondaryType === 'select')
-                                                        <select id="{{ $secondaryId }}" name="{{ $secondaryName }}"
-                                                                data-linked-secondary
-                                                                {{ $primaryValue ? 'required' : 'disabled' }}>
-                                                            <option value="">Selecciona una opción</option>
-                                                            @foreach ($secondaryOptions as $opt)
-                                                                @if (! is_scalar($opt))
-                                                                    @continue
-                                                                @endif
-                                                                <option value="{{ $opt }}" @selected($secondaryValue === $opt)>{{ $opt }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                    @elseif ($secondaryType === 'textarea')
-                                                        <textarea id="{{ $secondaryId }}" name="{{ $secondaryName }}"
-                                                                  rows="2" data-linked-secondary
-                                                                  {{ $primaryValue ? 'required' : 'disabled' }}>{{ is_scalar($secondaryValue) ? $secondaryValue : '' }}</textarea>
-                                                    @elseif ($secondaryType === 'semaforo')
-                                                        <select id="{{ $secondaryId }}" name="{{ $secondaryName }}"
-                                                                data-linked-secondary
-                                                                {{ $primaryValue ? 'required' : 'disabled' }}>
-                                                            <option value="">Selecciona nivel</option>
-                                                            @foreach (\App\Services\TemporaryModules\TemporaryModuleFieldService::semaforoLabels() as $semVal => $semLabel)
-                                                                <option value="{{ $semVal }}" @selected($secondaryValue === $semVal)>{{ $semLabel }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                    @else
-                                                        <input id="{{ $secondaryId }}"
-                                                               type="{{ $secondaryType === 'number' ? 'number' : ($secondaryType === 'date' ? 'date' : 'text') }}"
-                                                               name="{{ $secondaryName }}"
-                                                               value="{{ is_scalar($secondaryValue) ? $secondaryValue : '' }}"
-                                                               data-linked-secondary
-                                                               {{ $primaryValue ? 'required' : 'disabled' }}>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        @elseif ($field->type === 'textarea')
-                                            <textarea id="{{ $id }}" name="{{ $name }}" rows="3" {{ $field->is_required ? 'required' : '' }}>{{ is_scalar($value) ? $value : '' }}</textarea>
-                                        @elseif ($field->type === 'number')
-                                            <input id="{{ $id }}" type="number" step="any" name="{{ $name }}" value="{{ is_scalar($value) ? $value : '' }}" {{ $field->is_required ? 'required' : '' }}>
-                                        @elseif ($field->type === 'date')
-                                            <input id="{{ $id }}" type="date" name="{{ $name }}" value="{{ is_scalar($value) ? $value : '' }}" {{ $field->is_required ? 'required' : '' }}>
-                                        @elseif ($field->type === 'datetime')
-                                            <input id="{{ $id }}" type="datetime-local" name="{{ $name }}" value="{{ is_scalar($value) ? $value : '' }}" {{ $field->is_required ? 'required' : '' }}>
-                                        @elseif ($field->type === 'select')
-                                            <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
-                                                <option value="">Selecciona una opcion</option>
-                                                @foreach (($field->options ?? []) as $option)
-                                                    @if (! is_scalar($option))
-                                                        @continue
-                                                    @endif
-                                                    <option value="{{ $option }}" @selected($value === $option)>{{ $option }}</option>
-                                                @endforeach
-                                            </select>
-                                        @elseif ($field->type === 'municipio')
-                                            <select id="{{ $id }}" name="{{ $name }}" class="tm-municipio-select" {{ $field->is_required ? 'required' : '' }}>
-                                                <option value="">Selecciona un municipio</option>
-                                                @foreach ($entryMunicipios as $municipio)
-                                                    <option value="{{ $municipio }}" @selected($value === $municipio)>{{ $municipio }}</option>
-                                                @endforeach
-                                            </select>
-                                        @elseif ($field->type === 'boolean')
-                                            <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
-                                                <option value="">Selecciona</option>
-                                                <option value="1" @selected((string) $value === '1')>Si</option>
-                                                <option value="0" @selected((string) $value === '0')>No</option>
-                                            </select>
-                                        @elseif ($field->type === 'semaforo')
-                                            <select id="{{ $id }}" name="{{ $name }}" class="tm-semaforo-select" {{ $field->is_required ? 'required' : '' }}>
-                                                <option value="">Selecciona nivel</option>
-                                                @foreach (\App\Services\TemporaryModules\TemporaryModuleFieldService::semaforoLabels() as $semVal => $semLabel)
-                                                    <option value="{{ $semVal }}" @selected($value === $semVal)>{{ $semLabel }}</option>
-                                                @endforeach
-                                            </select>
-                                        @elseif (in_array($field->type, ['image', 'file'], true))
-                                            <div class="tm-upload-evidence">
-                                                <div class="tm-upload-evidence-toolbar">
-                                                    <button type="button" class="tm-btn tm-btn-outline" data-upload-trigger data-target-input="{{ $id }}" aria-label="Cargar imagen">
-                                                        <i class="fa-solid fa-upload" aria-hidden="true"></i> Cargar
-                                                    </button>
-                                                    <button type="button" class="tm-btn tm-btn-outline" data-paste-image-button data-target-input="{{ $id }}" aria-label="Pegar imagen" title="Pegar imagen">
-                                                        <i class="fa-solid fa-paste" aria-hidden="true"></i> Pegar
-                                                    </button>
-                                                </div>
-                                                <input type="hidden" name="remove_images[{{ $field->key }}]" value="0" data-remove-flag>
-                                                <small class="tm-upload-evidence-hint">Arrastra aquí o usa los botones.</small>
-                                                <div class="tm-upload-evidence-dropzone" data-paste-upload-wrap>
-                                                    <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" class="d-none" {{ ($field->is_required && !$hasExistingImage) ? 'required' : '' }}>
-                                                    <div class="tm-upload-evidence-placeholder">
-                                                        <i class="fa-solid fa-images" aria-hidden="true"></i>
-                                                        <p>Suelta la imagen aquí</p>
-                                                    </div>
-                                                    <div class="tm-image-preview" data-image-preview {{ is_string($value) && $value !== '' && str_contains($value, '/') ? '' : 'hidden' }}>
-                                                        <img
-                                                            src="{{ is_string($value) && $value !== '' && str_contains($value, '/') ? route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) : '' }}"
-                                                            alt="{{ $field->label }}"
-                                                            data-image-preview-img
-                                                        >
-                                                        <button type="button" class="tm-image-clear" data-image-remove aria-label="Quitar imagen">&times;</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @else
-                                            <input id="{{ $id }}" type="text" name="{{ $name }}" value="{{ is_scalar($value) ? $value : '' }}" {{ $field->is_required ? 'required' : '' }}>
-                                        @endif
-                                    </label>
-                                @endforeach
-
-                            </div>
-
-                            <div class="tm-actions">
-                                <button type="submit" class="tm-btn tm-btn-primary">Guardar cambios</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        @endforeach
     @endforeach
 
     <section class="tm-section-panel {{ !$isUploadSection ? 'is-active' : '' }}" id="tmRecordsView" role="tabpanel" aria-hidden="{{ !$isUploadSection ? 'false' : 'true' }}" data-records-url="{{ route('temporary-modules.records') }}" data-fragment-records-url="{{ $fragmentRecordsUrl ?? '' }}">
@@ -958,7 +644,6 @@
                     @php
                         $municipioField = $module->fields->firstWhere('type', 'municipio');
                         $isModuleActive = (int) ($activeModuleId ?? 0) === (int) $module->id || ((int) ($activeModuleId ?? 0) === 0 && $loop->first);
-                        $entries = $isModuleActive && isset($myEntries) ? $myEntries : $module->getRelation('myEntries');
                     @endphp
                     <section
                         class="tm-module-records-panel {{ $isModuleActive ? 'is-active' : '' }}"
@@ -1006,7 +691,7 @@
                             </div>
                         </div>
                         @php
-                            $recordsLoaded = $isModuleActive && isset($myEntries);
+                            $recordsLoaded = false;
                         @endphp
                         <div
                             class="tm-records-fragment-host"
@@ -1014,13 +699,7 @@
                             data-module-id="{{ $module->id }}"
                             @unless ($recordsLoaded) hidden @endunless
                         >
-                            @if ($recordsLoaded)
-                                @include('temporary_modules.delegate.partials.records_entries', [
-                                    'module' => $module,
-                                    'entries' => $myEntries,
-                                    'municipioField' => $municipioField,
-                                ])
-                            @endif
+                            {{-- Registros cargados vía AJAX fragment --}}
                         </div>
                         <div class="tm-records-panel-placeholder" @if ($recordsLoaded) hidden @endif>
                             <p class="tm-module-subtitle">{{ $module->name }}</p>
@@ -3851,6 +3530,19 @@
                 openModal.__tmHandleFile(file);
             }
         });
+
+        // --- Trigger initial load for the active module panel if we are in records view ---
+        if (recordsViewPanel && recordsViewPanel.classList.contains('is-active')) {
+            const activeChip = document.querySelector('[data-tm-module-chips-track] .tm-module-chip.is-active');
+            if (activeChip) {
+                const targetId = activeChip.getAttribute('data-module-target');
+                const panel = targetId ? document.getElementById(targetId) : null;
+                const host = panel ? panel.querySelector('.tm-records-fragment-host') : null;
+                if (host && !host.querySelector('.tm-records-fragment-inner')) {
+                    activeChip.click();
+                }
+            }
+        }
     });
 
     // Delegated click handler for suggestion buttons — single-field mode (immediate send)

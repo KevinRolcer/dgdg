@@ -886,6 +886,10 @@ class TemporaryModuleController extends Controller
         $microrregionesAsignadas = $this->accessService->microrregionesConMunicipiosPorUsuario((int) $user->id);
         $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
 
+        $microrregionesMunicipios = $microrregionesAsignadas->pluck('municipios', 'id')
+            ->map(fn ($m) => collect($m)->pluck('municipio')->toArray())
+            ->toArray();
+
         $allModulesQuery = TemporaryModule::query()
             ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all'])
             ->where('is_active', true)
@@ -917,63 +921,18 @@ class TemporaryModuleController extends Controller
             });
         }
 
-        $allModules = (clone $allModulesQuery)->get();
-        $modules = $allModules; // Sin paginación para la lista de módulos
+        $allModules = $allModulesQuery->get();
+        $modules = $allModules;
 
-        $moduleIds = $allModules->pluck('id')->all();
-        $entriesByModule = collect();
-        if ($moduleIds !== []) {
-            $entriesByModule = TemporaryModuleEntry::query()
-                ->whereIn('temporary_module_id', $moduleIds)
-                ->when(
-                    $microrregionIdsUsuario !== [],
-                    fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
-                    fn ($q) => $q->whereRaw('1 = 0')
-                )
-                ->with('microrregion:id,microrregion,cabecera')
-                ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
-                ->latest('submitted_at')
-                ->get()
-                ->groupBy('temporary_module_id');
-        }
-        foreach ($allModules as $module) {
-            $module->setRelation('myEntries', $entriesByModule->get($module->id, collect()));
-        }
-
-        // Solo carga campos y entradas del usuario para el módulo activo
-        $requestedModuleId = $request->filled('module')
-            ? (int) $request->query('module')
-            : null;
-
-        $activeModuleId = $requestedModuleId !== null
-            && $allModules->contains(fn ($module) => (int) $module->id === $requestedModuleId)
+        $requestedModuleId = $request->filled('module') ? (int) $request->query('module') : null;
+        $activeModuleId = ($requestedModuleId !== null && $allModules->contains('id', $requestedModuleId))
             ? $requestedModuleId
             : (int) ($allModules->first()?->id ?? 0);
 
         $activeModule = $allModules->firstWhere('id', $activeModuleId);
+        $fields = $activeModule ? $activeModule->fields : collect();
 
-        $fields = [];
-        $myEntries = collect();
-        if ($activeModule) {
-            $fields = $activeModule->fields()->select(['id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required'])->get();
-            $myEntries = $activeModule->entries()
-                ->when(
-                    $microrregionIdsUsuario !== [],
-                    fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
-                    fn ($q) => $q->whereRaw('1 = 0')
-                )
-                ->tap(fn ($q) => $this->applyDelegateMyRecordsFilters($q, $request, $microrregionIdsUsuario))
-                ->with('microrregion:id,microrregion,cabecera')
-                ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
-                ->latest('submitted_at')
-                ->paginate(10, ['*'], 'entries_page')
-                ->appends(array_merge($request->except('entries_page'), $this->delegateRecordsAppends($request, $activeModuleId)))
-                ->withQueryString();
-        }
-
-        $activeSection = optional($request->route())->getName() === 'temporary-modules.records'
-            ? 'records'
-            : 'upload';
+        $activeSection = optional($request->route())->getName() === 'temporary-modules.records' ? 'records' : 'upload';
 
         return view('temporary_modules.delegate.index', [
             'pageTitle' => 'Capturas temporales',
@@ -982,9 +941,9 @@ class TemporaryModuleController extends Controller
             'modules' => $modules,
             'allModules' => $allModules,
             'fields' => $fields,
-            'myEntries' => $myEntries,
             'municipios' => $municipios,
             'microrregionesAsignadas' => $microrregionesAsignadas,
+            'microrregionesMunicipios' => $microrregionesMunicipios,
             'activeSection' => $activeSection,
             'activeModuleId' => $activeModuleId,
             'fragmentUploadUrl' => route('temporary-modules.fragment.upload'),
@@ -1081,11 +1040,16 @@ class TemporaryModuleController extends Controller
             ->withQueryString();
         $municipioField = $temporaryModule->fields->firstWhere('type', 'municipio');
 
+        $microrregionesAsignadas = $this->accessService->microrregionesConMunicipiosPorUsuario((int) $user->id);
+        $tmImportable = $temporaryModule->fields->filter(fn ($f) => in_array($f->type, \App\Services\TemporaryModules\TemporaryModuleExcelImportService::IMPORTABLE_TYPES, true));
+
         return view('temporary_modules.delegate.partials.records_entries', [
             'module' => $temporaryModule,
             'entries' => $myEntries,
             'municipioField' => $municipioField,
             'fragmentRecordsUrl' => route('temporary-modules.fragment.records'),
+            'microrregionesAsignadas' => $microrregionesAsignadas,
+            'tmImportable' => $tmImportable,
         ]);
     }
 

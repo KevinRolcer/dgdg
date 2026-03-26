@@ -128,9 +128,10 @@ class TemporaryModuleExportService
                 ->withoutGlobalScopes()
                 ->reorder() // evitamos ordenar por submitted_at en una consulta DISTINCT
                 ->select('microrregion_id')
+                ->join('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
+                ->orderByRaw('CAST(microrregiones.microrregion AS UNSIGNED) ASC')
                 ->distinct()
                 ->pluck('microrregion_id')
-                ->sort()
                 ->values();
 
             if ($groups->isEmpty()) {
@@ -194,7 +195,12 @@ class TemporaryModuleExportService
             } else {
                 $targetSheet = $createDataSheet();
                 $targetSheet->setTitle('Registros');
-                $entriesQuery = $temporaryModule->entries()->latest('submitted_at');
+                $entriesQuery = $temporaryModule->entries()
+                    ->withoutGlobalScopes()
+                    ->leftJoin('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
+                    ->orderByRaw('CASE WHEN microrregion_id IS NULL THEN 1 ELSE 0 END, CAST(microrregiones.microrregion AS UNSIGNED) ASC, submitted_at DESC')
+                    ->select('temporary_module_entries.*');
+
                 $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta, $fechaCorte);
                 $this->applyPrintSetup($targetSheet, $orientation);
             }
@@ -689,7 +695,7 @@ class TemporaryModuleExportService
         $numFixed = count($fixedHeaders);
         $fechaCorteStr = $fechaCorte->format('d/m/Y H:i');
         $dataColumnsCount = $numFixed + count($exportColumns);
-        
+
         $titleRow = 1;
         $dateRow = 2;
         $includeCountTable = !empty($this->exportConfig['include_count_table']);
@@ -725,9 +731,9 @@ class TemporaryModuleExportService
                 $span = $includePct ? $numValues * 2 : $numValues;
                 $startCol = $colIdx;
                 $isRedundant = ($numValues === 1 && (trim((string)($group['values'][0]['label'] ?? '')) === '' || trim((string)($group['values'][0]['label'] ?? '')) === trim((string)($group['label'] ?? '')))) || $key === '_total';
-                
+
                 $sheet->setCellValue(Coordinate::stringFromColumnIndex($startCol).$groupRow, $group['label']);
-                
+
                 if ($span > 1) {
                     $endCol = $startCol + $span - 1;
                     $sheet->mergeCells(Coordinate::stringFromColumnIndex($startCol).$groupRow.':'.Coordinate::stringFromColumnIndex($endCol).$groupRow);
@@ -798,13 +804,13 @@ class TemporaryModuleExportService
         }
 
         $lastColumnLetter = Coordinate::stringFromColumnIndex($maxColIdx);
-        
+
         // Título y Fecha con el ancho máximo real
         $titleText = !empty($this->exportConfig['title']) ? (string)$this->exportConfig['title'] : (string)$temporaryModule->name;
         $sheet->setCellValue('A'.$titleRow, $titleText);
         $sheet->mergeCells('A'.$titleRow.':'.$lastColumnLetter.$titleRow);
         $sheet->getStyle('A'.$titleRow)->getFont()->setSize(16)->setBold(true);
-        
+
         $titleAlign = Alignment::HORIZONTAL_CENTER;
         if (is_array($this->exportConfig) && isset($this->exportConfig['title_align'])) {
             $alignCfg = (string) $this->exportConfig['title_align'];
@@ -947,11 +953,37 @@ class TemporaryModuleExportService
             $sheet->setCellValue('A'.$rowIndex, 'Sin registros');
         } else {
             $itemNumber = 1;
-            $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule, $exportColumns, $headerRowCount) {
+
+            // Tracking for row spanning/merging (microrregion column is usually B [index 2])
+            $lastMicrorregionValue = null;
+            $mergingStartRow = null;
+
+            $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule, $exportColumns, $headerRowCount, &$lastMicrorregionValue, &$mergingStartRow) {
                 foreach ($entries as $entry) {
                     $sheet->setCellValue('A'.$rowIndex, $itemNumber);
                     $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
-                    $sheet->setCellValue('B'.$rowIndex, (string) ($meta->label ?? $meta['label'] ?? 'Sin microrregión'));
+                    $currentMicrorregionValue = (string) ($meta->label ?? $meta['label'] ?? 'Sin microrregión');
+
+                    // Handling Microrregion merging (Column B)
+                    if ($lastMicrorregionValue === null) {
+                        $lastMicrorregionValue = $currentMicrorregionValue;
+                        $mergingStartRow = $rowIndex;
+                        $sheet->setCellValue('B'.$rowIndex, $currentMicrorregionValue);
+                    } elseif ($lastMicrorregionValue !== $currentMicrorregionValue) {
+                        // Merge previous group
+                        if ($mergingStartRow !== null && $mergingStartRow < ($rowIndex - 1)) {
+                            $sheet->mergeCells('B'.$mergingStartRow.':B'.($rowIndex - 1));
+                            $sheet->getStyle('B'.$mergingStartRow.':B'.($rowIndex - 1))->getAlignment()
+                                ->setVertical(Alignment::VERTICAL_CENTER)
+                                ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                        }
+                        $lastMicrorregionValue = $currentMicrorregionValue;
+                        $mergingStartRow = $rowIndex;
+                        $sheet->setCellValue('B'.$rowIndex, $currentMicrorregionValue);
+                    } else {
+                        // Same as before, don't set value yet (PhpSpreadsheet requirement for merging later)
+                        $sheet->setCellValue('B'.$rowIndex, '');
+                    }
 
                     $columnIndex = 3;
                     foreach ($exportColumns as $col) {
@@ -1055,6 +1087,14 @@ class TemporaryModuleExportService
                     $rowIndex++;
                     $itemNumber++;
                 }
+
+                // Merge last remaining group after all iterations
+                if ($mergingStartRow !== null && $mergingStartRow < ($rowIndex - 1)) {
+                    $sheet->mergeCells('B'.$mergingStartRow.':B'.($rowIndex - 1));
+                    $sheet->getStyle('B'.$mergingStartRow.':B'.($rowIndex - 1))->getAlignment()
+                        ->setVertical(Alignment::VERTICAL_CENTER)
+                        ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                }
             });
         }
 
@@ -1075,7 +1115,7 @@ class TemporaryModuleExportService
 
         for ($colIdx = 1; $colIdx <= $maxColIdx; $colIdx++) {
             $columnLetter = Coordinate::stringFromColumnIndex($colIdx);
-            
+
             $cfgWidth = null;
             $fieldKey = null;
 

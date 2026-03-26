@@ -277,3 +277,269 @@ html.theme-dark .agenda-filters-compact .tm-module-chip.tm-btn-clear {
     color: var(--clr-text-light) !important;
     border-color: var(--clr-border) !important;
 }
+
+/* Agenda Personal - Dark Theme Support */
+html.theme-dark .personal-agenda-page {
+    background-color: transparent !important;
+}
+
+html.theme-dark .pa-main {
+    background-color: transparent !important;
+}
+
+html.theme-dark .pa-sidebar {
+    background-color: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-content-header {
+    background-color: var(--clr-bg) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-search-input {
+    background-color: var(--tm-muted-bg) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-search-input:focus {
+    background-color: var(--clr-card) !important;
+    border-color: var(--clr-accent) !important;
+}
+
+html.theme-dark .pa-search-wrapper i {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .pa-tabs-pills {
+    background-color: var(--tm-muted-bg) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-tab-pill {
+    color: var(--clr-text-light) !important;
+    background-color: var(--tm-muted-bg) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-tab-pill.is-active {
+    background-color: var(--clr-accent) !important;
+    color: #fff !important;
+    border-color: var(--clr-accent) !important;
+}
+
+html.theme-dark .pa-toggle-btn {
+    background: var(--tm-surface) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-toggle-btn i {
+    color: inherit !important;
+}
+
+html.theme-dark .pa-toggle-btn:hover {
+    background: rgba(199, 155, 102, 0.08) !important;
+    color: var(--clr-accent) !important;
+    border-color: rgba(199, 155, 102, 0.35) !important;
+}
+
+html.theme-dark .pa-toggle-btn.is-active {
+    background: rgba(199, 155, 102, 0.16) !important;
+    color: var(--clr-accent) !important;
+    border-color: var(--clr-accent) !important;
+}
+
+html.theme-dark .pa-nav-item {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-nav-item:hover,
+html.theme-dark .pa-nav-item.is-active {
+    background: rgba(199, 155, 102, 0.15) !important;
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .pa-sidebar-toggle {
+    background-color: var(--tm-muted-bg) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-card:not(.pa-card--folder):not([style*="background-color"]) {
+    background-color: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-card-title {
+    color: inherit !important;
+}
+
+html.theme-dark .pa-card-body {
+    color: inherit !important;
+    opacity: 0.85;
+}
+
+/* Notas con color de fondo claro en tema oscuro: forzar texto oscuro para que contraste */
+html.theme-dark .pa-card--note[style*="background-color"] .pa-card-title,
+html.theme-dark .pa-card--note[style*="background-color"] .pa-card-body,
+html.theme-dark .pa-card--note[style*="background-color"] .pa-card-date,
+html.theme-dark .pa-card--note[style*="background-color"] .pa-card-footer,
+html.theme-dark .pa-card--note[style*="background-color"] .pa-card-actions i {
+    color: #333 !important;
+}
+
+/* Modals in Dark Theme */
+html.theme-dark .swal2-popup.pa-swal-popup,
+html.theme-dark .tm-swal-popup {
+    background-color: var(--clr-card) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .swal2-title.tm-swal-title {
+    background: var(--tm-muted-bg) !important;
+    color: var(--clr-text-main) !important;
+    border-bottom: 1px solid var(--clr-border) !important;
+}
+
+html.theme-dark .swal2-html-container.tm-swal-text {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .swal2-label {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .swal2-input,
+html.theme-dark .swal2-textarea,
+html.theme-dark .swal2-select {
+    background-color: var(--tm-muted-bg) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .swal2-actions {
+    background: var(--tm-muted-bg) !important;
+    border-top: 1px solid var(--clr-border) !important;
+}
+
+html.theme-dark .swal2-cancel.tm-swal-cancel {
+    background-color: var(--clr-card) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-card--placeholder {
+    border-color: var(--clr-border) !important;
+    background: transparent !important;
+}
+
+html.theme-dark .pa-card--placeholder i,
+html.theme-dark .pa-card--placeholder span {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .pa-card--placeholder:hover {
+    border-color: var(--clr-accent) !important;
+}
+
+html.theme-dark .pa-card--placeholder:hover i,
+html.theme-dark .pa-card--placeholder:hover span {
+    color: var(--clr-accent) !important;
+}
+
+/* Modal preview de nota en tema oscuro */
+html.theme-dark .pa-preview-card {
+    background: var(--clr-card) !important;
+    color: var(--clr-text-main) !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6) !important;
+}
+
+html.theme-dark .pa-preview-title {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-preview-date {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .pa-preview-body {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-preview-close {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .pa-preview-close:hover {
+    background: rgba(255, 255, 255, 0.14) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-preview-attachments {
+    border-top-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-preview-att-item {
+    border-color: var(--clr-border) !important;
+    background: var(--tm-muted-bg) !important;
+}
+
+html.theme-dark .pa-preview-card > div:last-child button {
+    background: var(--tm-muted-bg) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-explorer-bar {
+    background-color: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-breadcrumb-item {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .pa-breadcrumb-item:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-breadcrumb-item.is-current {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-view-toggle {
+    background-color: var(--tm-muted-bg) !important;
+}
+
+html.theme-dark .pa-view-btn {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .pa-view-btn.is-active {
+    background-color: var(--clr-card) !important;
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .pa-section-title {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .cal-current-month {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-slider-btn {
+    background-color: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-slider-btn:hover {
+    background-color: var(--clr-accent) !important;
+    color: #fff !important;
+}
+
