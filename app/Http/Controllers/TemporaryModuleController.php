@@ -1417,13 +1417,13 @@ class TemporaryModuleController extends Controller
         ]);
 
         $file = $request->file('archivo_excel');
-        $isPdf = $file->getClientOriginalExtension() === 'pdf';
+        $isPdf = strtolower($file->getClientOriginalExtension()) === 'pdf';
         $headerRow = (int) ($request->input('header_row') ?: 1);
         $sheetIndex = (int) ($request->input('sheet_index') ?: 0);
         $detected = null;
-        if ($request->boolean('auto_detect', true)) {
+        if ($request->boolean('auto_detect', true) && ! $isPdf) {
             try {
-                $detected = $this->adminSeedService->detectTableLayout($file);
+                $detected = $this->adminSeedService->detectTableLayout($file, 80, $sheetIndex);
                 if ($detected !== null) {
                     $headerRow = $detected['header_row'];
                 }
@@ -1441,9 +1441,16 @@ class TemporaryModuleController extends Controller
 
         try {
             if ($isPdf) {
+                // Subir memoria/tiempo para PDFs pesados
+                $sizeMb = $file->getSize() / 1_048_576;
+                if ($sizeMb > 20) {
+                    @ini_set('memory_limit', $sizeMb > 80 ? '1G' : '512M');
+                    @set_time_limit($sizeMb > 80 ? 300 : 180);
+                }
                 $preview = $this->pdfImportService->preview($temporaryModule, $file->getRealPath(), $headerRow);
             } else {
-                $preview = $this->excelImportService->preview($file, $headerRow, true, $sheetIndex);
+                // Lectura ligera: sin dibujos (SheetJS ya muestra la tabla en el cliente)
+                $preview = $this->excelImportService->preview($file, $headerRow, false, $sheetIndex);
             }
 
             if (!$preview['success']) {
@@ -1693,13 +1700,62 @@ class TemporaryModuleController extends Controller
             if ($municipioField) {
                 $munVal = trim((string) ($validated['data'][$municipioField->key] ?? ''));
                 if ($munVal !== '') {
+                    // Intento directo por nombre
                     $microrregionId = \App\Models\Municipio::where('municipio', $munVal)->value('microrregion_id');
+
+                    // Fallback: usar la misma normalización que el flujo de importación
+                    if ($microrregionId === null) {
+                        $micros = $this->accessService->microrregionesConMunicipiosPorUsuario($userId);
+                        $normVal = $this->excelImportService->normalizeLabel($munVal);
+                        foreach ($micros as $m) {
+                            foreach ($m->municipios ?? [] as $mun) {
+                                if ($this->excelImportService->normalizeLabel($mun) === $normVal) {
+                                    $microrregionId = $m->id;
+                                    break 2;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Normalizar valores de multiselect: convertir strings a arrays
+        $fields = $temporaryModule->fields;
+        $data = $validated['data'];
+        foreach ($fields as $f) {
+            if ($f->type === 'multiselect' && isset($data[$f->key]) && is_string($data[$f->key])) {
+                $strVal = trim($data[$f->key]);
+                if ($strVal === '') {
+                    $data[$f->key] = null;
+                } else {
+                    $opts = array_map('strval', $f->options ?? []);
+                    // Buscar coincidencia exacta o normalizada en opciones
+                    $matchIdx = null;
+                    if (in_array($strVal, $opts, true)) {
+                        $matchIdx = array_search($strVal, $opts, true);
+                    } else {
+                        $normVal = $this->excelImportService->normalizeLabel($strVal);
+                        foreach ($opts as $i => $o) {
+                            if ($this->excelImportService->normalizeLabel($o) === $normVal) {
+                                $matchIdx = $i;
+                                break;
+                            }
+                        }
+                    }
+                    if ($matchIdx !== null) {
+                        $data[$f->key] = [$opts[$matchIdx]];
+                    } else {
+                        // Intentar split por coma/punto y coma
+                        $items = array_values(array_filter(array_map('trim', preg_split('/[,;]+/', $strVal)), fn($s) => $s !== ''));
+                        $data[$f->key] = $items ?: [$strVal];
+                    }
                 }
             }
         }
 
         // Validar todos los campos (select, requeridos, microrregión) y devolver errores con sugerencias
-        $error = $this->excelImportService->validateSingleRow($temporaryModule, $validated['data'], $microrregionId, $userId);
+        $error = $this->excelImportService->validateSingleRow($temporaryModule, $data, $microrregionId, $userId);
         if ($error !== null) {
             return response()->json([
                 'success' => false,
@@ -1716,7 +1772,7 @@ class TemporaryModuleController extends Controller
         $temporaryModule->entries()->create([
             'user_id' => $request->user()->id,
             'microrregion_id' => $microrregionId,
-            'data' => $validated['data'],
+            'data' => $data,
             'submitted_at' => Carbon::now(),
         ]);
 

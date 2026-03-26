@@ -962,26 +962,57 @@ class TemporaryModuleExcelImportService
             if ($f->type === 'select') {
                 $opts = array_map('strval', $f->options ?? []);
                 if (! empty($opts) && ! in_array((string) $val, $opts, true)) {
-                    $failedFields[] = [
-                        'key' => $f->key,
-                        'label' => (string) $f->label,
-                        'reason' => 'No coincide con la lista.',
-                        'received' => (string) $val,
-                        'suggestions' => $opts,
-                    ];
+                    // Coincidencia case+accent insensitive
+                    $optsNorm = array_map(fn ($o) => $this->normalizeLabel($o), $opts);
+                    $matchIdx = array_search($this->normalizeLabel((string) $val), $optsNorm, true);
+                    if ($matchIdx !== false) {
+                        $data[$f->key] = $opts[$matchIdx];
+                    } else {
+                        $failedFields[] = [
+                            'key' => $f->key,
+                            'label' => (string) $f->label,
+                            'reason' => 'No coincide con la lista.',
+                            'received' => (string) $val,
+                            'suggestions' => $opts,
+                        ];
+                    }
                 }
             } elseif ($f->type === 'multiselect') {
                 $opts = array_map('strval', $f->options ?? []);
-                $valArray = is_array($val) ? $val : [$val];
-                $invalidOnes = array_diff($valArray, $opts);
-                if (! empty($opts) && ! empty($invalidOnes)) {
-                    $failedFields[] = [
-                        'key' => $f->key,
-                        'label' => (string) $f->label,
-                        'reason' => 'Contiene elementos inválidos.',
-                        'received' => is_array($val) ? implode(', ', $val) : (string) $val,
-                        'suggestions' => $opts,
-                    ];
+                // Normalizar: si es string, convertir a array
+                if (is_string($val)) {
+                    if (in_array($val, $opts, true)) {
+                        $valArray = [$val];
+                    } else {
+                        $valArray = array_values(array_filter(array_map('trim', preg_split('/[,;]+/', $val)), fn ($s) => $s !== ''));
+                    }
+                } else {
+                    $valArray = is_array($val) ? $val : [$val];
+                }
+                // Coincidencia case+accent insensitive para cada elemento
+                if (! empty($opts)) {
+                    $optsNorm = array_map(fn ($o) => $this->normalizeLabel($o), $opts);
+                    $resolved = [];
+                    $invalid = [];
+                    foreach ($valArray as $item) {
+                        $idx = array_search($this->normalizeLabel((string) $item), $optsNorm, true);
+                        if ($idx !== false) {
+                            $resolved[] = $opts[$idx];
+                        } else {
+                            $invalid[] = $item;
+                        }
+                    }
+                    if (! empty($invalid)) {
+                        $failedFields[] = [
+                            'key' => $f->key,
+                            'label' => (string) $f->label,
+                            'reason' => 'Contiene elementos inválidos.',
+                            'received' => is_array($val) ? implode(', ', $val) : (string) $val,
+                            'suggestions' => $opts,
+                        ];
+                    } else {
+                        $data[$f->key] = $resolved;
+                    }
                 }
             }
         }
@@ -1214,14 +1245,35 @@ class TemporaryModuleExcelImportService
                 if ($f->type === 'select') {
                     $opts = array_map('strval', $f->options ?? []);
                     if (!empty($opts) && !in_array((string)$val, $opts, true)) {
-                        $failedFields[] = ['key' => $f->key, 'label' => $f->label, 'reason' => 'No coincide con la lista.', 'received' => (string)($rawValues[$f->key] ?? ''), 'suggestions' => $opts];
+                        // Fallback: coincidencia case+accent insensitive
+                        $optsNorm = array_map(fn ($o) => $this->normalizeLabel($o), $opts);
+                        $matchIdx = array_search($this->normalizeLabel((string) $val), $optsNorm, true);
+                        if ($matchIdx !== false) {
+                            $values[$f->key] = $opts[$matchIdx];
+                        } else {
+                            $failedFields[] = ['key' => $f->key, 'label' => $f->label, 'reason' => 'No coincide con la lista.', 'received' => (string)($rawValues[$f->key] ?? ''), 'suggestions' => $opts];
+                        }
                     }
                 } elseif ($f->type === 'multiselect') {
                     $opts = array_map('strval', $f->options ?? []);
                     $valArray = is_array($val) ? $val : [$val];
-                    $invalidOnes = array_diff($valArray, $opts);
-                    if (!empty($opts) && !empty($invalidOnes)) {
-                        $failedFields[] = ['key' => $f->key, 'label' => $f->label, 'reason' => 'Contiene elementos inválidos.', 'received' => (string)($rawValues[$f->key] ?? ''), 'suggestions' => $opts];
+                    if (!empty($opts)) {
+                        $optsNorm = array_map(fn ($o) => $this->normalizeLabel($o), $opts);
+                        $resolved = [];
+                        $invalidOnes = [];
+                        foreach ($valArray as $item) {
+                            $idx = array_search($this->normalizeLabel((string) $item), $optsNorm, true);
+                            if ($idx !== false) {
+                                $resolved[] = $opts[$idx];
+                            } else {
+                                $invalidOnes[] = $item;
+                            }
+                        }
+                        if (!empty($invalidOnes)) {
+                            $failedFields[] = ['key' => $f->key, 'label' => $f->label, 'reason' => 'Contiene elementos inválidos.', 'received' => (string)($rawValues[$f->key] ?? ''), 'suggestions' => $opts];
+                        } else {
+                            $values[$f->key] = $resolved;
+                        }
                     }
                 }
             }

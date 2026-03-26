@@ -1092,7 +1092,11 @@
 
     async function refreshCsrfToken() {
         try {
-            const r = await fetch(@json(route('csrf.refresh')), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+            const r = await fetch(@json(route('csrf.refresh')), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+            if (r.redirected || r.status === 401) {
+                window.location.href = @json(route('login'));
+                return false;
+            }
             if (!r.ok) throw new Error('refresh failed');
             const j = await r.json();
             if (j.token) {
@@ -1100,13 +1104,15 @@
                 const meta = document.querySelector('meta[name="csrf-token"]');
                 if (meta) meta.setAttribute('content', j.token);
             }
-        } catch (_) { /* will fail on retry anyway */ }
+            return true;
+        } catch (_) { return false; }
     }
 
     async function csrfFetch(url, opts = {}) {
         const res = await fetch(url, opts);
         if (res.status === 419) {
-            await refreshCsrfToken();
+            const ok = await refreshCsrfToken();
+            if (!ok) return res;
             if (opts.body instanceof FormData) {
                 opts.body.set('_token', csrfToken);
             }
@@ -1116,6 +1122,21 @@
             return fetch(url, opts);
         }
         return res;
+    }
+
+    async function safeJsonParse(response) {
+        if (response.status === 419) {
+            throw new Error('Tu sesión ha expirado. Recarga la página para continuar.');
+        }
+        var ct = response.headers.get('content-type') || '';
+        if (!response.ok || !ct.includes('application/json')) {
+            var text = await response.text().catch(function() { return ''; });
+            if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+                throw new Error('El servidor no pudo procesar la solicitud (posible límite de memoria o tiempo). Intenta con un archivo más pequeño.');
+            }
+            throw new Error(text.substring(0, 200) || ('Error del servidor: HTTP ' + response.status));
+        }
+        return response.json();
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -1253,6 +1274,9 @@
         const renderErrorCardHtml = (err, idx, moduleId, singleUrl, cardId, isLogModal = false) => {
             const moduleName = isLogModal ? getModuleNameById(moduleId) : '';
             const failedFields = getFailedFields(err);
+            // Contar campos que tienen sugerencias (para modo multi-corrección)
+            const fieldsWithSugg = failedFields.filter(f => f.suggestions && f.suggestions.length > 0).length;
+            const isMultiCorrect = fieldsWithSugg >= 2;
 
             let failedFieldsHtml = '';
             if (failedFields.length > 0) {
@@ -1264,8 +1288,10 @@
                         fieldSugg = '<div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">' +
                             '<span style="width:100%; font-size:0.65rem; color:var(--clr-error-text); font-weight:700;">VALORES DISPONIBLES:</span>' +
                             f.suggestions.map(s => `
-                                <button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
-                                    onclick="retryImportRow(${idx}, null, '${String(s).replace(/'/g, "\\'")}', '${singleUrl.replace(/'/g, "\\'")}', '${moduleId}', '${cardId}', this, ${err.row || 0}, '${f.key}')"
+                                <button type="button" class="tm-btn tm-btn-sm tm-btn-outline ${isMultiCorrect ? 'tm-idx-stage-btn' : 'tm-idx-sugg-btn'}"
+                                    data-idx="${idx}" data-val="${escapeHtml(s)}" data-key="${escapeHtml(f.key)}"
+                                    data-surl="${escapeHtml(singleUrl)}" data-mid="${escapeHtml(moduleId)}"
+                                    data-cid="${escapeHtml(cardId)}" data-row="${err.row || 0}"
                                     style="font-size:0.68rem; padding:3px 8px; font-weight:600; text-transform:uppercase;">
                                     ${escapeHtml(s)}
                                 </button>
@@ -1292,8 +1318,10 @@
                 generalSuggHtml = '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">' +
                     '<span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">¿Quisiste decir? (Municipios)</span>' +
                     err.suggestions.map(s => `
-                        <button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
-                            onclick="retryImportRow(${idx}, ${Number(s.microrregion_id || 0)}, '${String(s.municipio || '').replace(/'/g, "\\'")}', '${singleUrl.replace(/'/g, "\\'")}', '${moduleId}', '${cardId}', this, ${err.row || 0})"
+                        <button type="button" class="tm-btn tm-btn-sm tm-btn-outline tm-idx-sugg-btn"
+                            data-idx="${idx}" data-val="${escapeHtml(s.municipio || '')}" data-mr="${Number(s.microrregion_id || 0)}"
+                            data-surl="${escapeHtml(singleUrl)}" data-mid="${escapeHtml(moduleId)}"
+                            data-cid="${escapeHtml(cardId)}" data-row="${err.row || 0}"
                             style="font-size:0.7rem; padding:4px 8px;">
                             ${escapeHtml(s.municipio)}
                         </button>
@@ -1353,6 +1381,7 @@
                         style="padding:4px 10px; font-size:0.75rem;">
                         <i class="fa-solid fa-pen"></i> Corregir datos manualmente
                     </button>
+                    ${isMultiCorrect ? `<button type="button" class="tm-btn tm-btn-sm tm-idx-save-staged-btn" data-cid="${escapeHtml(cardId)}" data-idx="${idx}" data-surl="${escapeHtml(singleUrl)}" data-mid="${escapeHtml(moduleId)}" data-row="${err.row || 0}" style="padding:4px 12px; font-size:0.75rem; background:var(--clr-secondary,#2e7d32); color:#fff; border:0; border-radius:6px; cursor:pointer; display:none;"><i class="fa-solid fa-check"></i> Guardar correcciones</button>` : ''}
                     ${generalSuggHtml}
                 </div>
             `;
@@ -1598,7 +1627,7 @@
                 headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                 credentials: 'same-origin'
             })
-                .then(function (res) { return res.ok ? res.json() : Promise.reject(res); })
+                .then(function (res) { return safeJsonParse(res); })
                 .then(function (data) {
                     const count = typeof data.my_entries_count === 'number' ? data.my_entries_count : null;
                     if (count === null) return;
@@ -2646,7 +2675,7 @@
                                 },
                                 body: JSON.stringify({ entry_ids: selected })
                             })
-                            .then(res => res.json())
+                            .then(res => safeJsonParse(res))
                             .then(data => {
                                 if (data.success) {
                                     if (typeof window.segobToast === 'function') {
@@ -3078,15 +3107,16 @@
                 });
             };
 
-            const fetchExcelPreviewThumbnails = (file) => {
+            const fetchExcelPreviewThumbnails = (file, useAutoDetect) => {
                 if (!file || !previewUrl) return;
                 const fd = new FormData();
                 fd.append('archivo_excel', file);
                 fd.append('header_row', headerRowInput?.value || '1');
                 fd.append('sheet_index', currentSheetIdx);
+                fd.append('auto_detect', useAutoDetect ? '1' : '0');
                 fd.append('_token', csrfToken);
                 csrfFetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
-                    .then((r) => r.json())
+                    .then((r) => safeJsonParse(r))
                     .then((j) => {
                         if (!j.success) return;
                         if (j.preview_rows && j.preview_rows.length) {
@@ -3368,7 +3398,7 @@
                     if (sheetTabsWrap) sheetTabsWrap.style.display = 'none';
                     const inner = modal.querySelector('.tm-excel-sheet-inner-el');
                     if (inner) inner.innerHTML = '<div style="padding:60px; text-align:center; color:var(--clr-text-light);"><i class="fa-solid fa-file-pdf" style="font-size:2.5rem; margin-bottom:12px; opacity:0.4; color:#e74c3c;"></i><p>Archivo PDF cargado. Las columnas se detectarán automáticamente del servidor.</p></div>';
-                    fetchExcelPreviewThumbnails(file);
+                    fetchExcelPreviewThumbnails(file, true);
                     modal.querySelector('.tm-excel-auto-detect').style.display = 'inline-flex';
                     return;
                 }
@@ -3382,7 +3412,7 @@
                         currentSheetIdx = 0;
                         switchToSheet(0);
                         renderSheetTabs(workbook.SheetNames, 0);
-                        fetchExcelPreviewThumbnails(file);
+                        fetchExcelPreviewThumbnails(file, true);
                         modal.querySelector('.tm-excel-auto-detect').style.display = 'inline-flex';
                     } catch (err) {
                         if (errPreviewEl) { errPreviewEl.textContent = 'Error al procesar el Excel.'; errPreviewEl.classList.remove('tm-hidden'); }
@@ -3457,7 +3487,7 @@
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Leyendo...';
 
                 csrfFetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
-                .then(r => r.json())
+                .then(r => safeJsonParse(r))
                 .then(j => {
                     if (!j.success) throw new Error(j.message);
 
@@ -3563,7 +3593,7 @@
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importando...';
 
                 csrfFetch(importUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
-                .then(r => r.json())
+                .then(r => safeJsonParse(r))
                 .then(j => {
                     const okEl = modal.querySelector('.tm-excel-import-ok');
                     const errEl = modal.querySelector('.tm-excel-import-err');
@@ -3708,7 +3738,7 @@
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Actualizando...';
 
                 csrfFetch(updateUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken } })
-                .then(r => r.json())
+                .then(r => safeJsonParse(r))
                 .then(j => {
                     const okEl = modal.querySelector('.tm-excel-import-ok');
                     const errEl = modal.querySelector('.tm-excel-import-err');
@@ -3823,13 +3853,82 @@
         });
     });
 
-    window.retryImportRow = function(errIdx, microrregionId, correctedValue, singleUrl, moduleId, cardId, buttonEl, rowNumber, specificFieldKey = null) {
+    // Delegated click handler for suggestion buttons — single-field mode (immediate send)
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.tm-idx-sugg-btn');
+        if (!btn) return;
+        const ds = btn.dataset;
+        const mrId = ds.mr ? Number(ds.mr) : null;
+        retryImportRow(Number(ds.idx), mrId, ds.val, ds.surl || null, ds.mid, ds.cid, btn, Number(ds.row), ds.key || null);
+    });
+
+    // Delegated click handler for staging buttons — multi-field mode (stage locally)
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.tm-idx-stage-btn');
+        if (!btn) return;
+        const ds = btn.dataset;
+        const card = document.getElementById(ds.cid);
+        if (!card) return;
+
+        // Deseleccionar otros botones del mismo campo
+        card.querySelectorAll(`.tm-idx-stage-btn[data-key="${CSS.escape(ds.key)}"]`).forEach(b => {
+            b.style.background = '';
+            b.style.color = '';
+            b.style.borderColor = '';
+        });
+        // Marcar este como seleccionado
+        btn.style.background = 'var(--clr-secondary, #2e7d32)';
+        btn.style.color = '#fff';
+        btn.style.borderColor = 'var(--clr-secondary, #2e7d32)';
+
+        // Guardar corrección en el dataset de la tarjeta
+        const staged = JSON.parse(card.dataset.stagedCorrections || '{}');
+        staged[ds.key] = { val: ds.val, mr: ds.mr || null };
+        card.dataset.stagedCorrections = JSON.stringify(staged);
+
+        // Mostrar botón "Guardar correcciones"
+        const saveBtn = card.querySelector('.tm-idx-save-staged-btn');
+        if (saveBtn) saveBtn.style.display = '';
+    });
+
+    // Delegated click handler for "Guardar correcciones" button
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.tm-idx-save-staged-btn');
+        if (!btn) return;
+        const ds = btn.dataset;
+        const card = document.getElementById(ds.cid);
+        if (!card) return;
+
+        const staged = JSON.parse(card.dataset.stagedCorrections || '{}');
+        if (Object.keys(staged).length === 0) return;
+
+        const rowData = JSON.parse(card.dataset.rowData);
+        let mrId = null;
+        for (const [key, corr] of Object.entries(staged)) {
+            const wasArray = Array.isArray(rowData[key]);
+            rowData[key] = wasArray ? [corr.val] : corr.val;
+            if (corr.mr) mrId = Number(corr.mr);
+        }
+
+        retryImportRow(Number(ds.idx), mrId, null, ds.surl || null, ds.mid, ds.cid, btn, Number(ds.row), null, rowData);
+    });
+
+    window.retryImportRow = function(errIdx, microrregionId, correctedValue, singleUrl, moduleId, cardId, buttonEl, rowNumber, specificFieldKey = null, prebuiltRowData = null) {
         const card = document.getElementById(cardId || ('tmErrRow_' + errIdx));
         if (!card) return;
 
-        const rowData = JSON.parse(card.dataset.rowData);
-        const fieldKey = specificFieldKey || String(card.dataset.municipioKey || 'municipio');
-        rowData[fieldKey] = correctedValue;
+        let rowData;
+        if (prebuiltRowData) {
+            rowData = prebuiltRowData;
+        } else {
+            rowData = JSON.parse(card.dataset.rowData);
+            const fieldKey = specificFieldKey || String(card.dataset.municipioKey || 'municipio');
+            // Si el valor original era un array (multiselect), envolver la corrección en array
+            const wasArray = Array.isArray(rowData[fieldKey]);
+            rowData[fieldKey] = wasArray ? [correctedValue] : correctedValue;
+        }
+        // Limpiar correcciones staged al enviar
+        delete card.dataset.stagedCorrections;
 
         const btn = buttonEl || null;
         if (!btn) {
@@ -3852,7 +3951,7 @@
                 microrregion_id: microrregionId
             })
         })
-        .then(r => r.json())
+        .then(r => safeJsonParse(r))
         .then(j => {
             if (j.success) {
                 btn.innerText = '✓ Importado';
@@ -4186,7 +4285,7 @@
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                     body: JSON.stringify({ data: data, microrregion_id: mrId })
                 });
-                var j = await r.json();
+                var j = await safeJsonParse(r);
                 if (j.success) {
                     Swal.fire({ title: 'Éxito', text: 'Registro corregido e importado.', icon: 'success', toast: true, position: 'top-end', timer: 3000, showConfirmButton: false });
                     // Si es tarjeta del modal de log, eliminar del sessionStorage

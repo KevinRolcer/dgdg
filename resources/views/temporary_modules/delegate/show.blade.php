@@ -948,7 +948,11 @@
 
     async function refreshCsrfToken() {
         try {
-            const r = await fetch(@json(route('csrf.refresh')), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+            const r = await fetch(@json(route('csrf.refresh')), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+            if (r.redirected || r.status === 401) {
+                window.location.href = @json(route('login'));
+                return false;
+            }
             if (!r.ok) throw new Error('refresh failed');
             const j = await r.json();
             if (j.token) {
@@ -956,13 +960,15 @@
                 const meta = document.querySelector('meta[name="csrf-token"]');
                 if (meta) meta.setAttribute('content', j.token);
             }
-        } catch (_) { /* will fail on retry anyway */ }
+            return true;
+        } catch (_) { return false; }
     }
 
     async function csrfFetch(url, opts = {}) {
         const res = await fetch(url, opts);
         if (res.status === 419) {
-            await refreshCsrfToken();
+            const ok = await refreshCsrfToken();
+            if (!ok) return res;
             // Rebuild body with the new token
             if (opts.body instanceof FormData) {
                 opts.body.set('_token', csrfToken);
@@ -973,6 +979,21 @@
             return fetch(url, opts);
         }
         return res;
+    }
+
+    async function safeJsonParse(response) {
+        if (response.status === 419) {
+            throw new Error('Tu sesión ha expirado. Recarga la página para continuar.');
+        }
+        const ct = response.headers.get('content-type') || '';
+        if (!response.ok || !ct.includes('application/json')) {
+            const text = await response.text().catch(() => '');
+            if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+                throw new Error('El servidor no pudo procesar la solicitud (posible límite de memoria o tiempo). Intenta con un archivo más pequeño.');
+            }
+            throw new Error(text.substring(0, 200) || ('Error del servidor: HTTP ' + response.status));
+        }
+        return response.json();
     }
 
     let excelHeaders = [];
@@ -1223,15 +1244,16 @@
         });
     };
 
-    const fetchExcelPreviewThumbnails = function(file) {
+    const fetchExcelPreviewThumbnails = function(file, useAutoDetect) {
         if (!file || !excelPreviewUrl) return;
         const fd = new FormData();
         fd.append('archivo_excel', file);
         fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
         fd.append('sheet_index', currentSheetIdx);
+        fd.append('auto_detect', useAutoDetect ? '1' : '0');
         fd.append('_token', csrfToken);
         csrfFetch(excelPreviewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
-            .then(function(r) { return r.json(); })
+            .then(function(r) { return safeJsonParse(r); })
             .then(function(j) {
                 if (!j.success) return;
                 if (j.preview_rows && j.preview_rows.length) {
@@ -1430,7 +1452,7 @@
             if (sheetTabsWrap) sheetTabsWrap.style.display = 'none';
             const inner = document.querySelector('.tm-excel-sheet-inner');
             if (inner) inner.innerHTML = '<div style="padding:60px; text-align:center; color:var(--clr-text-light);"><i class="fa-solid fa-file-pdf" style="font-size:2.5rem; margin-bottom:12px; opacity:0.4; color:#e74c3c;"></i><p>Archivo PDF cargado. Las columnas se detectarán automáticamente del servidor.</p></div>';
-            fetchExcelPreviewThumbnails(file);
+            fetchExcelPreviewThumbnails(file, true);
             const autoBtn = document.getElementById('tmExcelAutoDetect');
             if (autoBtn) autoBtn.style.display = 'inline-flex';
             return;
@@ -1445,7 +1467,7 @@
                 currentSheetIdx = 0;
                 switchToSheet(0);
                 renderSheetTabs(workbook.SheetNames, 0);
-                fetchExcelPreviewThumbnails(file);
+                fetchExcelPreviewThumbnails(file, true);
                 document.getElementById('tmExcelAutoDetect').style.display = 'inline-flex';
             } catch (err) {
                 const errEl = document.getElementById('tmExcelPreviewErr');
@@ -1566,6 +1588,7 @@
     });
 
     document.getElementById('tmExcelLeerColumnas')?.addEventListener('click', function () {
+        const btn = this;
         const errSection = document.getElementById('tmExcelErrorsSection');
         if (errSection) errSection.classList.add('tm-hidden');
         const errList = document.getElementById('tmExcelErrorsList');
@@ -1573,14 +1596,21 @@
 
         const file = document.getElementById('tmExcelFile')?.files[0];
         if (!file) return;
+
+        // Loading state
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Leyendo columnas…';
+
         const fd = new FormData();
         fd.append('archivo_excel', file);
         fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
         fd.append('sheet_index', currentSheetIdx);
+        fd.append('auto_detect', '0');
         fd.append('_token', csrfToken);
 
         csrfFetch(excelPreviewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
-            .then(r => r.json())
+            .then(r => safeJsonParse(r))
             .then(j => {
                 if (!j.success) throw new Error(j.message);
                 excelHeaders = j.headers || [];
@@ -1652,6 +1682,9 @@
             }).catch(e => {
                 const err = document.getElementById('tmExcelPreviewErr');
                 if (err) { err.textContent = e.message; err.classList.remove('tm-hidden'); }
+            }).finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
             });
     });
 
@@ -1688,7 +1721,7 @@
         fd.append('_token', csrfToken);
 
         csrfFetch(excelImportUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
-            .then(r => r.json())
+            .then(r => safeJsonParse(r))
             .then(j => {
                 const okEl = document.getElementById('tmExcelImportOk');
                 const errEl = document.getElementById('tmExcelImportErr');
@@ -1830,7 +1863,7 @@
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Actualizando...';
 
         csrfFetch(excelUpdateUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } })
-            .then(r => r.json())
+            .then(r => safeJsonParse(r))
             .then(j => {
                 const okEl = document.getElementById('tmExcelImportOk');
                 const errEl = document.getElementById('tmExcelImportErr');
@@ -1870,6 +1903,10 @@
     function renderShowErrorCardHtml(err, idx, moduleId, cardId) {
         const escapeH = (v) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
         const failedFields = Array.isArray(err?.failed_fields) && err.failed_fields.length > 0 ? err.failed_fields : [];
+        // Contar campos que tienen sugerencias (para modo multi-corrección)
+        const fieldsWithSugg = failedFields.filter(f => Array.isArray(f.suggestions) && f.suggestions.length > 0).length;
+        const isMultiCorrect = fieldsWithSugg >= 2;
+
         let failedFieldsHtml = '';
         if (failedFields.length > 0) {
             failedFieldsHtml = '<div style="margin-top:8px;"><strong style="font-size:0.75rem;">Campos con fallo:</strong><ul style="margin:6px 0 0 16px; padding:0; font-size:0.8rem; color:var(--clr-text-light);">' +
@@ -1879,9 +1916,9 @@
                         fieldSugg = '<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:4px;">' +
                             '<span style="width:100%; font-size:0.65rem; color:var(--clr-primary); font-weight:700;">VALORES DISPONIBLES:</span>' +
                             f.suggestions.map(s => {
-                                const val = String(s).replace(/'/g, "\\'");
-                                return `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
-                                    onclick="retryImportRow(${idx}, null, '${val}', null, ${moduleId}, '${cardId}', this, ${err.row || 0}, '${String(f.key).replace(/'/g, "\\'")}')"
+                                return `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline ${isMultiCorrect ? 'tm-show-stage-btn' : 'tm-sugg-btn'}"
+                                    data-idx="${idx}" data-val="${escapeH(s)}" data-key="${escapeH(f.key)}"
+                                    data-mid="${moduleId}" data-cid="${escapeH(cardId)}" data-row="${err.row || 0}"
                                     style="font-size:0.68rem; padding:3px 6px; font-weight:600; text-transform:uppercase;">
                                     ${escapeH(s)}
                                 </button>`;
@@ -1898,17 +1935,21 @@
                 '<span style="width:100%; font-weight:600; font-size:0.75rem; margin-bottom:4px; display:block;">¿Quisiste decir?</span>' +
                 err.suggestions.map(s => {
                     if (typeof s === 'string') {
-                        const val = s.replace(/'/g, "\\'");
-                        return `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
-                            onclick="retryImportRow(${idx}, null, '${val}', null, ${moduleId}, '${cardId}', this, ${err.row || 0})"
+                        return `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline tm-sugg-btn"
+                            data-idx="${idx}" data-val="${escapeH(s)}"
+                            data-mid="${moduleId}" data-cid="${escapeH(cardId)}" data-row="${err.row || 0}"
                             style="font-size:0.7rem; padding:4px 8px;">${escapeH(s)}</button>`;
                     }
-                    return `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline"
-                        onclick="retryImportRow(${idx}, ${s.microrregion_id}, '${s.municipio.replace(/'/g, "\\'")}'  , null, ${moduleId}, '${cardId}', this, ${err.row || 0})"
+                    return `<button type="button" class="tm-btn tm-btn-sm tm-btn-outline tm-sugg-btn"
+                        data-idx="${idx}" data-val="${escapeH(s.municipio)}" data-mr="${s.microrregion_id}"
+                        data-mid="${moduleId}" data-cid="${escapeH(cardId)}" data-row="${err.row || 0}"
                         style="font-size:0.7rem; padding:4px 8px;">${escapeH(s.municipio)}</button>`;
                 }).join('') +
             '</div>';
         }
+        const saveBtnHtml = isMultiCorrect
+            ? `<button type="button" class="tm-btn tm-btn-sm tm-show-save-staged-btn" data-cid="${escapeH(cardId)}" data-idx="${idx}" data-mid="${moduleId}" data-row="${err.row || 0}" style="margin-top:10px; padding:5px 14px; font-size:0.78rem; background:var(--clr-secondary,#2e7d32); color:#fff; border:0; border-radius:6px; cursor:pointer; display:none; font-weight:700;"><i class="fa-solid fa-check"></i> Guardar correcciones</button>`
+            : '';
         return `
             <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                 <div style="color:var(--clr-primary); font-weight:700;">Fila ${err.row}</div>
@@ -1916,16 +1957,86 @@
             </div>
             ${failedFieldsHtml}
             ${suggHtml}
+            ${saveBtnHtml}
         `;
     }
 
-    window.retryImportRow = function(errIdx, microrregionId, correctedValue, singleUrl, moduleId, cardId, buttonEl, rowNumber, fieldKey) {
+    // Delegated click handler for suggestion buttons — single-field mode (immediate send)
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.tm-sugg-btn');
+        if (!btn) return;
+        const ds = btn.dataset;
+        const mrId = ds.mr ? Number(ds.mr) : null;
+        retryImportRow(Number(ds.idx), mrId, ds.val, null, Number(ds.mid), ds.cid, btn, Number(ds.row), ds.key || null);
+    });
+
+    // Delegated click handler for staging buttons — multi-field mode (stage locally)
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.tm-show-stage-btn');
+        if (!btn) return;
+        const ds = btn.dataset;
+        const card = document.getElementById(ds.cid);
+        if (!card) return;
+
+        // Deseleccionar otros botones del mismo campo
+        card.querySelectorAll(`.tm-show-stage-btn[data-key="${CSS.escape(ds.key)}"]`).forEach(b => {
+            b.style.background = '';
+            b.style.color = '';
+            b.style.borderColor = '';
+        });
+        // Marcar este como seleccionado
+        btn.style.background = 'var(--clr-secondary, #2e7d32)';
+        btn.style.color = '#fff';
+        btn.style.borderColor = 'var(--clr-secondary, #2e7d32)';
+
+        // Guardar corrección en el dataset de la tarjeta
+        const staged = JSON.parse(card.dataset.stagedCorrections || '{}');
+        staged[ds.key] = { val: ds.val, mr: ds.mr || null };
+        card.dataset.stagedCorrections = JSON.stringify(staged);
+
+        // Mostrar botón "Guardar correcciones"
+        const saveBtn = card.querySelector('.tm-show-save-staged-btn');
+        if (saveBtn) saveBtn.style.display = '';
+    });
+
+    // Delegated click handler for "Guardar correcciones" button
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.tm-show-save-staged-btn');
+        if (!btn) return;
+        const ds = btn.dataset;
+        const card = document.getElementById(ds.cid);
+        if (!card) return;
+
+        const staged = JSON.parse(card.dataset.stagedCorrections || '{}');
+        if (Object.keys(staged).length === 0) return;
+
+        const rowData = JSON.parse(card.dataset.rowData);
+        let mrId = null;
+        for (const [key, corr] of Object.entries(staged)) {
+            const wasArray = Array.isArray(rowData[key]);
+            rowData[key] = wasArray ? [corr.val] : corr.val;
+            if (corr.mr) mrId = Number(corr.mr);
+        }
+
+        retryImportRow(Number(ds.idx), mrId, null, null, Number(ds.mid), ds.cid, btn, Number(ds.row), null, rowData);
+    });
+
+    window.retryImportRow = function(errIdx, microrregionId, correctedValue, singleUrl, moduleId, cardId, buttonEl, rowNumber, fieldKey, prebuiltRowData) {
         const card = document.getElementById(cardId || ('tmErrRow_' + errIdx));
         if (!card) return;
 
-        const rowData = JSON.parse(card.dataset.rowData);
-        const resolvedKey = fieldKey || String(card.dataset.municipioKey || 'municipio');
-        rowData[resolvedKey] = correctedValue;
+        let rowData;
+        if (prebuiltRowData) {
+            rowData = prebuiltRowData;
+        } else {
+            rowData = JSON.parse(card.dataset.rowData);
+            const resolvedKey = fieldKey || String(card.dataset.municipioKey || 'municipio');
+            // Si el valor original era un array (multiselect), envolver la corrección en array
+            const wasArray = Array.isArray(rowData[resolvedKey]);
+            rowData[resolvedKey] = wasArray ? [correctedValue] : correctedValue;
+        }
+        // Limpiar correcciones staged al enviar
+        delete card.dataset.stagedCorrections;
 
         const btn = buttonEl || event.target;
         const oldText = btn.innerText;
@@ -1947,7 +2058,7 @@
             },
             body: JSON.stringify(payload)
         })
-        .then(r => r.json())
+        .then(r => safeJsonParse(r))
         .then(j => {
             if (j.success) {
                 excelImportedCount++;

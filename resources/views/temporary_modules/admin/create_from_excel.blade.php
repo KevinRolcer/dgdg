@@ -130,7 +130,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const res = await fetch(url, opts);
         if (res.status === 419) {
             try {
-                const r = await fetch(@json(route('csrf.refresh')), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+                const r = await fetch(@json(route('csrf.refresh')), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+                if (r.redirected || r.status === 401) { window.location.href = @json(route('login')); return res; }
                 if (r.ok) { const j = await r.json(); if (j.token) { csrf = j.token; const m = document.querySelector('meta[name="csrf-token"]'); if (m) m.setAttribute('content', j.token); } }
             } catch (_) {}
             if (opts.body instanceof FormData) opts.body.set('_token', csrf);
@@ -138,6 +139,21 @@ document.addEventListener('DOMContentLoaded', function () {
             return fetch(url, opts);
         }
         return res;
+    }
+
+    async function safeJsonParse(response) {
+        if (response.status === 419) {
+            throw new Error('Tu sesión ha expirado. Recarga la página para continuar.');
+        }
+        var ct = response.headers.get('content-type') || '';
+        if (!response.ok || !ct.includes('application/json')) {
+            var text = await response.text().catch(function() { return ''; });
+            if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+                throw new Error('El servidor no pudo procesar la solicitud (posible límite de memoria o tiempo). Intenta con un archivo más pequeño.');
+            }
+            throw new Error(text.substring(0, 200) || ('Error del servidor: HTTP ' + response.status));
+        }
+        return response.json();
     }
     const fileInput = document.getElementById('tmSeedFile');
     const headerRowInput = document.getElementById('tmSeedHeaderRow');
@@ -249,6 +265,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!f) { errEl.textContent = 'Selecciona un archivo Excel.'; errEl.classList.remove('tm-hidden'); return; }
         errEl.classList.add('tm-hidden');
         detectNoteEl.classList.add('tm-hidden');
+
+        // Loading state
+        var readBtn = document.getElementById('tmSeedReadHeaders');
+        var origText = readBtn ? readBtn.innerHTML : '';
+        if (readBtn) { readBtn.disabled = true; readBtn.innerHTML = '<i class=\"fa-solid fa-spinner fa-spin\"></i> Leyendo…'; }
+
         var fd = new FormData();
         fd.append('archivo_excel', f);
         fd.append('header_row', headerRowInput.value || '1');
@@ -256,21 +278,26 @@ document.addEventListener('DOMContentLoaded', function () {
         fd.append('sheet_index', String(sheetIdx));
         fd.append('_token', csrf);
         csrfFetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, credentials: 'same-origin' })
-            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-            .then(function (x) {
-                if (!x.ok || !x.j.success) { errEl.textContent = x.j.message || 'Error al leer.'; errEl.classList.remove('tm-hidden'); return; }
-                if (typeof x.j.header_row === 'number') headerRowInput.value = String(x.j.header_row);
-                if (typeof x.j.data_start_row === 'number') dataRowInput.value = String(x.j.data_start_row);
-                if (x.j.detection_note) {
-                    detectNoteEl.textContent = x.j.detection_note;
+            .then(function (r) { return safeJsonParse(r); })
+            .then(function (j) {
+                if (!j.success) { errEl.textContent = j.message || 'Error al leer.'; errEl.classList.remove('tm-hidden'); return; }
+                if (typeof j.header_row === 'number') headerRowInput.value = String(j.header_row);
+                if (typeof j.data_start_row === 'number') dataRowInput.value = String(j.data_start_row);
+                if (j.detection_note) {
+                    detectNoteEl.textContent = j.detection_note;
                     detectNoteEl.classList.remove('tm-hidden');
                 }
-                if (x.j.sheet_names) {
-                    renderSheetTabs(x.j.sheet_names, typeof x.j.sheet_index === 'number' ? x.j.sheet_index : sheetIdx);
+                if (j.sheet_names) {
+                    renderSheetTabs(j.sheet_names, typeof j.sheet_index === 'number' ? j.sheet_index : sheetIdx);
                 }
                 colMr.dataset.set = '';
                 colMun.dataset.set = '';
-                fillSelects(x.j.headers || []);
+                fillSelects(j.headers || []);
+            }).catch(function (e) {
+                errEl.textContent = e.message || 'Error al procesar el archivo.';
+                errEl.classList.remove('tm-hidden');
+            }).finally(function () {
+                if (readBtn) { readBtn.disabled = false; readBtn.innerHTML = origText; }
             });
     }
 
