@@ -1066,6 +1066,16 @@ class TemporaryModuleExcelImportService
             }
         }
 
+        // Módulo sin municipio: la MR debe venir del import / corrección (no se infiere por catálogo).
+        if (($microrregionId === null || $microrregionId <= 0) && $municipioKey === null) {
+            $failedFields[] = [
+                'key' => '__microrregion__',
+                'label' => 'Microrregión',
+                'reason' => 'No se recibió la microrregión de destino. Usa la misma importación donde elegiste la MR o corrige desde el modal de Excel.',
+                'received' => '',
+            ];
+        }
+
         if (! empty($failedFields)) {
             return $this->hydrateErrorWithImages([
                 'row' => 'Manual',
@@ -1231,6 +1241,7 @@ class TemporaryModuleExcelImportService
                         'data' => $values,
                         'failed_fields' => [['key' => '__empty_mapped__', 'label' => 'Columnas mapeadas', 'reason' => 'Ninguna de las columnas asignadas tiene datos.', 'received' => '']],
                         'suggestions' => [],
+                        'selected_microrregion_id' => $microrregionId,
                     ];
                 }
                 $skipped++;
@@ -1279,7 +1290,14 @@ class TemporaryModuleExcelImportService
             }
 
             if (!empty($failedFields)) {
-                $rowErrors[] = ['row' => $row, 'message' => "Fila {$row}: datos no válidos en " . count($failedFields) . " campos.", 'data' => $values, 'failed_fields' => $failedFields, 'suggestions' => (count($failedFields) === 1) ? ($failedFields[0]['suggestions'] ?? []) : []];
+                $rowErrors[] = [
+                    'row' => $row,
+                    'message' => "Fila {$row}: datos no válidos en " . count($failedFields) . ' campos.',
+                    'data' => $values,
+                    'failed_fields' => $failedFields,
+                    'suggestions' => (count($failedFields) === 1) ? ($failedFields[0]['suggestions'] ?? []) : [],
+                    'selected_microrregion_id' => $microrregionId,
+                ];
                 $skipped++;
                 continue;
             }
@@ -1291,7 +1309,15 @@ class TemporaryModuleExcelImportService
                     if ($municipioKey && $rk === $municipioKey) {
                         $suggestions = $this->suggestMunicipios(trim((string)($rawValues[$rk] ?? '')), $suggestionBaseMunicipios, $municipioToMrMap);
                     }
-                    $rowErrors[] = $this->hydrateErrorWithImages(['row' => $row, 'message' => "Fila {$row}: falta campo obligatorio ({$fieldsByKey[$rk]->label}).", 'data' => $values, 'municipio_key' => $rk === $municipioKey ? $rk : null, 'failed_fields' => [['key' => $rk, 'label' => (string)$fieldsByKey[$rk]->label, 'reason' => 'Falta dato.', 'received' => (string)($rawValues[$rk] ?? '')]], 'suggestions' => $suggestions]);
+                    $rowErrors[] = $this->hydrateErrorWithImages([
+                        'row' => $row,
+                        'message' => "Fila {$row}: falta campo obligatorio ({$fieldsByKey[$rk]->label}).",
+                        'data' => $values,
+                        'municipio_key' => $rk === $municipioKey ? $rk : null,
+                        'failed_fields' => [['key' => $rk, 'label' => (string) $fieldsByKey[$rk]->label, 'reason' => 'Falta dato.', 'received' => (string) ($rawValues[$rk] ?? '')]],
+                        'suggestions' => $suggestions,
+                        'selected_microrregion_id' => $microrregionId,
+                    ]);
                     $skipped++;
                     continue 2;
                 }
@@ -1306,7 +1332,15 @@ class TemporaryModuleExcelImportService
             if ($rowMrId === null || $rowMrId <= 0) {
                 $rawMunVal = $municipioKey ? trim((string)($rawValues[$municipioKey] ?? '')) : '';
                 $suggestions = $rawMunVal !== '' ? $this->suggestMunicipios($rawMunVal, $suggestionBaseMunicipios, $municipioToMrMap) : [];
-                $rowErrors[] = $this->hydrateErrorWithImages(['row' => $row, 'message' => "Fila {$row}: No se pudo determinar la microrregión.", 'data' => $values, 'municipio_key' => $municipioKey, 'failed_fields' => [['key' => $municipioKey, 'label' => 'Municipio', 'reason' => 'No coincide con MR asignada.', 'received' => $rawMunVal]], 'suggestions' => $suggestions]);
+                $rowErrors[] = $this->hydrateErrorWithImages([
+                    'row' => $row,
+                    'message' => "Fila {$row}: No se pudo determinar la microrregión.",
+                    'data' => $values,
+                    'municipio_key' => $municipioKey,
+                    'failed_fields' => [['key' => $municipioKey, 'label' => 'Municipio', 'reason' => 'No coincide con MR asignada.', 'received' => $rawMunVal]],
+                    'suggestions' => $suggestions,
+                    'selected_microrregion_id' => $microrregionId,
+                ]);
                 $skipped++;
                 continue;
             }
@@ -1338,9 +1372,16 @@ class TemporaryModuleExcelImportService
                 }
 
                 $rowErrors[] = $this->hydrateErrorWithImages([
-                    'row' => $row, 'is_duplicate' => true, 'duplicate_type' => $excelDuplicate ? 'excel' : 'database', 'original_row' => $duplicateRef, 'conflict_data' => $conflictData,
+                    'row' => $row,
+                    'is_duplicate' => true,
+                    'duplicate_type' => $excelDuplicate ? 'excel' : 'database',
+                    'original_row' => $duplicateRef,
+                    'conflict_data' => $conflictData,
                     'message' => "Fila {$row}: registro duplicado (" . ($excelDuplicate ? "fila {$duplicateRef}" : 'ya existe') . ').',
-                    'data' => $values, 'failed_fields' => [['key' => '__duplicate__', 'label' => 'Duplicado', 'reason' => 'Ya existe en el sistema o archivo.', 'received' => '']], 'suggestions' => []
+                    'data' => $values,
+                    'failed_fields' => [['key' => '__duplicate__', 'label' => 'Duplicado', 'reason' => 'Ya existe en el sistema o archivo.', 'received' => '']],
+                    'suggestions' => [],
+                    'selected_microrregion_id' => $rowMrId,
                 ]);
                 $skipped++;
                 continue;

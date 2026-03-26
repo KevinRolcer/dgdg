@@ -1123,6 +1123,9 @@
                     if (err?.data_urls) card.dataset.dataUrls = JSON.stringify(err.data_urls);
                     if (err?.conflict_data) card.dataset.conflictData = JSON.stringify(err.conflict_data);
                     card.dataset.municipioKey = String(err?.municipio_key || 'municipio');
+                    if (err?.selected_microrregion_id != null && err.selected_microrregion_id !== '') {
+                        card.dataset.microrregionId = String(err.selected_microrregion_id);
+                    }
                     card.dataset.moduleId = moduleId;
                     card.dataset.singleUrl = singleUrl;
                     card.dataset.errorIndex = idx;
@@ -1242,6 +1245,9 @@
                 card.id = cardId;
                 card.dataset.rowData = JSON.stringify(err?.data);
                 card.dataset.municipioKey = String(err.municipio_key || 'municipio');
+                if (err?.selected_microrregion_id != null && err.selected_microrregion_id !== '') {
+                    card.dataset.microrregionId = String(err.selected_microrregion_id);
+                }
                 card.style = 'padding:15px; border:1px solid var(--clr-border); border-radius:12px; background:var(--clr-bg); font-size:0.85rem; transition: all 0.3s ease;';
                 card.innerHTML = renderErrorCardHtml(err, idx, moduleId, singleUrl, cardId, false);
                 errList.appendChild(card);
@@ -3309,6 +3315,9 @@
                                 if (err.data_urls) card.dataset.dataUrls = JSON.stringify(err.data_urls);
                                 if (err.conflict_data) card.dataset.conflictData = JSON.stringify(err.conflict_data);
                                 card.dataset.municipioKey = String(err.municipio_key || 'municipio');
+                                if (err?.selected_microrregion_id != null && err.selected_microrregion_id !== '') {
+                                    card.dataset.microrregionId = String(err.selected_microrregion_id);
+                                }
                                 card.style = 'padding:15px; border:1px solid var(--clr-border); border-radius:12px; background:var(--clr-bg); font-size:0.85rem; transition: all 0.3s ease;';
                                 card.innerHTML = renderErrorCardHtml(err, idx, currentModuleId, importSingleUrl, cardId, false);
                                 errList.appendChild(card);
@@ -3736,10 +3745,11 @@
         const exModal = document.getElementById('tmImportarExcelModal-' + moduleId);
         const singleUrl = card.dataset.singleUrl || (exModal ? exModal.dataset.excelImportSingleUrl : ('/modulos-temporales/' + moduleId + '/importar-fila'));
 
-        // Microrregión del formulario de excel (modal puede existir aunque no esté abierto)
+        // Microrregión: la del error de importación (misma MR que al importar) o la del modal Excel
+        const mrFromErr = card.dataset.microrregionId ? String(card.dataset.microrregionId).trim() : '';
         const mrInput = document.querySelector('#tmImportarExcelModal-' + moduleId + ' .tm-excel-mr-input')
             || (exModal ? exModal.querySelector('.tm-excel-mr-input') : null);
-        const mrId = mrInput && mrInput.value !== '' ? mrInput.value : '';
+        const mrId = mrFromErr !== '' ? mrFromErr : (mrInput && mrInput.value !== '' ? mrInput.value : '');
 
         // Formulario original para obtener labels y selects
         const entryModal = document.getElementById('delegate-preview-' + moduleId);

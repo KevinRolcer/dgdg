@@ -1663,9 +1663,10 @@ class TemporaryModuleController extends Controller
         $microrregionId = ! empty($validated['microrregion_id']) ? (int) $validated['microrregion_id'] : null;
         $userId = (int) $request->user()->id;
 
+        $municipioField = $temporaryModule->fields()->where('type', 'municipio')->first();
+
         // Si no se proporcionó microrregion_id, resolverlo desde el municipio en los datos
         if ($microrregionId === null) {
-            $municipioField = $temporaryModule->fields()->where('type', 'municipio')->first();
             if ($municipioField) {
                 $munVal = trim((string) ($validated['data'][$municipioField->key] ?? ''));
                 if ($munVal !== '') {
@@ -1686,11 +1687,16 @@ class TemporaryModuleController extends Controller
                         }
                     }
                 }
+            } else {
+                // Sin campo municipio: los datos son solo de la microrregión elegida en el import (o la única asignada).
+                $assignedIds = $this->accessService->microrregionIdsPorUsuario($userId);
+                if (count($assignedIds) === 1) {
+                    $microrregionId = (int) $assignedIds[0];
+                }
             }
         }
 
-        // No usar una microrregión (explícita o resuelta por catálogo) si el usuario no la tiene asignada;
-        // si no, validateSingleRow la acepta y abort_unless devolvía 403 sin mensaje útil.
+        // No usar una microrregión (explícita o resuelta por catálogo) si el usuario no la tiene asignada.
         if ($microrregionId !== null && ! $this->accessService->userCanAccessEntryByMicrorregion($userId, $microrregionId)) {
             $microrregionId = null;
         }
@@ -1739,11 +1745,19 @@ class TemporaryModuleController extends Controller
             ], 422);
         }
 
-        if ($microrregionId === null || $microrregionId < 1
-            || ! $this->accessService->userCanAccessEntryByMicrorregion($userId, $microrregionId)) {
+        if ($microrregionId === null || $microrregionId < 1) {
             return response()->json([
                 'success' => false,
-                'message' => 'No se pudo confirmar la microrregión para este registro. Revisa el municipio o tu asignación de microrregión.',
+                'message' => $municipioField
+                    ? 'No se pudo determinar la microrregión. Revisa el municipio o que el import indique la microrregión seleccionada.'
+                    : 'No se pudo determinar la microrregión. Abre de nuevo el import de Excel y elige la microrregión, o vuelve a cargar los errores desde la importación.',
+            ], 422);
+        }
+
+        if (! $this->accessService->userCanAccessEntryByMicrorregion($userId, $microrregionId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes asignada la microrregión indicada para este registro.',
             ], 422);
         }
 
