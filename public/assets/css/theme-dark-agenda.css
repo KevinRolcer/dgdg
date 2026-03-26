@@ -376,6 +376,24 @@ html.theme-dark .pa-card-title {
     color: inherit !important;
 }
 
+/* Carpetas con fondo elegido por el usuario: texto e icono coherentes (no heredar gris claro del layout) */
+html.theme-dark .pa-card.pa-card--folder.text-dark .pa-card-title {
+    color: rgba(28, 30, 38, 0.96) !important;
+}
+
+html.theme-dark .pa-card.pa-card--folder.text-dark .pa-folder-count-num {
+    color: rgba(28, 30, 38, 0.58) !important;
+}
+
+html.theme-dark .pa-card.pa-card--folder.text-dark .pa-folder-icon {
+    background-color: rgba(0, 0, 0, 0.08) !important;
+    color: rgba(30, 32, 42, 0.88) !important;
+}
+
+html.theme-dark .pa-card.pa-card--folder.text-dark .pa-folder-icon i {
+    color: inherit !important;
+}
+
 html.theme-dark .pa-card-body {
     color: inherit !important;
     opacity: 0.85;

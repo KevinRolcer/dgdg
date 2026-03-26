@@ -449,12 +449,39 @@
 .pa-card.text-light .pa-card-date,
 .pa-card.text-light .pa-folder-name,
 .pa-card.text-light .pa-folder-count,
+.pa-card.text-light .pa-folder-count-num,
 .pa-card.text-light .pa-folder-icon i {
     color: #ffffff !important; /* Force white text for dark backgrounds */
 }
 
 .pa-card.text-light .pa-folder-icon {
     background-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Carpetas con fondo claro: icono y texto en tonos neutros (no burdeos fijos) */
+.pa-card.pa-card--folder.text-dark .pa-folder-icon {
+    background-color: rgba(0, 0, 0, 0.08) !important;
+    color: rgba(30, 32, 42, 0.88) !important;
+}
+
+.pa-card.pa-card--folder.text-dark .pa-folder-icon i {
+    color: inherit !important;
+}
+
+.pa-card.pa-card--folder.text-dark .pa-card-title {
+    color: rgba(28, 30, 38, 0.96) !important;
+}
+
+.pa-card.pa-card--folder.text-dark .pa-folder-count-num {
+    font-size: 0.65rem;
+    color: rgba(28, 30, 38, 0.58) !important;
+    opacity: 1 !important;
+}
+
+.pa-card.pa-card--folder.text-light .pa-folder-count-num {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.88) !important;
+    opacity: 1 !important;
 }
 
 .pa-notes-grid {

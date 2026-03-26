@@ -1188,7 +1188,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (m.length === 4 && parseFloat(m[3]) === 0) return;
 
                 const lum = (parseInt(m[0]) * 299 + parseInt(m[1]) * 587 + parseInt(m[2]) * 114) / 1000;
-                card.classList.toggle('text-light', lum < 150);
+                card.classList.remove('text-light', 'text-dark');
+                if (lum < 150) {
+                    card.classList.add('text-light');
+                } else {
+                    card.classList.add('text-dark');
+                }
             }
         });
     }

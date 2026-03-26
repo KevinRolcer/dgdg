@@ -118,7 +118,7 @@
                             <i class="fa-solid {{ $folder->icon ?: 'fa-folder' }}"></i>
                         </div>
                         <h3 class="pa-card-title" style="margin: 0; font-size: 0.9rem;">{{ $folder->name }}</h3>
-                        <span class="pa-folder-count-num" style="font-size: 0.65rem; opacity: 0.5;">{{ $folder->notes_count }} notas</span>
+                        <span class="pa-folder-count-num">{{ $folder->notes_count }} notas</span>
                     </div>
                 @endforeach
 
