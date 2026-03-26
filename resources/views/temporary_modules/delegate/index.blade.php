@@ -843,6 +843,32 @@
         return Number.isNaN(n) ? null : n;
     }
 
+    /**
+     * Módulos sin municipio: importar-fila debe enviar la MR elegida en el modal Excel.
+     * Las sugerencias de select no llevan data-mr; se completa desde la tarjeta o el .tm-excel-mr-input.
+     */
+    function tmResolveMicrorregionForRetry(card, moduleId, microrregionId) {
+        var parsed = tmParseMicrorregionId(microrregionId);
+        if (parsed !== null) {
+            return parsed;
+        }
+        if (card && card.dataset && card.dataset.microrregionId) {
+            var fromCard = tmParseMicrorregionId(card.dataset.microrregionId);
+            if (fromCard !== null) {
+                return fromCard;
+            }
+        }
+        var mid = (moduleId !== undefined && moduleId !== null) ? String(moduleId).trim() : '';
+        if (mid !== '') {
+            var exModal = document.getElementById('tmImportarExcelModal-' + mid);
+            var mrInput = exModal ? exModal.querySelector('.tm-excel-mr-input') : null;
+            if (mrInput && mrInput.value !== '') {
+                return tmParseMicrorregionId(mrInput.value);
+            }
+        }
+        return null;
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         // --- Persistent Error Log Helpers ---
         const saveImportErrors = (moduleId, errors, singleUrl) => {
@@ -3344,6 +3370,10 @@
                             errList.innerHTML = '';
                             j.row_errors.forEach((err, idx) => {
                                 const cardId = `tmErrRow_${currentModuleId}_${idx}`;
+                                if (!searchAllCheck?.checked && mrInput && mrInput.value !== '' &&
+                                    (err.selected_microrregion_id == null || err.selected_microrregion_id === '')) {
+                                    err.selected_microrregion_id = parseInt(mrInput.value, 10);
+                                }
                                 const card = document.createElement('div');
                                 card.className = 'tm-error-log-card';
                                 card.id = cardId;
@@ -3697,7 +3727,7 @@
             },
             body: JSON.stringify({
                 data: rowData,
-                microrregion_id: tmParseMicrorregionId(microrregionId),
+                microrregion_id: tmResolveMicrorregionForRetry(card, moduleId, microrregionId),
             })
         })
         .then(r => safeJsonParse(r))
@@ -4036,7 +4066,7 @@
                 var r = await csrfFetch(singleUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-                    body: JSON.stringify({ data: data, microrregion_id: tmParseMicrorregionId(mrId) })
+                    body: JSON.stringify({ data: data, microrregion_id: tmResolveMicrorregionForRetry(card, moduleId, mrId) })
                 });
                 var j = await safeJsonParse(r);
                 if (j.success) {
