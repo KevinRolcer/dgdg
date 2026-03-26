@@ -867,6 +867,11 @@
                         return; // not a destructive conflict
                     }
 
+                    // text → texto largo: mismo string en JSON; sin migración de datos
+                    if (!isDeleted && newKey === oldKey && oldType === 'text' && newType === 'textarea') {
+                        return;
+                    }
+
                     const rowHasConflict = isDeleted || newKey !== oldKey || newType !== oldType;
                     if (rowHasConflict) {
                         hasConflict = true;
