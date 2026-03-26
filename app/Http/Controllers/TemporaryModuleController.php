@@ -934,6 +934,22 @@ class TemporaryModuleController extends Controller
 
         $activeSection = optional($request->route())->getName() === 'temporary-modules.records' ? 'records' : 'upload';
 
+        $delegateScriptPayload = [
+            'csrfToken' => csrf_token(),
+            'csrfRefreshUrl' => route('csrf.refresh'),
+            'loginUrl' => route('login'),
+            'microrregionesMunicipios' => $microrregionesAsignadas->mapWithKeys(function ($micro) {
+                return [(string) $micro->id => array_values($micro->municipios ?? [])];
+            })->all(),
+            'microrregionesMeta' => $microrregionesAsignadas->map(function ($m) {
+                return [
+                    'id' => (int) $m->id,
+                    'label' => 'MR '.$m->microrregion.' — '.$m->cabecera,
+                ];
+            })->values()->all(),
+            'semaforoLabels' => TemporaryModuleFieldService::semaforoLabels(),
+        ];
+
         return view('temporary_modules.delegate.index', [
             'pageTitle' => 'Capturas temporales',
             'pageDescription' => 'Registra informacion solicitada para tus municipios en modulos activos.',
@@ -948,6 +964,7 @@ class TemporaryModuleController extends Controller
             'activeModuleId' => $activeModuleId,
             'fragmentUploadUrl' => route('temporary-modules.fragment.upload'),
             'fragmentRecordsUrl' => route('temporary-modules.fragment.records'),
+            'delegateScriptPayload' => $delegateScriptPayload,
         ]);
     }
 
@@ -1050,6 +1067,71 @@ class TemporaryModuleController extends Controller
             'fragmentRecordsUrl' => route('temporary-modules.fragment.records'),
             'microrregionesAsignadas' => $microrregionesAsignadas,
             'tmImportable' => $tmImportable,
+        ]);
+    }
+
+    /**
+     * JSON para edición múltiple (mismos filtros que el fragmento de registros, máx. 500 filas).
+     */
+    public function delegateBulkEditData(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_if($user === null || $user->can('Modulos-Temporales-Admin'), 404);
+        $moduleId = (int) $request->query('module', 0);
+        abort_unless($moduleId > 0, 404);
+        $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($moduleId);
+        abort_unless($temporaryModule->isAvailable(), 404);
+        abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $user->id), 403);
+
+        $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
+        $municipioField = $temporaryModule->fields->firstWhere('type', 'municipio');
+
+        $entries = $temporaryModule->entries()
+            ->when(
+                $microrregionIdsUsuario !== [],
+                fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
+                fn ($q) => $q->whereRaw('1 = 0')
+            )
+            ->tap(fn ($q) => $this->applyDelegateMyRecordsFilters($q, $request, $microrregionIdsUsuario))
+            ->with('microrregion:id,microrregion,cabecera')
+            ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
+            ->latest('submitted_at')
+            ->limit(500)
+            ->get();
+
+        $fieldsPayload = $temporaryModule->fields->filter(fn ($f) => $f->type !== 'seccion')->values()->map(function ($f) {
+            return [
+                'key' => $f->key,
+                'label' => $f->label,
+                'type' => $f->type,
+                'options' => $f->options,
+                'is_required' => (bool) $f->is_required,
+                'comment' => $f->comment,
+            ];
+        });
+
+        $entriesPayload = $entries->values()->map(function ($e, $idx) use ($municipioField) {
+            $data = (array) ($e->data ?? []);
+            $municipioValue = $municipioField ? ($data[$municipioField->key] ?? null) : null;
+            $title = (is_string($municipioValue) && trim($municipioValue) !== '')
+                ? $municipioValue
+                : 'Registro '.($idx + 1);
+
+            return [
+                'id' => (int) $e->id,
+                'microrregion_id' => (int) $e->microrregion_id,
+                'microrregion_label' => $e->microrregion ? ('MR '.$e->microrregion->microrregion) : '?',
+                'data' => $data,
+                'title' => $title,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'module_id' => (int) $temporaryModule->id,
+            'module_name' => $temporaryModule->name,
+            'fields' => $fieldsPayload,
+            'entries' => $entriesPayload,
         ]);
     }
 

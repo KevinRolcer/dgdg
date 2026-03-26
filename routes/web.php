@@ -185,6 +185,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [TemporaryModuleController::class, 'delegateIndex'])->middleware('can:modulos-temporales-ver')->name('temporary-modules.index');
         Route::get('/fragmento/modulos', [TemporaryModuleController::class, 'delegatePartialUpload'])->middleware('can:modulos-temporales-ver')->name('temporary-modules.fragment.upload');
         Route::get('/fragmento/registros', [TemporaryModuleController::class, 'delegatePartialRecords'])->middleware('can:modulos-temporales-ver')->name('temporary-modules.fragment.records');
+        Route::get('/fragmento/registros-edicion-datos', [TemporaryModuleController::class, 'delegateBulkEditData'])->middleware('can:modulos-temporales-ver')->name('temporary-modules.fragment.bulk-edit-data');
         Route::get('/{module}/estado', [TemporaryModuleController::class, 'moduleStatus'])->middleware('can:modulos-temporales-ver')->whereNumber('module')->name('temporary-modules.module-status');
         Route::post('/{module}/importar-excel-preview', [TemporaryModuleController::class, 'importExcelPreview'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.import-excel-preview');
         Route::post('/{module}/importar-excel', [TemporaryModuleController::class, 'importExcel'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.import-excel');

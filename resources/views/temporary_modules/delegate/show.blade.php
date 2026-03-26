@@ -1,19 +1,21 @@
 @extends('layouts.app')
 
 @push('css')
-<link rel="stylesheet" href="{{ asset('assets/css/modules/temporary-modules.css') }}?v={{ @filemtime(public_path('assets/css/modules/temporary-modules.css')) ?: time() }}">
+<link rel="stylesheet" href="{{ asset('assets/css/modules/temporary-modules.css') }}?v={{ filemtime(public_path('assets/css/modules/temporary-modules.css')) ?: time() }}">
 @endpush
 
 @section('content')
 @php
-    $tmImportable = $temporaryModule->fields->filter(fn ($f) => in_array($f->type, \App\Services\TemporaryModules\TemporaryModuleExcelImportService::IMPORTABLE_TYPES, true));
+    $tmImportable = $temporaryModule->fields->filter(function ($f) {
+        return in_array($f->type, \App\Services\TemporaryModules\TemporaryModuleExcelImportService::IMPORTABLE_TYPES, true);
+    });
 @endphp
 <section class="tm-page">
     <article class="content-card tm-card">
         @if (session('status'))
             @php
                 $tmShowStatus = session('status');
-                $tmShowStatusStr = is_string($tmShowStatus) ? $tmShowStatus : (is_array($tmShowStatus) ? implode(' ', array_filter(array_map(static fn ($v) => is_scalar($v) ? (string) $v : '', $tmShowStatus))) : '');
+                $tmShowStatusStr = is_string($tmShowStatus) ? $tmShowStatus : (is_array($tmShowStatus) ? implode(' ', array_filter(array_map(function ($v) { return is_scalar($v) ? (string) $v : ''; }, $tmShowStatus))) : '');
             @endphp
             @if ($tmShowStatusStr !== '')
                 <div class="inline-alert inline-alert-success" role="alert">{{ $tmShowStatusStr }}</div>
@@ -412,6 +414,18 @@
 @endsection
 
 @push('scripts')
+@php
+    $tmShowMunicipiosPorMrForJs = ($microrregionesAsignadas ?? collect())->mapWithKeys(function ($micro) {
+        return [(string) $micro->id => array_values($micro->municipios ?? [])];
+    })->all();
+    $tmExcelPreviewUrlForJs = route('temporary-modules.import-excel-preview', $temporaryModule->id);
+    $tmExcelImportUrlForJs = route('temporary-modules.import-excel', $temporaryModule->id);
+    $tmExcelUpdateUrlForJs = route('temporary-modules.update-from-excel', $temporaryModule->id);
+    $tmExcelImportSingleUrlForJs = route('temporary-modules.import-single-row', $temporaryModule->id);
+    $tmCsrfTokenForJs = csrf_token();
+    $tmCsrfRefreshUrlForJs = route('csrf.refresh');
+    $tmLoginUrlForJs = route('login');
+@endphp
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         // --- Persistent Error Log Helpers ---
@@ -839,9 +853,7 @@
 
         const microrregionSelector = document.getElementById('tmMicrorregionSelector');
         const municipioSelects = Array.from(document.querySelectorAll('.tm-municipio-select'));
-        const municipiosPorMicrorregion = @json(($microrregionesAsignadas ?? collect())->mapWithKeys(function ($micro) {
-            return [(string) $micro->id => array_values($micro->municipios ?? [])];
-        })->all());
+        const municipiosPorMicrorregion = @json($tmShowMunicipiosPorMrForJs);
 
         const renderMunicipios = function (microrregionId) {
             if (!microrregionId || municipioSelects.length === 0) {
@@ -940,17 +952,17 @@
 
     /* Importar Excel - Premium Logic */
     const excelModal = document.getElementById('tmImportarExcelModal');
-    const excelPreviewUrl = @json(route('temporary-modules.import-excel-preview', $temporaryModule->id));
-    const excelImportUrl = @json(route('temporary-modules.import-excel', $temporaryModule->id));
-    const excelUpdateUrl = @json(route('temporary-modules.update-from-excel', $temporaryModule->id));
-    const excelImportSingleUrl = @json(route('temporary-modules.import-single-row', $temporaryModule->id));
-    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json(csrf_token());
+    const excelPreviewUrl = @json($tmExcelPreviewUrlForJs);
+    const excelImportUrl = @json($tmExcelImportUrlForJs);
+    const excelUpdateUrl = @json($tmExcelUpdateUrlForJs);
+    const excelImportSingleUrl = @json($tmExcelImportSingleUrlForJs);
+    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json($tmCsrfTokenForJs);
 
     async function refreshCsrfToken() {
         try {
-            const r = await fetch(@json(route('csrf.refresh')), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+            const r = await fetch(@json($tmCsrfRefreshUrlForJs), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
             if (r.redirected || r.status === 401) {
-                window.location.href = @json(route('login'));
+                window.location.href = @json($tmLoginUrlForJs);
                 return false;
             }
             if (!r.ok) throw new Error('refresh failed');

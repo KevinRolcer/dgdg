@@ -36,7 +36,7 @@
                                     <span class="tm-semaforo-badge tm-semaforo-badge--{{ $cell }}" title="{{ $semLab }}">{{ $semLab }}</span>
                                 @else
                                     @php
-                                        $displayText = is_array($cell) ? implode(', ', array_map(fn ($i) => is_scalar($i) ? (string) $i : json_encode($i, JSON_UNESCAPED_UNICODE), $cell)) : (is_scalar($cell) ? (string) $cell : '-');
+                                        $displayText = is_array($cell) ? implode(', ', array_map(function ($i) { return is_scalar($i) ? (string) $i : json_encode($i, JSON_UNESCAPED_UNICODE); }, $cell)) : (is_scalar($cell) ? (string) $cell : '-');
                                         $displayText = trim($displayText) !== '' ? $displayText : '-';
                                         $isLongText = mb_strlen($displayText) > 120;
                                     @endphp
@@ -101,7 +101,7 @@
                                     <span class="tm-semaforo-badge tm-semaforo-badge--{{ $cell }}" title="{{ $semLab }}">{{ $semLab }}</span>
                                 @else
                                     @php
-                                        $displayText = is_array($cell) ? implode(', ', array_map(fn ($i) => is_scalar($i) ? (string) $i : json_encode($i, JSON_UNESCAPED_UNICODE), $cell)) : (is_scalar($cell) ? (string) $cell : '-');
+                                        $displayText = is_array($cell) ? implode(', ', array_map(function ($i) { return is_scalar($i) ? (string) $i : json_encode($i, JSON_UNESCAPED_UNICODE); }, $cell)) : (is_scalar($cell) ? (string) $cell : '-');
                                         $displayText = trim($displayText) !== '' ? $displayText : '-';
                                         $isLongText = mb_strlen($displayText) > 120;
                                     @endphp
@@ -149,7 +149,9 @@
             $entryMunicipios = $entryMicrorregion && isset($entryMicrorregion->municipios) ? array_values($entryMicrorregion->municipios) : ($municipios ?? []);
             
             $orderedFields = $module->fields
-                ->sortBy(fn ($field) => in_array($field->type, ['image', 'file'], true) ? 1 : 0)
+                ->sortBy(function ($field) {
+                    return in_array($field->type, ['image', 'file'], true) ? 1 : 0;
+                })
                 ->values();
             $mediaDividerPrinted = false;
         @endphp

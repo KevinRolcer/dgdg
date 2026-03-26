@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @push('css')
-<link rel="stylesheet" href="{{ asset('assets/css/modules/temporary-modules.css') }}?v={{ @filemtime(public_path('assets/css/modules/temporary-modules.css')) ?: time() }}">
+<link rel="stylesheet" href="{{ asset('assets/css/modules/temporary-modules.css') }}?v={{ filemtime(public_path('assets/css/modules/temporary-modules.css')) ?: time() }}">
 <style>
     :root {
         --clr-error-text: var(--clr-primary);
@@ -76,7 +76,7 @@
         @if (session('status'))
             @php
                 $tmStatus = session('status');
-                $tmStatusStr = is_string($tmStatus) ? $tmStatus : (is_array($tmStatus) ? implode(' ', array_filter(array_map(static fn ($v) => is_scalar($v) ? (string) $v : '', $tmStatus))) : '');
+                $tmStatusStr = is_string($tmStatus) ? $tmStatus : (is_array($tmStatus) ? implode(' ', array_filter(array_map(function ($v) { return is_scalar($v) ? (string) $v : ''; }, $tmStatus))) : '');
             @endphp
             @if ($tmStatusStr !== '')
                 <div class="inline-alert inline-alert-success" role="alert">{{ $tmStatusStr }}</div>
@@ -132,7 +132,9 @@
 
     @foreach (($allModules ?? $modules) as $module)
         @php
-            $tmImportable = $module->fields->filter(fn ($f) => in_array($f->type, \App\Services\TemporaryModules\TemporaryModuleExcelImportService::IMPORTABLE_TYPES, true));
+            $tmImportable = $module->fields->filter(function ($f) {
+                return in_array($f->type, \App\Services\TemporaryModules\TemporaryModuleExcelImportService::IMPORTABLE_TYPES, true);
+            });
         @endphp
         <div class="tm-modal" id="delegate-preview-{{ $module->id }}" aria-hidden="true" role="dialog" aria-modal="true">
             <div class="tm-modal-backdrop" data-close-module-preview></div>
@@ -681,8 +683,11 @@
                                     </select>
                                 </label>
                                 <label class="tm-records-filter-field">
-                                    <div style="display:flex; gap:8px; align-items:center;">
+                                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                                         <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-tm-bulk-toggle title="Selección masiva">Seleccionar</button>
+                                        <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" data-tm-bulk-edit-open data-module-id="{{ $module->id }}" title="Editar varios registros">
+                                            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Edición múltiple
+                                        </button>
                                         <button type="button" class="tm-btn tm-btn-sm tm-btn-danger tm-hidden" data-tm-bulk-delete-trigger>
                                             <i class="fa-solid fa-trash-can"></i> <span data-tm-bulk-count>0</span>
                                         </button>
@@ -706,6 +711,76 @@
                             @unless ($recordsLoaded)
                                 <p class="tm-muted" style="font-size:0.85rem;">Selecciona este módulo arriba para cargar el listado.</p>
                             @endunless
+                        </div>
+
+                        <div
+                            class="tm-modal tm-bulk-edit-modal"
+                            id="tmBulkEditModal-{{ $module->id }}"
+                            aria-hidden="true"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="tmBulkEditTitle-{{ $module->id }}"
+                            data-bulk-data-url="{{ route('temporary-modules.fragment.bulk-edit-data') }}"
+                            data-submit-url="{{ route('temporary-modules.submit', $module->id) }}"
+                            data-module-id="{{ $module->id }}"
+                            data-show-mr-select="{{ ($microrregionesAsignadas ?? collect())->count() > 1 ? '1' : '0' }}"
+                            data-preview-url-template="{{ url('/modulos-temporales/'.$module->id.'/registros/__EID__/archivo/__FKEY__') }}"
+                        >
+                            <div class="tm-modal-backdrop" data-tm-bulk-edit-dismiss></div>
+                            <div class="tm-modal-dialog tm-modal-dialog-bulk-edit">
+                                <div class="tm-modal-head">
+                                    <div class="tm-modal-head-stack">
+                                        <h3 id="tmBulkEditTitle-{{ $module->id }}">Edición múltiple</h3>
+                                        <p class="tm-modal-subtitle tm-bulk-edit-module-name">{{ $module->name }}</p>
+                                    </div>
+                                    <button type="button" class="tm-modal-close" data-tm-bulk-edit-dismiss aria-label="Cerrar">
+                                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <div class="tm-modal-body tm-bulk-edit-body">
+                                    <div class="tm-bulk-edit-loading" data-tm-bulk-loading>
+                                        <p class="tm-muted">Cargando registros…</p>
+                                    </div>
+                                    <div class="tm-bulk-edit-main tm-hidden" data-tm-bulk-main>
+                                        <aside class="tm-bulk-edit-left">
+                                            <p class="tm-bulk-edit-hint">Registros (mismos filtros que el listado)</p>
+                                            <div class="tm-bulk-edit-list" data-tm-bulk-list></div>
+                                        </aside>
+                                        <div class="tm-bulk-edit-right">
+                                            <div class="tm-bulk-edit-empty" data-tm-bulk-form-empty>
+                                                <p class="tm-muted">Selecciona un registro para editar.</p>
+                                            </div>
+                                            <form class="tm-form tm-bulk-edit-form tm-hidden" data-tm-bulk-form novalidate>
+                                                <div class="tm-bulk-edit-mr-wrap tm-hidden" data-tm-bulk-mr-wrap>
+                                                    <label class="tm-entry-field">
+                                                        Microrregión de captura
+                                                        <select name="bulk_selected_microrregion_id" class="tm-input tm-bulk-mr-select" data-tm-bulk-mr-select></select>
+                                                    </label>
+                                                </div>
+                                                <div class="tm-grid tm-grid-2 tm-entry-grid tm-bulk-edit-fields" data-tm-bulk-fields></div>
+                                                <div class="tm-actions tm-bulk-edit-single-actions">
+                                                    <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-tm-bulk-save-one type="button">
+                                                        <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Guardar este registro
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                    <div class="tm-bulk-edit-error tm-hidden" data-tm-bulk-error></div>
+                                </div>
+                                <div class="tm-bulk-edit-footer">
+                                    <span class="tm-bulk-edit-counter" data-tm-bulk-counter>0 campos editados en 0 registros</span>
+                                    <div class="tm-bulk-edit-footer-actions">
+                                        <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" data-tm-bulk-dismiss>Salir</button>
+                                        <button type="button" class="tm-btn tm-btn-secondary tm-btn-sm tm-hidden" data-tm-bulk-save-exit>
+                                            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Salir y guardar cambios
+                                        </button>
+                                        <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-tm-bulk-save-all>
+                                            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Guardar cambios
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </section>
                 @endforeach
@@ -767,13 +842,14 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json(csrf_token());
+    const DELEGATE_BOOT = @json($delegateScriptPayload ?? []);
+    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || DELEGATE_BOOT.csrfToken;
 
     async function refreshCsrfToken() {
         try {
-            const r = await fetch(@json(route('csrf.refresh')), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+            const r = await fetch(DELEGATE_BOOT.csrfRefreshUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
             if (r.redirected || r.status === 401) {
-                window.location.href = @json(route('login'));
+                window.location.href = DELEGATE_BOOT.loginUrl;
                 return false;
             }
             if (!r.ok) throw new Error('refresh failed');
@@ -1449,9 +1525,9 @@
                 if (result.isConfirmed) form.submit();
             });
         }, true);
-        const microrregionesMunicipios = @json(($microrregionesAsignadas ?? collect())->mapWithKeys(function ($micro) {
-            return [(string) $micro->id => array_values($micro->municipios ?? [])];
-        })->all());
+        const microrregionesMunicipios = DELEGATE_BOOT.microrregionesMunicipios;
+        const microrregionesMeta = DELEGATE_BOOT.microrregionesMeta;
+        const tmSemaforoLabels = DELEGATE_BOOT.semaforoLabels;
         const openButtons = Array.from(document.querySelectorAll('[data-open-module-preview]'));
         const sectionTabs = Array.from(document.querySelectorAll('[data-section-tab]'));
         const sectionPanels = Array.from(document.querySelectorAll('.tm-section-panel'));
@@ -3617,6 +3693,755 @@
                 openModal.__tmHandleFile(file);
             }
         });
+
+        // --- Edición múltiple (modal lista + formulario) ---
+        (function initBulkEditModal() {
+            function tmBulkEsc(s) {
+                return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+            }
+            /** Filas iniciales del textarea (luego tmBulkFitTextareaHeight ajusta al contenido real). */
+            function tmBulkTextareaRows(str) {
+                const s = String(str ?? '');
+                if (!s.length) {
+                    return 1;
+                }
+                const lines = s.split(/\r?\n/).length;
+                const byWidth = Math.ceil(s.length / 72);
+                return Math.min(22, Math.max(1, lines, byWidth));
+            }
+            /** Altura proporcional al texto (poco contenido = poca altura). */
+            function tmBulkFitTextareaHeight(el) {
+                if (!el || el.tagName !== 'TEXTAREA' || !el.classList.contains('tm-bulk-textarea')) {
+                    return;
+                }
+                el.style.overflowY = 'hidden';
+                el.style.height = 'auto';
+                const natural = el.scrollHeight;
+                const maxH = Math.min(window.innerHeight * 0.5, 448);
+                const next = Math.min(natural, maxH);
+                el.style.height = next + 'px';
+                el.style.overflowY = natural > maxH ? 'auto' : 'hidden';
+            }
+            function deepClone(o) {
+                try {
+                    return JSON.parse(JSON.stringify(o));
+                } catch (e) {
+                    return {};
+                }
+            }
+            function valEqual(a, b) {
+                if (a === b) {
+                    return true;
+                }
+                if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
+                    return JSON.stringify(a) === JSON.stringify(b);
+                }
+                return String(a ?? '') === String(b ?? '');
+            }
+            function entryIsDirty(state, eid) {
+                const orig = state.originals[eid];
+                const draft = state.drafts[eid];
+                if (!orig || !draft) {
+                    return false;
+                }
+                for (const f of state.fields) {
+                    if (f.type === 'image' || f.type === 'file') {
+                        continue;
+                    }
+                    if (!valEqual(draft[f.key], orig[f.key])) {
+                        return true;
+                    }
+                }
+                if (state.showMrSelect) {
+                    const mrOrig = state.entryById[eid].microrregion_id;
+                    const mr = state.draftMicrorregion[eid] !== undefined ? state.draftMicrorregion[eid] : mrOrig;
+                    if (mr !== mrOrig) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            function countDirty(state) {
+                let fieldCount = 0;
+                const entryIds = new Set();
+                for (const eidStr of Object.keys(state.drafts)) {
+                    const eid = parseInt(eidStr, 10);
+                    const orig = state.originals[eid];
+                    const draft = state.drafts[eid];
+                    if (!orig || !draft) {
+                        continue;
+                    }
+                    for (const f of state.fields) {
+                        if (f.type === 'image' || f.type === 'file') {
+                            continue;
+                        }
+                        if (!valEqual(draft[f.key], orig[f.key])) {
+                            fieldCount++;
+                            entryIds.add(eid);
+                        }
+                    }
+                    if (state.showMrSelect) {
+                        const mrOrig = state.entryById[eid].microrregion_id;
+                        const mr = state.draftMicrorregion[eid] !== undefined ? state.draftMicrorregion[eid] : mrOrig;
+                        if (mr !== mrOrig) {
+                            fieldCount++;
+                            entryIds.add(eid);
+                        }
+                    }
+                }
+                return { fieldCount, entryCount: entryIds.size };
+            }
+            function refreshBulkCounter(modal) {
+                const st = modal.__bulkState;
+                if (!st) {
+                    return;
+                }
+                const c = countDirty(st);
+                const el = modal.querySelector('[data-tm-bulk-counter]');
+                if (el) {
+                    el.textContent = c.fieldCount + ' campo(s) editado(s) en ' + c.entryCount + ' registro(s)';
+                }
+                const saveExit = modal.querySelector('[data-tm-bulk-save-exit]');
+                if (saveExit) {
+                    saveExit.classList.toggle('tm-hidden', c.fieldCount === 0);
+                }
+                modal.querySelectorAll('[data-tm-bulk-row-save]').forEach(function (btn) {
+                    const id = parseInt(btn.getAttribute('data-entry-id'), 10);
+                    const dirty = entryIsDirty(st, id);
+                    btn.classList.toggle('tm-hidden', !dirty);
+                });
+                modal.querySelectorAll('[data-tm-bulk-dirty-badge]').forEach(function (badge) {
+                    const id = parseInt(badge.getAttribute('data-entry-id'), 10);
+                    badge.classList.toggle('tm-hidden', !entryIsDirty(st, id));
+                });
+            }
+            function buildFieldHtml(field, val, entryId, previewTpl) {
+                function isScalar(x) {
+                    return x === null || typeof x === 'string' || typeof x === 'number' || typeof x === 'boolean';
+                }
+                const k = field.key;
+                const req = field.is_required ? ' required' : '';
+                const lab = tmBulkEsc(field.label);
+                const comment = field.comment ? '<small class="tm-field-help">' + tmBulkEsc(field.comment) + '</small>' : '';
+                const name = 'values[' + k + ']';
+                let v = val;
+                if (v === undefined || v === null) {
+                    v = '';
+                }
+                if (field.type === 'textarea') {
+                    const tr = tmBulkTextareaRows(v);
+                    return '<label class="tm-entry-field tm-col-full">' + lab + comment +
+                        '<textarea class="tm-bulk-textarea" name="' + name + '" rows="' + tr + '" data-field-key="' + tmBulkEsc(k) + '"' + req + '>' + tmBulkEsc(String(v)) + '</textarea></label>';
+                }
+                if (field.type === 'number') {
+                    return '<label class="tm-entry-field">' + lab + comment +
+                        '<input type="number" step="any" name="' + name + '" value="' + tmBulkEsc(String(v)) + '" data-field-key="' + tmBulkEsc(k) + '"' + req + '></label>';
+                }
+                if (field.type === 'date') {
+                    return '<label class="tm-entry-field">' + lab + comment +
+                        '<input type="date" name="' + name + '" value="' + tmBulkEsc(String(v)) + '" data-field-key="' + tmBulkEsc(k) + '"' + req + '></label>';
+                }
+                if (field.type === 'datetime') {
+                    return '<label class="tm-entry-field">' + lab + comment +
+                        '<input type="datetime-local" name="' + name + '" value="' + tmBulkEsc(String(v)) + '" data-field-key="' + tmBulkEsc(k) + '"' + req + '></label>';
+                }
+                if (field.type === 'select') {
+                    const opts = Array.isArray(field.options) ? field.options : [];
+                    let optsHtml = '<option value="">Selecciona</option>';
+                    opts.forEach(function (opt) {
+                        if (typeof opt !== 'string' && typeof opt !== 'number') {
+                            return;
+                        }
+                        const sel = String(opt) === String(v) ? ' selected' : '';
+                        optsHtml += '<option value="' + tmBulkEsc(String(opt)) + '"' + sel + '>' + tmBulkEsc(String(opt)) + '</option>';
+                    });
+                    return '<label class="tm-entry-field">' + lab + comment +
+                        '<select name="' + name + '" data-field-key="' + tmBulkEsc(k) + '"' + req + '>' + optsHtml + '</select></label>';
+                }
+                if (field.type === 'multiselect') {
+                    const opts = Array.isArray(field.options) ? field.options : [];
+                    const arr = Array.isArray(v) ? v : (typeof v === 'string' && v ? v.split(',').map(function (s) { return s.trim(); }) : []);
+                    let boxes = '<div class="tm-multiselect-wrap">';
+                    opts.forEach(function (opt) {
+                        if (!isScalar(opt)) {
+                            return;
+                        }
+                        const checked = arr.indexOf(String(opt)) !== -1 ? ' checked' : '';
+                        boxes += '<label class="tm-multiselect-option"><input type="checkbox" name="' + name + '[]" value="' + tmBulkEsc(String(opt)) + '" data-field-key-multi="' + tmBulkEsc(k) + '"' + checked + '><span>' + tmBulkEsc(String(opt)) + '</span></label>';
+                    });
+                    boxes += '</div>';
+                    return '<label class="tm-entry-field tm-col-full">' + lab + comment + boxes + '</label>';
+                }
+                if (field.type === 'boolean') {
+                    const boolYes = v === true || v === 1 || v === '1' || (typeof v === 'string' && ['sí', 'si', 'yes', 'true', 'verdadero'].indexOf(String(v).toLowerCase().trim()) !== -1);
+                    const boolNo = v === false || v === 0 || v === '0' || (typeof v === 'string' && ['no', 'false', 'falso'].indexOf(String(v).toLowerCase().trim()) !== -1);
+                    return '<label class="tm-entry-field">' + lab + comment +
+                        '<select name="' + name + '" data-field-key="' + tmBulkEsc(k) + '"' + req + '>' +
+                        '<option value="">Selecciona</option>' +
+                        '<option value="1"' + (boolYes ? ' selected' : '') + '>Si</option>' +
+                        '<option value="0"' + (boolNo && !boolYes ? ' selected' : '') + '>No</option></select></label>';
+                }
+                if (field.type === 'semaforo') {
+                    let optsHtml = '<option value="">Selecciona nivel</option>';
+                    Object.keys(tmSemaforoLabels || {}).forEach(function (semVal) {
+                        const sel = String(v) === String(semVal) ? ' selected' : '';
+                        optsHtml += '<option value="' + tmBulkEsc(semVal) + '"' + sel + '>' + tmBulkEsc(tmSemaforoLabels[semVal]) + '</option>';
+                    });
+                    return '<label class="tm-entry-field">' + lab + comment +
+                        '<select name="' + name + '" class="tm-semaforo-select" data-field-key="' + tmBulkEsc(k) + '"' + req + '>' + optsHtml + '</select></label>';
+                }
+                if (field.type === 'categoria') {
+                    const catOpts = Array.isArray(field.options) ? field.options : [];
+                    let optsHtml = '<option value="">Selecciona categoría</option>';
+                    catOpts.forEach(function (cat) {
+                        const catName = cat && cat.name ? String(cat.name) : '';
+                        if (!catName) {
+                            return;
+                        }
+                        const sel = String(v) === catName ? ' selected' : '';
+                        optsHtml += '<option value="' + tmBulkEsc(catName) + '"' + sel + '>' + tmBulkEsc(catName) + '</option>';
+                        const subs = (cat.sub || []);
+                        subs.forEach(function (sub) {
+                            const subVal = catName + ' > ' + String(sub);
+                            const sel2 = String(v) === subVal ? ' selected' : '';
+                            optsHtml += '<option value="' + tmBulkEsc(subVal) + '"' + sel2 + '>' + tmBulkEsc(catName) + ' → ' + tmBulkEsc(String(sub)) + '</option>';
+                        });
+                    });
+                    return '<label class="tm-entry-field">' + lab + comment +
+                        '<select name="' + name + '" data-field-key="' + tmBulkEsc(k) + '"' + req + '>' + optsHtml + '</select></label>';
+                }
+                if (field.type === 'municipio') {
+                    return '<label class="tm-entry-field">' + lab + comment +
+                        '<select name="' + name + '" class="tm-municipio-select" data-field-key="' + tmBulkEsc(k) + '"' + req + '><option value="">Selecciona un municipio</option></select></label>';
+                }
+                if (field.type === 'linked') {
+                    const opts = field.options || {};
+                    const pt = opts.primary_type || 'text';
+                    const plab = opts.primary_label || 'Principal';
+                    const pOpts = opts.primary_options || [];
+                    const st = opts.secondary_type || 'text';
+                    const slab = opts.secondary_label || 'Secundario';
+                    const sOpts = opts.secondary_options || [];
+                    const existing = typeof v === 'object' && v !== null ? v : {};
+                    const pv = existing.primary != null ? existing.primary : '';
+                    const sv = existing.secondary != null ? existing.secondary : '';
+                    let primaryHtml = '';
+                    if (pt === 'select') {
+                        primaryHtml = '<select name="values[' + k + '__primary]" data-linked-primary data-field-key-p="' + tmBulkEsc(k) + '"' + req + '><option value="">Selecciona</option>';
+                        pOpts.forEach(function (opt) {
+                            primaryHtml += '<option value="' + tmBulkEsc(String(opt)) + '"' + (String(pv) === String(opt) ? ' selected' : '') + '>' + tmBulkEsc(String(opt)) + '</option>';
+                        });
+                        primaryHtml += '</select>';
+                    } else {
+                        primaryHtml = '<textarea class="tm-bulk-textarea" name="values[' + k + '__primary]" rows="' + tmBulkTextareaRows(pv) + '" data-linked-primary data-field-key-p="' + tmBulkEsc(k) + '"' + req + '>' + tmBulkEsc(String(pv)) + '</textarea>';
+                    }
+                    let secondaryHtml = '';
+                    const showSec = pv !== '' && pv !== null && pv !== undefined;
+                    if (st === 'select') {
+                        secondaryHtml = '<select name="values[' + k + '__secondary]" data-linked-secondary data-field-key-s="' + tmBulkEsc(k) + '"' + (showSec ? '' : ' disabled') + '><option value="">Selecciona</option>';
+                        sOpts.forEach(function (opt) {
+                            secondaryHtml += '<option value="' + tmBulkEsc(String(opt)) + '"' + (String(sv) === String(opt) ? ' selected' : '') + '>' + tmBulkEsc(String(opt)) + '</option>';
+                        });
+                        secondaryHtml += '</select>';
+                    } else {
+                        secondaryHtml = '<textarea class="tm-bulk-textarea" name="values[' + k + '__secondary]" rows="' + tmBulkTextareaRows(sv) + '" data-linked-secondary data-field-key-s="' + tmBulkEsc(k) + '"' + (showSec ? '' : ' disabled') + '>' + tmBulkEsc(String(sv)) + '</textarea>';
+                    }
+                    return '<div class="tm-entry-field tm-col-full tm-linked-field-wrap" data-linked-field-group data-linked-key="' + tmBulkEsc(k) + '">' +
+                        '<label class="tm-linked-primary-label">' + tmBulkEsc(plab) + '</label>' + primaryHtml +
+                        '<div class="tm-linked-secondary-wrap" data-linked-secondary-wrap' + (showSec ? '' : ' hidden') + '>' +
+                        '<label class="tm-linked-secondary-label">' + tmBulkEsc(slab) + '</label>' + secondaryHtml + '</div></div>';
+                }
+                if (field.type === 'image' || field.type === 'file') {
+                    const path = typeof v === 'string' && v.trim() !== '' ? v : '';
+                    const prev = path && previewTpl
+                        ? previewTpl.replace('__EID__', String(entryId)).replace('__FKEY__', String(k))
+                        : '';
+                    if (previewTpl && path) {
+                        return '<div class="tm-entry-field tm-col-full"><strong>' + lab + '</strong>' + comment +
+                            '<p class="tm-muted" style="font-size:0.78rem; margin:6px 0;">No se puede cambiar el archivo aquí. Usa <strong>Editar</strong> en el listado.</p>' +
+                            '<img src="' + tmBulkEsc(prev) + '" alt="" style="max-height:80px;border-radius:6px;border:1px solid var(--clr-border);"></div>';
+                    }
+                    return '<div class="tm-entry-field tm-col-full"><strong>' + lab + '</strong><p class="tm-muted" style="font-size:0.78rem;">Sin archivo o edita desde el listado.</p></div>';
+                }
+                if (field.type === 'geopoint') {
+                    const gr = tmBulkTextareaRows(v);
+                    return '<label class="tm-entry-field tm-col-full">' + lab + comment +
+                        '<textarea class="tm-bulk-textarea" name="' + name + '" rows="' + Math.min(8, Math.max(1, gr)) + '" data-field-key="' + tmBulkEsc(k) + '"' + req + ' spellcheck="false">' + tmBulkEsc(String(v)) + '</textarea></label>';
+                }
+                const tr = tmBulkTextareaRows(v);
+                return '<label class="tm-entry-field tm-col-full">' + lab + comment +
+                    '<textarea class="tm-bulk-textarea" name="' + name + '" rows="' + tr + '" data-field-key="' + tmBulkEsc(k) + '"' + req + '>' + tmBulkEsc(String(v)) + '</textarea></label>';
+            }
+            function syncDraftFromForm(modal) {
+                const st = modal.__bulkState;
+                const form = modal.querySelector('[data-tm-bulk-form]');
+                if (!st || !form || !st.selectedId) {
+                    return;
+                }
+                const eid = st.selectedId;
+                const draft = st.drafts[eid];
+                if (!draft) {
+                    return;
+                }
+                st.fields.forEach(function (f) {
+                    if (f.type === 'seccion' || f.type === 'image' || f.type === 'file') {
+                        return;
+                    }
+                    if (f.type === 'multiselect') {
+                        const arr = [];
+                        form.querySelectorAll('[data-field-key-multi="' + f.key + '"]').forEach(function (cb) {
+                            if (cb.checked) {
+                                arr.push(cb.value);
+                            }
+                        });
+                        draft[f.key] = arr;
+                        return;
+                    }
+                    if (f.type === 'linked') {
+                        const pk = f.key + '__primary';
+                        const sk = f.key + '__secondary';
+                        const pv = form.querySelector('[name="values[' + pk + ']"]');
+                        const sv = form.querySelector('[name="values[' + sk + ']"]');
+                        draft[f.key] = {
+                            primary: pv ? pv.value : null,
+                            secondary: sv && !sv.disabled ? sv.value : null,
+                        };
+                        return;
+                    }
+                    const inp = form.querySelector('[data-field-key="' + f.key + '"]');
+                    if (inp) {
+                        if (f.type === 'boolean') {
+                            draft[f.key] = inp.value === '' ? null : (inp.value === '1' || inp.value === 'true');
+                        } else {
+                            draft[f.key] = inp.value === '' ? null : inp.value;
+                        }
+                    }
+                });
+            }
+            function wireForm(modal) {
+                const form = modal.querySelector('[data-tm-bulk-form]');
+                if (!form) {
+                    return;
+                }
+                const st = modal.__bulkState;
+                form.querySelectorAll('[data-field-key], [data-field-key-multi], [data-linked-primary], [data-linked-secondary]').forEach(function (el) {
+                    el.addEventListener('input', function () { syncDraftFromForm(modal); refreshBulkCounter(modal); });
+                    el.addEventListener('change', function () { syncDraftFromForm(modal); refreshBulkCounter(modal); });
+                });
+                form.querySelectorAll('input[type="checkbox"][data-field-key-multi]').forEach(function (el) {
+                    el.addEventListener('change', function () { syncDraftFromForm(modal); refreshBulkCounter(modal); });
+                });
+                form.querySelectorAll('[data-linked-primary]').forEach(function (prim) {
+                    function onLinkedPrimaryToggle() {
+                        const wrap = prim.closest('[data-linked-field-group]');
+                        if (!wrap) {
+                            return;
+                        }
+                        const secWrap = wrap.querySelector('[data-linked-secondary-wrap]');
+                        const sec = wrap.querySelector('[data-linked-secondary]');
+                        const has = prim.value && String(prim.value).trim() !== '';
+                        if (secWrap) {
+                            secWrap.hidden = !has;
+                        }
+                        if (sec) {
+                            sec.disabled = !has;
+                            if (!has) {
+                                sec.value = '';
+                            }
+                        }
+                        syncDraftFromForm(modal);
+                        refreshBulkCounter(modal);
+                    }
+                    prim.addEventListener('change', onLinkedPrimaryToggle);
+                    prim.addEventListener('input', onLinkedPrimaryToggle);
+                });
+                const mrSel = form.querySelector('[data-tm-bulk-mr-select]');
+                if (mrSel && st) {
+                    mrSel.addEventListener('change', function () {
+                        st.draftMicrorregion[st.selectedId] = parseInt(mrSel.value, 10);
+                        setMunicipiosForForm(form, String(st.draftMicrorregion[st.selectedId] || st.entryById[st.selectedId].microrregion_id));
+                        refreshBulkCounter(modal);
+                    });
+                }
+                form.querySelectorAll('textarea.tm-bulk-textarea').forEach(function (ta) {
+                    ta.addEventListener('input', function () { tmBulkFitTextareaHeight(ta); });
+                    tmBulkFitTextareaHeight(ta);
+                });
+            }
+            function selectEntry(modal, entryId) {
+                const st = modal.__bulkState;
+                if (!st) {
+                    return;
+                }
+                if (st.selectedId && st.selectedId !== entryId) {
+                    syncDraftFromForm(modal);
+                }
+                st.selectedId = entryId;
+                if (!st.drafts[entryId]) {
+                    st.drafts[entryId] = deepClone(st.originals[entryId]);
+                }
+                modal.querySelectorAll('.tm-bulk-edit-row').forEach(function (row) {
+                    row.classList.toggle('is-active', parseInt(row.getAttribute('data-entry-id'), 10) === entryId);
+                });
+                const emptyEl = modal.querySelector('[data-tm-bulk-form-empty]');
+                const form = modal.querySelector('[data-tm-bulk-form]');
+                const fieldsEl = modal.querySelector('[data-tm-bulk-fields]');
+                const mrWrap = modal.querySelector('[data-tm-bulk-mr-wrap]');
+                const mrSel = modal.querySelector('[data-tm-bulk-mr-select]');
+                if (emptyEl) {
+                    emptyEl.classList.add('tm-hidden');
+                }
+                if (form) {
+                    form.classList.remove('tm-hidden');
+                }
+                const entry = st.entryById[entryId];
+                const previewTpl = modal.getAttribute('data-preview-url-template') || '';
+                let html = '';
+                st.fields.forEach(function (f) {
+                    if (f.type === 'seccion') {
+                        return;
+                    }
+                    html += buildFieldHtml(f, st.drafts[entryId][f.key], entryId, previewTpl);
+                });
+                if (fieldsEl) {
+                    fieldsEl.innerHTML = html;
+                }
+                if (st.showMrSelect && mrWrap && mrSel) {
+                    mrWrap.classList.remove('tm-hidden');
+                    mrSel.innerHTML = '';
+                    microrregionesMeta.forEach(function (m) {
+                        const opt = document.createElement('option');
+                        opt.value = String(m.id);
+                        opt.textContent = m.label;
+                        const cur = st.draftMicrorregion[entryId] !== undefined ? st.draftMicrorregion[entryId] : entry.microrregion_id;
+                        opt.selected = parseInt(cur, 10) === m.id;
+                        mrSel.appendChild(opt);
+                    });
+                } else if (mrWrap) {
+                    mrWrap.classList.add('tm-hidden');
+                }
+                const mrForMun = st.draftMicrorregion[entryId] !== undefined ? st.draftMicrorregion[entryId] : entry.microrregion_id;
+                setMunicipiosForForm(form, String(mrForMun));
+                const munField = st.fields.find(function (f) { return f.type === 'municipio'; });
+                if (munField && form) {
+                    const ms = form.querySelector('[data-field-key="' + munField.key + '"]');
+                    const mv = st.drafts[entryId][munField.key];
+                    if (ms && mv != null && String(mv) !== '') {
+                        ms.value = String(mv);
+                    }
+                }
+                wireForm(modal);
+                refreshBulkCounter(modal);
+            }
+            function appendValuesToFormData(fd, state, entryId) {
+                const draft = state.drafts[entryId];
+                const entry = state.entryById[entryId];
+                if (!draft || !entry) {
+                    return;
+                }
+                const mr = state.draftMicrorregion[entryId] !== undefined ? state.draftMicrorregion[entryId] : entry.microrregion_id;
+                fd.append('selected_microrregion_id', String(mr));
+                state.fields.forEach(function (f) {
+                    if (f.type === 'seccion' || f.type === 'image' || f.type === 'file') {
+                        return;
+                    }
+                    const k = f.key;
+                    const v = draft[k];
+                    if (f.type === 'multiselect') {
+                        const arr = Array.isArray(v) ? v : [];
+                        arr.forEach(function (item) {
+                            fd.append('values[' + k + '][]', item);
+                        });
+                        return;
+                    }
+                    if (f.type === 'linked') {
+                        const obj = typeof v === 'object' && v !== null ? v : {};
+                        fd.append('values[' + k + '__primary]', obj.primary != null ? String(obj.primary) : '');
+                        fd.append('values[' + k + '__secondary]', obj.secondary != null ? String(obj.secondary) : '');
+                        return;
+                    }
+                    if (f.type === 'boolean') {
+                        if (v === null || v === undefined) {
+                            fd.append('values[' + k + ']', '');
+                        } else {
+                            fd.append('values[' + k + ']', v === true || v === '1' || v === 1 ? '1' : '0');
+                        }
+                        return;
+                    }
+                    if (v === null || v === undefined) {
+                        fd.append('values[' + k + ']', '');
+                    } else {
+                        fd.append('values[' + k + ']', typeof v === 'object' ? JSON.stringify(v) : String(v));
+                    }
+                });
+            }
+            function saveEntryRequest(modal, entryId) {
+                const st = modal.__bulkState;
+                if (!st || !st.drafts[entryId]) {
+                    return Promise.resolve(false);
+                }
+                syncDraftFromForm(modal);
+                const fd = new FormData();
+                fd.append('_token', csrfToken);
+                fd.append('entry_id', String(entryId));
+                appendValuesToFormData(fd, st, entryId);
+                return csrfFetch(st.submitUrl, {
+                    method: 'POST',
+                    body: fd,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                }).then(function (r) {
+                    if (r.status === 422) {
+                        return r.json().then(function (j) {
+                            throw new Error(j.message || (j.errors && Object.values(j.errors).flat().join(' ')) || 'Validación');
+                        });
+                    }
+                    if (!r.ok) {
+                        throw new Error('Error al guardar');
+                    }
+                    return r.json();
+                }).then(function (j) {
+                    if (j.success) {
+                        st.originals[entryId] = deepClone(st.drafts[entryId]);
+                        const ent = st.entryById[entryId];
+                        if (ent && st.draftMicrorregion[entryId] !== undefined) {
+                            ent.microrregion_id = st.draftMicrorregion[entryId];
+                        }
+                        delete st.draftMicrorregion[entryId];
+                        refreshBulkCounter(modal);
+                        if (typeof window.__tmReloadRecordsPanel === 'function') {
+                            const panel = document.getElementById('module-records-' + st.moduleId);
+                            if (panel) {
+                                window.__tmReloadRecordsPanel(panel, { requireActive: false });
+                            }
+                        }
+                        return true;
+                    }
+                    throw new Error(j.message || 'Error');
+                });
+            }
+            function tryCloseBulkModal(modal) {
+                const st = modal.__bulkState;
+                const c = st ? countDirty(st) : { fieldCount: 0, entryCount: 0 };
+                if (c.fieldCount === 0) {
+                    closeModal(modal);
+                    return;
+                }
+                Swal.fire({
+                    title: 'Cambios sin guardar',
+                    text: 'Tienes ' + c.fieldCount + ' campo(s) editado(s). ¿Qué deseas hacer?',
+                    icon: 'warning',
+                    showDenyButton: true,
+                    showCancelButton: true,
+                    confirmButtonText: 'Guardar y salir',
+                    denyButtonText: 'Salir sin guardar',
+                    cancelButtonText: 'Seguir editando',
+                }).then(function (res) {
+                    if (res.isConfirmed) {
+                        saveAll(modal).then(function () {
+                            closeModal(modal);
+                        }).catch(function () {});
+                    } else if (res.isDenied) {
+                        closeModal(modal);
+                    }
+                });
+            }
+            function saveAll(modal) {
+                const st = modal.__bulkState;
+                if (!st) {
+                    return Promise.resolve();
+                }
+                syncDraftFromForm(modal);
+                const c = countDirty(st);
+                if (c.fieldCount === 0) {
+                    return Promise.resolve();
+                }
+                const ids = [];
+                st.entries.forEach(function (e) {
+                    if (entryIsDirty(st, e.id)) {
+                        ids.push(e.id);
+                    }
+                });
+                let chain = Promise.resolve();
+                ids.forEach(function (id) {
+                    chain = chain.then(function () {
+                        return saveEntryRequest(modal, id);
+                    });
+                });
+                return chain.then(function () {
+                    Swal.fire({ title: 'Listo', text: 'Registros actualizados.', icon: 'success', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false });
+                }).catch(function (e) {
+                    Swal.fire('Error', e.message || 'No se pudo guardar', 'error');
+                    return Promise.reject(e);
+                });
+            }
+            document.addEventListener('click', function (e) {
+                const openBtn = e.target.closest('[data-tm-bulk-edit-open]');
+                if (openBtn) {
+                    e.preventDefault();
+                    const moduleId = openBtn.getAttribute('data-module-id');
+                    const panel = document.getElementById('module-records-' + moduleId);
+                    const modal = document.getElementById('tmBulkEditModal-' + moduleId);
+                    if (!modal || !panel) {
+                        return;
+                    }
+                    const buscarEl = panel.querySelector('[data-tm-filter-buscar]');
+                    const mrEl = panel.querySelector('[data-tm-filter-microrregion]');
+                    const buscar = buscarEl ? String(buscarEl.value || '').trim() : '';
+                    const mr = mrEl ? String(mrEl.value || '').trim() : '';
+                    const base = modal.getAttribute('data-bulk-data-url');
+                    const url = new URL(base, window.location.origin);
+                    url.searchParams.set('module', moduleId);
+                    if (buscar) {
+                        url.searchParams.set('buscar', buscar);
+                    }
+                    if (mr) {
+                        url.searchParams.set('microrregion_id', mr);
+                    }
+                    modal.querySelector('[data-tm-bulk-loading]').classList.remove('tm-hidden');
+                    modal.querySelector('[data-tm-bulk-main]').classList.add('tm-hidden');
+                    modal.querySelector('[data-tm-bulk-error]').classList.add('tm-hidden');
+                    fetch(url.toString(), { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                        .then(function (r) {
+                            return r.json();
+                        })
+                        .then(function (j) {
+                            if (!j.success) {
+                                throw new Error(j.message || 'Error al cargar');
+                            }
+                            const st = {
+                                payload: j,
+                                fields: j.fields || [],
+                                entries: j.entries || [],
+                                originals: {},
+                                drafts: {},
+                                draftMicrorregion: {},
+                                selectedId: null,
+                                entryById: {},
+                                showMrSelect: modal.getAttribute('data-show-mr-select') === '1',
+                                submitUrl: modal.getAttribute('data-submit-url'),
+                                moduleId: parseInt(modal.getAttribute('data-module-id'), 10),
+                            };
+                            j.entries.forEach(function (e) {
+                                st.originals[e.id] = deepClone(e.data);
+                                st.entryById[e.id] = e;
+                            });
+                            modal.__bulkState = st;
+                            const listEl = modal.querySelector('[data-tm-bulk-list]');
+                            const nameEl = modal.querySelector('.tm-bulk-edit-module-name');
+                            if (nameEl) {
+                                nameEl.textContent = j.module_name || '';
+                            }
+                            if (listEl) {
+                                if (!st.entries.length) {
+                                    listEl.innerHTML = '<p class="tm-muted">No hay registros con los filtros actuales.</p>';
+                                } else {
+                                    listEl.innerHTML = st.entries.map(function (e) {
+                                        return '<div class="tm-bulk-edit-row" data-entry-id="' + e.id + '">' +
+                                            '<button type="button" class="tm-bulk-edit-row-main" data-tm-bulk-select-entry="' + e.id + '">' +
+                                            '<span class="tm-bulk-edit-row-title">' + tmBulkEsc(e.title) + '</span>' +
+                                            '<span class="tm-bulk-edit-row-meta">' + tmBulkEsc(e.microrregion_label) + '</span></button>' +
+                                            '<span class="tm-bulk-edit-row-badge tm-hidden" data-tm-bulk-dirty-badge data-entry-id="' + e.id + '">Pendiente</span>' +
+                                            '<button type="button" class="tm-btn tm-btn-sm tm-btn-primary tm-hidden" data-tm-bulk-row-save data-entry-id="' + e.id + '">Guardar</button>' +
+                                            '</div>';
+                                    }).join('');
+                                }
+                            }
+                            modal.querySelector('[data-tm-bulk-loading]').classList.add('tm-hidden');
+                            modal.querySelector('[data-tm-bulk-main]').classList.remove('tm-hidden');
+                            modal.querySelector('[data-tm-bulk-form]')?.classList.add('tm-hidden');
+                            modal.querySelector('[data-tm-bulk-form-empty]')?.classList.remove('tm-hidden');
+                            refreshBulkCounter(modal);
+                            openModal(modal, openBtn);
+                        })
+                        .catch(function (err) {
+                            modal.querySelector('[data-tm-bulk-loading]').classList.add('tm-hidden');
+                            const errEl = modal.querySelector('[data-tm-bulk-error]');
+                            if (errEl) {
+                                errEl.textContent = err.message || 'Error';
+                                errEl.classList.remove('tm-hidden');
+                            }
+                            openModal(modal, openBtn);
+                        });
+                    return;
+                }
+                const sel = e.target.closest('[data-tm-bulk-select-entry]');
+                if (sel) {
+                    const row = sel.closest('.tm-bulk-edit-row');
+                    const modal = sel.closest('.tm-bulk-edit-modal');
+                    if (!row || !modal || !modal.__bulkState) {
+                        return;
+                    }
+                    selectEntry(modal, parseInt(row.getAttribute('data-entry-id'), 10));
+                    return;
+                }
+                const rowSave = e.target.closest('[data-tm-bulk-row-save]');
+                if (rowSave) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const modal = rowSave.closest('.tm-bulk-edit-modal');
+                    const id = parseInt(rowSave.getAttribute('data-entry-id'), 10);
+                    if (modal && modal.__bulkState) {
+                        if (modal.__bulkState.selectedId !== id) {
+                            selectEntry(modal, id);
+                        }
+                        syncDraftFromForm(modal);
+                        saveEntryRequest(modal, id).then(function (ok) {
+                            if (ok) {
+                                Swal.fire({ title: 'Guardado', text: 'Registro actualizado.', icon: 'success', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+                            }
+                        }).catch(function (err) {
+                            Swal.fire('Error', err.message, 'error');
+                        });
+                    }
+                    return;
+                }
+                const saveOne = e.target.closest('[data-tm-bulk-save-one]');
+                if (saveOne) {
+                    const modal = saveOne.closest('.tm-bulk-edit-modal');
+                    const st = modal && modal.__bulkState;
+                    if (st && st.selectedId) {
+                        syncDraftFromForm(modal);
+                        saveEntryRequest(modal, st.selectedId).then(function (ok) {
+                            if (ok) {
+                                Swal.fire({ title: 'Guardado', text: 'Registro actualizado.', icon: 'success', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+                            }
+                        }).catch(function (err) {
+                            Swal.fire('Error', err.message, 'error');
+                        });
+                    }
+                    return;
+                }
+                const saveAllBtn = e.target.closest('[data-tm-bulk-save-all]');
+                if (saveAllBtn) {
+                    const modal = saveAllBtn.closest('.tm-bulk-edit-modal');
+                    if (modal) {
+                        saveAll(modal);
+                    }
+                    return;
+                }
+                const saveExit = e.target.closest('[data-tm-bulk-save-exit]');
+                if (saveExit) {
+                    const modal = saveExit.closest('.tm-bulk-edit-modal');
+                    if (modal) {
+                        saveAll(modal).then(function () {
+                            closeModal(modal);
+                        }).catch(function () {});
+                    }
+                    return;
+                }
+                const dismiss = e.target.closest('[data-tm-bulk-edit-dismiss], [data-tm-bulk-dismiss]');
+                if (dismiss) {
+                    const modal = dismiss.closest('.tm-bulk-edit-modal');
+                    if (modal) {
+                        tryCloseBulkModal(modal);
+                    }
+                }
+            });
+        })();
 
         // --- Trigger initial load for the active module panel if we are in records view ---
         if (recordsViewPanel && recordsViewPanel.classList.contains('is-active')) {

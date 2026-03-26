@@ -121,17 +121,22 @@
 @endsection
 
 @push('scripts')
+@php
+    $tmSeedPreviewUrlForJs = route('temporary-modules.admin.seed-preview');
+    $tmCsrfRefreshUrlForJs = route('csrf.refresh');
+    $tmLoginUrlForJs = route('login');
+@endphp
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const previewUrl = @json(route('temporary-modules.admin.seed-preview'));
+    const previewUrl = @json($tmSeedPreviewUrlForJs);
     let csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
     async function csrfFetch(url, opts = {}) {
         const res = await fetch(url, opts);
         if (res.status === 419) {
             try {
-                const r = await fetch(@json(route('csrf.refresh')), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
-                if (r.redirected || r.status === 401) { window.location.href = @json(route('login')); return res; }
+                const r = await fetch(@json($tmCsrfRefreshUrlForJs), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+                if (r.redirected || r.status === 401) { window.location.href = @json($tmLoginUrlForJs); return res; }
                 if (r.ok) { const j = await r.json(); if (j.token) { csrf = j.token; const m = document.querySelector('meta[name="csrf-token"]'); if (m) m.setAttribute('content', j.token); } }
             } catch (_) {}
             if (opts.body instanceof FormData) opts.body.set('_token', csrf);
