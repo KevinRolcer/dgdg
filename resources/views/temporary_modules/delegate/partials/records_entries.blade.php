@@ -303,12 +303,41 @@
                                             </div>
                                         </div>
                                     @elseif ($field->type === 'textarea')
-                                        <textarea id="{{ $id }}" name="{{ $name }}" rows="3" {{ $field->is_required ? 'required' : '' }}>{{ $value }}</textarea>
+                                        <textarea id="{{ $id }}" name="{{ $name }}" rows="3" {{ $field->is_required ? 'required' : '' }}>{{ is_scalar($value) ? $value : '' }}</textarea>
+                                    @elseif ($field->type === 'number')
+                                        <input id="{{ $id }}" type="number" step="any" name="{{ $name }}" value="{{ is_scalar($value) ? $value : '' }}" {{ $field->is_required ? 'required' : '' }}>
+                                    @elseif ($field->type === 'date')
+                                        <input id="{{ $id }}" type="date" name="{{ $name }}" value="{{ is_scalar($value) ? $value : '' }}" {{ $field->is_required ? 'required' : '' }}>
+                                    @elseif ($field->type === 'datetime')
+                                        <input id="{{ $id }}" type="datetime-local" name="{{ $name }}" value="{{ is_scalar($value) ? $value : '' }}" {{ $field->is_required ? 'required' : '' }}>
                                     @elseif ($field->type === 'select')
                                         <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
                                             <option value="">Selecciona una opcion</option>
                                             @foreach (($field->options ?? []) as $option)
+                                                @if (! is_scalar($option))
+                                                    @continue
+                                                @endif
                                                 <option value="{{ $option }}" @selected($value === $option)>{{ $option }}</option>
+                                            @endforeach
+                                        </select>
+                                    @elseif ($field->type === 'boolean')
+                                        @php
+                                            $v = $value;
+                                            $boolYes = $v === true || $v === 1 || $v === '1'
+                                                || (is_string($v) && in_array(mb_strtolower(trim($v)), ['sí', 'si', 'yes', 'true', 'verdadero'], true));
+                                            $boolNo = $v === false || $v === 0 || $v === '0'
+                                                || (is_string($v) && in_array(mb_strtolower(trim($v)), ['no', 'false', 'falso'], true));
+                                        @endphp
+                                        <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
+                                            <option value="">Selecciona</option>
+                                            <option value="1" @selected($boolYes)>Si</option>
+                                            <option value="0" @selected($boolNo && ! $boolYes)>No</option>
+                                        </select>
+                                    @elseif ($field->type === 'semaforo')
+                                        <select id="{{ $id }}" name="{{ $name }}" class="tm-semaforo-select" {{ $field->is_required ? 'required' : '' }}>
+                                            <option value="">Selecciona nivel</option>
+                                            @foreach (\App\Services\TemporaryModules\TemporaryModuleFieldService::semaforoLabels() as $semVal => $semLabel)
+                                                <option value="{{ $semVal }}" @selected($value === $semVal)>{{ $semLabel }}</option>
                                             @endforeach
                                         </select>
                                     @elseif ($field->type === 'municipio')

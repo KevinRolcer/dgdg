@@ -811,6 +811,10 @@
         if (!response.ok) {
             if (ct.includes('application/json')) {
                 var errJson = await response.json().catch(function() { return {}; });
+                // 422/403: devolver el objeto para que importSingleRow / validación muestren j.error (no solo el mensaje genérico)
+                if (response.status === 422 || response.status === 403) {
+                    return errJson;
+                }
                 var msg = errJson.message || '';
                 if (!msg && errJson.errors) {
                     msg = Object.values(errJson.errors).flat().join(' ');
@@ -828,6 +832,15 @@
             throw new Error(text2.substring(0, 200) || ('Respuesta inesperada: HTTP ' + response.status));
         }
         return response.json();
+    }
+
+    /** Evita enviar "" en microrregion_id (Laravel falla regla integer). */
+    function tmParseMicrorregionId(mrId) {
+        if (mrId === '' || mrId === undefined || mrId === null) {
+            return null;
+        }
+        var n = parseInt(String(mrId).trim(), 10);
+        return Number.isNaN(n) ? null : n;
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -2125,6 +2138,9 @@
                     panel.querySelectorAll('.tm-record-bulk-check, .tm-bulk-col').forEach(el => el.classList.remove('tm-hidden'));
                 }
                 if (typeof updateBulkUI === 'function') updateBulkUI(panel);
+                Array.from(host.querySelectorAll(imageInputSelector)).forEach(function (inp) {
+                    initializeImagePreview(inp);
+                });
             }).catch(function (err) {
                 console.error('Fragment load error:', err);
                 host.innerHTML = '<p class="inline-alert inline-alert-error">No se pudo cargar el listado. <a href="' + (recordsUrl ? recordsUrl + '?module=' + moduleId : '#') + '">Recargar página</a></p>';
@@ -2253,6 +2269,19 @@
                 }
                 const panel = event.target.closest('.tm-module-records-panel');
                 reloadRecordsPanelFromFilters(panel, { requireActive: true });
+            });
+
+            /* Modal “Editar registro”: al cambiar microrregión, actualizar lista de municipios (fragmento AJAX). */
+            recordsViewPanel.addEventListener('change', function (event) {
+                const mrSel = event.target.closest('.tm-mr-selector');
+                if (!mrSel || !recordsViewPanel.contains(mrSel)) {
+                    return;
+                }
+                const form = mrSel.closest('form.tm-entry-form');
+                if (!form) {
+                    return;
+                }
+                setMunicipiosForForm(form, mrSel.value);
             });
 
             recordsViewPanel.addEventListener('click', function (event) {
@@ -2593,15 +2622,22 @@
             });
         });
 
-        Array.from(document.querySelectorAll('.tm-modal')).forEach(function (modal) {
-            Array.from(modal.querySelectorAll('[data-close-module-preview], [data-close-image-preview]')).forEach(function (button) {
-                button.addEventListener('click', function () {
-                    closeModal(modal);
-                    if (modal.id === 'tmImagePreviewModal' && imageModalImg) {
-                        imageModalImg.removeAttribute('src');
-                    }
-                });
-            });
+        /* Cerrar modales por backdrop/botón X: delegación global (los modales de “Editar” se inyectan por AJAX
+           y no existían en el DOM en el forEach inicial). */
+        document.addEventListener('click', function (event) {
+            const closeEl = event.target.closest('[data-close-module-preview], [data-close-image-preview]');
+            if (!closeEl) {
+                return;
+            }
+            const modal = closeEl.closest('.tm-modal');
+            if (!modal) {
+                return;
+            }
+            event.preventDefault();
+            closeModal(modal);
+            if (modal.id === 'tmImagePreviewModal' && imageModalImg) {
+                imageModalImg.removeAttribute('src');
+            }
         });
 
         document.addEventListener('keydown', function (event) {
@@ -3661,7 +3697,7 @@
             },
             body: JSON.stringify({
                 data: rowData,
-                microrregion_id: microrregionId
+                microrregion_id: tmParseMicrorregionId(microrregionId),
             })
         })
         .then(r => safeJsonParse(r))
@@ -4000,7 +4036,7 @@
                 var r = await csrfFetch(singleUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-                    body: JSON.stringify({ data: data, microrregion_id: mrId })
+                    body: JSON.stringify({ data: data, microrregion_id: tmParseMicrorregionId(mrId) })
                 });
                 var j = await safeJsonParse(r);
                 if (j.success) {
@@ -4027,7 +4063,12 @@
                     }, 400);
                 } else if (j.error) {
                     // Si el backend devuelve un nuevo objeto de error (por ejemplo, aún falta el municipio)
-                    Swal.fire({ title: 'Atención', text: 'El registro aún tiene errores: ' + j.message, icon: 'warning', toast: true, position: 'top-end', timer: 4000 });
+                    var errDetail = j.message || '';
+                    if (j.error.failed_fields && j.error.failed_fields[0]) {
+                        var ff = j.error.failed_fields[0];
+                        errDetail = [ff.label, ff.reason, ff.received ? '(valor: ' + ff.received + ')' : ''].filter(Boolean).join(' ');
+                    }
+                    Swal.fire({ title: 'Atención', text: 'Revisa el registro: ' + errDetail, icon: 'warning', toast: true, position: 'top-end', timer: 5000 });
 
                     // Actualizar dataset con los nuevos datos (incluyendo data_urls para imágenes)
                     card.dataset.rowData = JSON.stringify(j.error.data || data);
@@ -4041,6 +4082,11 @@
                     setTimeout(() => {
                         window.openErrorModifyModal(cardId);
                     }, 500);
+                } else if (j.errors && typeof j.errors === 'object') {
+                    var flatErr = Object.values(j.errors).flat();
+                    Swal.fire({ title: 'Error de validación', text: (flatErr[0] || j.message || 'Revisa los datos.'), icon: 'error' });
+                } else if (j.success === false && j.message) {
+                    Swal.fire({ title: 'No se pudo guardar', text: j.message, icon: 'warning' });
                 } else {
                     throw new Error(j.message || 'Error al guardar');
                 }
