@@ -9,11 +9,11 @@
     <script src="{{ asset('assets/js/theme-init.js') }}"></script>
     <link rel="stylesheet" href="{{ asset('assets/css/fonts-gilroy.css') }}?v={{ @filemtime(public_path('assets/css/fonts-gilroy.css')) ?: time() }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
-    <link rel="stylesheet" href="{{ asset('assets/css/app-shell.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/css/theme-dark.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/css/app-shell.css') }}?v={{ @filemtime(public_path('assets/css/app-shell.css')) ?: time() }}">
+    <link rel="stylesheet" href="{{ asset('assets/css/theme-dark.css') }}?v={{ @filemtime(public_path('assets/css/theme-dark.css')) ?: time() }}">
     @stack('css')
-    <link rel="stylesheet" href="{{ asset('assets/css/theme-dark-modules.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/css/theme-dark-agenda.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/css/theme-dark-modules.css') }}?v={{ @filemtime(public_path('assets/css/theme-dark-modules.css')) ?: time() }}">
+    <link rel="stylesheet" href="{{ asset('assets/css/theme-dark-agenda.css') }}?v={{ @filemtime(public_path('assets/css/theme-dark-agenda.css')) ?: time() }}">
     {{-- jQuery vía cdnjs (CSP solo permite cdnjs/jsdelivr/unpkg, no code.jquery.com) --}}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
