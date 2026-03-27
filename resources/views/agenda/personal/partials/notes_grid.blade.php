@@ -56,8 +56,11 @@
     }
 @endphp
 
-    @php $isHomeReminder = ($filter ?? '') === 'home'; @endphp
-    <div class="pa-card pa-card--note {{ $contrastClass }}{{ $isHomeReminder ? ' pa-card--note-home' : '' }}"
+    @php
+        $isHomeReminder = ($filter ?? '') === 'home';
+        $hasReminder = (bool) $note->scheduled_date;
+    @endphp
+    <div class="pa-card pa-card--note {{ $contrastClass }}{{ $isHomeReminder ? ' pa-card--note-home' : '' }}{{ $hasReminder ? ' pa-card--has-reminder' : '' }}"
          style="background-color: {{ $bgColor }}; --note-color: {{ $bgColor }}; position: relative;"
          draggable="{{ $isHomeReminder ? 'false' : 'true' }}"
          data-id="{{ $note->id }}"
@@ -89,23 +92,44 @@
             <i class="fa-solid fa-thumbtack pa-note-priority-pin pa-cal-priority-pin--{{ $note->priority }}" title="Prioridad: {{ ucfirst($note->priority) }}"></i>
         @endif
 
-        @unless($isHomeReminder)
-        <div class="pa-card-header" style="display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 6px;">
-            <div class="pa-card-actions" style="display: flex; gap: 8px; opacity: 0; transition: opacity 0.2s; margin-right: 18px;">
-                @if($isTrashed)
-                    <i class="fa-solid fa-rotate-left" title="Restaurar" onclick="event.stopPropagation(); restoreNote({{ $note->id }})"></i>
-                @else
-                    <i class="fa-regular fa-pen-to-square" title="Editar" onclick="event.stopPropagation(); editNote({{ $note->id }})"></i>
-                    @if($note->is_archived)
-                        <i class="fa-solid fa-box-open" title="Desarchivar" onclick="event.stopPropagation(); restoreNote({{ $note->id }})"></i>
+        @if($hasReminder || !$isHomeReminder)
+        <div class="pa-card-topbar">
+            @if($hasReminder)
+                <div class="pa-card-reminder pa-card-reminder--compact" aria-label="Fecha del recordatorio" title="Recordatorio: {{ $note->scheduled_date->translatedFormat('d M Y') }}{{ $note->scheduled_time ? ' · '.\Carbon\Carbon::parse($note->scheduled_time)->format('H:i') : ' · Todo el día' }}">
+                    <i class="fa-regular fa-bell pa-card-reminder-icon" aria-hidden="true"></i>
+                    <span class="pa-card-reminder-text">
+                        <span class="pa-card-reminder-date">{{ $note->scheduled_date->translatedFormat('j M') }}</span>
+                        @if($note->scheduled_time)
+                            <span class="pa-card-reminder-sep">·</span><span class="pa-card-reminder-time">{{ \Carbon\Carbon::parse($note->scheduled_time)->format('H:i') }}</span>
+                        @else
+                            <span class="pa-card-reminder-sep">·</span><span class="pa-card-reminder-allday">día</span>
+                        @endif
+                    </span>
+                </div>
+            @else
+                <span class="pa-card-topbar-spacer" aria-hidden="true"></span>
+            @endif
+            @unless($isHomeReminder)
+            <div class="pa-card-header pa-card-header--topbar">
+                <div class="pa-card-actions" style="display: flex; gap: 8px; opacity: 0; transition: opacity 0.2s; margin-right: 18px;">
+                    @if($isTrashed)
+                        <i class="fa-solid fa-rotate-left" title="Restaurar" onclick="event.stopPropagation(); restoreNote({{ $note->id }})"></i>
                     @else
-                        <i class="fa-solid fa-box-archive" title="Archivar" onclick="event.stopPropagation(); archiveNote({{ $note->id }})"></i>
+                        <i class="fa-regular fa-pen-to-square" title="Editar" onclick="event.stopPropagation(); editNote({{ $note->id }})"></i>
+                        @if($note->is_archived)
+                            <i class="fa-solid fa-box-open" title="Desarchivar" onclick="event.stopPropagation(); restoreNote({{ $note->id }})"></i>
+                        @else
+                            <i class="fa-solid fa-box-archive" title="Archivar" onclick="event.stopPropagation(); archiveNote({{ $note->id }})"></i>
+                        @endif
                     @endif
-                @endif
-                <i class="fa-solid fa-trash-can" title="Eliminar" onclick="event.stopPropagation(); deleteNote({{ $note->id }}, {{ $isTrashed ? 'true' : 'false' }})"></i>
+                    <i class="fa-solid fa-trash-can" title="Eliminar" onclick="event.stopPropagation(); deleteNote({{ $note->id }}, {{ $isTrashed ? 'true' : 'false' }})"></i>
+                </div>
             </div>
+            @else
+            <span class="pa-card-topbar-spacer" aria-hidden="true"></span>
+            @endunless
         </div>
-        @endunless
+        @endif
 
         <h4 class="pa-card-title" style="word-break: break-all;">{{ $note->title ?? ($note->is_encrypted ? 'Nota Cifrada' : 'Sin título') }}</h4>
 
@@ -141,21 +165,31 @@
             </div>
         @endif
 
-        <div class="pa-card-footer" style="padding-top: 12px; display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
-            @if($note->folder)
-                @php
-                    $fIcon = trim((string) ($note->folder->icon ?? ''));
-                    $fIcon = $fIcon === '' ? 'fa-folder' : preg_replace('/^fa-(solid|regular|brands)\s+/i', '', $fIcon);
-                    $folderTrashed = $note->folder->trashed();
-                @endphp
-                <span style="font-size: 0.65rem; background: rgba(0,0,0,0.05); padding: 1px 6px; border-radius: 6px;" title="{{ $folderTrashed ? 'Carpeta archivada' : '' }}">
-                    <i class="fa-solid {{ str_contains($fIcon, 'fa-') ? $fIcon : 'fa-folder' }}"></i> {{ $note->folder->name }}
-                    @if($folderTrashed)
-                        <span style="opacity: 0.75;">· archivada</span>
+        <div class="pa-card-footer">
+            <div class="pa-card-footer-row">
+                @if($note->folder)
+                    @php
+                        $fIcon = trim((string) ($note->folder->icon ?? ''));
+                        $fIcon = $fIcon === '' ? 'fa-folder' : preg_replace('/^fa-(solid|regular|brands)\s+/i', '', $fIcon);
+                        $folderTrashed = $note->folder->trashed();
+                    @endphp
+                    <span class="pa-card-folder-chip" title="{{ $folderTrashed ? 'Carpeta archivada' : '' }}">
+                        <i class="fa-solid {{ str_contains($fIcon, 'fa-') ? $fIcon : 'fa-folder' }}"></i> {{ $note->folder->name }}
+                        @if($folderTrashed)
+                            <span class="pa-card-folder-archived-hint">· archivada</span>
+                        @endif
+                    </span>
+                @else
+                    <span class="pa-card-footer-spacer" aria-hidden="true"></span>
+                @endif
+                <div class="pa-card-date{{ $hasReminder ? ' pa-card-date--secondary' : '' }}">
+                    @if($hasReminder)
+                        Creada {{ $note->created_at->translatedFormat('d M Y') }}
+                    @else
+                        {{ $note->created_at->format('d/m/Y') }}
                     @endif
-                </span>
-            @endif
-            <div class="pa-card-date" style="font-size: 0.7rem; opacity: 0.6; font-weight: 600;">{{ $note->created_at->format('d/m/Y') }}</div>
+                </div>
+            </div>
         </div>
     </div>
 @empty

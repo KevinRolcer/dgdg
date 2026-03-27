@@ -1666,7 +1666,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!noteData) return;
         if (noteData.is_encrypted) { decryptNote(id, 'preview', pill || sourceEl); return; }
 
-        const dateLine = card?.querySelector('.pa-card-date')?.textContent || noteData.displayDate || '';
+        const dateLine = paResolveCardDateLineFromEl(card) || noteData.displayDate || '';
 
         const calAnchor = paResolveCalendarAnchor(sourceEl);
         if (calAnchor) {
@@ -1798,11 +1798,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
+    function paResolveCardDateLineFromEl(el) {
+        if (!el || !el.querySelector) return '';
+        const rem = el.querySelector('.pa-card-reminder');
+        if (rem) return rem.textContent.replace(/\s+/g, ' ').trim();
+        const d = el.querySelector('.pa-card-date');
+        return d ? d.textContent.trim() : '';
+    }
+
     function showDecryptedPreview(noteData, cardOrPill, opts) {
         opts = opts || {};
-        const dateLine = (cardOrPill && cardOrPill.querySelector && cardOrPill.querySelector('.pa-card-date'))
-            ? cardOrPill.querySelector('.pa-card-date').textContent
-            : (noteData.displayDate || '');
+        const dateLine = paResolveCardDateLineFromEl(cardOrPill) || (noteData.displayDate || '');
 
         const usePop = opts.popover && opts.anchorEl;
         const html = paBuildNotePreviewCardHtml(noteData, dateLine, noteData.id, { showDecryptedBadge: true, popover: usePop });

@@ -303,6 +303,9 @@
     color: #ffffff !important;
 }
 .text-light .pa-card-date,
+.text-light .pa-card-reminder,
+.text-light .pa-card-reminder-text,
+.text-light .pa-card-reminder-icon,
 .text-light .pa-card-actions i,
 .text-light .pa-card-title,
 .text-light .pa-card-body {
@@ -830,6 +833,9 @@
 .pa-card.text-light .pa-card-title,
 .pa-card.text-light .pa-card-body,
 .pa-card.text-light .pa-card-date,
+.pa-card.text-light .pa-card-reminder,
+.pa-card.text-light .pa-card-reminder-text,
+.pa-card.text-light .pa-card-reminder-icon,
 .pa-card.text-light .pa-folder-name,
 .pa-card.text-light .pa-folder-count,
 .pa-card.text-light .pa-folder-count-num,
@@ -935,6 +941,143 @@
     min-width: 240px;
     max-width: 280px;
     padding: 12px;
+}
+
+/* Barra superior de nota: recordatorio compacto (izq.) + acciones (der.) */
+.pa-card-topbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 5px;
+    width: 100%;
+    min-width: 0;
+}
+
+.pa-card-topbar-spacer {
+    flex: 1;
+    min-width: 0;
+}
+
+.pa-card-header--topbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-start;
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+.pa-card-reminder.pa-card-reminder--compact {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex: 0 1 auto;
+    max-width: calc(100% - 84px);
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 0.58rem;
+    font-weight: 700;
+    line-height: 1.2;
+    box-sizing: border-box;
+}
+
+.pa-card-reminder.pa-card-reminder--compact .pa-card-reminder-icon {
+    margin-top: 0;
+    font-size: 0.6rem;
+    opacity: 0.92;
+    flex-shrink: 0;
+}
+
+.pa-card-reminder-text {
+    display: inline;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.pa-card-reminder.pa-card-reminder--compact .pa-card-reminder-sep {
+    opacity: 0.72;
+    font-weight: 600;
+}
+
+.pa-card.text-dark .pa-card-reminder.pa-card-reminder--compact {
+    background: rgba(0, 0, 0, 0.09);
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    color: rgba(18, 20, 28, 0.96);
+}
+
+.pa-card.text-light .pa-card-reminder.pa-card-reminder--compact {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    color: #fff;
+}
+
+/* Pie de nota: carpeta / creada */
+.pa-card-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding-top: 12px;
+    margin-top: auto;
+    width: 100%;
+    align-items: stretch;
+    box-sizing: border-box;
+}
+
+.pa-card-footer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+}
+
+.pa-card-footer-spacer {
+    flex: 1;
+    min-width: 0;
+}
+
+.pa-card-folder-chip {
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pa-card.text-dark .pa-card-folder-chip {
+    background: rgba(0, 0, 0, 0.06);
+    color: inherit;
+}
+
+.pa-card.text-light .pa-card-folder-chip {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.pa-card-folder-archived-hint {
+    opacity: 0.75;
+}
+
+.pa-card-footer .pa-card-date {
+    margin-bottom: 0;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.pa-card-date--secondary {
+    font-size: 0.62rem !important;
+    opacity: 0.55 !important;
+    font-weight: 600 !important;
+}
+
+.pa-card.text-light .pa-card-date--secondary {
+    color: rgba(255, 255, 255, 0.78) !important;
+    opacity: 0.9 !important;
 }
 
 /* Slider Navigation Buttons */
@@ -1410,10 +1553,22 @@
     background-color: #f8fafc !important; /* Very subtle light blue-grey hover */
 }
 
-.pa-main.is-explorer-mode .pa-notes-grid.is-list-view .pa-card--note .pa-card-header {
+.pa-main.is-explorer-mode .pa-notes-grid.is-list-view .pa-card--note .pa-card-topbar {
     margin-bottom: 0 !important;
-    order: 3;
     flex-shrink: 0;
+    max-width: 46%;
+    min-width: 0;
+    align-items: center;
+}
+
+.pa-main.is-explorer-mode .pa-notes-grid.is-list-view .pa-card--note .pa-card-header--topbar {
+    margin-bottom: 0 !important;
+}
+
+.pa-main.is-explorer-mode .pa-notes-grid.is-list-view .pa-card--note .pa-card-reminder.pa-card-reminder--compact {
+    max-width: min(100%, 11rem);
+    font-size: 0.54rem;
+    padding: 2px 5px;
 }
 
 .pa-main.is-explorer-mode .pa-notes-grid.is-list-view .pa-card--note .pa-card-title {
