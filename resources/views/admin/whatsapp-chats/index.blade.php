@@ -34,7 +34,56 @@
                 </div>
             @endif
 
+            <div
+                class="wa-folder-upload-box"
+                id="waFolderUploadRoot"
+                data-upload-url="{{ route('whatsapp-chats.admin.folder-upload') }}"
+                data-finalize-url="{{ route('whatsapp-chats.admin.folder-finalize') }}"
+                data-csrf="{{ csrf_token() }}"
+            >
+                <h2 class="wa-upload-section-title">Importar carpeta (export descomprimido)</h2>
+                <p class="wa-upload-section-desc">
+                    Descomprime el ZIP de WhatsApp en tu equipo. Luego elige la carpeta del chat (o la que contiene la carpeta del chat): los archivos se suben <strong>uno por uno</strong> para evitar timeouts.
+                </p>
+                <div class="wa-folder-tab-warn" id="waFolderTabWarn" role="alert" hidden>
+                    <strong>No cierres ni cambies de pestaña</strong> mientras suben los archivos; si interrumpes, vuelve a elegir la carpeta.
+                </div>
+                <div class="wa-form-row wa-folder-actions">
+                    <input
+                        type="file"
+                        id="waFolderInput"
+                        class="wa-folder-input-hidden"
+                        multiple
+                        webkitdirectory
+                        directory
+                    >
+                    <button type="button" class="tm-btn tm-btn-primary" id="waFolderPickBtn">
+                        <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                        Elegir carpeta…
+                    </button>
+                    <label class="wa-folder-label-field">
+                        <span class="wa-folder-label-text">Nombre (opcional)</span>
+                        <input type="text" id="waFolderLabel" class="wa-input wa-folder-label-input" maxlength="255" placeholder="Ej. Chat trabajo" autocomplete="off">
+                    </label>
+                </div>
+                <div class="wa-folder-progress-wrap" id="waFolderProgressWrap" hidden>
+                    <div class="wa-folder-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                        <div class="wa-folder-progress-bar"></div>
+                    </div>
+                    <p class="wa-folder-progress-meta" id="waFolderProgressMeta"></p>
+                </div>
+                <p class="wa-folder-status" id="waFolderStatus" aria-live="polite"></p>
+                <p class="wa-upload-hint">
+                    Cada archivo admite hasta ~{{ (int) ($maxUploadMb ?? 768) }} MB (mismo tope que el ZIP). Máx. {{ number_format((int) config('whatsapp_chats.folder_import_max_files', 25000)) }} archivos por lote.
+                </p>
+            </div>
+
+            <div class="wa-upload-divider">
+                <span>O</span>
+            </div>
+
             <div class="wa-upload-box">
+                <h2 class="wa-upload-section-title">Subir un solo ZIP</h2>
                 <form method="POST" action="{{ route('whatsapp-chats.admin.store') }}" enctype="multipart/form-data">
                     @csrf
                     <div class="wa-form-row">
@@ -44,7 +93,7 @@
                             Subir ZIP
                         </button>
                     </div>
-                    <p style="margin:10px 0 0;color:var(--clr-text-muted);font-size:0.82rem;">
+                    <p class="wa-upload-hint">
                         Compatible con export clásico (_chat.txt + media) y export en HTML por partes.
                         <br>
                         <strong>Tamaño máximo (app):</strong> hasta ~{{ (int) ($maxUploadMb ?? 768) }} MB (3&nbsp;GB como tope).
@@ -121,3 +170,6 @@
 </section>
 @endsection
 
+@push('scripts')
+<script src="{{ asset('assets/js/modules/whatsapp-chats-folder-upload.js') }}?v={{ @filemtime(public_path('assets/js/modules/whatsapp-chats-folder-upload.js')) ?: time() }}"></script>
+@endpush

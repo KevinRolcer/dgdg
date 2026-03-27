@@ -23,7 +23,8 @@ class WhatsAppChatArchiveImportJob implements ShouldQueue
 
     public function __construct(
         public readonly int $archiveId,
-        public readonly int $userId
+        public readonly int $userId,
+        public readonly bool $fromExtractedFolder = false
     ) {}
 
     public function handle(WhatsAppChatArchiveImportService $importService): void
@@ -48,7 +49,11 @@ class WhatsAppChatArchiveImportJob implements ShouldQueue
         $reporter->report(6, 'Iniciando importación…', true);
 
         try {
-            $importService->processFromPendingZip($archive, $reporter->asCallable());
+            if ($this->fromExtractedFolder) {
+                $importService->processFromExtractedDirectory($archive, $reporter->asCallable());
+            } else {
+                $importService->processFromPendingZip($archive, $reporter->asCallable());
+            }
             $archive->refresh();
 
             try {
@@ -74,7 +79,7 @@ class WhatsAppChatArchiveImportJob implements ShouldQueue
                 'archive_id' => $this->archiveId,
                 'user_id' => $this->userId,
             ]);
-            $this->markFailedAndNotify($archive, $user, 'Error inesperado al procesar el ZIP.');
+            $this->markFailedAndNotify($archive, $user, 'Error inesperado al procesar la importación.');
         }
     }
 

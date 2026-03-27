@@ -11,8 +11,10 @@ use App\Services\WhatsApp\WhatsAppChatEncryptionService;
 use App\Services\WhatsApp\WhatsAppChatPathNormalizer;
 use App\Services\WhatsApp\WhatsAppTotpService;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -162,7 +164,7 @@ class WhatsAppChatArchiveController extends Controller
 
         $uploadedFile = $validated['archivo_zip'];
         $originalZipName = $uploadedFile->getClientOriginalName();
-        $zipUuid = (string) \Illuminate\Support\Str::uuid();
+        $zipUuid = (string) Str::uuid();
 
         $extractDirRelative = 'whatsapp-chats/'.$zipUuid;
         $extractDirAbsolute = $disk->path($extractDirRelative);
@@ -196,6 +198,189 @@ class WhatsAppChatArchiveController extends Controller
         return redirect()
             ->route('whatsapp-chats.admin.index')
             ->with('status', 'El ZIP se está procesando en segundo plano. Sigue el avance en notificaciones (campana).');
+    }
+
+    public function storeFolderFile(Request $request): JsonResponse
+    {
+        $maxKb = (int) config('whatsapp_chats.max_upload_kb', 786432);
+        $maxMb = (int) config('whatsapp_chats.max_upload_mb', 768);
+        $maxFiles = (int) config('whatsapp_chats.folder_import_max_files', 25000);
+
+        $validated = $request->validate([
+            'batch_token' => ['required', 'uuid'],
+            'relative_path' => ['required', 'string', 'max:4096'],
+            'file' => ['required', 'file', 'max:'.$maxKb],
+        ], [
+            'file.max' => 'Cada archivo supera el límite permitido (~'.$maxMb.' MB).',
+        ]);
+
+        try {
+            $relativeSafe = $this->sanitizeFolderRelativePath((string) $validated['relative_path']);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Ruta inválida.',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        $lower = mb_strtolower($relativeSafe);
+        if (str_contains($lower, '__macosx/') || $lower === '.ds_store' || str_ends_with($lower, '/.ds_store')) {
+            return response()->json(['ok' => true, 'skipped' => true]);
+        }
+
+        $diskName = (string) config('whatsapp_chats.storage_disk', 'whatsapp_chats');
+        $disk = Storage::disk($diskName);
+        $token = (string) $validated['batch_token'];
+        $stagingPrefix = 'folder-staging/'.$token;
+
+        $sessionKey = 'wa_folder_upload_count.'.$token;
+        $currentCount = (int) $request->session()->get($sessionKey, 0);
+        if ($currentCount >= $maxFiles) {
+            return response()->json([
+                'message' => 'Se alcanzó el máximo de archivos por lote ('.$maxFiles.').',
+                'errors' => ['file' => ['Límite de archivos']],
+            ], 422);
+        }
+
+        $targetRel = $stagingPrefix.'/'.$relativeSafe;
+        $absoluteTarget = $disk->path($targetRel);
+        File::ensureDirectoryExists(dirname($absoluteTarget));
+
+        $uploaded = $request->file('file');
+        $uploaded->move(dirname($absoluteTarget), basename($absoluteTarget));
+
+        $request->session()->put($sessionKey, $currentCount + 1);
+
+        return response()->json([
+            'ok' => true,
+            'path' => $relativeSafe,
+            'files_in_batch' => $currentCount + 1,
+        ]);
+    }
+
+    public function finalizeFolderUpload(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'batch_token' => ['required', 'uuid'],
+            'label' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $token = (string) $validated['batch_token'];
+        $diskName = (string) config('whatsapp_chats.storage_disk', 'whatsapp_chats');
+        $disk = Storage::disk($diskName);
+        $stagingPrefix = 'folder-staging/'.$token;
+        $stagingAbs = $disk->path($stagingPrefix);
+
+        if (! is_dir($stagingAbs)) {
+            return response()->json([
+                'message' => 'No hay archivos subidos para este lote o la sesión expiró. Vuelve a elegir la carpeta.',
+            ], 422);
+        }
+
+        $files = $disk->allFiles($stagingPrefix);
+        $n = count($files);
+        if ($n < 1) {
+            return response()->json([
+                'message' => 'La carpeta temporal está vacía.',
+            ], 422);
+        }
+
+        $maxFiles = (int) config('whatsapp_chats.folder_import_max_files', 25000);
+        if ($n > $maxFiles) {
+            $disk->deleteDirectory($stagingPrefix);
+            $request->session()->forget('wa_folder_upload_count.'.$token);
+
+            return response()->json([
+                'message' => 'Demasiados archivos en el lote (máx. '.$maxFiles.').',
+            ], 422);
+        }
+
+        $importUuid = (string) Str::uuid();
+        $destRel = 'whatsapp-chats/'.$importUuid;
+        $destAbs = $disk->path($destRel);
+
+        $user = $request->user();
+        $folderLabel = trim((string) ($validated['label'] ?? ''));
+        if ($folderLabel === '') {
+            $folderLabel = 'Carpeta ('.$n.' archivos)';
+        }
+
+        $chat = WhatsAppChatArchive::create([
+            'title' => 'Importando…',
+            'original_zip_name' => $folderLabel,
+            'storage_root_path' => $destRel,
+            'message_parts' => [],
+            'message_parts_count' => 0,
+            'created_by' => $user->id,
+            'is_encrypted' => false,
+            'wrapped_dek' => null,
+            'encrypted_key_version' => 1,
+            'storage_disk' => $diskName,
+            'import_status' => WhatsAppChatArchive::IMPORT_STATUS_PROCESSING,
+            'import_error' => null,
+            'import_progress' => 0,
+            'import_phase' => 'En cola…',
+        ]);
+
+        try {
+            File::moveDirectory($stagingAbs, $destAbs);
+        } catch (\Throwable) {
+            $chat->delete();
+            if (is_dir($destAbs)) {
+                File::deleteDirectory($destAbs);
+            }
+
+            return response()->json([
+                'message' => 'No se pudo mover los archivos al almacenamiento final. Reintenta o comprueba permisos en disco.',
+            ], 500);
+        }
+
+        $request->session()->forget('wa_folder_upload_count.'.$token);
+
+        $user->notify(new WhatsAppChatImportProgressNotification($chat->id, $folderLabel));
+
+        WhatsAppChatArchiveImportJob::dispatch($chat->id, (int) $user->id, true)->afterResponse();
+
+        $this->audit($request, $chat->id, 'import_queued_folder', $destRel);
+
+        return response()->json([
+            'ok' => true,
+            'redirect' => route('whatsapp-chats.admin.index'),
+            'message' => 'Carpeta recibida. La importación continúa en segundo plano; revisa la campana de notificaciones.',
+        ]);
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function sanitizeFolderRelativePath(string $raw): string
+    {
+        $raw = str_replace('\\', '/', trim($raw));
+        $raw = ltrim($raw, '/');
+        $segments = [];
+        foreach (explode('/', $raw) as $seg) {
+            if ($seg === '' || $seg === '.') {
+                continue;
+            }
+            if ($seg === '..') {
+                throw ValidationException::withMessages([
+                    'relative_path' => ['La ruta del archivo no es válida.'],
+                ]);
+            }
+            if (str_contains($seg, "\0")) {
+                throw ValidationException::withMessages([
+                    'relative_path' => ['La ruta del archivo no es válida.'],
+                ]);
+            }
+            $segments[] = $seg;
+        }
+        if ($segments === []) {
+            throw ValidationException::withMessages([
+                'relative_path' => ['Ruta vacía.'],
+            ]);
+        }
+
+        return implode('/', $segments);
     }
 
     public function importStatus(Request $request, WhatsAppChatArchive $chat): JsonResponse

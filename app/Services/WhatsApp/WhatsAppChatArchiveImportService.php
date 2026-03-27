@@ -58,6 +58,52 @@ final class WhatsAppChatArchiveImportService
             $onProgress(36, 'Analizando estructura del chat…');
         }
 
+        $this->runDetectEncryptAndSave($archive, $extractDirRelative, $extractDirAbsolute, $diskRootAbs, $onProgress, true);
+    }
+
+    /**
+     * Misma canalización que tras descomprimir ZIP: archivos ya están bajo storage_root_path.
+     *
+     * @param  (callable(int $percent, string $phase): void)|null  $onProgress
+     * @throws ValidationException
+     */
+    public function processFromExtractedDirectory(WhatsAppChatArchive $archive, ?callable $onProgress = null): void
+    {
+        $disk = $archive->disk();
+        $diskName = $archive->storageDiskName();
+        $diskRootAbs = $this->diskAbsoluteRoot($diskName);
+
+        $extractDirRelative = trim(str_replace('\\', '/', (string) $archive->storage_root_path), '/');
+        $extractDirAbsolute = $disk->path($extractDirRelative);
+
+        if ($extractDirRelative === '' || ! is_dir($extractDirAbsolute)) {
+            throw ValidationException::withMessages([
+                'import' => 'No se encontró la carpeta de importación en el servidor.',
+            ]);
+        }
+
+        if ($onProgress !== null) {
+            $onProgress(18, 'Analizando archivos recibidos…');
+        }
+
+        if ($onProgress !== null) {
+            $onProgress(36, 'Analizando estructura del chat…');
+        }
+
+        $this->runDetectEncryptAndSave($archive, $extractDirRelative, $extractDirAbsolute, $diskRootAbs, $onProgress, false);
+    }
+
+    /**
+     * @param  (callable(int $percent, string $phase): void)|null  $onProgress
+     */
+    private function runDetectEncryptAndSave(
+        WhatsAppChatArchive $archive,
+        string $extractDirRelative,
+        string $extractDirAbsolute,
+        string $diskRootAbs,
+        ?callable $onProgress,
+        bool $removeUploadZipIfPresent
+    ): void {
         [$chatTitle, $chatRootDirRelative, $messageParts] = $this->detectChatAndMessageParts(
             $extractDirRelative,
             $extractDirAbsolute,
@@ -76,7 +122,7 @@ final class WhatsAppChatArchiveImportService
         }
 
         $encryptProgress = $onProgress;
-        $this->encryption->encryptTree($disk, $chatRootDirRelative, $dek, function (int $done, int $total) use ($encryptProgress): void {
+        $this->encryption->encryptTree($archive->disk(), $chatRootDirRelative, $dek, function (int $done, int $total) use ($encryptProgress): void {
             if ($encryptProgress === null) {
                 return;
             }
@@ -94,7 +140,8 @@ final class WhatsAppChatArchiveImportService
             $encryptProgress($pct, 'Cifrando archivos ('.$done.'/'.$total.')…');
         });
 
-        if ($disk->exists($extractDirRelative.'/upload.zip')) {
+        $disk = $archive->disk();
+        if ($removeUploadZipIfPresent && $disk->exists($extractDirRelative.'/upload.zip')) {
             $disk->delete($extractDirRelative.'/upload.zip');
         }
 
@@ -201,7 +248,7 @@ final class WhatsAppChatArchiveImportService
 
         if (count($chatTxt) === 0) {
             throw ValidationException::withMessages([
-                'import' => 'No se detectó ningún chat válido. Se esperaba message_*.html o _chat.txt dentro del ZIP.',
+                'import' => 'No se detectó ningún chat válido. Se esperaba message_*.html o _chat.txt dentro de la carpeta.',
             ]);
         }
 

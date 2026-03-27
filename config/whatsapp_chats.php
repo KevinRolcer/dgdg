@@ -58,6 +58,13 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Importación por carpeta (export descomprimido, archivo por archivo)
+    |--------------------------------------------------------------------------
+    */
+    'folder_import_max_files' => max(50, min(100000, (int) env('WHATSAPP_FOLDER_IMPORT_MAX_FILES', 25000))),
+
+    /*
+    |--------------------------------------------------------------------------
     | KEK (clave maestra) — preferir variable de entorno en producción
     |--------------------------------------------------------------------------
     |
