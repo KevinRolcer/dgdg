@@ -455,6 +455,35 @@ html.theme-dark .pa-card.pa-card--folder.text-dark .pa-folder-icon i {
     color: inherit !important;
 }
 
+/* Botones de acción (fondo claro): iconos negros para contraste en tema oscuro */
+html.theme-dark .pa-folder-action-btn {
+    color: #14151a !important;
+}
+
+html.theme-dark .pa-folder-action-btn i {
+    color: inherit !important;
+}
+
+html.theme-dark .pa-folder-action-btn:hover,
+html.theme-dark .pa-folder-action-btn:hover i {
+    color: #fff !important;
+}
+
+html.theme-dark .pa-folder-action-btn--danger:hover,
+html.theme-dark .pa-folder-action-btn--danger:hover i {
+    color: #fff !important;
+}
+
+html.theme-dark .pa-folder-pin-btn.is-pinned,
+html.theme-dark .pa-folder-pin-btn.is-pinned i {
+    color: #fff !important;
+}
+
+html.theme-dark .pa-folder-pin-btn.is-pinned:hover,
+html.theme-dark .pa-folder-pin-btn.is-pinned:hover i {
+    color: #fff !important;
+}
+
 html.theme-dark .pa-card-body {
     color: inherit !important;
     opacity: 0.85;
