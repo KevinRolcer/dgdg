@@ -3061,6 +3061,38 @@ a.tm-paginator-btn:hover {
     color: #fff;
 }
 
+/* SweetAlert: exportación (Excel / Word / PDF) vs informe de análisis */
+.tm-swal-export-section-title {
+    margin: 0 0 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--clr-text-light);
+}
+
+.tm-export-personalize-export-block {
+    margin-top: 25px;
+    padding-top: 18px;
+    border-top: 1px solid var(--clr-border);
+}
+
+.tm-export-personalize-export-block .tm-export-format-section__title {
+    margin: 0 0 4px;
+}
+
+.tm-export-personalize-export-block .tm-export-format-section__hint {
+    margin: 0 0 12px;
+}
+
+.tm-export-personalize-export-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    align-items: center;
+}
+
 .tm-export-personalize-form {
     flex: 0 0 40%;
     max-width: 44%;

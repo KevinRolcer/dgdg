@@ -432,12 +432,16 @@
                             <button type="button" class="tm-export-restore-btn" id="tmExportRestoreBtn">Restaurar todas las columnas</button>
                         </p>
 
-                        <div class="tm-export-actions-footer" style="margin-top: 25px; display: flex; gap: 12px; justify-content: flex-end; border-top: 1px solid #eee; padding-top: 20px;">
-                            <button type="button" class="tm-btn tm-btn-success" id="tmExportApplyExcelSingle">Expo</button>
-                            <button type="button" class="tm-btn tm-btn-primary" id="tmExportApplyWordTable">Word</button>
-                            <button type="button" class="tm-btn tm-btn-danger" id="tmExportApplyPdfTable">PDF</button>
+                        <div class="tm-export-personalize-export-block">
+                            <h4 class="tm-export-format-section__title">Exportación</h4>
+                            <p class="tm-export-format-section__hint">Excel (1 hoja o por microregión), Word y PDF</p>
+                            <div class="tm-export-personalize-export-buttons">
+                                <button type="button" class="tm-btn tm-btn-success" id="tmExportApplyExcelSingle" title="Todos los registros en una sola hoja">Excel — 1 hoja</button>
+                                <button type="button" class="tm-btn tm-btn-success tm-export-btn-excel-mr" id="tmExportApplyExcelMr" title="Una hoja por microregión">Excel — por MR</button>
+                                <button type="button" class="tm-btn tm-btn-primary tm-btn-word" id="tmExportApplyWordTable" title="Exportar a Word (.docx)">Word</button>
+                                <button type="button" class="tm-btn tm-btn-danger" id="tmExportApplyPdfTable" title="Exportar a PDF">PDF</button>
+                            </div>
                         </div>
-                    </div>
                     </div>
                     <div class="tm-export-personalize-preview-wrap">
                         <div class="tm-export-preview-toolbar">
@@ -2523,6 +2527,9 @@
                     if (applyExcelSingleBtn && exportUrl) {
                         applyExcelSingleBtn.onclick = function () { applyExport('excel', 'single'); };
                     }
+                    if (applyExcelMrBtn && exportUrl) {
+                        applyExcelMrBtn.onclick = function () { applyExport('excel', 'mr'); };
+                    }
                     if (applyWordTableBtn && exportUrl) {
                         applyWordTableBtn.onclick = function () { applyExport('word', 'single'); };
                     }
@@ -2599,7 +2606,7 @@
             const exportUrl = exportBtnRef.getAttribute('data-export-url');
             if (!exportUrl || !templateSwal) { return; }
             var savedChoice = null;
-            var choiceAllow = { single: 1, mr: 1, word_table: 1, pdf_table: 1, analysis_word: 1 };
+            var choiceAllow = { single: 1, word_table: 1, pdf_table: 1, analysis_word: 1 };
             try {
                 var dr = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
                 if (dr) {
@@ -2607,16 +2614,28 @@
                     if (po && po.swal_choice && choiceAllow[po.swal_choice]) { savedChoice = po.swal_choice; }
                 }
             } catch (e) {}
+            if (savedChoice === 'mr') {
+                savedChoice = 'single';
+            }
             templateSwal.fire({
-                title: 'Tipo de exportación',
-                html: '<div class="tm-swal-export-options" style="text-align:left">'
-                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.55rem;cursor:pointer;">'
+                title: 'Exportación',
+                html: '<div class="tm-swal-export-options tm-swal-export-options--stacked" style="text-align:left">'
+                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.5rem;cursor:pointer;">'
                     + '<input type="radio" name="tm-export-choice" value="single" checked style="margin-top:.2rem;"> '
-                    + '<span><strong>Expo</strong><br><small style="color:#64748b">Excel con todos los registros en una hoja.</small></span>'
+                    + '<span><strong>Excel</strong><br><small style="color:#64748b">Todos los registros en una hoja.</small></span>'
                     + '</label>'
-                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.65rem;cursor:pointer;">'
+                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.5rem;cursor:pointer;">'
+                    + '<input type="radio" name="tm-export-choice" value="word_table" style="margin-top:.2rem;"> '
+                    + '<span><strong>Word</strong><br><small style="color:#64748b">Tabla de registros (.docx).</small></span>'
+                    + '</label>'
+                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.75rem;cursor:pointer;">'
+                    + '<input type="radio" name="tm-export-choice" value="pdf_table" style="margin-top:.2rem;"> '
+                    + '<span><strong>PDF</strong><br><small style="color:#64748b">Tabla de registros (.pdf).</small></span>'
+                    + '</label>'
+                    + '<p class="tm-swal-export-section-title" style="margin-top:4px;">Informe</p>'
+                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.75rem;cursor:pointer;">'
                     + '<input type="radio" name="tm-export-choice" value="analysis_word" style="margin-top:.2rem;"> '
-                    + '<span><strong>Informe de análisis (Word)</strong><br><small style="color:#64748b">Documento .docx con resumen y tablas de análisis.</small></span>'
+                    + '<span><strong>Informe de análisis (Word)</strong><br><small style="color:#64748b">Resumen y tablas de análisis (.docx).</small></span>'
                     + '</label>'
                     + '<hr style="margin:.65rem 0;border:none;border-top:1px solid #e2e8f0;">'
                     + '<p style="margin:0;"><button type="button" class="tm-btn tm-btn-outline tm-swal-personalize-btn">Personalizar columnas y diseño</button></p>'
@@ -2686,9 +2705,8 @@
                     }
                     return;
                 }
-                const mode = choice === 'mr' ? 'mr' : 'single';
                 const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
-                window.location.href = exportUrl + separator + 'mode=' + mode + '&analysis=0';
+                window.location.href = exportUrl + separator + 'mode=single&analysis=0';
             });
         }
 
