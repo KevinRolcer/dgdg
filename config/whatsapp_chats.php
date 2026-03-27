@@ -8,6 +8,9 @@ if ($waMaxUploadMb > 3072) {
     $waMaxUploadMb = 3072;
 }
 
+$waTxtPreviewMaxFileMb = max(1, (int) env('WHATSAPP_CHATS_TXT_PREVIEW_MAX_FILE_MB', 15));
+$waTxtPreviewMaxMessages = max(100, min(50000, (int) env('WHATSAPP_CHATS_TXT_PREVIEW_MAX_MESSAGES', 5000)));
+
 return [
 
     /*
@@ -36,6 +39,22 @@ return [
     'max_upload_mb' => $waMaxUploadMb,
 
     'max_upload_kb' => $waMaxUploadMb * 1024,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Vista previa web (_chat.txt) — evitar cuelgues del navegador (OOM)
+    |--------------------------------------------------------------------------
+    |
+    | Si el TXT supera el tamaño en bytes, se usa solo la vista por partes HTML.
+    | Si entra en tamaño pero hay muchos mensajes, solo se parsean los primeros N
+    | para el JSON embebido y el render progresivo.
+    |
+    */
+    'txt_preview_max_file_mb' => $waTxtPreviewMaxFileMb,
+
+    'txt_preview_max_file_bytes' => $waTxtPreviewMaxFileMb * 1024 * 1024,
+
+    'txt_preview_max_messages' => $waTxtPreviewMaxMessages,
 
     /*
     |--------------------------------------------------------------------------

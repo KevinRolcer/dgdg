@@ -33,6 +33,15 @@
         </header>
 
         <article class="content-card tm-card tm-card-in-shell wa-preview-card">
+            @if (!empty($txtPreviewSkippedLargeFile))
+                <div class="inline-alert inline-alert-warning" role="status" style="margin-bottom:14px;">
+                    El archivo de conversación TXT supera ~{{ (int) ($txtPreviewMaxFileMb ?? 15) }}&nbsp;MB. La vista previa por mensajes está desactivada para no saturar el navegador; usa las <strong>partes HTML</strong> del panel izquierdo. El respaldo completo sigue en el servidor.
+                </div>
+            @elseif (!empty($txtPreviewTruncated))
+                <div class="inline-alert inline-alert-warning" role="status" style="margin-bottom:14px;">
+                    Solo se muestran los primeros {{ (int) ($txtPreviewMaxMessages ?? 5000) }} mensajes en esta vista. El resto del chat sigue en los archivos importados.
+                </div>
+            @endif
             <div
                 class="wa-preview-layout"
                 id="waPreviewRoot"

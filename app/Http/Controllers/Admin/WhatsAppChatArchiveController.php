@@ -250,8 +250,25 @@ class WhatsAppChatArchiveController extends Controller
         });
 
         $txtMessages = collect();
+        $txtPreviewTruncated = false;
+        $txtPreviewSkippedLargeFile = false;
+
         if (is_string($txtPartPath) && $txtPartPath !== '') {
-            $txtMessages = $this->buildTxtMessagesCollection($chat, $disk, $txtPartPath, (string) $chat->storage_root_path, $dek);
+            $maxTxtBytes = (int) config('whatsapp_chats.txt_preview_max_file_bytes', 15728640);
+            try {
+                $txtSize = $disk->size($txtPartPath);
+            } catch (\Throwable) {
+                $txtSize = PHP_INT_MAX;
+            }
+
+            if ($txtSize > $maxTxtBytes) {
+                $txtPreviewSkippedLargeFile = true;
+            } else {
+                $maxMsgs = (int) config('whatsapp_chats.txt_preview_max_messages', 5000);
+                $parsed = $this->buildTxtMessagesCollection($chat, $disk, $txtPartPath, (string) $chat->storage_root_path, $dek, $maxMsgs);
+                $txtMessages = $parsed['collection'];
+                $txtPreviewTruncated = $parsed['truncated'];
+            }
         }
 
         $txtMessages = $txtMessages->map(function (array $msg) use ($chat) {
@@ -286,6 +303,10 @@ class WhatsAppChatArchiveController extends Controller
             'txtPartPath' => $txtPartPath,
             'txtMessages' => $txtMessages,
             'waPreviewMode' => $waPreviewMode,
+            'txtPreviewTruncated' => $txtPreviewTruncated,
+            'txtPreviewSkippedLargeFile' => $txtPreviewSkippedLargeFile,
+            'txtPreviewMaxMessages' => (int) config('whatsapp_chats.txt_preview_max_messages', 5000),
+            'txtPreviewMaxFileMb' => (int) config('whatsapp_chats.txt_preview_max_file_mb', 15),
         ]);
     }
 
@@ -379,13 +400,17 @@ class WhatsAppChatArchiveController extends Controller
         }
     }
 
+    /**
+     * @return array{collection: Collection<int, array<string, mixed>>, truncated: bool}
+     */
     private function buildTxtMessagesCollection(
         WhatsAppChatArchive $chat,
         \Illuminate\Contracts\Filesystem\Filesystem $disk,
         string $txtRelativePath,
         string $chatRootRelativePath,
-        ?string $dek
-    ): Collection {
+        ?string $dek,
+        ?int $maxMessages = null
+    ): array {
         $raw = '';
         if ($chat->is_encrypted && $dek) {
             $raw = $this->encryption->decryptDiskFileToString($disk, $txtRelativePath, $dek, false);
@@ -395,19 +420,20 @@ class WhatsAppChatArchiveController extends Controller
 
         $mediaIndex = $this->buildMediaIndex($disk, $chatRootRelativePath);
 
-        return $this->parseTxtRawToMessages($raw, $mediaIndex);
+        return $this->parseTxtRawToMessages($raw, $mediaIndex, $maxMessages);
     }
 
     /**
      * @param  array<string,string>  $mediaIndex
-     * @return Collection<int, array<string,mixed>>
+     * @return array{collection: Collection<int, array<string,mixed>>, truncated: bool}
      */
-    private function parseTxtRawToMessages(string $raw, array $mediaIndex): Collection
+    private function parseTxtRawToMessages(string $raw, array $mediaIndex, ?int $maxMessages = null): array
     {
         $lines = preg_split('/\\r\\n|\\r|\\n/u', $raw) ?: [];
 
         $messages = [];
         $current = null;
+        $truncated = false;
 
         foreach ($lines as $line) {
             $line = (string) $line;
@@ -415,6 +441,11 @@ class WhatsAppChatArchiveController extends Controller
             if (preg_match('/^\\[(.*?)\\]\\s([^:]+):\\s(.*)$/u', $line, $m)) {
                 if ($current !== null) {
                     $messages[] = $current;
+                    if ($maxMessages !== null && count($messages) >= $maxMessages) {
+                        $truncated = true;
+                        $current = null;
+                        break;
+                    }
                 }
 
                 $current = [
@@ -432,10 +463,14 @@ class WhatsAppChatArchiveController extends Controller
         }
 
         if ($current !== null) {
-            $messages[] = $current;
+            if ($maxMessages === null || count($messages) < $maxMessages) {
+                $messages[] = $current;
+            } else {
+                $truncated = true;
+            }
         }
 
-        return collect($messages)->values()->map(function (array $msg, int $idx) use ($mediaIndex) {
+        $collection = collect($messages)->values()->map(function (array $msg, int $idx) use ($mediaIndex) {
             $filename = $this->extractMediaFilenameFromText((string) ($msg['text'] ?? ''));
             $mediaRelPath = null;
             $mediaKind = null;
@@ -461,6 +496,11 @@ class WhatsAppChatArchiveController extends Controller
                 'media_is_sticker' => $mediaIsSticker,
             ];
         });
+
+        return [
+            'collection' => $collection,
+            'truncated' => $truncated,
+        ];
     }
 
     /**
