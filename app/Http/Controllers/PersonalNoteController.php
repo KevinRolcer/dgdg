@@ -25,6 +25,12 @@ class PersonalNoteController extends Controller
         $folderId = $request->get('folder_id');
         $priority = $request->get('priority');
         $creationDate = $request->get('creation_date');
+        $search = $request->get('search');
+        $search = is_string($search) ? trim($search) : '';
+        if (strlen($search) > 200) {
+            $search = substr($search, 0, 200);
+        }
+        $searchParam = $search !== '' ? $search : null;
 
         if ($filter === 'calendar' && ($month === null || $month === '' || $year === null || $year === '')) {
             $month = now()->month;
@@ -40,11 +46,19 @@ class PersonalNoteController extends Controller
             $creationDate = null;
         }
 
-        $notes = $this->personalNoteService->getNotes($user->id, $filter, $timeFilter, $month, $year, $folderId, $priority, $creationDate);
-        $folders = $this->personalNoteService->getFolders($user->id);
-        $archivedFolders = $filter === 'archive'
+        $notes = $this->personalNoteService->getNotes($user->id, $filter, $timeFilter, $month, $year, $folderId, $priority, $creationDate, $searchParam);
+
+        $foldersAll = $this->personalNoteService->getFolders($user->id);
+        $folders = $searchParam
+            ? $this->personalNoteService->getFolders($user->id, $searchParam)
+            : $foldersAll;
+
+        $archivedFoldersAll = $filter === 'archive'
             ? $this->personalNoteService->getArchivedFolders($user->id)
             : collect();
+        $archivedFolders = ($filter === 'archive' && $searchParam)
+            ? $this->personalNoteService->getArchivedFolders($user->id, $searchParam)
+            : $archivedFoldersAll;
 
         if ($request->ajax()) {
             if ($folderId) {
@@ -62,7 +76,7 @@ class PersonalNoteController extends Controller
 
                 if ($filter === 'archive') {
                     $response['archived_folders_html'] = view('agenda.personal.partials.archived_folders_grid', ['folders' => $archivedFolders])->render();
-                    $response['folders'] = $archivedFolders;
+                    $response['folders'] = $archivedFoldersAll;
                 }
 
                 return response()->json($response);
@@ -70,7 +84,7 @@ class PersonalNoteController extends Controller
             if ($filter === 'folders_json') {
                 return response()->json([
                     'html' => view('agenda.personal.partials.folders_grid', compact('folders'))->render(),
-                    'folders' => $folders,
+                    'folders' => $foldersAll,
                 ]);
             }
             if ($filter === 'calendar') {
@@ -80,19 +94,25 @@ class PersonalNoteController extends Controller
                 return response()->json([
                     'html' => view('agenda.personal.partials.notes_grid', compact('notes', 'filter'))->render(),
                     'archived_folders_html' => view('agenda.personal.partials.archived_folders_grid', ['folders' => $archivedFolders])->render(),
-                    'folders' => $archivedFolders, // Enviar carpetas archivadas para el select del filtro
+                    'folders' => $archivedFoldersAll,
                 ]);
             }
             if (in_array($filter, ['all', 'folders', 'today', 'upcoming', 'priorities', 'folder'])) {
                 return response()->json([
                     'html' => view('agenda.personal.partials.notes_grid', compact('notes', 'filter'))->render(),
-                    'folders' => $folders,
+                    'folders' => $foldersAll,
+                    'folders_html' => view('agenda.personal.partials.folders_grid', compact('folders'))->render(),
                 ]);
             }
             return view('agenda.personal.partials.notes_grid', compact('notes', 'filter'))->render();
         }
 
-        return view('agenda.personal.index', compact('notes', 'folders', 'archivedFolders'));
+        return view('agenda.personal.index', [
+            'notes' => $notes,
+            'folders' => $folders,
+            'foldersAll' => $foldersAll,
+            'archivedFolders' => $archivedFolders,
+        ]);
     }
 
     public function store(Request $request)
@@ -150,6 +170,13 @@ class PersonalNoteController extends Controller
         abort_unless($note->user_id === $request->user()->id, 403);
         $this->personalNoteService->archiveNote($note);
         return response()->json(['success' => true]);
+    }
+
+    public function emptyTrash(Request $request)
+    {
+        $deleted = $this->personalNoteService->emptyTrash($request->user()->id);
+
+        return response()->json(['success' => true, 'deleted' => $deleted]);
     }
 
     public function restore(Request $request, $id)

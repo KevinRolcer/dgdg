@@ -19,6 +19,24 @@ function paBuildUrl(path, params = {}) {
     return url.toString();
 }
 
+function paGetSearchQuery() {
+    const el = document.getElementById('pa-search');
+    if (!el) return '';
+    let s = String(el.value || '').trim();
+    if (s.length > 200) s = s.slice(0, 200);
+    return s;
+}
+
+function paSyncSearchClearUi() {
+    const input = document.getElementById('pa-search');
+    const wrap = document.getElementById('pa-search-wrapper');
+    const clearBtn = document.getElementById('pa-search-clear');
+    if (!input || !wrap || !clearBtn) return;
+    const has = (input.value || '').trim().length > 0;
+    wrap.classList.toggle('has-search-text', has);
+    clearBtn.hidden = !has;
+}
+
 async function paFetch(url, options = {}) {
     const headers = {
         'X-Requested-With': 'XMLHttpRequest',
@@ -120,7 +138,7 @@ async function paParseFetchJson(response) {
 }
 
 window.loadFolders = function() {
-    return fetch(paBuildUrl(window.paRoutes.index, { filter: 'folders_json' }), {
+    return fetch(paBuildUrl(window.paRoutes.index, { filter: 'folders_json', search: paGetSearchQuery() }), {
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
     })
     .then(paParseFetchJson)
@@ -637,20 +655,89 @@ window.restoreArchivedFolder = function(id) {
         });
 };
 
+window.emptyTrash = function() {
+    if (!window.paRoutes || !window.paRoutes.trashEmpty) return;
+    swalAlert.fire({
+        title: '¿Vaciar la papelera?',
+        text: 'Se eliminarán permanentemente todas las notas que están en la papelera. No se puede deshacer.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, vaciar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            confirmButton: 'tm-swal-confirm btn-danger',
+            cancelButton: 'tm-swal-cancel',
+        },
+    }).then(async (result) => {
+        if (!result.isConfirmed) return;
+        try {
+            const response = await fetch(window.paRoutes.trashEmpty, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            const parsed = await paParseFetchJson(response);
+            const data = parsed.data || {};
+            if (parsed.parseError || !parsed.ok || !data.success) {
+                if (typeof segobToast === 'function') segobToast('error', 'No se pudo vaciar la papelera');
+                return;
+            }
+            const n = typeof data.deleted === 'number' ? data.deleted : 0;
+            if (typeof segobToast === 'function') {
+                segobToast('success', n > 0 ? `Se eliminaron ${n} nota(s)` : 'Papelera vacía');
+            }
+            if (typeof window.loadNotes === 'function') window.loadNotes('trash');
+            if (typeof loadFolders === 'function') loadFolders();
+        } catch (e) {
+            if (typeof segobToast === 'function') segobToast('error', 'Fallo de conexión');
+        }
+    });
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('pa-search');
-    const noteCards = document.querySelectorAll('.pa-card--note');
+    const searchClearBtn = document.getElementById('pa-search-clear');
     const tabs = document.querySelectorAll('.pa-tab');
 
-    // Buscador en tiempo real
+    const PA_SEARCH_DEBOUNCE_MS = 320;
+    let paSearchDebounceTimer = null;
+
+    function scheduleSearchReload() {
+        if (paSearchDebounceTimer) clearTimeout(paSearchDebounceTimer);
+        paSearchDebounceTimer = setTimeout(() => {
+            paSearchDebounceTimer = null;
+            paSyncSearchClearUi();
+            if (typeof window.loadNotes === 'function') window.loadNotes();
+            if (typeof updateHash === 'function') updateHash();
+        }, PA_SEARCH_DEBOUNCE_MS);
+    }
+
     if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            const query = this.value.toLowerCase();
-            noteCards.forEach(card => {
-                if (card.classList.contains('pa-card--placeholder')) return;
-                const content = card.dataset.searchContent || '';
-                card.style.display = content.includes(query) ? 'flex' : 'none';
-            });
+        paSyncSearchClearUi();
+        searchInput.addEventListener('input', () => {
+            paSyncSearchClearUi();
+            scheduleSearchReload();
+        });
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                searchInput.value = '';
+                paSyncSearchClearUi();
+                if (typeof window.loadNotes === 'function') window.loadNotes();
+                if (typeof updateHash === 'function') updateHash();
+            }
+        });
+    }
+    if (searchClearBtn && searchInput) {
+        searchClearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            paSyncSearchClearUi();
+            searchInput.focus();
+            if (typeof window.loadNotes === 'function') window.loadNotes();
+            if (typeof updateHash === 'function') updateHash();
         });
     }
 
@@ -794,7 +881,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const cleanParams = { 
                 filter: currentFilter === 'archive' ? 'archive' : 'folder', 
-                folder_id: folderId 
+                folder_id: folderId,
+                search: paGetSearchQuery(),
             };
 
             const response = await paFetch(paBuildUrl(window.paRoutes.index, cleanParams), {
@@ -821,8 +909,7 @@ document.addEventListener('DOMContentLoaded', function() {
             initContextMenu();
             applyContrast();
 
-            // Persist folder state in URL hash
-            window.location.hash = `filter=folders&folder_id=${folderId}`;
+            if (typeof updateHash === 'function') updateHash();
         } catch (error) {
             console.error('Error navigating to folder:', error);
             if (container) container.style.opacity = '1';
@@ -983,6 +1070,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 toggleNotesGrid(filter === 'archive' || filter === 'trash');
             }
 
+            const emptyTrashBtn = document.getElementById('pa-empty-trash-btn');
+            if (emptyTrashBtn) {
+                emptyTrashBtn.style.display = filter === 'trash' ? 'inline-flex' : 'none';
+            }
+
             // Evitar loadNotes al activar "Carpetas" desde un clic en tarjeta: navigateToFolder() cargará con folder_id (sin esto, loadNotes('folders') sin carpeta gana la carrera y muestra notas incorrectas).
             if (window.__paSuppressNextNavLoadNotes) {
                 window.__paSuppressNextNavLoadNotes = false;
@@ -1066,7 +1158,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (priority) hash += `&priority=${priority}`;
         if (folderId) hash += `&folder_id=${folderId}`;
         if (creationDate) hash += `&creation_date=${creationDate}`;
-        
+        const searchQ = paGetSearchQuery();
+        if (searchQ) hash += `&search=${encodeURIComponent(searchQ)}`;
+
         window.location.hash = hash;
     }
 
@@ -1119,7 +1213,8 @@ document.addEventListener('DOMContentLoaded', function() {
             year: window.paCurrentYear,
             folder_id: folderId,
             priority: priority,
-            creation_date: creationDate
+            creation_date: creationDate,
+            search: paGetSearchQuery(),
         });
 
         try {
@@ -1162,6 +1257,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     if (data && data.folders && typeof paSyncFolderFilterSelect === 'function') {
                         paSyncFolderFilterSelect(data.folders);
+                    }
+                    if (data && typeof data.folders_html === 'string') {
+                        const fg = document.getElementById('pa-folders-container');
+                        if (fg) fg.innerHTML = data.folders_html;
+                    }
+                    const paFoldersJson = document.getElementById('pa-folders-json');
+                    if (paFoldersJson && data && data.folders) {
+                        paFoldersJson.textContent = JSON.stringify(data.folders);
                     }
                 } catch (_) {
                     html = text;
@@ -1256,12 +1359,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (response.ok) {
                 segobToast('success', isEdit ? 'Nota actualizada' : 'Nota creada');
-                if (window.paCurrentFolderId) {
-                    navigateToFolder(window.paCurrentFolderId);
-                } else {
-                    const currentFilter = document.querySelector('.pa-nav-item.is-active')?.dataset.filter || 'all';
-                    window.loadNotes(currentFilter);
-                }
+                paRefreshNotesAfterMutation();
                 // Refresh folder counts
                 loadFolders();
             } else if (response.status === 422) {
@@ -1797,6 +1895,25 @@ document.addEventListener('DOMContentLoaded', function() {
         updateAttCounter();
     };
 
+    function paRefreshNotesAfterMutation() {
+        if (document.getElementById('pa-notes-container')) {
+            if (window.paCurrentFolderId) {
+                navigateToFolder(window.paCurrentFolderId);
+            } else {
+                const activeNav = document.querySelector('.pa-nav-item.is-active');
+                if (activeNav) {
+                    loadNotes(activeNav.dataset.filter);
+                } else {
+                    loadNotes();
+                }
+            }
+            return;
+        }
+        if (document.getElementById('pa-home-personal-notes')) {
+            window.location.reload();
+        }
+    }
+
     window.archiveNote = async function(id) {
         const result = await swalAlert.fire({
             title: '¿Archivar nota?',
@@ -1831,14 +1948,7 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (error) {
                 console.error('Archive fetch error:', error);
             }
-            const activeNav = document.querySelector('.pa-nav-item.is-active');
-            if (window.paCurrentFolderId) {
-                navigateToFolder(window.paCurrentFolderId);
-            } else if (activeNav) {
-                loadNotes(activeNav.dataset.filter);
-            } else {
-                loadNotes();
-            }
+            paRefreshNotesAfterMutation();
         }
     };
 
@@ -1861,14 +1971,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Restore fetch error:', error);
         }
-        const activeNav = document.querySelector('.pa-nav-item.is-active');
-        if (window.paCurrentFolderId) {
-            navigateToFolder(window.paCurrentFolderId);
-        } else if (activeNav) {
-            loadNotes(activeNav.dataset.filter);
-        } else {
-            loadNotes();
-        }
+        paRefreshNotesAfterMutation();
         // Refresh folder counts
         loadFolders();
     };
@@ -1906,14 +2009,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Delete fetch error:', error);
                 segobToast('error', 'Fallo de conexión');
             }
-            const activeNav = document.querySelector('.pa-nav-item.is-active');
-            if (window.paCurrentFolderId) {
-                navigateToFolder(window.paCurrentFolderId);
-            } else if (activeNav) {
-                loadNotes(activeNav.dataset.filter);
-            } else {
-                loadNotes();
-            }
+            paRefreshNotesAfterMutation();
         }
     };
 
@@ -1983,7 +2079,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedNoteId = null;
 
     function initDragAndDrop() {
-        const notes = document.querySelectorAll('.pa-card--note');
+        const notes = document.querySelectorAll('.pa-card--note:not(.pa-card--note-home)');
         const folders = document.querySelectorAll('.pa-card--folder:not(.pa-card--placeholder):not(.pa-card--folder-archived)');
 
         notes.forEach(note => {
@@ -2041,7 +2137,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function initContextMenu() {
-        const notes = document.querySelectorAll('.pa-card--note:not(.pa-card--placeholder)');
+        const notes = document.querySelectorAll('.pa-card--note:not(.pa-card--placeholder):not(.pa-card--note-home)');
         const menu = document.getElementById('pa-context-menu');
         const submenu = document.getElementById('pa-folder-submenu');
         const moveItem = document.getElementById('ctx-move');
@@ -2125,13 +2221,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Refresh folder counts via AJAX (cleaner than manual DOM manipulation)
                 loadFolders();
 
-                // If inside a folder, reload that folder; otherwise reload normal view
-                if (window.paCurrentFolderId) {
-                    navigateToFolder(window.paCurrentFolderId);
-                } else {
-                    const currentFilter = document.querySelector('.pa-nav-item.is-active')?.dataset.filter || 'all';
-                    loadNotes(currentFilter);
-                }
+                paRefreshNotesAfterMutation();
                 segobToast('success', 'Nota movida correctamente');
             } else {
                 segobToast('error', 'Error al mover la nota');
@@ -2146,6 +2236,12 @@ document.addEventListener('DOMContentLoaded', function() {
     syncAllNotesPillState();
     syncPersonalAgendaNavChrome();
     syncCalendarToggleButton();
+
+    (function syncTrashEmptyBtnVisibility() {
+        const btn = document.getElementById('pa-empty-trash-btn');
+        const f = document.querySelector('.pa-nav-item.is-active')?.dataset.filter;
+        if (btn) btn.style.display = f === 'trash' ? 'inline-flex' : 'none';
+    })();
 
     document.getElementById('pa-calendar-toggle-btn')?.addEventListener('click', () => {
         const notesSection = document.getElementById('section-notes');
@@ -2225,6 +2321,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (notesContainer) gridObserver.observe(notesContainer, { childList: true });
     if (foldersContainer) gridObserver.observe(foldersContainer, { childList: true });
     if (archivedFoldersContainer) gridObserver.observe(archivedFoldersContainer, { childList: true });
+    const homePersonalNotesEl = document.getElementById('pa-home-personal-notes');
+    if (homePersonalNotesEl) {
+        gridObserver.observe(homePersonalNotesEl, { childList: true });
+        applyContrast();
+    }
 
     // Handle initial state from URL hash
     function applyUrlState() {
@@ -2237,6 +2338,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const folderId = params.get('folder_id');
         const priority = params.get('priority');
         const creationDate = params.get('creation_date');
+        const searchFromHash = params.get('search');
+
+        if (searchFromHash !== null) {
+            const si = document.getElementById('pa-search');
+            if (si) {
+                si.value = searchFromHash;
+                paSyncSearchClearUi();
+            }
+        }
 
         if (folderId) {
             // If it's a specific folder in sidebar 'folders' mode, or just a folder filter

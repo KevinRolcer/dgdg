@@ -21,7 +21,7 @@
 
 {{-- Nueva Nota Placeholder: inicio + vista carpetas (lista de carpetas + notas sin carpeta) --}}
 @php $isArchive = ($filter ?? '') === 'archive'; @endphp
-@if(!$isArchive && (!isset($filter) || in_array($filter, ['all', 'calendar', 'folder', 'folders'])))
+@if(!$isArchive && ($filter ?? '') !== 'home' && (!isset($filter) || in_array($filter, ['all', 'calendar', 'folder', 'folders'])))
 <div class="pa-card pa-card--note pa-card--placeholder" style="min-height: 180px; border-style: dashed;" onclick="openPersonalNoteModal()">
     <div class="pa-placeholder-icon">
         <i class="fa-solid fa-plus-circle" style="font-size: 1.8rem;"></i>
@@ -56,9 +56,10 @@
     }
 @endphp
 
-    <div class="pa-card pa-card--note {{ $contrastClass }}"
+    @php $isHomeReminder = ($filter ?? '') === 'home'; @endphp
+    <div class="pa-card pa-card--note {{ $contrastClass }}{{ $isHomeReminder ? ' pa-card--note-home' : '' }}"
          style="background-color: {{ $bgColor }}; --note-color: {{ $bgColor }}; position: relative;"
-         draggable="true"
+         draggable="{{ $isHomeReminder ? 'false' : 'true' }}"
          data-id="{{ $note->id }}"
          data-search-content="{{ strtolower($note->title . ' ' . ($note->is_encrypted ? '' : (string)$note->content)) }}"
          data-note-data="{{ json_encode([
@@ -88,6 +89,7 @@
             <i class="fa-solid fa-thumbtack pa-note-priority-pin pa-cal-priority-pin--{{ $note->priority }}" title="Prioridad: {{ ucfirst($note->priority) }}"></i>
         @endif
 
+        @unless($isHomeReminder)
         <div class="pa-card-header" style="display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 6px;">
             <div class="pa-card-actions" style="display: flex; gap: 8px; opacity: 0; transition: opacity 0.2s; margin-right: 18px;">
                 @if($isTrashed)
@@ -103,6 +105,7 @@
                 <i class="fa-solid fa-trash-can" title="Eliminar" onclick="event.stopPropagation(); deleteNote({{ $note->id }}, {{ $isTrashed ? 'true' : 'false' }})"></i>
             </div>
         </div>
+        @endunless
 
         <h4 class="pa-card-title" style="word-break: break-all;">{{ $note->title ?? ($note->is_encrypted ? 'Nota Cifrada' : 'Sin título') }}</h4>
 

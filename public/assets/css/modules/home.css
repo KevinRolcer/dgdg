@@ -30,9 +30,8 @@
 }
 
 .home-shell-main-head {
-    margin-bottom: 0.5rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--clr-border);
+    margin-bottom: 0.35rem;
+    padding-bottom: 0;
 }
 
 .home-shell .home-shell-main-title {
@@ -92,11 +91,76 @@ html.theme-dark .home-shell .home-shell-main-title {
     line-height: 1.35;
 }
 
+.home-personal-agenda {
+    margin-top: 0.5rem;
+    padding-top: 0;
+    border-top: none;
+}
+
+.home-personal-agenda-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.35rem 0.75rem;
+}
+
+.home-personal-agenda-head .home-panel-heading {
+    margin-bottom: 0;
+}
+
+.home-personal-agenda-sub {
+    margin-top: 0.15rem;
+    margin-bottom: 0.4rem;
+}
+
+.home-personal-agenda-link {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--clr-accent);
+    text-decoration: none;
+    white-space: nowrap;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    margin-right: 2px;
+}
+
+.home-personal-agenda-link:hover {
+    text-decoration: underline;
+}
+
+html.theme-dark .home-personal-agenda-link {
+    color: var(--clr-text-main);
+}
+
+.home-personal-agenda-grid-wrap {
+    min-width: 0;
+    margin: 0 -0.25rem;
+}
+
+.home-shell .home-personal-agenda-notes.pa-notes-grid.is-grid {
+    margin: 0;
+    padding: 0.35rem 0.25rem 0.5rem;
+    gap: 1rem !important;
+}
+
+.home-shell .home-personal-agenda-notes .pa-card--note {
+    min-width: 0;
+    max-width: none;
+}
+
+.home-personal-agenda-empty {
+    font-size: 0.72rem;
+    color: var(--clr-text-light);
+    padding: 0.35rem 0;
+    margin: 0;
+}
+
 @media (min-width: 769px) {
     .home-shell {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
-        gap: 0;
+        gap: 10px;
         align-items: start;
         width: 100%;
         max-width: min(1180px, calc(100% - 16px));

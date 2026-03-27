@@ -6,6 +6,7 @@ use App\Models\PersonalNote;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class PersonalNoteService
 {
@@ -65,7 +66,7 @@ class PersonalNoteService
         return hash_pbkdf2('sha256', $password, self::PBKDF2_SALT, self::PBKDF2_ITERATIONS, 32, true);
     }
 
-    public function getNotes(int $userId, string $filter = 'all', string $timeFilter = 'all', $month = null, $year = null, $folderId = null, $priority = null, $creationDate = null)
+    public function getNotes(int $userId, string $filter = 'all', string $timeFilter = 'all', $month = null, $year = null, $folderId = null, $priority = null, $creationDate = null, ?string $search = null)
     {
         $query = PersonalNote::forUser($userId);
         if ($filter === 'archive') {
@@ -159,6 +160,17 @@ class PersonalNoteService
             });
         }
 
+        if ($search !== null && $search !== '') {
+            $term = '%'.addcslashes($search, '%_\\').'%';
+            $query->where(function ($q) use ($term) {
+                $q->where('title', 'like', $term)
+                    ->orWhere(function ($q2) use ($term) {
+                        $q2->where('is_encrypted', false)
+                            ->where('content', 'like', $term);
+                    });
+            });
+        }
+
         return $query->orderBy('is_encrypted', 'desc')
             ->orderByRaw("CASE priority
                 WHEN 'high' THEN 1
@@ -205,25 +217,62 @@ class PersonalNoteService
     /**
      * Folders Management
      */
-    public function getFolders(int $userId)
+    public function getFolders(int $userId, ?string $search = null)
     {
-        return \App\Models\PersonalNoteFolder::where('user_id', '=', $userId)
+        $query = \App\Models\PersonalNoteFolder::where('user_id', '=', $userId)
             ->withCount('notes')
             ->orderByDesc('is_pinned')
             ->orderByDesc('pinned_at')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        if ($search !== null && $search !== '') {
+            $term = '%'.addcslashes($search, '%_\\').'%';
+            $query->where('name', 'like', $term);
+        }
+
+        return $query->get();
     }
 
     /**
      * Carpetas archivadas (soft delete) del usuario, para la vista Archivo.
      */
-    public function getArchivedFolders(int $userId)
+    public function getArchivedFolders(int $userId, ?string $search = null)
     {
-        return \App\Models\PersonalNoteFolder::onlyTrashed()
+        $query = \App\Models\PersonalNoteFolder::onlyTrashed()
             ->where('user_id', '=', $userId)
             ->withCount('notes')
-            ->orderByDesc('deleted_at')
+            ->orderByDesc('deleted_at');
+
+        if ($search !== null && $search !== '') {
+            $term = '%'.addcslashes($search, '%_\\').'%';
+            $query->where('name', 'like', $term);
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Notas con fecha programada hoy o mañana (activas, no archivadas, no papelera).
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, PersonalNote>
+     */
+    public function getPersonalNotesScheduledTodayOrTomorrow(int $userId, int $limit = 30)
+    {
+        $today = today();
+        $tomorrow = today()->copy()->addDay();
+
+        return PersonalNote::forUser($userId)
+            ->with(['folder', 'attachments'])
+            ->where('is_archived', false)
+            ->whereNotNull('scheduled_date')
+            ->where(function ($q) use ($today, $tomorrow) {
+                $q->whereDate('scheduled_date', $today)
+                    ->orWhereDate('scheduled_date', $tomorrow);
+            })
+            ->orderBy('scheduled_date')
+            ->orderByRaw('COALESCE(scheduled_time, "23:59:59") ASC')
+            ->orderByRaw("CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 WHEN 'none' THEN 4 ELSE 5 END ASC")
+            ->limit($limit)
             ->get();
     }
 
@@ -326,5 +375,34 @@ class PersonalNoteService
 
         unset($data['password']);
         return $note->update($data);
+    }
+
+    /**
+     * Eliminar definitivamente todas las notas en la papelera del usuario (archivos adjuntos y registros).
+     */
+    public function emptyTrash(int $userId): int
+    {
+        return (int) DB::transaction(function () use ($userId) {
+            $notes = PersonalNote::onlyTrashed()
+                ->forUser($userId)
+                ->with('attachments')
+                ->get();
+
+            $count = 0;
+            foreach ($notes as $note) {
+                foreach ($note->attachments as $attachment) {
+                    foreach (['secure_shared', 'public'] as $disk) {
+                        if (Storage::disk($disk)->exists($attachment->file_path)) {
+                            Storage::disk($disk)->delete($attachment->file_path);
+                            break;
+                        }
+                    }
+                }
+                $note->forceDelete();
+                $count++;
+            }
+
+            return $count;
+        });
     }
 }

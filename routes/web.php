@@ -254,6 +254,7 @@ Route::middleware('auth')->group(function () {
 
     Route::group(['prefix' => 'personal-agenda', 'as' => 'personal-agenda.'], function () {
         Route::get('/', [\App\Http\Controllers\PersonalNoteController::class, 'index'])->name('index');
+        Route::delete('/trash', [\App\Http\Controllers\PersonalNoteController::class, 'emptyTrash'])->name('trash.empty');
         Route::post('/', [\App\Http\Controllers\PersonalNoteController::class, 'store'])->name('store');
         Route::put('/{note}', [\App\Http\Controllers\PersonalNoteController::class, 'update'])->name('update');
         Route::delete('/{note}', [\App\Http\Controllers\PersonalNoteController::class, 'destroy'])->name('destroy');

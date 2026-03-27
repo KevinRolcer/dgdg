@@ -51,9 +51,12 @@
         {{-- Cabecera Ultra Compacta - Buscador + Filtros --}}
         <header class="pa-content-header">
             <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
-                <div class="pa-search-wrapper" style="margin: 0; width: 220px; flex-shrink: 0;">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" class="pa-search-input" placeholder="Buscar notas..." id="pa-search">
+                <div class="pa-search-wrapper" id="pa-search-wrapper" style="margin: 0; width: 220px; flex-shrink: 0;">
+                    <i class="pa-search-icon fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input type="search" class="pa-search-input" placeholder="Buscar notas y carpetas…" id="pa-search" name="pa-search" autocomplete="off" enterkeyhint="search">
+                    <button type="button" class="pa-search-clear" id="pa-search-clear" aria-label="Limpiar búsqueda" title="Limpiar" hidden>
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
                 </div>
 
                 <div class="pa-tabs-pills">
@@ -121,8 +124,11 @@
         {{-- Notas (is-mis-notas-home: solo Ver Todo + mes; sin filtros extendidos hasta que cambie el nav) --}}
         <section class="pa-section is-mis-notas-home" id="section-notes">
             <div class="pa-section-header" id="notes-section-header" style="flex-wrap: wrap; gap: 15px;">
-                <div style="display: flex; align-items: center; gap: 15px;">
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                     <h3 class="pa-section-title" id="notes-section-title" style="font-size: 1rem; opacity: 0.7; margin: 0;">Notas Recientes</h3>
+                    <button type="button" id="pa-empty-trash-btn" class="pa-btn-empty-trash" style="display: none;" onclick="emptyTrash()">
+                        <i class="fa-solid fa-trash-can"></i> Vaciar papelera
+                    </button>
                 </div>
 
                 {{-- Filtros: en Mis notas (inicio) solo Ver Todo + navegador de mes; prioridad/carpeta/fecha en calendario y carpetas --}}
@@ -194,30 +200,10 @@
 
 {{-- JSON con flags HEX: evita </script> u otros caracteres en nombres que rompen el parser JS (Unexpected end of input). --}}
 <script id="pa-folders-json" type="application/json">
-{!! json_encode($folders, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) !!}
+{!! json_encode($foldersAll, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) !!}
 </script>
 
-<script>
-    window.paRoutes = {
-        {{-- URL absoluta: si solo se usa /personal-agenda, fetch apunta al dominio raíz y falla (404) con la app en subcarpeta. --}}
-        index: @json(route('personal-agenda.index')),
-        store: "{{ route('personal-agenda.store') }}",
-        foldersStore: "{{ route('personal-agenda.folders.store') }}",
-        foldersUpdate: "{{ route('personal-agenda.folders.update', ['folder' => ':id']) }}",
-        foldersArchive: "{{ route('personal-agenda.folders.archive', ['folder' => ':id']) }}",
-        foldersRestore: "{{ preg_replace('#/[0-9]+/restore$#', '/:id/restore', route('personal-agenda.folders.restore', ['folderId' => 999999])) }}",
-        foldersPin: "{{ route('personal-agenda.folders.pin', ['folder' => ':id']) }}",
-        foldersDestroy: "{{ route('personal-agenda.folders.destroy', ['folder' => ':id']) }}",
-        attachmentsDestroy: "{{ route('personal-agenda.attachments.destroy', ['attachment' => ':id']) }}",
-        attachmentsServe: "{{ route('personal-agenda.attachments.serve', ['attachment' => ':id']) }}",
-        decrypt: "{{ route('personal-agenda.decrypt', ['note' => ':id']) }}",
-        archive: "{{ route('personal-agenda.archive', ['note' => ':id']) }}",
-        restore: "{{ route('personal-agenda.restore', ['id' => ':id']) }}",
-        move: "{{ route('personal-agenda.move', ['note' => ':id']) }}",
-        update: "{{ route('personal-agenda.update', ['note' => ':id']) }}",
-        destroy: "{{ route('personal-agenda.destroy', ['note' => ':id']) }}",
-    };
-</script>
+@include('agenda.personal.partials.pa_routes_script')
 @endsection
 
 @push('scripts')

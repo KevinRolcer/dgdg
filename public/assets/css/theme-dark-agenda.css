@@ -297,6 +297,16 @@ html.theme-dark .pa-content-header {
     border-color: var(--clr-border) !important;
 }
 
+html.theme-dark .pa-btn-empty-trash {
+    color: #f87171 !important;
+    background: rgba(248, 113, 113, 0.12) !important;
+    border-color: rgba(248, 113, 113, 0.4) !important;
+}
+
+html.theme-dark .pa-btn-empty-trash:hover {
+    background: rgba(248, 113, 113, 0.2) !important;
+}
+
 html.theme-dark .pa-search-input {
     background-color: var(--tm-muted-bg) !important;
     border-color: var(--clr-border) !important;
@@ -308,7 +318,7 @@ html.theme-dark .pa-search-input:focus {
     border-color: var(--clr-accent) !important;
 }
 
-html.theme-dark .pa-search-wrapper i {
+html.theme-dark .pa-search-wrapper .pa-search-icon {
     color: var(--clr-text-light) !important;
 }
 

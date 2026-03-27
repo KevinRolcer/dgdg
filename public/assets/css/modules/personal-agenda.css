@@ -224,6 +224,25 @@
     border-color: #cbd5e1;
 }
 
+.pa-btn-empty-trash {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #b91c1c;
+    background: rgba(185, 28, 28, 0.08);
+    border: 1px solid rgba(185, 28, 28, 0.35);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.pa-btn-empty-trash:hover {
+    background: rgba(185, 28, 28, 0.14);
+}
+
 .pa-tabs-pills {
     display: flex;
     gap: 6px;
@@ -403,7 +422,7 @@
 .pa-search-input {
     width: 100%;
     height: var(--ui-input-height);
-    padding: 0 16px 0 40px;
+    padding: 0 34px 0 40px;
     background-color: var(--clr-bg);
     border: 1px solid var(--clr-border);
     border-radius: var(--ui-radius-lg);
@@ -412,19 +431,62 @@
     transition: all 0.2s;
 }
 
+/* type="search" añade una X nativa (WebKit/Blink); ya usamos .pa-search-clear */
+.pa-search-input::-webkit-search-decoration,
+.pa-search-input::-webkit-search-cancel-button,
+.pa-search-input::-webkit-search-results-button,
+.pa-search-input::-webkit-search-results-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.pa-search-input::-moz-search-clear {
+    display: none;
+}
+
+.pa-search-wrapper:not(.has-search-text) .pa-search-input {
+    padding-right: 16px;
+}
+
+.pa-search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--clr-text-light);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    transition: background 0.15s, color 0.15s;
+}
+
+.pa-search-clear:hover {
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--clr-text-main);
+}
+
 .pa-search-input:focus {
     border-color: var(--clr-primary);
     outline: none;
     background-color: white;
 }
 
-.pa-search-wrapper i {
+.pa-search-wrapper .pa-search-icon {
     position: absolute;
     left: 14px;
     top: 50%;
     transform: translateY(-50%);
     color: var(--clr-text-light);
     font-size: 0.9rem;
+    pointer-events: none;
 }
 
 .pa-notes-calendar-meta {
@@ -2262,6 +2324,11 @@
     --pa-icon-option-hover-bg: #f1f5f9;
     --pa-icon-option-active-border: var(--clr-primary);
     --pa-icon-option-active-bg: #fff;
+}
+
+html.theme-dark .pa-search-clear:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--clr-text-main);
 }
 
 html.theme-dark {

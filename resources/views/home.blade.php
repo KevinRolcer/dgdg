@@ -2,6 +2,7 @@
 
 @push('css')
 <link rel="stylesheet" href="{{ asset('assets/css/modules/home.css') }}?v={{ @filemtime(public_path('assets/css/modules/home.css')) ?: time() }}">
+<link rel="stylesheet" href="{{ asset('assets/css/modules/personal-agenda.css') }}?v={{ @filemtime(public_path('assets/css/modules/personal-agenda.css')) ?: time() }}">
 @endpush
 
 @section('content')
@@ -25,9 +26,21 @@
             <div class="home-inline-alert home-inline-alert-error" role="alert">{{ $errors->first() }}</div>
         @endif
 
-        <section class="home-panel-block" aria-labelledby="home-welcome-heading">
-            <h2 class="home-panel-heading" id="home-welcome-heading">Bienvenido</h2>
-            <p class="home-panel-lead">Desde aquí puedes consultar el calendario de eventos y acceder a los módulos del sistema.</p>
+        <section class="home-panel-block home-personal-agenda" aria-labelledby="home-personal-agenda-heading">
+            <div class="home-personal-agenda-head">
+                <h2 class="home-panel-heading" id="home-personal-agenda-heading">Agenda personal</h2>
+                <a href="{{ route('personal-agenda.index') }}#filter=calendar&amp;tab=month" class="home-personal-agenda-link">Abrir calendario</a>
+            </div>
+            <p class="home-panel-lead home-personal-agenda-sub">Recordatorios próximos</p>
+            @if (($personalAgendaHomeNotes ?? collect())->isNotEmpty())
+                <div class="home-personal-agenda-grid-wrap">
+                    <div class="pa-notes-grid is-grid home-personal-agenda-notes" id="pa-home-personal-notes">
+                        @include('agenda.personal.partials.notes_grid', ['notes' => $personalAgendaHomeNotes, 'filter' => 'home'])
+                    </div>
+                </div>
+            @else
+                <p class="home-personal-agenda-empty">No hay notas programadas para hoy ni para mañana.</p>
+            @endif
         </section>
     </div>
 
@@ -96,3 +109,13 @@
     <button type="button" class="home-calendar-mobile-backdrop" id="calendarMobileBackdrop" aria-label="Cerrar calendario"></button>
 </div>
 @endsection
+
+@if (($personalAgendaHomeNotes ?? collect())->isNotEmpty())
+@push('scripts')
+<script id="pa-folders-json" type="application/json">
+{!! json_encode($paFoldersForHomeJson ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) !!}
+</script>
+@include('agenda.personal.partials.pa_routes_script')
+<script src="{{ asset('assets/js/modules/personal-agenda.js') }}?v={{ @filemtime(public_path('assets/js/modules/personal-agenda.js')) ?: time() }}"></script>
+@endpush
+@endif
