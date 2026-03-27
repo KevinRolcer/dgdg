@@ -2340,6 +2340,10 @@
                         }
                     } catch (eDraft) {}
 
+                    if (personalizeModal) {
+                        personalizeModal._exportGroups = [];
+                    }
+
                     if (draftCfg) {
                         if (titleEl) { titleEl.value = draftCfg.title != null ? String(draftCfg.title) : (data.title || ''); }
                         personalizeModal.querySelectorAll('.tm-export-title-align .tm-export-align-btn').forEach(function (b) {
@@ -2552,6 +2556,9 @@
                                 }).then(function(res) {
                                     if (res.isConfirmed && res.value) {
                                         var name = res.value.trim();
+                                        if (!personalizeModal._exportGroups) {
+                                            personalizeModal._exportGroups = [];
+                                        }
                                         if (name && personalizeModal._exportGroups.indexOf(name) === -1) {
                                             personalizeModal._exportGroups.push(name);
                                             renderExportGroups();
@@ -2562,6 +2569,9 @@
                             } else {
                                 var name = prompt('Nombre del grupo:');
                                 if (name && (name = name.trim()) !== '') {
+                                    if (!personalizeModal._exportGroups) {
+                                        personalizeModal._exportGroups = [];
+                                    }
                                     if (personalizeModal._exportGroups.indexOf(name) === -1) {
                                         personalizeModal._exportGroups.push(name);
                                         renderExportGroups();
@@ -2579,6 +2589,9 @@
                                 var removeBtn = e.target.closest('.tm-export-group-remove');
                                 if (removeBtn) {
                                     var gName = removeBtn.getAttribute('data-group');
+                                    if (!Array.isArray(personalizeModal._exportGroups)) {
+                                        personalizeModal._exportGroups = [];
+                                    }
                                     personalizeModal._exportGroups = personalizeModal._exportGroups.filter(function(g) { return g !== gName; });
                                     // Limpiar grupo de las columnas
                                     columnsEl.querySelectorAll('.tm-export-col-group-select').forEach(function(sel) {
