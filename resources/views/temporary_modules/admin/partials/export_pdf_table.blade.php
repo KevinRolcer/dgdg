@@ -161,6 +161,11 @@
     $tempEntries = $entries instanceof \Illuminate\Support\Collection ? $entries->values()->all() : array_values($entries);
     $colHeaders = $columns;
     $itemNumber = 1;
+    $nCols = count($colHeaders);
+    $columnWidthPercents = $columnWidthPercents ?? [];
+    if ($nCols > 0 && (count($columnWidthPercents) !== $nCols)) {
+        $columnWidthPercents = array_fill(0, $nCols, 100 / $nCols);
+    }
 
     $groupSpans = [];
     foreach ($colHeaders as $col) {
@@ -182,8 +187,17 @@
         <thead>
         @if($hasAnyGroup)
             <tr>
+                @php $gColIdx = 0; @endphp
                 @foreach($groupSpans as $gs)
-                    <th colspan="{{ $gs['span'] }}" style="background-color: {{ $gs['label'] !== '' ? '#64748b' : 'transparent' }}; color: #fff; border: {{ $gs['label'] !== '' ? '1px solid #000' : 'none' }};">
+                    @php
+                        $span = (int) $gs['span'];
+                        $pct = 0.0;
+                        for ($si = 0; $si < $span; $si++) {
+                            $pct += (float) ($columnWidthPercents[$gColIdx + $si] ?? 0);
+                        }
+                        $gColIdx += $span;
+                    @endphp
+                    <th colspan="{{ $gs['span'] }}" style="background-color: {{ $gs['label'] !== '' ? '#64748b' : 'transparent' }}; color: #fff; border: {{ $gs['label'] !== '' ? '1px solid #000' : 'none' }}; width: {{ $pct }}%;">
                         {{ $gs['label'] }}
                     </th>
                 @endforeach
@@ -193,12 +207,8 @@
             @foreach ($colHeaders as $col)
                 @php
                     $bg    = !empty($col['color']) ? $resolveCss($col['color']) : '#861E34';
-                    $key   = $col['key'] ?? '';
-                    $wStyle = '';
-                    if ($key === 'item')         $wStyle = 'width: 30pt;';
-                    elseif ($key === 'microrregion') $wStyle = 'width: 90pt;';
-                    elseif ($key === 'municipio')    $wStyle = 'width: 90pt;';
-                    elseif ($key === 'estatus')      $wStyle = 'width: 60pt;';
+                    $pct   = (float) ($columnWidthPercents[$loop->index] ?? (100 / max(1, $nCols)));
+                    $wStyle = 'width: '.$pct.'%;';
                 @endphp
                 <th style="background-color: {{ $bg }}; color: #fff; text-align: center; vertical-align: middle; {{ $wStyle }}">
                     {{ $col['label'] }}
@@ -210,9 +220,13 @@
         @foreach ($tempEntries as $entry)
             <tr>
                 @foreach ($colHeaders as $col)
-                    @php $key = $col['key']; @endphp
+                    @php
+                        $key = $col['key'];
+                        $pct = (float) ($columnWidthPercents[$loop->index] ?? (100 / max(1, $nCols)));
+                        $baseW = 'width: '.$pct.'%;';
+                    @endphp
                     @if ($key === 'item')
-                        <td style="width: 30pt; text-align: center;">{{ $itemNumber }}</td>
+                        <td style="{{ $baseW }} text-align: center;">{{ $itemNumber }}</td>
                         @php $itemNumber++; @endphp
                     @elseif ($key === 'microrregion')
                         @php
@@ -220,7 +234,7 @@
                             $lMrTxt = $lMeta['label'] ?? ($lMeta->label ?? 'Sin microrregión');
                         @endphp
                         {{-- Sin rowspan: Dompdf al partir la tabla entre páginas rompía columnas --}}
-                        <td style="vertical-align: middle; text-align: center; width: 90pt;">{{ $lMrTxt }}</td>
+                        <td style="vertical-align: middle; text-align: center; {{ $baseW }}">{{ $lMrTxt }}</td>
                     @else
                         @php
                             $val = $entry->data[$key] ?? null;
@@ -235,11 +249,11 @@
                             } else {
                                 $cellText = '';
                             }
-                            $tdW = '';
-                            if ($key === 'municipio') $tdW = 'width: 90pt; text-align: left;';
-                            if ($key === 'estatus')   $tdW = 'width: 60pt; text-align: center;';
+                            $tdAlign = '';
+                            if ($key === 'municipio') $tdAlign = 'text-align: left;';
+                            if ($key === 'estatus')   $tdAlign = 'text-align: center;';
                         @endphp
-                        <td style="{{ $tdW }}">{{ $cellText }}</td>
+                        <td style="{{ $baseW }} {{ $tdAlign }}">{{ $cellText }}</td>
                     @endif
                 @endforeach
             </tr>

@@ -319,14 +319,75 @@ html.theme-dark .pa-tabs-pills {
 
 html.theme-dark .pa-tab-pill {
     color: var(--clr-text-light) !important;
-    background-color: var(--tm-muted-bg) !important;
-    border-color: var(--clr-border) !important;
+    background-color: transparent !important;
+    border-color: transparent !important;
+}
+
+html.theme-dark .pa-tab-pill:hover {
+    background-color: rgba(134, 30, 52, 0.2) !important;
+    color: var(--clr-text-main) !important;
 }
 
 html.theme-dark .pa-tab-pill.is-active {
-    background-color: var(--clr-accent) !important;
+    background-color: var(--clr-primary) !important;
     color: #fff !important;
-    border-color: var(--clr-accent) !important;
+    border-color: var(--clr-primary) !important;
+}
+
+/* Filtros avanzados (Hoy / Semana / Mes + prioridad) */
+html.theme-dark .personal-agenda-page {
+    --pa-filter-group-bg: rgba(255, 255, 255, 0.04);
+    --pa-filter-group-border: rgba(255, 255, 255, 0.1);
+    --pa-pri-high: #f87171;
+    --pa-pri-high-bg: rgba(248, 113, 113, 0.12);
+    --pa-pri-medium: #fbbf24;
+    --pa-pri-medium-bg: rgba(251, 191, 36, 0.12);
+    --pa-pri-low: #4ade80;
+    --pa-pri-low-bg: rgba(74, 222, 128, 0.12);
+}
+
+html.theme-dark .pa-filter-pill:not(.pa-filter-pill--priority) {
+    background: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-filter-pill:not(.pa-filter-pill--priority):hover {
+    background: var(--tm-muted-bg) !important;
+}
+
+html.theme-dark .pa-filter-pill:not(.pa-filter-pill--priority).is-active {
+    background: var(--clr-primary) !important;
+    color: #fff !important;
+    border-color: var(--clr-primary) !important;
+}
+
+html.theme-dark .pa-filter-pill--priority {
+    border-width: 1.5px !important;
+}
+
+html.theme-dark .pa-filter-pill--high {
+    border-color: rgba(248, 113, 113, 0.45) !important;
+    color: #fecaca !important;
+}
+
+html.theme-dark .pa-filter-pill--medium {
+    border-color: rgba(251, 191, 36, 0.45) !important;
+    color: #fde68a !important;
+}
+
+html.theme-dark .pa-filter-pill--low {
+    border-color: rgba(74, 222, 128, 0.45) !important;
+    color: #bbf7d0 !important;
+}
+
+html.theme-dark .pa-filter-pill--priority.is-active {
+    color: #fff !important;
+}
+
+html.theme-dark .pa-filter-select-pill,
+html.theme-dark .pa-filter-date-pill {
+    color: var(--clr-text-main) !important;
 }
 
 html.theme-dark .pa-toggle-btn {
@@ -505,8 +566,81 @@ html.theme-dark .pa-preview-att-item {
     background: var(--tm-muted-bg) !important;
 }
 
-html.theme-dark .pa-preview-card > div:last-child button {
-    background: var(--tm-muted-bg) !important;
+html.theme-dark .pa-preview-card--modern {
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-preview-kicker {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-preview-chip {
+    background: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-preview-chip i {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .pa-preview-chip--lock {
+    border-color: rgba(232, 136, 156, 0.28) !important;
+    background: rgba(134, 30, 52, 0.12) !important;
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-preview-chip--lock i {
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .pa-preview-panel {
+    background: var(--tm-muted-bg, #252b3a) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-preview-panel--note {
+    background: var(--tm-muted-bg, #252b3a) !important;
+    border-color: var(--clr-border) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+html.theme-dark .pa-preview-title--modern {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-preview-body--modern {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .pa-preview-footer-btn {
+    background: var(--clr-card) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-preview-topbar-edit {
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .pa-preview-topbar-edit:hover {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-preview-footer-btn--primary {
+    background: var(--clr-primary) !important;
+    color: #fff !important;
+    border-color: var(--clr-primary) !important;
+}
+
+html.theme-dark .pa-preview-footer-btn--primary:hover {
+    background: var(--clr-primary-dark) !important;
+    border-color: var(--clr-primary-dark) !important;
+    color: #fff !important;
+}
+
+html.theme-dark .pa-preview-att-doc {
+    background: var(--clr-card) !important;
     color: var(--clr-text-main) !important;
     border-color: var(--clr-border) !important;
 }
@@ -559,5 +693,106 @@ html.theme-dark .pa-slider-btn {
 html.theme-dark .pa-slider-btn:hover {
     background-color: var(--clr-accent) !important;
     color: #fff !important;
+}
+
+/* Calendario personal — tema oscuro */
+html.theme-dark #pa-schedule-wrapper.pa-schedule-wrapper {
+    background: transparent !important;
+}
+
+html.theme-dark .pa-schedule-container-scroll {
+    background: var(--tm-surface, #1e2433) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-cal-time-corner,
+html.theme-dark .pa-cal-time-cell {
+    background: var(--tm-muted-bg, #252b3a) !important;
+    color: var(--clr-text-light) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-cal-week-labels .pa-cal-week-title {
+    background: linear-gradient(180deg, var(--tm-muted-bg) 0%, var(--tm-surface) 100%) !important;
+    color: var(--clr-text-light) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-cal-week-title.is-week-active {
+    background: linear-gradient(180deg, rgba(134, 30, 52, 0.25) 0%, rgba(134, 30, 52, 0.12) 100%) !important;
+    color: var(--clr-accent) !important;
+}
+
+html.theme-dark .pa-cal-day-labels .pa-cal-day-head {
+    background: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-cal-day-name {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .pa-cal-day-num {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-cal-slot {
+    background: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-cal-slot--allday {
+    background: rgba(199, 155, 102, 0.06) !important;
+}
+
+html.theme-dark .pa-cal-slot.is-today-col {
+    background: rgba(134, 30, 52, 0.12) !important;
+}
+
+html.theme-dark .pa-cal-slot--allday.is-today-col {
+    background: rgba(134, 30, 52, 0.16) !important;
+}
+
+html.theme-dark .pa-cal-note {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    background-color: var(--pa-note-bg, #343f52) !important;
+}
+
+html.theme-dark .pa-cal-note-icon i.pa-cal-icon--dark {
+    color: #0f172a !important;
+    opacity: 0.95 !important;
+}
+
+html.theme-dark .pa-cal-note-icon i.pa-cal-icon--light {
+    color: #f1f5f9 !important;
+    opacity: 0.98 !important;
+}
+
+html.theme-dark .pa-cal-time-cell--allday {
+    color: var(--clr-text-light) !important;
+}
+
+html.theme-dark .pa-cal-preview-popover .pa-preview-card--modern {
+    box-shadow: 0 20px 56px rgba(0, 0, 0, 0.55) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-cal-decrypt-note-title {
+    color: var(--clr-text-main) !important;
+}
+
+html.theme-dark .pa-cal-decrypt-input {
+    background: var(--clr-card) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .pa-cal-decrypt-input:focus {
+    border-color: var(--clr-accent) !important;
+    box-shadow: 0 0 0 3px rgba(199, 155, 102, 0.22) !important;
+}
+
+html.theme-dark .pa-cal-decrypt-err {
+    color: #f87171 !important;
 }
 

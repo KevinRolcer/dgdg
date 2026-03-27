@@ -23,15 +23,26 @@ class PersonalNoteController extends Controller
         $month = $request->get('month');
         $year = $request->get('year');
         $folderId = $request->get('folder_id');
+        $priority = $request->get('priority');
+        $creationDate = $request->get('creation_date');
 
-        $notes = $this->personalNoteService->getNotes($user->id, $filter, $timeFilter, $month, $year, $folderId);
+        if ($filter === 'calendar' && ($month === null || $month === '' || $year === null || $year === '')) {
+            $month = now()->month;
+            $year = now()->year;
+        }
+
+        $notes = $this->personalNoteService->getNotes($user->id, $filter, $timeFilter, $month, $year, $folderId, $priority, $creationDate);
         $folders = $this->personalNoteService->getFolders($user->id);
 
         if ($request->ajax()) {
             if ($folderId) {
                 $currentFolder = \App\Models\PersonalNoteFolder::where('user_id', $user->id)->find($folderId);
+                $partialHtml = $filter === 'calendar'
+                    ? view('agenda.personal.partials.calendar_grid', compact('notes', 'filter', 'month', 'year'))->render()
+                    : view('agenda.personal.partials.notes_grid', ['notes' => $notes, 'filter' => 'folder'])->render();
+
                 return response()->json([
-                    'html' => view('agenda.personal.partials.notes_grid', ['notes' => $notes, 'filter' => 'folder'])->render(),
+                    'html' => $partialHtml,
                     'folder' => $currentFolder ? ['id' => $currentFolder->id, 'name' => $currentFolder->name, 'icon' => $currentFolder->icon] : null,
                 ]);
             }
@@ -46,14 +57,21 @@ class PersonalNoteController extends Controller
 
     public function store(Request $request)
     {
+        $normalizedPassword = trim((string) $request->input('password', ''));
+        $shouldEncrypt = $request->boolean('is_encrypted') && $normalizedPassword !== '';
+        $request->merge([
+            'is_encrypted' => $shouldEncrypt,
+            'password' => $shouldEncrypt ? $normalizedPassword : null,
+        ]);
+
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'content' => 'nullable|string',
             'folder_id' => 'nullable|exists:personal_note_folders,id',
             'is_encrypted' => 'boolean',
-            'password' => 'required_if:is_encrypted,1|nullable|string|min:4',
+            'password' => 'nullable|string|min:4',
             'color' => 'nullable|string|max:20',
-            'priority' => 'required|in:low,medium,high',
+            'priority' => 'required|in:none,low,medium,high',
             'reminder_at' => 'nullable|date',
             'scheduled_date' => 'nullable|date',
             'scheduled_time' => 'nullable',
@@ -112,14 +130,21 @@ class PersonalNoteController extends Controller
     {
         abort_unless($note->user_id === $request->user()->id, 403);
 
+        $normalizedPassword = trim((string) $request->input('password', ''));
+        $shouldEncrypt = $request->boolean('is_encrypted') && $normalizedPassword !== '';
+        $request->merge([
+            'is_encrypted' => $shouldEncrypt,
+            'password' => $shouldEncrypt ? $normalizedPassword : null,
+        ]);
+
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'content' => 'nullable|string',
             'folder_id' => 'nullable|exists:personal_note_folders,id',
             'is_encrypted' => 'boolean',
-            'password' => 'required_if:is_encrypted,1|nullable|string|min:4',
+            'password' => 'nullable|string|min:4',
             'color' => 'nullable|string|max:20',
-            'priority' => 'required|in:low,medium,high',
+            'priority' => 'required|in:none,low,medium,high',
             'reminder_at' => 'nullable|date',
             'scheduled_date' => 'nullable|date',
             'scheduled_time' => 'nullable',

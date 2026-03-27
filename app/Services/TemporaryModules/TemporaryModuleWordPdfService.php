@@ -67,11 +67,13 @@ class TemporaryModuleWordPdfService
                 $label = $dbFieldLabels[$key] ?? $key;
             }
 
+            $mw = $col['max_width_chars'] ?? null;
             $columnMap[$key] = [
                 'key' => $key,
                 'label' => $label,
                 'color' => (string) ($col['color'] ?? ''),
                 'group' => (string) ($col['group'] ?? ''),
+                'max_width_chars' => ($mw !== null && is_numeric($mw)) ? (int) $mw : null,
             ];
         }
         $columns = array_values($columnMap);
@@ -126,6 +128,10 @@ class TemporaryModuleWordPdfService
 
         $title = (string) ($exportConfig['title'] ?? $fileName);
         $orientationConfig = ($exportConfig['orientation'] ?? 'portrait') === 'landscape' ? 'landscape' : 'portrait';
+
+        $columnWidthFractions = $this->computeColumnWidthFractions($columns);
+        $usableTableTwips = $orientationConfig === 'landscape' ? 14570 : 9638;
+        $columnTwips = $this->distributeTwipsFromFractions($columnWidthFractions, $usableTableTwips);
 
         $includeCountTable = !empty($exportConfig['include_count_table']);
         $countByFields = $includeCountTable && is_array($exportConfig['count_by_fields'] ?? null)
@@ -265,12 +271,6 @@ class TemporaryModuleWordPdfService
 
             $table = $section->addTable($tblStyle);
 
-            $dynTwips = null;
-            if ($stretch && $totalCols > 0) {
-                // Aprox ancho total disponible en horizontal A4 son 9000 twips (depende de márgenes)
-                $dynTwips = (int) round(9000 / $totalCols);
-            }
-
             // Encabezados con Grupos
             $groupSpans = [];
             foreach ($columns as $col) {
@@ -287,16 +287,22 @@ class TemporaryModuleWordPdfService
 
             if ($hasAnyGroup) {
                 $table->addRow();
+                $gColIdx = 0;
                 foreach ($groupSpans as $gs) {
+                    $span = (int) $gs['span'];
+                    $mergedTwips = 0;
+                    for ($si = 0; $si < $span; $si++) {
+                        $mergedTwips += $columnTwips[$gColIdx + $si] ?? 0;
+                    }
+                    $gColIdx += $span;
                     if ($gs['label'] !== '') {
-                        $table->addCell($dynTwips ? ($dynTwips * $gs['span']) : null, [
+                        $table->addCell($mergedTwips > 0 ? $mergedTwips : null, [
                             'gridSpan' => $gs['span'],
                             'bgColor' => '64748B',
                             'valign' => 'center'
                         ])->addText((string) $gs['label'], ['bold' => true, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
                     } else {
-                        // Celda vacía sin grupo
-                        $table->addCell($dynTwips ? ($dynTwips * $gs['span']) : null, [
+                        $table->addCell($mergedTwips > 0 ? $mergedTwips : null, [
                             'gridSpan' => $gs['span'],
                             'valign' => 'center'
                         ]);
@@ -308,14 +314,15 @@ class TemporaryModuleWordPdfService
             foreach ($columns as $idx => $col) {
                 // Determinar color de fondo para encabezados dinámicos
                 $bgIdx = $this->getColumnBgColor($col, $idx);
-                $table->addCell($dynTwips, ['bgColor' => $bgIdx, 'valign' => 'center'])->addText((string) $col['label'], ['bold' => true, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                $w = $columnTwips[$idx] ?? null;
+                $table->addCell($w, ['bgColor' => $bgIdx, 'valign' => 'center'])->addText((string) $col['label'], ['bold' => true, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
             }
 
             // Filas
             $itemNumber = 1;
             foreach ($entries as $entry) {
                 $table->addRow();
-                foreach ($columns as $col) {
+                foreach ($columns as $idx => $col) {
                     $key = $col['key'];
                     if ($key === 'item') {
                         $text = (string) $itemNumber;
@@ -335,7 +342,8 @@ class TemporaryModuleWordPdfService
                             $text = '';
                         }
                     }
-                    $table->addCell($dynTwips)->addText($text);
+                    $w = $columnTwips[$idx] ?? null;
+                    $table->addCell($w)->addText($text);
                 }
             }
 
@@ -357,11 +365,14 @@ class TemporaryModuleWordPdfService
             ? array_merge(['_total'], $countByFields)
             : [];
         $countTableColors = is_array($exportConfig['count_table_colors'] ?? null) ? $exportConfig['count_table_colors'] : [];
+        $columnWidthPercents = $this->fractionsToPercents($columnWidthFractions);
+
         $html = view('temporary_modules.admin.partials.export_pdf_table', [
             'title' => $title,
             'fechaCorteStr' => $fechaCorteStr,
             'orientation' => $orientationConfig,
             'columns' => $columns,
+            'columnWidthPercents' => $columnWidthPercents,
             'entries' => $entries,
             'microrregionMeta' => $microrregionMeta,
             'stretch' => $stretch,
@@ -463,5 +474,83 @@ class TemporaryModuleWordPdfService
         }
         // Default color institucional
         return '861E34';
+    }
+
+    /**
+     * Pesos alineados con la vista previa / Excel: max_width_chars (2–60) o valores por defecto por columna.
+     *
+     * @param list<array{key?: string, max_width_chars?: int|null}> $columns
+     * @return list<float> Fracciones que suman 1.0
+     */
+    private function computeColumnWidthFractions(array $columns): array
+    {
+        $weights = [];
+        foreach ($columns as $col) {
+            $key = (string) ($col['key'] ?? '');
+            $mw = $col['max_width_chars'] ?? null;
+            if ($mw !== null && is_numeric($mw)) {
+                $w = max(2, min((int) $mw, 60));
+            } else {
+                $w = match ($key) {
+                    'item' => 4,
+                    'microrregion' => 18,
+                    'municipio' => 20,
+                    'estatus' => 12,
+                    default => 24,
+                };
+            }
+            $weights[] = (float) $w;
+        }
+        $sum = array_sum($weights);
+        $n = count($columns);
+        if ($sum <= 0 || $n === 0) {
+            return array_fill(0, $n, $n > 0 ? 1.0 / $n : 1.0);
+        }
+        $fractions = [];
+        foreach ($weights as $w) {
+            $fractions[] = $w / $sum;
+        }
+
+        return $fractions;
+    }
+
+    /**
+     * @param list<float> $fractions
+     * @return list<int>
+     */
+    private function distributeTwipsFromFractions(array $fractions, int $totalTwips): array
+    {
+        $n = count($fractions);
+        if ($n === 0) {
+            return [];
+        }
+        $twips = [];
+        $allocated = 0;
+        for ($i = 0; $i < $n; $i++) {
+            if ($i === $n - 1) {
+                $twips[] = max(0, $totalTwips - $allocated);
+            } else {
+                $t = (int) round($totalTwips * $fractions[$i]);
+                $twips[] = $t;
+                $allocated += $t;
+            }
+        }
+
+        return $twips;
+    }
+
+    /**
+     * @param list<float> $fractions
+     * @return list<float> Porcentajes que suman 100
+     */
+    private function fractionsToPercents(array $fractions): array
+    {
+        $percents = array_map(static fn (float $f) => round(100.0 * $f, 4), $fractions);
+        $sum = array_sum($percents);
+        if ($sum > 0 && abs($sum - 100.0) > 0.0001 && $percents !== []) {
+            $percents[count($percents) - 1] += (100.0 - $sum);
+        }
+
+        return $percents;
     }
 }

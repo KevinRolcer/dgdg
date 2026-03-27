@@ -132,16 +132,62 @@
             </div>
         </section>
 
-        {{-- Notas --}}
-        <section class="pa-section" id="section-notes">
-            <div class="pa-section-header" id="notes-section-header">
+        {{-- Notas (is-mis-notas-home: solo Ver Todo + mes; sin filtros extendidos hasta que cambie el nav) --}}
+        <section class="pa-section is-mis-notas-home" id="section-notes">
+            <div class="pa-section-header" id="notes-section-header" style="flex-wrap: wrap; gap: 15px;">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <h3 class="pa-section-title" id="notes-section-title" style="font-size: 1rem; opacity: 0.7;">Notas Recientes</h3>
+                    <h3 class="pa-section-title" id="notes-section-title" style="font-size: 1rem; opacity: 0.7; margin: 0;">Notas Recientes</h3>
                 </div>
-                <div style="display: flex; gap: 8px; color: #999; align-items: center;" id="notes-calendar-filter">
-                    <i class="fa-solid fa-chevron-left btn-cal-prev" style="cursor: pointer; font-size: 0.75rem;" onclick="navCalendar('prev')"></i>
-                    <span style="font-size: 0.7rem; font-weight: 700; color: #333;" class="cal-current-month">{{ now()->translatedFormat('M Y') }}</span>
-                    <i class="fa-solid fa-chevron-right btn-cal-next" style="cursor: pointer; font-size: 0.75rem;" onclick="navCalendar('next')"></i>
+
+                {{-- Filtros: en Mis notas (inicio) solo Ver Todo + navegador de mes; prioridad/carpeta/fecha en calendario y carpetas --}}
+                <div class="pa-advanced-filters" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <button class="pa-filter-pill is-active" data-filter-type="all-notes" id="filter-all-notes">
+                        Ver Todo
+                    </button>
+
+                    <div id="pa-filters-extended" class="pa-filters-extended">
+                        <div class="pa-filter-pill-group pa-filter-pill-group--priority">
+                            <span class="pa-filter-label">Prioridad</span>
+                            <button type="button" class="pa-filter-pill pa-filter-pill--priority pa-filter-pill--high" data-priority="high" title="Solo prioridad alta">
+                                <span class="pa-pri-swatch" aria-hidden="true"></span>
+                                <span class="pa-pri-text">Alta</span>
+                            </button>
+                            <button type="button" class="pa-filter-pill pa-filter-pill--priority pa-filter-pill--medium" data-priority="medium" title="Solo prioridad media">
+                                <span class="pa-pri-swatch" aria-hidden="true"></span>
+                                <span class="pa-pri-text">Media</span>
+                            </button>
+                            <button type="button" class="pa-filter-pill pa-filter-pill--priority pa-filter-pill--low" data-priority="low" title="Solo prioridad baja">
+                                <span class="pa-pri-swatch" aria-hidden="true"></span>
+                                <span class="pa-pri-text">Baja</span>
+                            </button>
+                        </div>
+
+                        <div class="pa-filter-pill-group">
+                            <span class="pa-filter-label">Carpeta:</span>
+                            <select class="pa-filter-select-pill" id="filter-folder">
+                                <option value="">Todas</option>
+                                @foreach($folders as $folder)
+                                    <option value="{{ $folder->id }}">{{ $folder->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="pa-filter-pill-group">
+                            <span class="pa-filter-label">Creado el:</span>
+                            <input type="date" class="pa-filter-date-pill" id="filter-creation-date">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pa-notes-calendar-meta" id="notes-calendar-filter">
+
+                    <button type="button" class="pa-cal-toggle-btn" id="pa-calendar-toggle-btn" aria-expanded="true">
+                            Ocultar
+                    </button>
+                    <i class="fa-solid fa-chevron-left btn-cal-prev" role="button" tabindex="0" aria-label="Mes anterior" onclick="navCalendar('prev')"></i>
+                    <span class="cal-current-month">{{ mb_strtoupper(now()->translatedFormat('M Y')) }}</span>
+                    <i class="fa-solid fa-chevron-right btn-cal-next" role="button" tabindex="0" aria-label="Mes siguiente" onclick="navCalendar('next')"></i>
+                    
                 </div>
             </div>
 

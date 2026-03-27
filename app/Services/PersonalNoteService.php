@@ -64,9 +64,19 @@ class PersonalNoteService
         return hash_pbkdf2('sha256', $password, self::PBKDF2_SALT, self::PBKDF2_ITERATIONS, 32, true);
     }
 
-    public function getNotes(int $userId, string $filter = 'all', string $timeFilter = 'all', $month = null, $year = null, $folderId = null)
+    public function getNotes(int $userId, string $filter = 'all', string $timeFilter = 'all', $month = null, $year = null, $folderId = null, $priority = null, $creationDate = null)
     {
         $query = PersonalNote::forUser($userId)->with('folder');
+
+        // Apply Priority Filter
+        if ($priority && $priority !== 'all') {
+            $query->where('priority', $priority);
+        }
+
+        // Apply Creation Date Filter
+        if ($creationDate) {
+            $query->whereDate('created_at', $creationDate);
+        }
 
         // If navigating inside a specific folder
         if ($folderId) {
@@ -82,9 +92,20 @@ class PersonalNoteService
                 $query->onlyTrashed();
                 break;
             case 'calendar':
-                $query->whereNotNull('scheduled_date')->where('is_archived', false);
+                // Notas con fecha de evento en el mes, o sin evento pero creadas en el mes (para que el calendario no quede vacío).
+                $query->where('is_archived', false);
                 if ($month && $year) {
-                    $query->whereMonth('scheduled_date', $month)->whereYear('scheduled_date', $year);
+                    $query->where(function ($q) use ($month, $year) {
+                        $q->where(function ($q2) use ($month, $year) {
+                            $q2->whereNotNull('scheduled_date')
+                                ->whereMonth('scheduled_date', $month)
+                                ->whereYear('scheduled_date', $year);
+                        })->orWhere(function ($q2) use ($month, $year) {
+                            $q2->whereNull('scheduled_date')
+                                ->whereMonth('created_at', $month)
+                                ->whereYear('created_at', $year);
+                        });
+                    });
                 }
                 break;
             case 'folders':
@@ -96,7 +117,8 @@ class PersonalNoteService
                 break;
         }
 
-        if ($timeFilter !== 'all' && $filter !== 'trash') {
+        // Apply Time Filter (Today, Week, Month) — no aplica a la vista Calendario: el mes ya se acota con month/year.
+        if ($timeFilter !== 'all' && $filter !== 'trash' && !$creationDate && $filter !== 'calendar') {
             $dateField = ($filter === 'calendar') ? 'scheduled_date' : 'created_at';
 
             switch ($timeFilter) {
@@ -113,21 +135,29 @@ class PersonalNoteService
                     break;
             }
         } else {
-            if ($month && $year && $filter !== 'trash') {
-                $query->where(function ($q) use ($month, $year, $filter) {
-                    $dateField = ($filter === 'calendar') ? 'scheduled_date' : 'created_at';
-
-                    $q->where(function ($q2) use ($month, $year, $dateField) {
-                        $q2->whereMonth($dateField, $month)->whereYear($dateField, $year);
-                    })->orWhere(function ($q2) use ($month, $year) {
-                        $q2->whereMonth('scheduled_date', $month)->whereYear('scheduled_date', $year);
+            // Calendario: el rango de fechas ya va en case 'calendar'. Evitar duplicar condiciones (y OR raros).
+            if ($month && $year && $filter !== 'trash' && $filter !== 'calendar') {
+                if ($query instanceof \Illuminate\Database\Eloquent\Builder) {
+                    $query->where(function ($q) use ($month, $year, $filter) {
+                        $dateField = ($filter === 'calendar') ? 'scheduled_date' : 'created_at';
+                        $q->where(function ($q2) use ($month, $year, $dateField) {
+                            $q2->whereMonth($dateField, $month)->whereYear($dateField, $year);
+                        })->orWhere(function ($q2) use ($month, $year) {
+                            $q2->whereMonth('scheduled_date', $month)->whereYear('scheduled_date', $year);
+                        });
                     });
-                });
+                }
             }
         }
 
         return $query->orderBy('is_encrypted', 'desc')
-            ->orderBy('priority', 'desc')
+            ->orderByRaw("CASE priority
+                WHEN 'high' THEN 1
+                WHEN 'medium' THEN 2
+                WHEN 'low' THEN 3
+                WHEN 'none' THEN 4
+                ELSE 5 END ASC")
+            ->orderByRaw("COALESCE(scheduled_time, '23:59:59') ASC")
             ->orderBy('created_at', 'desc')
             ->get();
     }
@@ -147,9 +177,14 @@ class PersonalNoteService
      */
     public function createNote(array $data, int $userId): PersonalNote
     {
-        if (!empty($data['is_encrypted']) && !empty($data['password'])) {
-            $data['content'] = $this->encryptContent($data['content'] ?? '', $data['password']);
-            $data['password_verify_hash'] = Hash::make($data['password']);
+        $password = isset($data['password']) ? trim((string) $data['password']) : '';
+        if (!empty($data['is_encrypted']) && $password !== '') {
+            $data['content'] = $this->encryptContent($data['content'] ?? '', $password);
+            $data['password_verify_hash'] = Hash::make($password);
+            $data['is_encrypted'] = true;
+        } else {
+            $data['is_encrypted'] = false;
+            $data['password_verify_hash'] = null;
         }
 
         $data['user_id'] = $userId;
@@ -196,13 +231,14 @@ class PersonalNoteService
      */
     public function updateNote(PersonalNote $note, array $data): bool
     {
-        if (!empty($data['is_encrypted']) && !empty($data['password'])) {
-            $data['content'] = $this->encryptContent($data['content'] ?? '', $data['password']);
-            $data['password_verify_hash'] = Hash::make($data['password']);
-        } elseif (empty($data['is_encrypted']) && $note->is_encrypted) {
-            // Note was encrypted, now it's not. We need the old password to decrypt first?
-            // Or only allow changing if password is provided.
-            // Simplified: if is_encrypted is toggled OFF, we need the password to decrypt it first.
+        $password = isset($data['password']) ? trim((string) $data['password']) : '';
+        if (!empty($data['is_encrypted']) && $password !== '') {
+            $data['content'] = $this->encryptContent($data['content'] ?? '', $password);
+            $data['password_verify_hash'] = Hash::make($password);
+            $data['is_encrypted'] = true;
+        } else {
+            $data['is_encrypted'] = false;
+            $data['password_verify_hash'] = null;
         }
 
         unset($data['password']);

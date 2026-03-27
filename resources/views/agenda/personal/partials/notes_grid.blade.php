@@ -56,7 +56,7 @@
 @endphp
 
     <div class="pa-card pa-card--note {{ $contrastClass }}"
-         style="background-color: {{ $bgColor }}; --note-color: {{ $bgColor }};"
+         style="background-color: {{ $bgColor }}; --note-color: {{ $bgColor }}; position: relative;"
          draggable="true"
          data-id="{{ $note->id }}"
          data-search-content="{{ strtolower($note->title . ' ' . ($note->is_encrypted ? '' : (string)$note->content)) }}"
@@ -71,6 +71,10 @@
              'is_archived' => $note->is_archived,
              'scheduled_date' => $note->scheduled_date ? $note->scheduled_date->format('Y-m-d') : null,
              'scheduled_time' => $note->scheduled_time,
+             'displayDate' => $note->scheduled_date
+                 ? $note->scheduled_date->translatedFormat('d M Y')
+                     . ($note->scheduled_time ? ' · '.\Carbon\Carbon::parse($note->scheduled_time)->format('H:i') : ' · Todo el día')
+                 : $note->created_at->translatedFormat('d M Y'),
              'attachments' => $note->attachments->map(fn($a) => [
                  'id' => $a->id,
                  'file_name' => $a->file_name,
@@ -79,10 +83,12 @@
              ])
          ]) }}"
          @if($note->is_encrypted && !$isTrashed) onclick="decryptNote({{ $note->id }})" @elseif(!$isTrashed) onclick="previewNote({{ $note->id }})" @endif>
+        @if(($note->priority ?? 'none') !== 'none')
+            <i class="fa-solid fa-thumbtack pa-note-priority-pin pa-cal-priority-pin--{{ $note->priority }}" title="Prioridad: {{ ucfirst($note->priority) }}"></i>
+        @endif
 
-        <div class="pa-card-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-            <div class="pa-card-date">{{ $note->created_at->format('d/m/Y') }}</div>
-            <div class="pa-card-actions" style="display: flex; gap: 8px; opacity: 0; transition: opacity 0.2s;">
+        <div class="pa-card-header" style="display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 6px;">
+            <div class="pa-card-actions" style="display: flex; gap: 8px; opacity: 0; transition: opacity 0.2s; margin-right: 18px;">
                 @if($isTrashed)
                     <i class="fa-solid fa-rotate-left" title="Restaurar" onclick="event.stopPropagation(); restoreNote({{ $note->id }})"></i>
                 @else
@@ -120,26 +126,28 @@
                 @foreach($note->attachments as $att)
                     <a href="{{ route('personal-agenda.attachments.serve', $att->id) }}" target="_blank" onclick="event.stopPropagation()"
                        title="{{ $att->file_name }}"
-                       style="width: 32px; height: 32px; background: rgba(0,0,0,0.05); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: inherit; text-decoration: none;">
+                       class="pa-card-att-link">
                         @if($att->file_type === 'image')
                             <img src="{{ route('personal-agenda.attachments.serve', $att->id) }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;">
                         @else
-                            <i class="fa-solid fa-file-lines" style="opacity: 0.7;"></i>
+                            <i class="fa-solid fa-file-lines pa-card-att-icon"></i>
                         @endif
                     </a>
                 @endforeach
             </div>
         @endif
 
-        <div class="pa-card-footer" style="padding-top: 12px; display: flex; align-items: center; margin-top: auto;">
+        <div class="pa-card-footer" style="padding-top: 12px; display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
             @if($note->folder)
+                @php
+                    $fIcon = trim((string) ($note->folder->icon ?? ''));
+                    $fIcon = $fIcon === '' ? 'fa-folder' : preg_replace('/^fa-(solid|regular|brands)\s+/i', '', $fIcon);
+                @endphp
                 <span style="font-size: 0.65rem; background: rgba(0,0,0,0.05); padding: 1px 6px; border-radius: 6px;">
-                    <i class="fa-solid {{ $note->folder->icon ?: 'fa-folder' }}"></i> {{ $note->folder->name }}
+                    <i class="fa-solid {{ str_contains($fIcon, 'fa-') ? $fIcon : 'fa-folder' }}"></i> {{ $note->folder->name }}
                 </span>
             @endif
-            @if($note->priority === 'high')
-                <span style="margin-left: auto; color: #d93025; font-size: 0.7rem; font-weight: 700;">Alta</span>
-            @endif
+            <div class="pa-card-date" style="font-size: 0.7rem; opacity: 0.6; font-weight: 600;">{{ $note->created_at->format('d/m/Y') }}</div>
         </div>
     </div>
 @empty
