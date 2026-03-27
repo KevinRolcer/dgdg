@@ -19,8 +19,9 @@
     }
 @endphp
 
-{{-- Nueva Nota Placeholder (Solo en vista 'all', 'calendar' o 'folder') --}}
-@if(!isset($filter) || in_array($filter, ['all', 'calendar', 'folder']))
+{{-- Nueva Nota Placeholder: inicio + vista carpetas (lista de carpetas + notas sin carpeta) --}}
+@php $isArchive = ($filter ?? '') === 'archive'; @endphp
+@if(!$isArchive && (!isset($filter) || in_array($filter, ['all', 'calendar', 'folder', 'folders'])))
 <div class="pa-card pa-card--note pa-card--placeholder" style="min-height: 180px; border-style: dashed;" onclick="openPersonalNoteModal()">
     <div class="pa-placeholder-icon">
         <i class="fa-solid fa-plus-circle" style="font-size: 1.8rem;"></i>
@@ -142,9 +143,13 @@
                 @php
                     $fIcon = trim((string) ($note->folder->icon ?? ''));
                     $fIcon = $fIcon === '' ? 'fa-folder' : preg_replace('/^fa-(solid|regular|brands)\s+/i', '', $fIcon);
+                    $folderTrashed = $note->folder->trashed();
                 @endphp
-                <span style="font-size: 0.65rem; background: rgba(0,0,0,0.05); padding: 1px 6px; border-radius: 6px;">
+                <span style="font-size: 0.65rem; background: rgba(0,0,0,0.05); padding: 1px 6px; border-radius: 6px;" title="{{ $folderTrashed ? 'Carpeta archivada' : '' }}">
                     <i class="fa-solid {{ str_contains($fIcon, 'fa-') ? $fIcon : 'fa-folder' }}"></i> {{ $note->folder->name }}
+                    @if($folderTrashed)
+                        <span style="opacity: 0.75;">· archivada</span>
+                    @endif
                 </span>
             @endif
             <div class="pa-card-date" style="font-size: 0.7rem; opacity: 0.6; font-weight: 600;">{{ $note->created_at->format('d/m/Y') }}</div>

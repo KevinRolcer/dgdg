@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\PersonalNote;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
@@ -66,7 +67,15 @@ class PersonalNoteService
 
     public function getNotes(int $userId, string $filter = 'all', string $timeFilter = 'all', $month = null, $year = null, $folderId = null, $priority = null, $creationDate = null)
     {
-        $query = PersonalNote::forUser($userId)->with('folder');
+        $query = PersonalNote::forUser($userId);
+        if ($filter === 'archive') {
+            // Carpetas archivadas (soft delete): mantener nombre en la nota cargando la carpeta eliminada
+            $query->with(['folder' => function ($q) {
+                $q->withTrashed();
+            }]);
+        } else {
+            $query->with('folder');
+        }
 
         // Apply Priority Filter
         if ($priority && $priority !== 'all') {
@@ -79,11 +88,11 @@ class PersonalNoteService
         }
 
         // If navigating inside a specific folder
-        if ($folderId) {
-            $query->where('folder_id', $folderId);
+        if ($folderId && $folderId !== 'all') {
+            $query->where('folder_id', (int)$folderId);
         }
 
-        // Main filter (Sidebar)
+        // Main filter (Sidebar/Context)
         switch ($filter) {
             case 'archive':
                 $query->where('is_archived', true);
@@ -92,7 +101,6 @@ class PersonalNoteService
                 $query->onlyTrashed();
                 break;
             case 'calendar':
-                // Notas con fecha de evento en el mes, o sin evento pero creadas en el mes (para que el calendario no quede vacío).
                 $query->where('is_archived', false);
                 if ($month && $year) {
                     $query->where(function ($q) use ($month, $year) {
@@ -109,11 +117,17 @@ class PersonalNoteService
                 }
                 break;
             case 'folders':
-                $query->where('is_archived', false);
-                break;
+            case 'folder':
             case 'all':
             default:
                 $query->where('is_archived', false);
+                // Si estamos navegando en una carpeta, forzar el filtro aunque el switch caiga en default/all
+                if ($folderId && $folderId !== 'all') {
+                    $query->where('folder_id', (int)$folderId);
+                } else if ($filter === 'folder' || ($filter === 'folders' && $folderId)) {
+                    // Caso de seguridad: si pide carpeta pero no hay ID, mostrar vacío o filtrar nulos si fuera el caso
+                    $query->where('folder_id', -1); 
+                }
                 break;
         }
 
@@ -134,20 +148,15 @@ class PersonalNoteService
                     $query->whereMonth($dateField, $m)->whereYear($dateField, $y);
                     break;
             }
-        } else {
-            // Calendario: el rango de fechas ya va en case 'calendar'. Evitar duplicar condiciones (y OR raros).
-            if ($month && $year && $filter !== 'trash' && $filter !== 'calendar') {
-                if ($query instanceof \Illuminate\Database\Eloquent\Builder) {
-                    $query->where(function ($q) use ($month, $year, $filter) {
-                        $dateField = ($filter === 'calendar') ? 'scheduled_date' : 'created_at';
-                        $q->where(function ($q2) use ($month, $year, $dateField) {
-                            $q2->whereMonth($dateField, $month)->whereYear($dateField, $year);
-                        })->orWhere(function ($q2) use ($month, $year) {
-                            $q2->whereMonth('scheduled_date', $month)->whereYear('scheduled_date', $year);
-                        });
-                    });
-                }
-            }
+        } else if ($month && $year && $filter !== 'trash' && $filter !== 'calendar') {
+            // Rango de fechas mensual (fuera de Calendario)
+            $query->where(function ($q) use ($month, $year) {
+                $q->where(function ($q2) use ($month, $year) {
+                    $q2->whereMonth('created_at', $month)->whereYear('created_at', $year);
+                })->orWhere(function ($q2) use ($month, $year) {
+                    $q2->whereMonth('scheduled_date', $month)->whereYear('scheduled_date', $year);
+                });
+            });
         }
 
         return $query->orderBy('is_encrypted', 'desc')
@@ -198,10 +207,63 @@ class PersonalNoteService
      */
     public function getFolders(int $userId)
     {
-        return \App\Models\PersonalNoteFolder::where('user_id', $userId)
+        return \App\Models\PersonalNoteFolder::where('user_id', '=', $userId)
             ->withCount('notes')
+            ->orderByDesc('is_pinned')
+            ->orderByDesc('pinned_at')
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Carpetas archivadas (soft delete) del usuario, para la vista Archivo.
+     */
+    public function getArchivedFolders(int $userId)
+    {
+        return \App\Models\PersonalNoteFolder::onlyTrashed()
+            ->where('user_id', '=', $userId)
+            ->withCount('notes')
+            ->orderByDesc('deleted_at')
+            ->get();
+    }
+
+    public function pinnedFoldersCount(int $userId): int
+    {
+        return \App\Models\PersonalNoteFolder::where('user_id', $userId)
+            ->where('is_pinned', true)
+            ->count();
+    }
+
+    /**
+     * @return array{success: bool, pinned?: bool, pinned_count?: int, message?: string}
+     */
+    public function toggleFolderPin(\App\Models\PersonalNoteFolder $folder): array
+    {
+        if ($folder->is_pinned) {
+            $folder->update(['is_pinned' => false, 'pinned_at' => null]);
+
+            return [
+                'success' => true,
+                'pinned' => false,
+                'pinned_count' => $this->pinnedFoldersCount($folder->user_id),
+            ];
+        }
+
+        $count = $this->pinnedFoldersCount($folder->user_id);
+        if ($count >= 6) {
+            return [
+                'success' => false,
+                'message' => 'Solo puedes fijar hasta 6 carpetas. Quita la fijación de una para añadir otra.',
+            ];
+        }
+
+        $folder->update(['is_pinned' => true, 'pinned_at' => now()]);
+
+        return [
+            'success' => true,
+            'pinned' => true,
+            'pinned_count' => $count + 1,
+        ];
     }
 
     public function createFolder(array $data, int $userId): \App\Models\PersonalNoteFolder
@@ -213,6 +275,27 @@ class PersonalNoteService
     public function updateFolder(\App\Models\PersonalNoteFolder $folder, array $data): bool
     {
         return $folder->update($data);
+    }
+
+    public function archiveFolder(\App\Models\PersonalNoteFolder $folder): bool
+    {
+        return DB::transaction(function () use ($folder) {
+            $folder->notes()->update(['is_archived' => true]);
+
+            return $folder->delete();
+        });
+    }
+
+    /**
+     * Restaurar carpeta archivada (soft delete): vuelve a la lista de carpetas activas
+     * y las notas que pertenecían a ella se desarchivan.
+     */
+    public function restoreFolder(\App\Models\PersonalNoteFolder $folder): bool
+    {
+        return DB::transaction(function () use ($folder) {
+            $folder->restore();
+            return $folder->notes()->update(['is_archived' => false]);
+        });
     }
 
     public function deleteFolder(\App\Models\PersonalNoteFolder $folder, bool $deleteNotes = false): bool

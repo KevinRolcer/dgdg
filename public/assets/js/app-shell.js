@@ -151,12 +151,29 @@ document.addEventListener('DOMContentLoaded', function () {
             var url = urlTemplate.replace(/\/0$/, '/' + id);
             var failCount = 0;
             var intervalId = setInterval(function () {
-                fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                fetch(url, {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                })
                     .then(function (res) {
+                        if (res.status === 401 || res.status === 403) {
+                            clearInterval(exportPollIntervals[id]);
+                            delete exportPollIntervals[id];
+                            return Promise.reject(new Error('unauthorized'));
+                        }
+                        if (!res.ok) {
+                            failCount++;
+                            if (failCount >= 3) {
+                                clearInterval(exportPollIntervals[id]);
+                                delete exportPollIntervals[id];
+                            }
+                            return Promise.reject(new Error('http'));
+                        }
                         failCount = 0;
                         return res.json();
                     })
                     .then(function (data) {
+                        if (!data) return;
                         if (data.status === 'completed' || data.status === 'failed') {
                             clearInterval(exportPollIntervals[id]);
                             delete exportPollIntervals[id];

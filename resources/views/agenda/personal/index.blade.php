@@ -7,25 +7,6 @@
 @php
     $pageTitle = 'Agenda Personal';
     $hidePageHeader = true;
-
-    // Helper to determine text contrast based on hex background
-    function getContrastClass($hexColor) {
-        if (!$hexColor || !str_starts_with($hexColor, '#')) return 'text-dark';
-
-        $hexColor = str_replace('#', '', $hexColor);
-        if (strlen($hexColor) == 3) {
-            $r = hexdec(substr($hexColor, 0, 1) . substr($hexColor, 0, 1));
-            $g = hexdec(substr($hexColor, 1, 1) . substr($hexColor, 1, 1));
-            $b = hexdec(substr($hexColor, 2, 1) . substr($hexColor, 2, 1));
-        } else {
-            $r = hexdec(substr($hexColor, 0, 2));
-            $g = hexdec(substr($hexColor, 2, 2));
-            $b = hexdec(substr($hexColor, 4, 2));
-        }
-
-        $luminance = (0.299 * $r + 0.587 * $g + 0.114 * $b) / 255;
-        return $luminance > 0.6 ? 'text-dark' : 'text-light';
-    }
 @endphp
 
 @section('content')
@@ -106,29 +87,34 @@
                 <span style="font-size: 0.75rem; color: var(--clr-text-light); cursor: pointer;" onclick="document.querySelector('[data-filter=\'folders\']').click()">Ver todas <i class="fa-solid fa-chevron-right"></i></span>
             </div>
 
-            <div class="pa-folder-grid" id="pa-folders-container">
-                @foreach($folders as $folder)
-                    <div class="pa-card pa-card--folder {{ getContrastClass($folder->color) }}"
-                         style="background-color: {{ $folder->color ?? 'var(--pa-blue)' }}; position: relative;"
-                         data-id="{{ $folder->id }}">
-                        <div class="pa-folder-delete" style="position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity 0.2s; cursor: pointer;" onclick="event.stopPropagation(); deleteFolder({{ $folder->id }}, '{{ $folder->name }}')">
-                            <i class="fa-solid fa-trash-can" style="font-size: 0.75rem; {{ getContrastClass($folder->color) === 'text-light' ? 'color: rgba(255,255,255,0.6);' : 'color: rgba(0,0,0,0.35);' }}"></i>
-                        </div>
-                        <div class="pa-folder-icon">
-                            <i class="fa-solid {{ $folder->icon ?: 'fa-folder' }}"></i>
-                        </div>
-                        <h3 class="pa-card-title" style="margin: 0; font-size: 0.9rem;">{{ $folder->name }}</h3>
-                        <span class="pa-folder-count-num">{{ $folder->notes_count }} notas</span>
-                    </div>
-                @endforeach
-
-                {{-- Nueva Carpeta --}}
-                <div class="pa-card pa-card--folder pa-card--placeholder" style="border-style: dashed; padding: 12px;" onclick="openFolderModal()">
-                    <div class="pa-placeholder-icon">
-                        <i class="fa-solid fa-folder-plus"></i>
-                    </div>
-                    <span style="font-size: 0.75rem; font-weight: 700;">Nueva carpeta</span>
+            <div class="pa-slider-container pa-slider-container--folders" id="pa-folders-slider-container">
+                <button type="button" class="pa-slider-btn pa-slider-btn--left" onclick="slideFolders('left')" aria-label="Ver carpetas anteriores">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <div class="pa-folder-grid" id="pa-folders-container">
+                    @include('agenda.personal.partials.folders_grid', ['folders' => $folders])
                 </div>
+                <button type="button" class="pa-slider-btn pa-slider-btn--right" onclick="slideFolders('right')" aria-label="Ver carpetas siguientes">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        </section>
+
+        {{-- Carpetas archivadas (solo vista Archivo) --}}
+        <section class="pa-section" id="section-archived-folders" style="{{ request('filter') === 'archive' ? '' : 'display: none;' }}">
+            <div class="pa-section-header">
+                <h3 class="pa-section-title" style="font-size: 1rem; opacity: 0.7;">Carpetas archivadas</h3>
+            </div>
+            <div class="pa-slider-container pa-slider-container--folders" id="pa-archived-folders-slider">
+                <button type="button" class="pa-slider-btn pa-slider-btn--left" onclick="slideArchivedFolders('left')" aria-label="Carpetas anteriores">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <div class="pa-folder-grid" id="pa-archived-folders-container">
+                    @include('agenda.personal.partials.archived_folders_grid', ['folders' => $archivedFolders])
+                </div>
+                <button type="button" class="pa-slider-btn pa-slider-btn--right" onclick="slideArchivedFolders('right')" aria-label="Carpetas siguientes">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
             </div>
         </section>
 
@@ -206,9 +192,9 @@
     </main>
 </div>
 
-{{-- Hidden Folders Data for JS --}}
+{{-- JSON con flags HEX: evita </script> u otros caracteres en nombres que rompen el parser JS (Unexpected end of input). --}}
 <script id="pa-folders-json" type="application/json">
-    @json($folders)
+{!! json_encode($folders, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) !!}
 </script>
 
 <script>
@@ -217,6 +203,10 @@
         index: @json(route('personal-agenda.index')),
         store: "{{ route('personal-agenda.store') }}",
         foldersStore: "{{ route('personal-agenda.folders.store') }}",
+        foldersUpdate: "{{ route('personal-agenda.folders.update', ['folder' => ':id']) }}",
+        foldersArchive: "{{ route('personal-agenda.folders.archive', ['folder' => ':id']) }}",
+        foldersRestore: "{{ preg_replace('#/[0-9]+/restore$#', '/:id/restore', route('personal-agenda.folders.restore', ['folderId' => 999999])) }}",
+        foldersPin: "{{ route('personal-agenda.folders.pin', ['folder' => ':id']) }}",
         foldersDestroy: "{{ route('personal-agenda.folders.destroy', ['folder' => ':id']) }}",
         attachmentsDestroy: "{{ route('personal-agenda.attachments.destroy', ['attachment' => ':id']) }}",
         attachmentsServe: "{{ route('personal-agenda.attachments.serve', ['attachment' => ':id']) }}",

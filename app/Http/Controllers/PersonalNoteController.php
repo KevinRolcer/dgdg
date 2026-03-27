@@ -31,28 +31,68 @@ class PersonalNoteController extends Controller
             $year = now()->year;
         }
 
+        // Si se pide una carpeta específica, ignoramos los filtros de fecha/prioridad de la vista general 
+        // para evitar "leaks" de notas de la raíz o de otras carpetas.
+        if ($folderId && $folderId !== 'all') {
+            $month = null;
+            $year = null;
+            $priority = null;
+            $creationDate = null;
+        }
+
         $notes = $this->personalNoteService->getNotes($user->id, $filter, $timeFilter, $month, $year, $folderId, $priority, $creationDate);
         $folders = $this->personalNoteService->getFolders($user->id);
+        $archivedFolders = $filter === 'archive'
+            ? $this->personalNoteService->getArchivedFolders($user->id)
+            : collect();
 
         if ($request->ajax()) {
             if ($folderId) {
-                $currentFolder = \App\Models\PersonalNoteFolder::where('user_id', $user->id)->find($folderId);
+                $currentFolder = \App\Models\PersonalNoteFolder::withTrashed()
+                    ->where('user_id', $user->id)
+                    ->find($folderId);
                 $partialHtml = $filter === 'calendar'
                     ? view('agenda.personal.partials.calendar_grid', compact('notes', 'filter', 'month', 'year'))->render()
-                    : view('agenda.personal.partials.notes_grid', ['notes' => $notes, 'filter' => 'folder'])->render();
+                    : view('agenda.personal.partials.notes_grid', ['notes' => $notes, 'filter' => $filter === 'archive' ? 'archive' : 'folder'])->render();
 
-                return response()->json([
+                $response = [
                     'html' => $partialHtml,
                     'folder' => $currentFolder ? ['id' => $currentFolder->id, 'name' => $currentFolder->name, 'icon' => $currentFolder->icon] : null,
+                ];
+
+                if ($filter === 'archive') {
+                    $response['archived_folders_html'] = view('agenda.personal.partials.archived_folders_grid', ['folders' => $archivedFolders])->render();
+                    $response['folders'] = $archivedFolders;
+                }
+
+                return response()->json($response);
+            }
+            if ($filter === 'folders_json') {
+                return response()->json([
+                    'html' => view('agenda.personal.partials.folders_grid', compact('folders'))->render(),
+                    'folders' => $folders,
                 ]);
             }
             if ($filter === 'calendar') {
                 return view('agenda.personal.partials.calendar_grid', compact('notes', 'filter', 'month', 'year'))->render();
             }
+            if ($filter === 'archive') {
+                return response()->json([
+                    'html' => view('agenda.personal.partials.notes_grid', compact('notes', 'filter'))->render(),
+                    'archived_folders_html' => view('agenda.personal.partials.archived_folders_grid', ['folders' => $archivedFolders])->render(),
+                    'folders' => $archivedFolders, // Enviar carpetas archivadas para el select del filtro
+                ]);
+            }
+            if (in_array($filter, ['all', 'folders', 'today', 'upcoming', 'priorities', 'folder'])) {
+                return response()->json([
+                    'html' => view('agenda.personal.partials.notes_grid', compact('notes', 'filter'))->render(),
+                    'folders' => $folders,
+                ]);
+            }
             return view('agenda.personal.partials.notes_grid', compact('notes', 'filter'))->render();
         }
 
-        return view('agenda.personal.index', compact('notes', 'folders'));
+        return view('agenda.personal.index', compact('notes', 'folders', 'archivedFolders'));
     }
 
     public function store(Request $request)
@@ -206,6 +246,68 @@ class PersonalNoteController extends Controller
         $folder = $this->personalNoteService->createFolder($validated, $request->user()->id);
 
         return response()->json(['success' => true, 'folder' => $folder]);
+    }
+
+    public function updateFolder(Request $request, \App\Models\PersonalNoteFolder $folder)
+    {
+        abort_unless($folder->user_id === $request->user()->id, 403);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'color' => 'nullable|string|max:20',
+            'icon' => 'nullable|string|max:50',
+        ]);
+
+        $this->personalNoteService->updateFolder($folder, $validated);
+
+        return response()->json(['success' => true, 'folder' => $folder->fresh()]);
+    }
+
+    /**
+     * Archiva la carpeta (soft delete): las notas pasan a sin carpeta.
+     */
+    public function archiveFolder(Request $request, \App\Models\PersonalNoteFolder $folder)
+    {
+        abort_unless($folder->user_id === $request->user()->id, 403);
+
+        $this->personalNoteService->archiveFolder($folder);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Restaurar carpeta archivada (soft delete): vuelve a la lista de carpetas activas.
+     */
+    public function restoreFolder(Request $request, int $folderId)
+    {
+        $folder = \App\Models\PersonalNoteFolder::onlyTrashed()
+            ->where('user_id', $request->user()->id)
+            ->whereKey($folderId)
+            ->firstOrFail();
+
+        $this->personalNoteService->restoreFolder($folder);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function toggleFolderPin(Request $request, \App\Models\PersonalNoteFolder $folder)
+    {
+        abort_unless($folder->user_id === $request->user()->id, 403);
+
+        $result = $this->personalNoteService->toggleFolderPin($folder);
+
+        if (! $result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'No se pudo actualizar la fijación.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'pinned' => $result['pinned'],
+            'pinned_count' => $result['pinned_count'],
+        ]);
     }
 
     public function destroyFolder(Request $request, \App\Models\PersonalNoteFolder $folder)

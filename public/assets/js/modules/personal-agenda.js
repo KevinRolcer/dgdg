@@ -69,10 +69,81 @@ function paParseNoteDataFromEl(el) {
     return paParseNoteData(raw);
 }
 
+/** Lista de carpetas desde #pa-folders-json (evita JSON.parse('') → Unexpected end of input). */
+function paReadFoldersJson() {
+    const el = document.getElementById('pa-folders-json');
+    if (!el) return [];
+    const raw = (el.textContent || '').trim();
+    if (!raw) return [];
+    try {
+        const data = JSON.parse(raw);
+        return Array.isArray(data) ? data : [];
+    } catch (e) {
+        console.warn('pa-folders-json inválido', e);
+        return [];
+    }
+}
+
+/** Actualiza el desplegable "Carpeta" del filtro tras crear/editar/archivar carpetas (sin recargar la página). */
+function paSyncFolderFilterSelect(folders) {
+    const sel = document.getElementById('filter-folder');
+    if (!sel || !Array.isArray(folders)) return;
+    const current = sel.value;
+    sel.replaceChildren();
+    const optAll = document.createElement('option');
+    optAll.value = '';
+    optAll.textContent = 'Todas';
+    sel.appendChild(optAll);
+    folders.forEach((f) => {
+        if (f == null || f.id == null) return;
+        const o = document.createElement('option');
+        o.value = String(f.id);
+        o.textContent = f.name != null ? String(f.name) : '';
+        sel.appendChild(o);
+    });
+    if (current && [...sel.options].some((opt) => opt.value === current)) {
+        sel.value = current;
+    }
+}
+
+async function paParseFetchJson(response) {
+    const text = await response.text();
+    const trimmed = (text || '').trim();
+    if (!trimmed) {
+        return { ok: response.ok, data: {}, emptyBody: true };
+    }
+    try {
+        return { ok: response.ok, data: JSON.parse(trimmed), emptyBody: false };
+    } catch (e) {
+        return { ok: response.ok, data: {}, parseError: true, bodySnippet: trimmed.slice(0, 160) };
+    }
+}
+
+window.loadFolders = function() {
+    return fetch(paBuildUrl(window.paRoutes.index, { filter: 'folders_json' }), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(paParseFetchJson)
+    .then(({ ok, data }) => {
+        if (!ok || !data) return;
+        const container = document.getElementById('pa-folders-container');
+        if (container && data.html) {
+            container.innerHTML = data.html;
+        }
+        const scriptEl = document.getElementById('pa-folders-json');
+        if (scriptEl && data.folders) {
+            scriptEl.textContent = JSON.stringify(data.folders);
+            // Sync filter dropdown
+            if (typeof paSyncFolderFilterSelect === 'function') {
+                paSyncFolderFilterSelect(data.folders);
+            }
+        }
+    });
+};
+
 window.openPersonalNoteModal = function(noteData = null) {
     window._pendingAttachments = [];
-    const foldersContainer = document.getElementById('pa-folders-json');
-    const folders = foldersContainer ? JSON.parse(foldersContainer.textContent) : [];
+    const folders = paReadFoldersJson();
     const activeFolderId = noteData?.folder_id || window.paCurrentFolderId || null;
     const folderOptions = folders.map(f => `
         <option value="${f.id}" ${activeFolderId == f.id ? 'selected' : ''}>${f.name}</option>
@@ -272,24 +343,36 @@ window.openPersonalNoteModal = function(noteData = null) {
     });
 };
 
-window.openFolderModal = function() {
+window.openFolderModal = function(folderId) {
+    let folder = null;
+    if (folderId != null && folderId !== '') {
+        const list = paReadFoldersJson();
+        folder = list.find(f => Number(f.id) === Number(folderId)) || null;
+    }
+    const isEdit = !!folder;
+    const titleHead = isEdit ? 'Editar carpeta' : 'Nueva Carpeta';
+    const confirmBtn = isEdit ? 'Guardar' : 'Crear';
+    const defaultColor = folder?.color || '#e3f2fd';
+    const defaultIcon = folder?.icon || 'fa-folder';
+
     swalAlert.fire({
-        title: `<div>Nueva Carpeta</div><i class="fa-solid fa-xmark" style="cursor:pointer; font-size: 1rem; opacity: 0.5;" onclick="Swal.close()"></i>`,
+        title: `<div>${titleHead}</div><i class="fa-solid fa-xmark" style="cursor:pointer; font-size: 1rem; opacity: 0.5;" onclick="Swal.close()"></i>`,
         html: `
             <div class="swal-form-container">
+                <input type="hidden" id="folder-record-id" value="">
                 <label class="swal2-label">Nombre de la carpeta</label>
                 <input id="folder-name" class="swal2-input" placeholder="Ej. Proyectos...">
 
                 <div style="display: flex; align-items: center; gap: 15px; margin-top: 10px;">
                     <label class="swal2-label" style="margin: 0;">Identificador visual</label>
                     <div style="display: flex; gap: 8px;">
-                        <div class="pa-color-circle" id="folder-color-preview" style="background: #e3f2fd; border: 1.5px solid #ddd; cursor: pointer; width: 32px; height: 32px; border-radius: 50%; position: relative !important;">
-                            <input type="color" id="folder-color" value="#e3f2fd"
+                        <div class="pa-color-circle" id="folder-color-preview" style="background: ${defaultColor}; border: 1.5px solid #ddd; cursor: pointer; width: 32px; height: 32px; border-radius: 50%; position: relative !important;">
+                            <input type="color" id="folder-color" value="${defaultColor}"
                                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer; border: none; padding: 0; background: transparent; opacity: 0; -webkit-appearance: none; appearance: none; display: block !important;">
                         </div>
                         <div class="pa-icon-selector-trigger" id="folder-icon-preview" style="width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid #ddd; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.9rem;">
-                            <i class="fa-solid fa-folder"></i>
-                            <input type="hidden" id="folder-icon" value="fa-folder">
+                            <i class="fa-solid ${defaultIcon}"></i>
+                            <input type="hidden" id="folder-icon" value="${defaultIcon}">
                         </div>
                     </div>
                 </div>
@@ -309,7 +392,7 @@ window.openFolderModal = function() {
                         'fa-tv', 'fa-gamepad', 'fa-gift', 'fa-cake-candles', 'fa-pizza-slice', 'fa-burger', 'fa-coffee', 'fa-credit-card',
                         'fa-wallet', 'fa-money-bill-wave'
                     ].map(icon => `
-                        <div class="pa-icon-option ${icon === 'fa-folder' ? 'is-active' : ''}" data-icon="${icon}">
+                        <div class="pa-icon-option ${icon === defaultIcon ? 'is-active' : ''}" data-icon="${icon}">
                             <i class="fa-solid ${icon}"></i>
                         </div>
                     `).join('')}
@@ -317,7 +400,7 @@ window.openFolderModal = function() {
             </div>
         `,
         showCancelButton: true,
-        confirmButtonText: 'Crear',
+        confirmButtonText: confirmBtn,
         cancelButtonText: 'Cancelar',
         customClass: {
             popup: 'pa-swal-popup tm-swal-popup',
@@ -327,8 +410,11 @@ window.openFolderModal = function() {
             cancelButton: 'tm-swal-cancel'
         },
         didOpen: () => {
+            const rid = document.getElementById('folder-record-id');
+            if (rid) rid.value = isEdit && folder ? String(folder.id) : '';
             const nameInput = document.getElementById('folder-name');
             if (nameInput) {
+                if (isEdit && folder) nameInput.value = folder.name || '';
                 nameInput.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
@@ -339,6 +425,10 @@ window.openFolderModal = function() {
             const colorInput = document.getElementById('folder-color');
             const colorPreview = document.getElementById('folder-color-preview');
             if (colorInput && colorPreview) {
+                if (isEdit && folder?.color) {
+                    colorInput.value = folder.color;
+                    colorPreview.style.background = folder.color;
+                }
                 colorInput.addEventListener('input', (e) => {
                     colorPreview.style.background = e.target.value;
                 });
@@ -369,8 +459,15 @@ window.openFolderModal = function() {
             }
         },
         preConfirm: () => {
+            const name = (document.getElementById('folder-name')?.value || '').trim();
+            if (!name) {
+                if (typeof segobToast === 'function') segobToast('warning', 'Indica un nombre para la carpeta');
+                return false;
+            }
+            const rid = document.getElementById('folder-record-id')?.value;
             return {
-                name: document.getElementById('folder-name').value,
+                id: rid || null,
+                name,
                 color: document.getElementById('folder-color').value,
                 icon: document.getElementById('folder-icon').value
             };
@@ -381,27 +478,169 @@ window.openFolderModal = function() {
 };
 
 async function saveFolder(data) {
+    const isEdit = data.id != null && String(data.id).length > 0;
+    const url = isEdit
+        ? window.paRoutes.foldersUpdate.replace(':id', data.id)
+        : window.paRoutes.foldersStore;
+    const method = isEdit ? 'PUT' : 'POST';
+    const payload = {
+        name: data.name,
+        color: data.color,
+        icon: data.icon
+    };
     try {
-        const response = await fetch(window.paRoutes.foldersStore, {
-            method: 'POST',
+        const response = await fetch(url, {
+            method,
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
             },
-            body: JSON.stringify(data)
+            body: JSON.stringify(payload)
         });
-        if (response.ok) location.reload();
+        if (response.ok) {
+            segobToast('success', isEdit ? 'Carpeta actualizada' : 'Carpeta creada');
+            await loadFolders();
+            const activeNav = document.querySelector('.pa-nav-item.is-active');
+            const navFilter = activeNav?.dataset?.filter || 'all';
+            if (typeof window.loadNotes === 'function') {
+                window.loadNotes(navFilter);
+            }
+        } else {
+            const parsed = await paParseFetchJson(response);
+            const msg = (parsed.data && (parsed.data.message || parsed.data.error)) || 'No se pudo guardar la carpeta';
+            segobToast('error', typeof msg === 'string' ? msg : 'No se pudo guardar la carpeta');
+        }
     } catch (error) {
         segobToast('error', 'Fallo de conexión');
     }
 }
 
+window.toggleFolderPin = function(id) {
+    fetch(window.paRoutes.foldersPin.replace(':id', id), {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+        .then(paParseFetchJson)
+        .then(({ ok, data }) => {
+            if (!ok || !data.success) {
+                if (typeof segobToast === 'function') {
+                    segobToast('warning', data.message || 'No se pudo actualizar la fijación');
+                }
+                return;
+            }
+            if (typeof segobToast === 'function') {
+                segobToast('success', data.pinned ? 'Carpeta fijada' : 'Fijación quitada');
+            }
+            loadFolders();
+        })
+        .catch(() => {
+            if (typeof segobToast === 'function') segobToast('error', 'Fallo de conexión');
+        });
+};
+
+window.archiveFolder = function(id, name) {
+    const archiveUrl = window.paRoutes.foldersArchive && window.paRoutes.foldersArchive.replace(':id', id);
+    if (!archiveUrl || archiveUrl.includes(':id')) {
+        if (typeof segobToast === 'function') segobToast('error', 'Ruta de archivado no configurada. Recarga la página.');
+        console.error('foldersArchive inválida', window.paRoutes.foldersArchive);
+        return;
+    }
+    swalAlert.fire({
+        title: '¿Archivar carpeta?',
+        html: `<p class="text-start" style="font-size:0.9rem;">La carpeta <strong>${String(name).replace(/</g, '&lt;')}</strong> y todas sus notas pasarán al <strong>Archivo</strong>. La carpeta dejará de mostrarse en la lista.</p>`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, archivar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            confirmButton: 'tm-swal-confirm btn-primary',
+            cancelButton: 'tm-swal-cancel'
+        }
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        fetch(archiveUrl, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+            .then(paParseFetchJson)
+            .then(({ ok, data, parseError, emptyBody }) => {
+                if (parseError) {
+                    if (typeof segobToast === 'function') {
+                        segobToast('error', 'Respuesta inválida (¿sesión caducada?). Recarga e inténtalo de nuevo.');
+                    }
+                    return;
+                }
+                if (emptyBody && !ok) {
+                    if (typeof segobToast === 'function') segobToast('error', 'Error del servidor al archivar');
+                    return;
+                }
+                if (data && data.success) {
+                    if (typeof segobToast === 'function') segobToast('success', 'Carpeta archivada');
+                    loadFolders();
+                    if (document.querySelector('.pa-nav-item.is-active')?.dataset.filter === 'archive' && typeof window.loadNotes === 'function') {
+                        window.loadNotes('archive');
+                    }
+                    return;
+                }
+                if (typeof segobToast === 'function') {
+                    segobToast('warning', (data && data.message) || 'No se pudo archivar');
+                }
+            })
+            .catch(() => {
+                if (typeof segobToast === 'function') segobToast('error', 'Fallo de conexión');
+            });
+    });
+};
+
+window.restoreArchivedFolder = function(id) {
+    const url = window.paRoutes.foldersRestore && window.paRoutes.foldersRestore.replace(':id', String(id));
+    if (!url || url.includes(':id')) {
+        if (typeof segobToast === 'function') segobToast('error', 'Ruta no configurada. Recarga la página.');
+        return;
+    }
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    })
+        .then(paParseFetchJson)
+        .then(({ ok, data }) => {
+            if (!ok || !data || !data.success) {
+                if (typeof segobToast === 'function') segobToast('error', 'No se pudo restaurar la carpeta');
+                return;
+            }
+            if (typeof segobToast === 'function') segobToast('success', 'Carpeta restaurada');
+            
+            // Si estamos dentro de la carpeta que se acaba de restaurar, salir a la raíz del archivo
+            if (String(window.paCurrentFolderId) === String(id)) {
+                if (typeof navigateToFolder === 'function') navigateToFolder(null);
+            } else {
+                if (typeof loadFolders === 'function') loadFolders();
+                if (typeof window.loadNotes === 'function') window.loadNotes('archive');
+            }
+        })
+        .catch(() => {
+            if (typeof segobToast === 'function') segobToast('error', 'Fallo de conexión');
+        });
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('pa-search');
     const noteCards = document.querySelectorAll('.pa-card--note');
     const tabs = document.querySelectorAll('.pa-tab');
-    const foldersData = JSON.parse(document.getElementById('pa-folders-json')?.textContent || '[]');
 
     // Buscador en tiempo real
     if (searchInput) {
@@ -479,8 +718,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const breadcrumb = document.getElementById('pa-breadcrumb');
         if (!breadcrumb) return;
 
+        const activeNav = document.querySelector('.pa-nav-item.is-active');
+        const isArchive = activeNav && activeNav.dataset.filter === 'archive';
+        const rootLabel = isArchive ? 'Archivo' : 'Mis Notas';
+        const rootIcon = isArchive ? 'fa-box-archive' : 'fa-house';
+
         let html = `<a href="#" class="pa-breadcrumb-item pa-breadcrumb-root ${!folder ? 'is-current' : ''}" onclick="event.preventDefault(); navigateToFolder(null);">
-            <i class="fa-solid fa-house" style="font-size: 0.7rem;"></i> Mis Notas
+            <i class="fa-solid ${rootIcon}" style="font-size: 0.7rem;"></i> ${rootLabel}
         </a>`;
 
         if (folder) {
@@ -494,35 +738,75 @@ document.addEventListener('DOMContentLoaded', function() {
     window.navigateToFolder = async function(folderId) {
         window.paCurrentFolderId = folderId;
 
+        // Sincronizar el select de filtros si existe
+        const folderFilter = document.getElementById('filter-folder');
+        if (folderFilter) {
+            folderFilter.value = folderId || '';
+        }
+
+        const activeNav = document.querySelector('.pa-nav-item.is-active');
+        const currentFilter = activeNav ? activeNav.dataset.filter : 'all';
+
         if (!folderId) {
-            // Go back to root folders view
+            // Go back to root view
             setExplorerMode(true);
             updateBreadcrumb(null);
-            loadNotes('folders');
-            // Show folders section & notes header again
-            const folderSec = document.getElementById('section-folders');
-            if (folderSec) folderSec.style.display = 'block';
+            
+            if (currentFilter === 'archive') {
+                loadNotes('archive');
+                const archivedFolderSec = document.getElementById('section-archived-folders');
+                if (archivedFolderSec) archivedFolderSec.style.display = 'block';
+                // Asegurarse de ocultar el de carpetas activas por si acaso
+                const folderSec = document.getElementById('section-folders');
+                if (folderSec) folderSec.style.display = 'none';
+            } else {
+                loadNotes('folders');
+                const folderSec = document.getElementById('section-folders');
+                if (folderSec) folderSec.style.display = 'block';
+                const archivedFolderSec = document.getElementById('section-archived-folders');
+                if (archivedFolderSec) archivedFolderSec.style.display = 'none';
+            }
+
             const notesHeader = document.getElementById('notes-section-header');
             if (notesHeader) notesHeader.style.display = '';
             return;
         }
 
-        // Hide folders section & notes header — show only notes inside this folder
+        // Hide dynamic sections — show only notes inside this folder
         const folderSec = document.getElementById('section-folders');
+        const archivedFolderSec = document.getElementById('section-archived-folders');
         if (folderSec) folderSec.style.display = 'none';
+        if (archivedFolderSec) archivedFolderSec.style.display = 'none';
         const notesHeader = document.getElementById('notes-section-header');
         if (notesHeader) notesHeader.style.display = 'none';
 
         const container = document.getElementById('pa-notes-container');
         if (container) container.style.opacity = '0.5';
 
+        if (container) {
+            container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; opacity: 0.5;"><i class="fa-solid fa-spinner fa-spin"></i> Cargando notas...</div>';
+            container.style.opacity = '0.5';
+        }
+
         try {
-            const response = await paFetch(paBuildUrl(window.paRoutes.index, { folder_id: folderId }), {
+            const activeNav = document.querySelector('.pa-nav-item.is-active');
+            let currentFilter = activeNav ? activeNav.dataset.filter : 'all';
+            
+            const cleanParams = { 
+                filter: currentFilter === 'archive' ? 'archive' : 'folder', 
+                folder_id: folderId 
+            };
+
+            const response = await paFetch(paBuildUrl(window.paRoutes.index, cleanParams), {
                 headers: {
                     'Accept': 'application/json'
                 }
             });
-            const data = await response.json();
+            const parsed = await paParseFetchJson(response);
+            const data = parsed.data || {};
+            if (parsed.parseError || (parsed.emptyBody && !data.html)) {
+                throw new Error('Respuesta inválida al abrir carpeta');
+            }
 
             if (container) {
                 container.innerHTML = data.html;
@@ -564,20 +848,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Folder card click → navigate inside
     function bindFolderClicks() {
-        document.querySelectorAll('.pa-card--folder:not(.pa-card--placeholder)').forEach(card => {
+        document.querySelectorAll('.pa-card--folder:not(.pa-card--placeholder):not(.pa-card--folder-archived)').forEach(card => {
             card.style.cursor = 'pointer';
             card.onclick = function(e) {
-                if (e.target.closest('.pa-folder-delete')) return;
+                if (e.target.closest('.pa-folder-delete') || e.target.closest('.pa-folder-action-btn')) return;
                 const folderId = this.dataset.id;
                 if (!folderId) return;
 
-                // Switch sidebar to "Carpetas"
-                const foldersNavItem = document.querySelector('.pa-nav-item[data-filter="folders"]');
-                if (foldersNavItem && !foldersNavItem.classList.contains('is-active')) {
-                    foldersNavItem.click();
+                const activeNav = document.querySelector('.pa-nav-item.is-active');
+                const isArchive = activeNav && activeNav.dataset.filter === 'archive';
+
+                if (!isArchive) {
+                    const foldersNavItem = document.querySelector('.pa-nav-item[data-filter="folders"]');
+                    if (foldersNavItem && !foldersNavItem.classList.contains('is-active')) {
+                        window.__paSuppressNextNavLoadNotes = true;
+                        foldersNavItem.click();
+                    }
                 }
 
-                // Navigate into the folder
                 navigateToFolder(folderId);
             };
         });
@@ -629,6 +917,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             const folderSec = document.getElementById('section-folders');
+            const archivedFolderSec = document.getElementById('section-archived-folders');
+            if (archivedFolderSec) {
+                archivedFolderSec.style.display = filter === 'archive' ? 'block' : 'none';
+            }
             if (folderSec) {
                 folderSec.style.display = (filter === 'all' || filter === 'folders') ? 'block' : 'none';
 
@@ -691,7 +983,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 toggleNotesGrid(filter === 'archive' || filter === 'trash');
             }
 
-            loadNotes(filter);
+            // Evitar loadNotes al activar "Carpetas" desde un clic en tarjeta: navigateToFolder() cargará con folder_id (sin esto, loadNotes('folders') sin carpeta gana la carrera y muestra notas incorrectas).
+            if (window.__paSuppressNextNavLoadNotes) {
+                window.__paSuppressNextNavLoadNotes = false;
+            } else {
+                loadNotes(filter);
+            }
             updateHash();
             syncAllNotesPillState();
         });
@@ -841,13 +1138,30 @@ document.addEventListener('DOMContentLoaded', function() {
             const text = await response.text();
             const folderIdParam = document.getElementById('filter-folder')?.value || '';
             const looksLikeJsonEnvelope = text.trim().startsWith('{') && text.includes('"html"');
-            if (window.paCurrentFolderId || folderIdParam || looksLikeJsonEnvelope) {
+            if (filter === 'archive') {
+                try {
+                    const data = JSON.parse(text);
+                    html = data && typeof data.html === 'string' ? data.html : text;
+                    const af = document.getElementById('pa-archived-folders-container');
+                    if (af && data && typeof data.archived_folders_html === 'string') {
+                        af.innerHTML = data.archived_folders_html;
+                    }
+                    if (data && data.folders && typeof paSyncFolderFilterSelect === 'function') {
+                        paSyncFolderFilterSelect(data.folders);
+                    }
+                } catch (_) {
+                    html = text;
+                }
+            } else if (window.paCurrentFolderId || folderIdParam || looksLikeJsonEnvelope) {
                 try {
                     const data = JSON.parse(text);
                     if (data && typeof data.html === 'string') {
                         html = data.html;
                     } else {
                         html = text;
+                    }
+                    if (data && data.folders && typeof paSyncFolderFilterSelect === 'function') {
+                        paSyncFolderFilterSelect(data.folders);
                     }
                 } catch (_) {
                     html = text;
@@ -948,6 +1262,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     const currentFilter = document.querySelector('.pa-nav-item.is-active')?.dataset.filter || 'all';
                     window.loadNotes(currentFilter);
                 }
+                // Refresh folder counts
+                loadFolders();
             } else if (response.status === 422) {
                 const err = await response.json().catch(() => null);
                 segobToast('warning', err?.message || 'Máximo 10 imágenes y 10 archivos por nota.');
@@ -1213,7 +1529,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     body: JSON.stringify({ password: password.trim() })
                 });
-                const data = await response.json();
+                const parsed = await paParseFetchJson(response);
+                const data = parsed.data;
                 if (data.success) {
                     noteData.content = data.content;
                     noteData.password = password.trim();
@@ -1361,7 +1678,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     body: JSON.stringify({ password })
                 });
-                const data = await response.json();
+                const parsed = await paParseFetchJson(response);
+                const data = parsed.data;
                 if (data.success) {
                     noteData.content = data.content;
                     noteData.password = password;
@@ -1479,23 +1797,6 @@ document.addEventListener('DOMContentLoaded', function() {
         updateAttCounter();
     };
 
-    async function saveFolder(data) {
-        try {
-            const response = await fetch(window.paRoutes.foldersStore, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify(data)
-            });
-            if (response.ok) location.reload();
-        } catch (error) {
-            segobToast('error', 'Fallo de conexión');
-        }
-    }
-
     window.archiveNote = async function(id) {
         const result = await swalAlert.fire({
             title: '¿Archivar nota?',
@@ -1522,6 +1823,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 if (response.ok) {
                     segobToast('success', 'Nota archivada');
+                    loadFolders();
                 } else {
                     console.warn('Archive response:', response.status);
                     segobToast('warning', 'Posible error al archivar');
@@ -1567,6 +1869,8 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             loadNotes();
         }
+        // Refresh folder counts
+        loadFolders();
     };
 
     window.deleteNote = async function(id, permanent = false) {
@@ -1593,6 +1897,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 if (response.ok) {
                     segobToast('success', 'Nota eliminada');
+                    loadFolders();
                 } else {
                     console.warn('Delete response:', response.status);
                     segobToast('error', 'Error al eliminar');
@@ -1652,12 +1957,34 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
+    window.slideFolders = function(direction) {
+        const container = document.getElementById('pa-folders-container');
+        if (!container) return;
+        const scrollAmount = 280;
+        if (direction === 'left') {
+            container.scrollLeft -= scrollAmount;
+        } else {
+            container.scrollLeft += scrollAmount;
+        }
+    };
+
+    window.slideArchivedFolders = function(direction) {
+        const container = document.getElementById('pa-archived-folders-container');
+        if (!container) return;
+        const scrollAmount = 280;
+        if (direction === 'left') {
+            container.scrollLeft -= scrollAmount;
+        } else {
+            container.scrollLeft += scrollAmount;
+        }
+    };
+
     // --- Lógica de Reubicación (Drag & Drop + Context Menu) ---
     let selectedNoteId = null;
 
     function initDragAndDrop() {
         const notes = document.querySelectorAll('.pa-card--note');
-        const folders = document.querySelectorAll('.pa-card--folder:not(.pa-card--placeholder)');
+        const folders = document.querySelectorAll('.pa-card--folder:not(.pa-card--placeholder):not(.pa-card--folder-archived)');
 
         notes.forEach(note => {
             note.addEventListener('dragstart', function(e) {
@@ -1789,44 +2116,14 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify({ folder_id: folderId })
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
+        .then(paParseFetchJson)
+        .then(({ data }) => {
+            if (data && data.success) {
                 const menu = document.getElementById('pa-context-menu');
                 if (menu) menu.style.display = 'none';
 
-                // Update counts in DOM (Folders section)
-                const noteElement = document.querySelector(`.pa-card--note[data-id="${targetNoteId}"]`);
-                if (noteElement && noteElement.getAttribute('data-note-data')) {
-                    const noteData = paParseNoteDataFromEl(noteElement);
-                    if (noteData) {
-                    const oldFolderId = noteData.folder_id;
-
-                    // Decrement old folder if it was in one
-                    if (oldFolderId) {
-                        const oldFolderCard = document.querySelector(`.pa-card--folder[data-id="${oldFolderId}"]`);
-                        if (oldFolderCard) {
-                            const countSpan = oldFolderCard.querySelector('.pa-folder-count-num');
-                            if (countSpan) {
-                                let count = parseInt(countSpan.textContent) || 0;
-                                countSpan.textContent = `${Math.max(0, count - 1)} notas`;
-                            }
-                        }
-                    }
-
-                    // Increment new folder
-                    if (folderId) {
-                        const newFolderCard = document.querySelector(`.pa-card--folder[data-id="${folderId}"]`);
-                        if (newFolderCard) {
-                            const countSpan = newFolderCard.querySelector('.pa-folder-count-num');
-                            if (countSpan) {
-                                let count = parseInt(countSpan.textContent) || 0;
-                                countSpan.textContent = `${count + 1} notas`;
-                            }
-                        }
-                    }
-                    }
-                }
+                // Refresh folder counts via AJAX (cleaner than manual DOM manipulation)
+                loadFolders();
 
                 // If inside a folder, reload that folder; otherwise reload normal view
                 if (window.paCurrentFolderId) {
@@ -1899,19 +2196,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     body: JSON.stringify({ _method: 'DELETE', delete_notes: result.value.delete_notes })
                 })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
+                .then(paParseFetchJson)
+                .then(({ data }) => {
+                    if (data && data.success) {
                         segobToast('success', 'Carpeta eliminada');
-                        location.reload();
+                        loadFolders();
+                    } else if (typeof segobToast === 'function') {
+                        segobToast('error', (data && data.message) || 'No se pudo eliminar');
                     }
+                })
+                .catch(() => {
+                    if (typeof segobToast === 'function') segobToast('error', 'Fallo de conexión');
                 });
             }
         });
     };
 
-    // Hook into MutationObserver for notes grid
+    // Hook into MutationObserver for notes grid and folders grid
     const notesContainer = document.getElementById('pa-notes-container');
+    const foldersContainer = document.getElementById('pa-folders-container');
+    const archivedFoldersContainer = document.getElementById('pa-archived-folders-container');
     const gridObserver = new MutationObserver(() => {
         initDragAndDrop();
         initContextMenu();
@@ -1919,6 +2223,8 @@ document.addEventListener('DOMContentLoaded', function() {
         bindFolderClicks();
     });
     if (notesContainer) gridObserver.observe(notesContainer, { childList: true });
+    if (foldersContainer) gridObserver.observe(foldersContainer, { childList: true });
+    if (archivedFoldersContainer) gridObserver.observe(archivedFoldersContainer, { childList: true });
 
     // Handle initial state from URL hash
     function applyUrlState() {
