@@ -21,7 +21,9 @@ class WhatsAppChatsBackupCommand extends Command
         $dayFolder = $destBase.DIRECTORY_SEPARATOR.now()->format('Y-m-d');
         File::ensureDirectoryExists($dayFolder);
 
-        $query = WhatsAppChatArchive::query()->orderBy('id');
+        $query = WhatsAppChatArchive::query()
+            ->where('import_status', WhatsAppChatArchive::IMPORT_STATUS_READY)
+            ->orderBy('id');
         if ($this->option('chat')) {
             $query->whereKey((int) $this->option('chat'));
         }

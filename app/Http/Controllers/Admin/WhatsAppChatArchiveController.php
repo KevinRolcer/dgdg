@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\WhatsAppChatArchiveImportJob;
 use App\Models\WhatsAppChatAccessLog;
 use App\Models\WhatsAppChatArchive;
 use App\Services\WhatsApp\WhatsAppChatEncryptionService;
@@ -16,7 +17,6 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
-use ZipArchive;
 
 class WhatsAppChatArchiveController extends Controller
 {
@@ -124,6 +124,8 @@ class WhatsAppChatArchiveController extends Controller
                 'original_zip_name',
                 'imported_at',
                 'message_parts_count',
+                'import_status',
+                'import_error',
             ])
             ->orderByDesc('imported_at')
             ->paginate(15)
@@ -154,15 +156,8 @@ class WhatsAppChatArchiveController extends Controller
 
         $user = $request->user();
 
-        if (! class_exists(ZipArchive::class)) {
-            throw ValidationException::withMessages([
-                'archivo_zip' => 'Este servidor no tiene soporte para ZIP (ZipArchive).',
-            ]);
-        }
-
         $diskName = (string) config('whatsapp_chats.storage_disk', 'whatsapp_chats');
         $disk = Storage::disk($diskName);
-        $diskRootAbs = $this->diskAbsoluteRoot($diskName);
 
         $uploadedFile = $validated['archivo_zip'];
         $originalZipName = $uploadedFile->getClientOriginalName();
@@ -172,56 +167,45 @@ class WhatsAppChatArchiveController extends Controller
         $extractDirAbsolute = $disk->path($extractDirRelative);
         File::ensureDirectoryExists($extractDirAbsolute);
 
-        $tempZipPath = $extractDirAbsolute.DIRECTORY_SEPARATOR.'upload.zip';
         $uploadedFile->move($extractDirAbsolute, 'upload.zip');
 
-        $zip = new ZipArchive;
-        if ($zip->open($tempZipPath) !== true) {
-            throw ValidationException::withMessages([
-                'archivo_zip' => 'No se pudo abrir el ZIP. Verifica que sea una exportación válida de WhatsApp.',
-            ]);
-        }
-        $zip->extractTo($extractDirAbsolute);
-        $zip->close();
-
-        [$chatTitle, $chatRootDirRelative, $messageParts] = $this->detectChatAndMessageParts(
-            $extractDirRelative,
-            $extractDirAbsolute,
-            $diskRootAbs
-        );
-
-        $dek = $this->encryption->generateDek();
-        $wrapped = $this->encryption->wrapDek($dek);
-        $this->encryption->encryptTree($disk, $chatRootDirRelative, $dek);
-
-        if ($disk->exists($extractDirRelative.'/upload.zip')) {
-            $disk->delete($extractDirRelative.'/upload.zip');
-        }
-
-        $compactParts = WhatsAppChatPathNormalizer::normalizeStoragePaths($messageParts, $chatRootDirRelative);
-
         $chat = WhatsAppChatArchive::create([
-            'title' => $chatTitle,
+            'title' => 'Importando…',
             'original_zip_name' => $originalZipName,
-            'storage_root_path' => $chatRootDirRelative,
-            'message_parts' => $compactParts,
-            'message_parts_count' => count($compactParts),
+            'storage_root_path' => $extractDirRelative,
+            'message_parts' => [],
+            'message_parts_count' => 0,
             'created_by' => $user->id,
-            'is_encrypted' => true,
-            'wrapped_dek' => $wrapped,
+            'is_encrypted' => false,
+            'wrapped_dek' => null,
             'encrypted_key_version' => 1,
             'storage_disk' => $diskName,
+            'import_status' => WhatsAppChatArchive::IMPORT_STATUS_PROCESSING,
+            'import_error' => null,
         ]);
 
-        $this->audit($request, $chat->id, 'import', $chatRootDirRelative);
+        WhatsAppChatArchiveImportJob::dispatch($chat->id, (int) $user->id);
+
+        $this->audit($request, $chat->id, 'import_queued', $extractDirRelative);
 
         return redirect()
-            ->route('whatsapp-chats.admin.show', ['chat' => $chat->id])
-            ->with('status', 'ZIP importado y cifrado correctamente.');
+            ->route('whatsapp-chats.admin.index')
+            ->with('status', 'El ZIP se está procesando en segundo plano. Recibirás una notificación en la campana cuando termine (éxito o error).');
     }
 
     public function show(Request $request, WhatsAppChatArchive $chat)
     {
+        if ($chat->import_status === WhatsAppChatArchive::IMPORT_STATUS_PROCESSING) {
+            return redirect()
+                ->route('whatsapp-chats.admin.index')
+                ->with('error', 'Esta importación sigue procesándose. Te avisaremos por notificación cuando esté lista.');
+        }
+        if ($chat->import_status === WhatsAppChatArchive::IMPORT_STATUS_FAILED) {
+            return redirect()
+                ->route('whatsapp-chats.admin.index')
+                ->with('error', 'Esta importación falló: '.(string) ($chat->import_error ?? 'sin detalle'));
+        }
+
         $disk = $chat->disk();
         $messageParts = WhatsAppChatPathNormalizer::expandStoragePaths(
             is_array($chat->message_parts) ? $chat->message_parts : [],
@@ -292,6 +276,8 @@ class WhatsAppChatArchiveController extends Controller
 
     public function media(Request $request, WhatsAppChatArchive $chat): Response
     {
+        abort_unless($chat->import_status === WhatsAppChatArchive::IMPORT_STATUS_READY, 404);
+
         $file = trim((string) $request->query('file', ''), '/');
         abort_if($file === '', 404);
 
@@ -376,112 +362,6 @@ class WhatsAppChatArchiveController extends Controller
         } catch (\Throwable) {
             // no bloquear flujo si falla auditoría
         }
-    }
-
-    private function diskAbsoluteRoot(string $diskName): string
-    {
-        $root = (string) config("filesystems.disks.{$diskName}.root", '');
-
-        return rtrim($root, DIRECTORY_SEPARATOR);
-    }
-
-    /**
-     * @return array{0:string,1:string,2:array<int,string>}
-     */
-    private function detectChatAndMessageParts(string $extractDirRelative, string $extractDirAbsolute, string $diskAbsoluteRoot): array
-    {
-        $subdirs = File::directories($extractDirAbsolute);
-        foreach ($subdirs as $candidateAbsoluteDir) {
-            $candidateName = basename($candidateAbsoluteDir);
-
-            $messagesDirAbsolute = $candidateAbsoluteDir.DIRECTORY_SEPARATOR.'messages';
-            if (! is_dir($messagesDirAbsolute)) {
-                continue;
-            }
-
-            $htmlFiles = glob($messagesDirAbsolute.DIRECTORY_SEPARATOR.'message_*.html');
-            if (! $htmlFiles || count($htmlFiles) === 0) {
-                continue;
-            }
-
-            sort($htmlFiles, SORT_NATURAL);
-
-            $messageParts = array_map(function (string $absFile) use ($diskAbsoluteRoot) {
-                $normalizedAbs = str_replace('\\', '/', $absFile);
-                $normalizedRoot = rtrim(str_replace('\\', '/', $diskAbsoluteRoot), '/');
-
-                return ltrim(str_replace($normalizedRoot, '', $normalizedAbs), '/');
-            }, $htmlFiles);
-
-            $chatRootDirRelative = $extractDirRelative.'/'.$candidateName;
-
-            return [$candidateName, str_replace('\\', '/', $chatRootDirRelative), $messageParts];
-        }
-
-        $iter = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($extractDirAbsolute, \FilesystemIterator::SKIP_DOTS)
-        );
-
-        $messageHtml = [];
-        $chatTxt = [];
-        foreach ($iter as $fileInfo) {
-            /** @var \SplFileInfo $fileInfo */
-            if ($fileInfo->isFile() && preg_match('/message_\\d+\\.html$/', $fileInfo->getFilename())) {
-                $messageHtml[] = $fileInfo->getPathname();
-            }
-            if ($fileInfo->isFile() && preg_match('/(^|_)chat\\.txt$/i', $fileInfo->getFilename())) {
-                $chatTxt[] = $fileInfo->getPathname();
-            }
-        }
-
-        if (count($messageHtml) > 0) {
-            sort($messageHtml, SORT_NATURAL);
-            $firstMessageAbs = $messageHtml[0];
-            $messagesDirAbs = dirname($firstMessageAbs);
-            $chatRootAbs = dirname($messagesDirAbs);
-            $chatRootName = basename($chatRootAbs);
-
-            $messageParts = array_map(function (string $absFile) use ($diskAbsoluteRoot) {
-                $normalizedAbs = str_replace('\\', '/', $absFile);
-                $normalizedRoot = rtrim(str_replace('\\', '/', $diskAbsoluteRoot), '/');
-
-                return ltrim(str_replace($normalizedRoot, '', $normalizedAbs), '/');
-            }, $messageHtml);
-
-            $chatRootDirRelative = ltrim(str_replace(
-                rtrim(str_replace('\\', '/', $diskAbsoluteRoot), '/'),
-                '',
-                str_replace('\\', '/', $chatRootAbs)
-            ), '/');
-
-            return [$chatRootName, $chatRootDirRelative, $messageParts];
-        }
-
-        if (count($chatTxt) === 0) {
-            throw ValidationException::withMessages([
-                'archivo_zip' => 'No se detectó ningún chat válido. Se esperaba message_*.html o _chat.txt dentro del ZIP.',
-            ]);
-        }
-
-        sort($chatTxt, SORT_NATURAL);
-        $firstChatTxtAbs = $chatTxt[0];
-        $chatRootAbs = dirname($firstChatTxtAbs);
-        $chatRootName = basename($chatRootAbs);
-
-        $messageParts = array_map(function (string $absFile) use ($diskAbsoluteRoot) {
-            $normalizedAbs = str_replace('\\', '/', $absFile);
-            $normalizedRoot = rtrim(str_replace('\\', '/', $diskAbsoluteRoot), '/');
-
-            return ltrim(str_replace($normalizedRoot, '', $normalizedAbs), '/');
-        }, $chatTxt);
-
-        $chatRootDirRelative = ltrim(str_replace(
-            rtrim(str_replace('\\', '/', $diskAbsoluteRoot), '/'),
-            '',
-            str_replace('\\', '/', $chatRootAbs)
-        ), '/');
-
-        return [$chatRootName, $chatRootDirRelative, $messageParts];
     }
 
     private function buildTxtMessagesCollection(

@@ -9,6 +9,12 @@ use Illuminate\Support\Facades\Storage;
 
 class WhatsAppChatArchive extends Model
 {
+    public const IMPORT_STATUS_READY = 'ready';
+
+    public const IMPORT_STATUS_PROCESSING = 'processing';
+
+    public const IMPORT_STATUS_FAILED = 'failed';
+
     protected $table = 'whatsapp_chat_archives';
 
     public $timestamps = false;
@@ -24,6 +30,9 @@ class WhatsAppChatArchive extends Model
         'wrapped_dek',
         'encrypted_key_version',
         'storage_disk',
+        'import_status',
+        'import_error',
+        'imported_at',
     ];
 
     protected $casts = [

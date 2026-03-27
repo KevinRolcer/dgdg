@@ -4,8 +4,8 @@ $waMaxUploadMb = (int) env('WHATSAPP_CHATS_MAX_UPLOAD_MB', 768);
 if ($waMaxUploadMb < 50) {
     $waMaxUploadMb = 768;
 }
-if ($waMaxUploadMb > 4096) {
-    $waMaxUploadMb = 4096;
+if ($waMaxUploadMb > 3072) {
+    $waMaxUploadMb = 3072;
 }
 
 return [
@@ -27,9 +27,10 @@ return [
     | Tamaño máximo del ZIP de importación
     |--------------------------------------------------------------------------
     |
-    | Laravel valida en kilobytes (MB × 1024). Debe ser coherente con PHP
-    | (upload_max_filesize, post_max_size) y el servidor web (p. ej. Nginx
-    | client_max_body_size). Por defecto 768 MB para respaldos grandes.
+    | Laravel valida en kilobytes (MB × 1024). Tope en app: 3072 MB (3 GB).
+    | Debe ser coherente con PHP (upload_max_filesize, post_max_size) y el
+    | servidor web (p. ej. Nginx client_max_body_size). La importación pesada
+    | corre en cola (queue worker) para evitar timeouts HTTP.
     |
     */
     'max_upload_mb' => $waMaxUploadMb,

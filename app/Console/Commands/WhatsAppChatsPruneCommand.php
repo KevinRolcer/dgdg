@@ -22,6 +22,7 @@ class WhatsAppChatsPruneCommand extends Command
 
         $cutoff = now()->subDays($days);
         $ids = WhatsAppChatArchive::query()
+            ->where('import_status', WhatsAppChatArchive::IMPORT_STATUS_READY)
             ->where('imported_at', '<', $cutoff)
             ->pluck('id');
 
