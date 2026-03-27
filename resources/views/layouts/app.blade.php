@@ -19,18 +19,34 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="{{ asset('assets/js/vendor/simple-expand.min.js') }}"></script>
 </head>
-<body @can('Modulos-Temporales-Admin') data-export-status-url="{{ route('temporary-modules.admin.export-status', ['exportRequest' => 0]) }}" @endcan>
+<body
+    @can('Modulos-Temporales-Admin') data-export-status-url="{{ route('temporary-modules.admin.export-status', ['exportRequest' => 0]) }}" @endcan
+    @can('Chats-WhatsApp-Sensible') data-whatsapp-import-status-base="{{ url('/admin/whatsapp-chats') }}" @endcan
+>
     @php
         $topbarNotifications = collect($topbarNotifications ?? []);
         if (auth()->check()) {
             $dbNotifications = auth()->user()->unreadNotifications->map(function ($noty) {
+                $d = $noty->data ?? [];
+                $waArchiveId = $d['whatsapp_archive_id'] ?? $d['whatsapp_chat_id'] ?? null;
+                $waStatus = $d['whatsapp_import_status'] ?? null;
+                if ($waStatus === null && array_key_exists('whatsapp_import_success', $d)) {
+                    $waStatus = ($d['whatsapp_import_success'] ?? false) ? 'completed' : 'failed';
+                }
+                $waProgress = isset($d['whatsapp_import_progress']) ? (int) $d['whatsapp_import_progress'] : null;
+                $waPhase = $d['whatsapp_import_phase'] ?? null;
+
                 return [
                     'id' => $noty->id,
-                    'icon' => $noty->data['icon'] ?? 'fa-regular fa-bell',
-                    'title' => $noty->data['title'] ?? 'Nueva Notificación',
+                    'icon' => $d['icon'] ?? 'fa-regular fa-bell',
+                    'title' => $d['title'] ?? 'Nueva Notificación',
                     'time' => $noty->created_at->locale('es')->diffForHumans(),
-                    'url' => $noty->data['url'] ?? null,
-                    'export_request_id' => $noty->data['export_request_id'] ?? null,
+                    'url' => $d['url'] ?? null,
+                    'export_request_id' => $d['export_request_id'] ?? null,
+                    'whatsapp_archive_id' => $waArchiveId,
+                    'whatsapp_import_progress' => $waProgress,
+                    'whatsapp_import_phase' => $waPhase,
+                    'whatsapp_import_status' => $waStatus,
                 ];
             });
             $topbarNotifications = $dbNotifications->concat($topbarNotifications);
@@ -87,19 +103,31 @@
                                             }
                                         }
                                     @endphp
-                                    <li class="{{ $loop->first ? 'is-active' : '' }}" style="position:relative; padding-right:42px;" @if(!empty($notification['export_request_id'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif>
+                                    <li class="{{ $loop->first ? 'is-active' : '' }} wa-notify-item" style="position:relative; padding-right:42px;"
+                                        @if(!empty($notification['export_request_id'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif
+                                        @if(!empty($notification['whatsapp_archive_id']) && ($notification['whatsapp_import_status'] ?? '') === 'processing') data-whatsapp-import-archive-id="{{ $notification['whatsapp_archive_id'] }}" @endif
+                                    >
                                         <span class="topbar-notify-icon">
                                             <i class="{{ $notification['icon'] ?? 'fa-regular fa-bell' }}" aria-hidden="true"></i>
                                         </span>
                                         <div>
                                             @if(!empty($targetUrl))
                                                 <a href="{{ $targetUrl }}" style="text-decoration:none; color:inherit;" title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">
-                                                    <strong title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                                    <strong class="wa-notify-import-title" title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">{{ $notification['title'] ?? 'Notificación' }}</strong>
                                                 </a>
                                             @else
-                                                <strong title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                                <strong class="wa-notify-import-title" title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">{{ $notification['title'] ?? 'Notificación' }}</strong>
                                             @endif
-                                            <small>{{ $notification['time'] ?? 'Reciente' }}</small>
+                                            @if(($notification['whatsapp_import_status'] ?? '') === 'processing')
+                                                @php $waPct = min(100, max(0, (int) ($notification['whatsapp_import_progress'] ?? 0))); @endphp
+                                                <div class="wa-notify-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $waPct }}">
+                                                    <div class="wa-notify-progress-bar" style="width: {{ $waPct }}%;"></div>
+                                                </div>
+                                                @if(!empty($notification['whatsapp_import_phase']))
+                                                    <small class="wa-notify-phase">{{ $notification['whatsapp_import_phase'] }}</small>
+                                                @endif
+                                            @endif
+                                            <small class="wa-notify-time">{{ $notification['time'] ?? 'Reciente' }}</small>
                                         </div>
                                         @if(!empty($notification['id']))
                                             <form method="POST" action="{{ route('notifications.destroy', $notification['id']) }}" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); margin:0; display:flex;">
@@ -300,19 +328,31 @@
                                 }
                             }
                         @endphp
-                        <li style="position:relative; padding-right:42px;" @if(!empty($notification['export_request_id'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif>
+                        <li class="wa-notify-item" style="position:relative; padding-right:42px;"
+                            @if(!empty($notification['export_request_id'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif
+                            @if(!empty($notification['whatsapp_archive_id']) && ($notification['whatsapp_import_status'] ?? '') === 'processing') data-whatsapp-import-archive-id="{{ $notification['whatsapp_archive_id'] }}" @endif
+                        >
                             <span class="topbar-notify-icon">
                                 <i class="{{ $notification['icon'] ?? 'fa-regular fa-bell' }}" aria-hidden="true"></i>
                             </span>
                             <div>
                                 @if(!empty($targetUrl))
                                     <a href="{{ $targetUrl }}" style="text-decoration:none; color:inherit;" title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">
-                                        <strong title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                        <strong class="wa-notify-import-title" title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">{{ $notification['title'] ?? 'Notificación' }}</strong>
                                     </a>
                                 @else
-                                    <strong title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">{{ $notification['title'] ?? 'Notificación' }}</strong>
+                                    <strong class="wa-notify-import-title" title="{{ $notification['file_name'] ?? ($notification['title'] ?? 'Notificación') }}">{{ $notification['title'] ?? 'Notificación' }}</strong>
                                 @endif
-                                <small>{{ $notification['time'] ?? 'Reciente' }}</small>
+                                @if(($notification['whatsapp_import_status'] ?? '') === 'processing')
+                                    @php $waPctD = min(100, max(0, (int) ($notification['whatsapp_import_progress'] ?? 0))); @endphp
+                                    <div class="wa-notify-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $waPctD }}">
+                                        <div class="wa-notify-progress-bar" style="width: {{ $waPctD }}%;"></div>
+                                    </div>
+                                    @if(!empty($notification['whatsapp_import_phase']))
+                                        <small class="wa-notify-phase">{{ $notification['whatsapp_import_phase'] }}</small>
+                                    @endif
+                                @endif
+                                <small class="wa-notify-time">{{ $notification['time'] ?? 'Reciente' }}</small>
                             </div>
                             @if(!empty($notification['id']))
                                 <form method="POST" action="{{ route('notifications.destroy', $notification['id']) }}" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); margin:0; display:flex;">

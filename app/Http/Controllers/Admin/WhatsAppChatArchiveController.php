@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Jobs\WhatsAppChatArchiveImportJob;
 use App\Models\WhatsAppChatAccessLog;
+use App\Notifications\WhatsAppChatImportProgressNotification;
 use App\Models\WhatsAppChatArchive;
 use App\Services\WhatsApp\WhatsAppChatEncryptionService;
 use App\Services\WhatsApp\WhatsAppChatPathNormalizer;
@@ -182,15 +183,29 @@ class WhatsAppChatArchiveController extends Controller
             'storage_disk' => $diskName,
             'import_status' => WhatsAppChatArchive::IMPORT_STATUS_PROCESSING,
             'import_error' => null,
+            'import_progress' => 0,
+            'import_phase' => 'En cola…',
         ]);
 
-        WhatsAppChatArchiveImportJob::dispatch($chat->id, (int) $user->id);
+        $user->notify(new WhatsAppChatImportProgressNotification($chat->id, $originalZipName));
+
+        WhatsAppChatArchiveImportJob::dispatch($chat->id, (int) $user->id)->afterResponse();
 
         $this->audit($request, $chat->id, 'import_queued', $extractDirRelative);
 
         return redirect()
             ->route('whatsapp-chats.admin.index')
-            ->with('status', 'El ZIP se está procesando en segundo plano. Recibirás una notificación en la campana cuando termine (éxito o error).');
+            ->with('status', 'El ZIP se está procesando en segundo plano. Sigue el avance en notificaciones (campana).');
+    }
+
+    public function importStatus(Request $request, WhatsAppChatArchive $chat): JsonResponse
+    {
+        return response()->json([
+            'progress' => (int) ($chat->import_progress ?? 0),
+            'phase' => (string) ($chat->import_phase ?? ''),
+            'status' => (string) $chat->import_status,
+            'done' => $chat->import_status !== WhatsAppChatArchive::IMPORT_STATUS_PROCESSING,
+        ]);
     }
 
     public function show(Request $request, WhatsAppChatArchive $chat)

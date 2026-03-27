@@ -48,8 +48,6 @@
                         Compatible con export clásico (_chat.txt + media) y export en HTML por partes.
                         <br>
                         <strong>Tamaño máximo (app):</strong> hasta ~{{ (int) ($maxUploadMb ?? 768) }} MB (3&nbsp;GB como tope).
-                        El ZIP se procesa en cola para evitar timeouts; hace falta un worker (<code>php artisan queue:work</code>) y <code>QUEUE_CONNECTION</code> distinto de <code>sync</code>.
-                        El servidor (PHP <code>upload_max_filesize</code> / <code>post_max_size</code> y, si aplica, Nginx/Apache) debe permitir el tamaño de subida o fallará antes de validar.
                     </p>
                 </form>
             </div>

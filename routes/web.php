@@ -246,6 +246,10 @@ Route::middleware('auth')->group(function () {
         Route::middleware([\App\Http\Middleware\ConfirmWhatsAppSensitiveAccess::class])->group(function () {
             Route::get('/', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'index'])->name('whatsapp-chats.admin.index');
             Route::post('/', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'store'])->name('whatsapp-chats.admin.store');
+            Route::get('/{chat}/import-status', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'importStatus'])
+                ->whereNumber('chat')
+                ->middleware('throttle:120,1')
+                ->name('whatsapp-chats.admin.import-status');
             Route::get('/{chat}', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'show'])->whereNumber('chat')->name('whatsapp-chats.admin.show');
             Route::get('/{chat}/media', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'media'])->whereNumber('chat')->name('whatsapp-chats.admin.media');
             Route::delete('/{chat}', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'destroy'])->whereNumber('chat')->name('whatsapp-chats.admin.destroy');

@@ -133,6 +133,113 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     var exportPollIntervals = {};
+    var waImportPollIntervals = {};
+
+    function stopAllWaImportPolling() {
+        Object.keys(waImportPollIntervals).forEach(function (id) {
+            clearInterval(waImportPollIntervals[id]);
+            delete waImportPollIntervals[id];
+        });
+    }
+
+    function updateWaImportNotificationRows(archiveId, progress, phase) {
+        var pct = Math.min(100, Math.max(0, parseInt(progress, 10) || 0));
+        var titleText = phase
+            ? 'WhatsApp: ' + pct + '% — ' + phase
+            : 'WhatsApp: ' + pct + '%';
+        document.querySelectorAll('[data-whatsapp-import-archive-id="' + archiveId + '"]').forEach(function (row) {
+            var bar = row.querySelector('.wa-notify-progress-bar');
+            if (bar) {
+                bar.style.width = pct + '%';
+            }
+            var progEl = row.querySelector('.wa-notify-progress');
+            if (progEl) {
+                progEl.setAttribute('aria-valuenow', String(pct));
+            }
+            var strong = row.querySelector('.wa-notify-import-title');
+            if (strong) {
+                strong.textContent = titleText;
+            }
+            var phaseLine = row.querySelector('.wa-notify-phase');
+            if (phaseLine) {
+                phaseLine.textContent = phase || '';
+            }
+        });
+    }
+
+    function startWhatsAppImportPolling() {
+        stopAllWaImportPolling();
+        var base = document.body.getAttribute('data-whatsapp-import-status-base');
+        if (!base) {
+            return;
+        }
+        var baseTrim = base.replace(/\/?$/, '');
+        document.querySelectorAll('[data-whatsapp-import-archive-id]').forEach(function (el) {
+            var id = el.getAttribute('data-whatsapp-import-archive-id');
+            if (!id || waImportPollIntervals[id]) {
+                return;
+            }
+            var url = baseTrim + '/' + id + '/import-status';
+            var failCount = 0;
+            function pollWaImportOnce() {
+                if (!document.querySelector('[data-whatsapp-import-archive-id="' + id + '"]')) {
+                    if (waImportPollIntervals[id]) {
+                        clearInterval(waImportPollIntervals[id]);
+                        delete waImportPollIntervals[id];
+                    }
+                    return;
+                }
+                fetch(url, {
+                    credentials: 'same-origin',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                    .then(function (res) {
+                        if (res.status === 401 || res.status === 403) {
+                            if (waImportPollIntervals[id]) {
+                                clearInterval(waImportPollIntervals[id]);
+                                delete waImportPollIntervals[id];
+                            }
+                            return Promise.reject(new Error('unauthorized'));
+                        }
+                        if (!res.ok) {
+                            failCount++;
+                            if (failCount >= 5 && waImportPollIntervals[id]) {
+                                clearInterval(waImportPollIntervals[id]);
+                                delete waImportPollIntervals[id];
+                            }
+                            return Promise.reject(new Error('http'));
+                        }
+                        failCount = 0;
+                        return res.json();
+                    })
+                    .then(function (data) {
+                        if (!data) {
+                            return;
+                        }
+                        updateWaImportNotificationRows(id, data.progress, data.phase);
+                        if (data.done) {
+                            if (waImportPollIntervals[id]) {
+                                clearInterval(waImportPollIntervals[id]);
+                                delete waImportPollIntervals[id];
+                            }
+                            refreshNotifications();
+                        }
+                    })
+                    .catch(function () {
+                        failCount++;
+                        if (failCount >= 5 && waImportPollIntervals[id]) {
+                            clearInterval(waImportPollIntervals[id]);
+                            delete waImportPollIntervals[id];
+                        }
+                    });
+            }
+            pollWaImportOnce();
+            waImportPollIntervals[id] = setInterval(pollWaImportOnce, 3000);
+        });
+    }
 
     function stopAllExportPolling() {
         Object.keys(exportPollIntervals).forEach(function (id) {
@@ -263,6 +370,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
                 startExportStatusPolling();
+                startWhatsAppImportPolling();
             })
             .catch(function () {
                 // opcional: podríamos mostrar un toast de error si existe swal
@@ -289,6 +397,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (document.body.getAttribute('data-export-status-url')) {
         startExportStatusPolling();
+    }
+
+    if (document.body.getAttribute('data-whatsapp-import-status-base')) {
+        startWhatsAppImportPolling();
     }
 
     function toggleTopbarDropdown(toggleButton, panelElement) {

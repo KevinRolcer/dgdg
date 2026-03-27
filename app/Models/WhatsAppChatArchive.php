@@ -32,6 +32,8 @@ class WhatsAppChatArchive extends Model
         'storage_disk',
         'import_status',
         'import_error',
+        'import_progress',
+        'import_phase',
         'imported_at',
     ];
 
@@ -41,6 +43,7 @@ class WhatsAppChatArchive extends Model
         'imported_at' => 'datetime',
         'is_encrypted' => 'boolean',
         'encrypted_key_version' => 'integer',
+        'import_progress' => 'integer',
     ];
 
     public function creator(): BelongsTo

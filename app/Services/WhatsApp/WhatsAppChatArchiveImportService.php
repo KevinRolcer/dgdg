@@ -16,9 +16,10 @@ final class WhatsAppChatArchiveImportService
     /**
      * Extrae upload.zip bajo storage_root_path del registro, detecta el chat, cifra y actualiza el registro.
      *
+     * @param  (callable(int $percent, string $phase): void)|null  $onProgress Porcentaje aproximado global (0–100) y etiqueta.
      * @throws ValidationException
      */
-    public function processFromPendingZip(WhatsAppChatArchive $archive): void
+    public function processFromPendingZip(WhatsAppChatArchive $archive, ?callable $onProgress = null): void
     {
         if (! class_exists(ZipArchive::class)) {
             throw ValidationException::withMessages([
@@ -40,6 +41,10 @@ final class WhatsAppChatArchiveImportService
             ]);
         }
 
+        if ($onProgress !== null) {
+            $onProgress(12, 'Descomprimiendo ZIP…');
+        }
+
         $zip = new ZipArchive;
         if ($zip->open($tempZipPath) !== true) {
             throw ValidationException::withMessages([
@@ -49,21 +54,55 @@ final class WhatsAppChatArchiveImportService
         $zip->extractTo($extractDirAbsolute);
         $zip->close();
 
+        if ($onProgress !== null) {
+            $onProgress(36, 'Analizando estructura del chat…');
+        }
+
         [$chatTitle, $chatRootDirRelative, $messageParts] = $this->detectChatAndMessageParts(
             $extractDirRelative,
             $extractDirAbsolute,
             $diskRootAbs
         );
 
+        if ($onProgress !== null) {
+            $onProgress(48, 'Preparando cifrado…');
+        }
+
         $dek = $this->encryption->generateDek();
         $wrapped = $this->encryption->wrapDek($dek);
-        $this->encryption->encryptTree($disk, $chatRootDirRelative, $dek);
+
+        if ($onProgress !== null) {
+            $onProgress(52, 'Cifrando archivos…');
+        }
+
+        $encryptProgress = $onProgress;
+        $this->encryption->encryptTree($disk, $chatRootDirRelative, $dek, function (int $done, int $total) use ($encryptProgress): void {
+            if ($encryptProgress === null) {
+                return;
+            }
+            if ($total < 1) {
+                $encryptProgress(92, 'Cifrando archivos…');
+
+                return;
+            }
+            $step = max(1, (int) ceil($total / 40));
+            if ($done !== $total && ($done % $step) !== 0) {
+                return;
+            }
+            $pct = 52 + (int) round(($done / $total) * 44);
+            $pct = min(96, max(52, $pct));
+            $encryptProgress($pct, 'Cifrando archivos ('.$done.'/'.$total.')…');
+        });
 
         if ($disk->exists($extractDirRelative.'/upload.zip')) {
             $disk->delete($extractDirRelative.'/upload.zip');
         }
 
         $compactParts = WhatsAppChatPathNormalizer::normalizeStoragePaths($messageParts, $chatRootDirRelative);
+
+        if ($onProgress !== null) {
+            $onProgress(98, 'Guardando registro…');
+        }
 
         $archive->forceFill([
             'title' => $chatTitle,
@@ -75,6 +114,8 @@ final class WhatsAppChatArchiveImportService
             'encrypted_key_version' => 1,
             'import_status' => WhatsAppChatArchive::IMPORT_STATUS_READY,
             'import_error' => null,
+            'import_progress' => 100,
+            'import_phase' => 'Completado',
             'imported_at' => now(),
         ])->save();
     }

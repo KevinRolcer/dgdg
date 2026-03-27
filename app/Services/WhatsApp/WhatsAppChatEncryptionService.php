@@ -126,9 +126,10 @@ final class WhatsAppChatEncryptionService
     /**
      * Cifra recursivamente todos los archivos bajo $rootRelative (excluye upload.zip antes de borrarlo aparte).
      *
+     * @param  (callable(int $done, int $total): void)|null  $onFileProgress
      * @return int número de archivos cifrados
      */
-    public function encryptTree(Filesystem $disk, string $rootRelative, string $dek): int
+    public function encryptTree(Filesystem $disk, string $rootRelative, string $dek, ?callable $onFileProgress = null): int
     {
         $rootRelative = $this->normalizeRel($rootRelative);
         if ($rootRelative === '' || ! $disk->exists($rootRelative)) {
@@ -136,16 +137,28 @@ final class WhatsAppChatEncryptionService
         }
 
         $files = $disk->allFiles($rootRelative);
-        $count = 0;
+        $toEncrypt = [];
         foreach ($files as $file) {
             $file = $this->normalizeRel((string) $file);
             if ($file === '' || str_ends_with(mb_strtolower($file), 'upload.zip')) {
                 continue;
             }
+            $toEncrypt[] = $file;
+        }
+
+        $total = count($toEncrypt);
+        $done = 0;
+        $count = 0;
+
+        foreach ($toEncrypt as $file) {
             $before = $disk->exists($file) ? strlen((string) $disk->get($file)) : 0;
             $this->encryptDiskFile($disk, $file, $dek);
             if ($before > 0) {
                 $count++;
+            }
+            $done++;
+            if ($onFileProgress !== null) {
+                $onFileProgress($done, $total);
             }
         }
 

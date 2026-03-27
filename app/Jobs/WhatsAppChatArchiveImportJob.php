@@ -5,8 +5,9 @@ namespace App\Jobs;
 use App\Models\User;
 use App\Models\WhatsAppChatAccessLog;
 use App\Models\WhatsAppChatArchive;
-use App\Notifications\WhatsAppChatImportCompleted;
+use App\Notifications\WhatsAppChatImportProgressNotification;
 use App\Services\WhatsApp\WhatsAppChatArchiveImportService;
+use App\Services\WhatsApp\WhatsAppImportProgressReporter;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -27,6 +28,11 @@ class WhatsAppChatArchiveImportJob implements ShouldQueue
 
     public function handle(WhatsAppChatArchiveImportService $importService): void
     {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
+        @ini_set('max_execution_time', '0');
+
         $archive = WhatsAppChatArchive::query()->find($this->archiveId);
         $user = User::query()->find($this->userId);
 
@@ -38,8 +44,11 @@ class WhatsAppChatArchiveImportJob implements ShouldQueue
             return;
         }
 
+        $reporter = new WhatsAppImportProgressReporter($user, $archive);
+        $reporter->report(6, 'Iniciando importación…', true);
+
         try {
-            $importService->processFromPendingZip($archive);
+            $importService->processFromPendingZip($archive, $reporter->asCallable());
             $archive->refresh();
 
             try {
@@ -56,12 +65,7 @@ class WhatsAppChatArchiveImportJob implements ShouldQueue
                 // no bloquear
             }
 
-            $user->notify(new WhatsAppChatImportCompleted(
-                $archive->id,
-                (string) $archive->title,
-                true,
-                null
-            ));
+            WhatsAppChatImportProgressNotification::markCompleted($user, $archive);
         } catch (ValidationException $e) {
             $message = collect($e->errors())->flatten()->first() ?? $e->getMessage();
             $this->markFailedAndNotify($archive, $user, (string) $message);
@@ -96,13 +100,11 @@ class WhatsAppChatArchiveImportJob implements ShouldQueue
         $archive->forceFill([
             'import_status' => WhatsAppChatArchive::IMPORT_STATUS_FAILED,
             'import_error' => $message,
+            'import_phase' => 'Error',
         ])->save();
 
-        $user->notify(new WhatsAppChatImportCompleted(
-            $archive->id,
-            (string) $archive->title,
-            false,
-            $message
-        ));
+        $archive->refresh();
+
+        WhatsAppChatImportProgressNotification::markFailed($user, $archive, $message);
     }
 }

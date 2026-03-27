@@ -744,6 +744,34 @@ body.sidebar-collapsed .sidebar-logout-btn {
     line-height: 1.25;
 }
 
+.wa-notify-progress {
+    height: 5px;
+    border-radius: 4px;
+    background: rgba(134, 30, 52, 0.12);
+    overflow: hidden;
+    margin: 4px 0 3px;
+}
+
+.wa-notify-progress-bar {
+    height: 100%;
+    border-radius: 4px;
+    background: var(--clr-primary-dark, #861e34);
+    transition: width 0.35s ease;
+}
+
+small.wa-notify-phase {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--clr-text-muted, var(--clr-text-light));
+    margin-bottom: 2px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.notifications-drawer-body .wa-notify-progress {
+    margin-top: 6px;
+}
+
 .topbar-notify-item-delete {
     border: 0;
     background: transparent;

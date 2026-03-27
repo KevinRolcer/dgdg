@@ -40,7 +40,8 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // Debe superar el job más largo (p. ej. importación WhatsApp, 4 h); si es menor, el mismo job puede ejecutarse dos veces.
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 15000),
             'after_commit' => false,
         ],
 
