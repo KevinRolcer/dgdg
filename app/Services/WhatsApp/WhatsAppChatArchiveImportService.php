@@ -114,8 +114,7 @@ final class WhatsAppChatArchiveImportService
             $onProgress(48, 'Preparando cifrado…');
         }
 
-        $dek = $this->encryption->generateDek();
-        $wrapped = $this->encryption->wrapDek($dek);
+        [$dek, $wrapped] = $this->resolveImportDek($archive);
 
         if ($onProgress !== null) {
             $onProgress(52, 'Cifrando archivos…');
@@ -165,6 +164,27 @@ final class WhatsAppChatArchiveImportService
             'import_phase' => 'Completado',
             'imported_at' => now(),
         ])->save();
+    }
+
+    /**
+     * @return array{0:string,1:string}
+     */
+    private function resolveImportDek(WhatsAppChatArchive $archive): array
+    {
+        $wrapped = (string) ($archive->wrapped_dek ?? '');
+        if ($wrapped !== '') {
+            return [$this->encryption->unwrapDek($wrapped), $wrapped];
+        }
+
+        $dek = $this->encryption->generateDek();
+        $wrapped = $this->encryption->wrapDek($dek);
+
+        $archive->forceFill([
+            'wrapped_dek' => $wrapped,
+            'encrypted_key_version' => 1,
+        ])->save();
+
+        return [$dek, $wrapped];
     }
 
     private function diskAbsoluteRoot(string $diskName): string

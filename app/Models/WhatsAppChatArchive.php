@@ -5,10 +5,13 @@ namespace App\Models;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
 class WhatsAppChatArchive extends Model
 {
+    public const IMPORT_STATUS_UPLOADING = 'uploading';
+
     public const IMPORT_STATUS_READY = 'ready';
 
     public const IMPORT_STATUS_PROCESSING = 'processing';
@@ -34,6 +37,10 @@ class WhatsAppChatArchive extends Model
         'import_error',
         'import_progress',
         'import_phase',
+        'folder_source_signature',
+        'folder_root_name',
+        'folder_total_files',
+        'folder_uploaded_files',
         'imported_at',
     ];
 
@@ -44,11 +51,18 @@ class WhatsAppChatArchive extends Model
         'is_encrypted' => 'boolean',
         'encrypted_key_version' => 'integer',
         'import_progress' => 'integer',
+        'folder_total_files' => 'integer',
+        'folder_uploaded_files' => 'integer',
     ];
 
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function uploadFiles(): HasMany
+    {
+        return $this->hasMany(WhatsAppChatArchiveUploadFile::class, 'whatsapp_chat_archive_id');
     }
 
     public function storageDiskName(): string

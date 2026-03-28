@@ -995,8 +995,13 @@ class MesasPazService
             
             $presidente = null;
             $representante = null;
+            $asisteColumnSinReporteDelegado = $this->textoIndicaSinReporteDelegado($colAsiste);
 
-            if ($colAsiste === 'DIRECTOR DE SEGURIDAD MUNICIPAL' || strpos((string)$colAsiste, 'DIRECTOR') !== false) {
+            if ($asisteColumnSinReporteDelegado) {
+                // Columna H (asiste presidente): "Sin reporte del/de delegado" → mismo criterio que S/R en captura manual.
+                $presidente = 'S/R';
+                $representante = null;
+            } elseif ($colAsiste === 'DIRECTOR DE SEGURIDAD MUNICIPAL' || strpos((string)$colAsiste, 'DIRECTOR') !== false) {
                 $presidente = 'Representante';
                 $representante = 'Director de seguridad municipal'; // o similar
             } elseif ($colAsiste === 'NO' || $colAsiste === 'NINGUNO') {
@@ -1024,7 +1029,8 @@ class MesasPazService
                 'presidente' => $presidente,
                 'representante' => $representante,
                 'modalidad' => $modalidadValida,
-                'acuerdosList' => $acuerdosList
+                'acuerdosList' => $acuerdosList,
+                'asiste_column_sin_reporte_delegado' => $asisteColumnSinReporteDelegado,
             ];
             
             $municipioIdsYaVistos[] = $municipioDB->id;
@@ -1039,26 +1045,36 @@ class MesasPazService
         DB::beginTransaction();
         try {
             foreach ($registrosParseados as $rp) {
+                $esSrPorColumnaH = ! empty($rp['asiste_column_sin_reporte_delegado']);
+
                 $presidenteFinal = $rp['presidente'];
                 $asisteFinal = $this->resolverAsisteDesdePresidente($rp['presidente'], $rp['representante']);
                 $delegadoAsistioFinal = 'Si'; // asumimos Si si no viene de reglas
 
+                if ($esSrPorColumnaH) {
+                    $presidenteFinal = 'S/R';
+                    $asisteFinal = $this->resolverAsisteDesdePresidente('S/R', null);
+                    $delegadoAsistioFinal = 'S/R';
+                }
+
                 $override = $this->resolverReglaEspecialPorModalidad($rp['modalidad']);
-                if ($override !== null) {
+                if ($override !== null && ! $esSrPorColumnaH) {
                     $presidenteFinal = $override['presidente'];
                     $asisteFinal = $override['asiste'];
                     $delegadoAsistioFinal = $override['delegado_asistio'];
                 }
 
+                $esSuspensionModalidad = str_contains($this->quitarAcentos(mb_strtoupper((string) $rp['modalidad'], 'UTF-8')), 'SUSPENCION');
+
                 $parteItems = [];
-                if ($usarParte && strpos((string)$rp['modalidad'], 'Suspención') !== false) {
+                if ($usarParte && ($esSuspensionModalidad || $esSrPorColumnaH)) {
                     $parteItems = ['S/R'];
                 }
                 
                 $acuerdoItems = $rp['acuerdosList'];
                 if (empty($acuerdoItems)) {
-                    $acuerdoItems = (str_contains((string)$rp['modalidad'], 'Suspención') || str_contains((string)$rp['modalidad'], 'Suspension')) 
-                        ? ['Suspención de mesa de paz'] 
+                    $acuerdoItems = $esSuspensionModalidad
+                        ? ['Suspención de mesa de paz']
                         : ['No se ha anotado nada'];
                 }
 
@@ -1252,6 +1268,10 @@ class MesasPazService
             return 'Ambos';
         }
 
+        if ($valor === 'S/R') {
+            return 'S/R';
+        }
+
         return $valor === '' ? null : $valor;
     }
 
@@ -1259,6 +1279,10 @@ class MesasPazService
     {
         if ($presidente === 'Si') {
             return 'Sí';
+        }
+
+        if ($presidente === 'S/R') {
+            return 'S/R';
         }
 
         if ($presidente === 'Representante') {
@@ -1290,7 +1314,25 @@ class MesasPazService
         if ($presidente === 'No') {
             return 'NO';
         }
+        if ($presidente === 'S/R') {
+            return 'S/R';
+        }
+
         return null;
+    }
+
+    /**
+     * Texto de Excel/modalidad tipo "Sin reporte del delegado", "Sin reporte de Delegado modalidad", etc.
+     */
+    private function textoIndicaSinReporteDelegado(string $texto): bool
+    {
+        $t = $this->quitarAcentos(mb_strtoupper(trim($texto), 'UTF-8'));
+        $t = (string) preg_replace('/\s+/u', ' ', $t);
+        if ($t === '') {
+            return false;
+        }
+
+        return str_contains($t, 'SIN REPORTE') && str_contains($t, 'DELEGADO');
     }
 
     private function resolverReglaEspecialPorModalidad(string $modalidad): ?array
@@ -1306,11 +1348,11 @@ class MesasPazService
             ];
         }
 
-        if ($valor === mb_strtolower('Sin reporte de Delegado')) {
+        if ($this->textoIndicaSinReporteDelegado($modalidad)) {
             return [
-                'asiste' => 'SRD',
-                'presidente' => 'No',
-                'delegado_asistio' => 'No',
+                'asiste' => 'S/R',
+                'presidente' => 'S/R',
+                'delegado_asistio' => 'S/R',
             ];
         }
 

@@ -128,6 +128,7 @@
                             <option value="">Seleccionar</option>
                             <option value="Si" @if(($delegadoAsistioActual ?? '') === 'Si') selected @endif>Sí</option>
                             <option value="No" @if(($delegadoAsistioActual ?? '') === 'No') selected @endif>No</option>
+                            <option value="S/R" @if(($delegadoAsistioActual ?? '') === 'S/R') selected @endif>S/R (sin reporte del delegado)</option>
                         </select>
                     </div>
 
@@ -219,6 +220,7 @@
                                                 <option value="Si" @if(optional($registroMunicipio)->presidente === 'Si') selected @endif>Sí</option>
                                                 <option value="Representante" @if(optional($registroMunicipio)->presidente === 'Representante') selected @endif>Representante</option>
                                                 <option value="Ambos" @if(optional($registroMunicipio)->presidente === 'Ambos') selected @endif>Ambos (Presidente y Representante)</option>
+                                                <option value="S/R" @if(optional($registroMunicipio)->presidente === 'S/R') selected @endif>S/R (sin reporte del delegado)</option>
                                                 {{-- Municipio no presente" == "No" --}}
                                                 <option value="Ninguno" @if(in_array(optional($registroMunicipio)->presidente, ['No', 'Ninguno'])) selected @endif>Municipio no presente</option>
                                                 <option value="No" hidden @if(optional($registroMunicipio)->presidente === 'No') selected @endif>No</option>
@@ -260,7 +262,7 @@
                                     </div>
                                     <div class="small text-muted mt-2 d-none contestado-detalle-item">
                                         {{-- Compatibilidad visual: si existe histórico en BD con "No"/"Ninguno", se presenta como "Municipio no presente". --}}
-                                        Asistió Presidente Municipal: {{ $item->presidente === 'Si' ? 'Sí' : ($item->presidente === 'Representante' ? 'Representante' : ($item->presidente === 'Ambos' ? 'Ambos (Presidente y Representante)' : (in_array($item->presidente, ['No', 'Ninguno']) ? 'Municipio no presente' : $item->presidente))) }}@if(!empty($item->asiste)) · Asiste: {{ str_ireplace(['Presidente y Representante', 'Director de seguridad', 'Secretario/Regidor de gobernación', 'Presidente'], ['Presidente y Representante', 'Director de Seguridad Municipal', 'Secretario/Regidor de Gobernación', 'Presidente Municipal'], $item->asiste) }}@endif
+                                        Asistió Presidente Municipal: {{ $item->presidente === 'Si' ? 'Sí' : ($item->presidente === 'Representante' ? 'Representante' : ($item->presidente === 'Ambos' ? 'Ambos (Presidente y Representante)' : ($item->presidente === 'S/R' ? 'S/R' : (in_array($item->presidente, ['No', 'Ninguno']) ? 'Municipio no presente' : $item->presidente)))) }}@if(!empty($item->asiste)) · Asiste: {{ str_ireplace(['Presidente y Representante', 'Director de seguridad', 'Secretario/Regidor de gobernación', 'Presidente'], ['Presidente y Representante', 'Director de Seguridad Municipal', 'Secretario/Regidor de Gobernación', 'Presidente Municipal'], $item->asiste) }}@endif
                                     </div>
                                 </li>
                             @endforeach

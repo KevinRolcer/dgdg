@@ -40,13 +40,16 @@
                 data-upload-url="{{ route('whatsapp-chats.admin.folder-upload') }}"
                 data-finalize-url="{{ route('whatsapp-chats.admin.folder-finalize') }}"
                 data-csrf="{{ csrf_token() }}"
+                data-request-max-files="{{ (int) ($folderUploadRequestMaxFiles ?? 8) }}"
+                data-parallel-requests="{{ (int) ($folderUploadParallelRequests ?? 4) }}"
+                data-request-target-bytes="{{ (int) ($folderUploadRequestTargetBytes ?? (24 * 1024 * 1024)) }}"
             >
                 <h2 class="wa-upload-section-title">Importar carpeta (export descomprimido)</h2>
                 <p class="wa-upload-section-desc">
-                    Descomprime el ZIP de WhatsApp en tu equipo. Luego elige la carpeta del chat (o la que contiene la carpeta del chat): los archivos se suben <strong>uno por uno</strong> para evitar timeouts.
+                    Descomprime el ZIP de WhatsApp en tu equipo. Luego elige la carpeta del chat: los archivos se envían en <strong>lotes concurrentes</strong> y, si repites la carga, solo se sube lo que todavía no esté registrado.
                 </p>
                 <div class="wa-folder-tab-warn" id="waFolderTabWarn" role="alert" hidden>
-                    <strong>No cierres ni cambies de pestaña</strong> mientras suben los archivos; si interrumpes, vuelve a elegir la carpeta.
+                    <strong>No cierres ni cambies de pestaña</strong> mientras suben los archivos; si se interrumpe, vuelve a elegir la misma carpeta para reanudar.
                 </div>
                 <div class="wa-form-row wa-folder-actions">
                     <input
@@ -124,10 +127,13 @@
                                     <strong>{{ $chat->title }}</strong>
                                     @if ($st === 'processing')
                                         <div><span class="tm-badge" style="background:var(--clr-warning-soft,#fff3cd);color:#856404;">Procesando…</span></div>
+                                    @elseif ($st === 'uploading')
+                                        <div><span class="tm-badge" style="background:rgba(59,130,246,.16);color:#1d4ed8;">Recibiendo archivos…</span></div>
+                                        <div><small style="color:var(--clr-text-muted)">{{ (int) ($chat->folder_uploaded_files ?? 0) }} / {{ max(1, (int) ($chat->folder_total_files ?? 0)) }} archivos</small></div>
                                     @elseif ($st === 'failed')
                                         <div><span class="tm-badge" style="background:var(--clr-danger-soft,#f8d7da);color:#721c24;">Error</span></div>
                                         @if (!empty($chat->import_error))
-                                            <div><small style="color:var(--clr-text-muted)">{{ \Illuminate\Support\Str::limit($chat->import_error, 120) }}</small></div>
+                                            <div><small style="color:var(--clr-text-muted)">{{ \Illuminate\Support\Str::limit(is_scalar($chat->import_error) ? (string) $chat->import_error : json_encode($chat->import_error), 120) }}</small></div>
                                         @endif
                                     @endif
                                     @if (!empty($chat->original_zip_name))
@@ -135,7 +141,25 @@
                                     @endif
                                 </td>
                                 <td>{{ $st === 'ready' ? $partsCount : '—' }}</td>
-                                <td>{{ $st === 'processing' ? '—' : optional($chat->imported_at)->format('d/m/Y H:i') }}</td>
+                                <td>
+                                    @if (in_array($st, ['processing', 'uploading'], true))
+                                        —
+                                    @else
+                                        @php
+                                            $importedLabel = '—';
+                                            try {
+                                                if ($chat->imported_at) {
+                                                    $importedLabel = $chat->imported_at instanceof \Carbon\Carbon
+                                                        ? $chat->imported_at->format('d/m/Y H:i')
+                                                        : \Carbon\Carbon::parse($chat->imported_at)->format('d/m/Y H:i');
+                                                }
+                                            } catch (\Throwable) {
+                                                $importedLabel = '—';
+                                            }
+                                        @endphp
+                                        {{ $importedLabel }}
+                                    @endif
+                                </td>
                                 <td>
                                     <div style="display:flex;gap:8px;align-items:center;">
                                         @if ($st === 'ready')
@@ -143,9 +167,15 @@
                                             Ver
                                         </a>
                                         @else
-                                        <span class="tm-btn tm-btn-outline tm-btn-sm" style="opacity:0.5;pointer-events:none;cursor:not-allowed;" title="{{ $st === 'processing' ? 'Aún se procesa' : 'Importación fallida' }}">Ver</span>
+                                        <span class="tm-btn tm-btn-outline tm-btn-sm" style="opacity:0.5;pointer-events:none;cursor:not-allowed;" title="{{ $st === 'uploading' ? 'Aún se reciben archivos' : ($st === 'processing' ? 'Aún se procesa' : 'Importación fallida') }}">Ver</span>
                                         @endif
-                                        <form method="POST" action="{{ route('whatsapp-chats.admin.destroy', ['chat' => $chat->id]) }}" onsubmit="return confirm('¿Eliminar esta exportación de chat y sus archivos?');">
+                                        <form
+                                            class="js-wa-chat-delete-form"
+                                            method="POST"
+                                            action="{{ route('whatsapp-chats.admin.destroy', ['chat' => $chat->id]) }}"
+                                            data-wa-delete-title="¿Eliminar esta exportación?"
+                                            data-wa-delete-text="Se borrarán el registro y los archivos del chat en el servidor. No se puede deshacer."
+                                        >
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="tm-btn tm-btn-danger tm-btn-sm">Eliminar</button>
@@ -171,5 +201,6 @@
 @endsection
 
 @push('scripts')
+<script src="{{ asset('assets/js/modules/whatsapp-chats-admin-actions.js') }}?v={{ @filemtime(public_path('assets/js/modules/whatsapp-chats-admin-actions.js')) ?: time() }}"></script>
 <script src="{{ asset('assets/js/modules/whatsapp-chats-folder-upload.js') }}?v={{ @filemtime(public_path('assets/js/modules/whatsapp-chats-folder-upload.js')) ?: time() }}"></script>
 @endpush

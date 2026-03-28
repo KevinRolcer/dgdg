@@ -257,16 +257,31 @@ document.addEventListener('DOMContentLoaded', function () {
         return !!(modalidadGlobalSelect && modalidadGlobalSelect.value && delegadoAsistioGlobalSelect && delegadoAsistioGlobalSelect.value);
     }
 
+    function normalizarTextoModalidadRegla(texto) {
+        return String(texto || '')
+            .normalize('NFD')
+            .replace(/\p{M}/gu, '')
+            .toUpperCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    /** Alineado con MesasPazService::textoIndicaSinReporteDelegado (variantes con "del", texto extra). */
+    function textoIndicaSinReporteDelegadoModalidad(texto) {
+        const t = normalizarTextoModalidadRegla(texto);
+        return t !== '' && t.includes('SIN REPORTE') && t.includes('DELEGADO');
+    }
+
     function obtenerReglaEspecialPorModalidad() {
         if (!modalidadGlobalSelect || !modalidadGlobalSelect.value) {
             return null;
         }
 
         const modalidad = String(modalidadGlobalSelect.value || '').trim();
-        if (modalidad === 'Sin reporte de Delegado') {
+        if (textoIndicaSinReporteDelegadoModalidad(modalidad)) {
             return {
-                delegadoAsistio: 'No',
-                presidente: 'No',
+                delegadoAsistio: 'S/R',
+                presidente: 'S/R',
             };
         }
 

@@ -23,7 +23,13 @@
                 </p>
             </div>
             <div class="wa-preview-head-actions">
-                <form method="POST" action="{{ route('whatsapp-chats.admin.destroy', ['chat' => $chat->id]) }}" onsubmit="return confirm('¿Eliminar esta exportación de chat y sus archivos?');">
+                <form
+                    class="js-wa-chat-delete-form"
+                    method="POST"
+                    action="{{ route('whatsapp-chats.admin.destroy', ['chat' => $chat->id]) }}"
+                    data-wa-delete-title="¿Eliminar esta exportación?"
+                    data-wa-delete-text="Se borrarán el registro y los archivos del chat en el servidor. No se puede deshacer."
+                >
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="tm-btn tm-btn-danger tm-btn-sm">Eliminar</button>
@@ -175,6 +181,7 @@
 </section>
 
 @push('scripts')
+<script src="{{ asset('assets/js/modules/whatsapp-chats-admin-actions.js') }}?v={{ @filemtime(public_path('assets/js/modules/whatsapp-chats-admin-actions.js')) ?: time() }}"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/l10n/es.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="{{ asset('assets/js/modules/whatsapp-chats-show.js') }}?v={{ @filemtime(public_path('assets/js/modules/whatsapp-chats-show.js')) ?: time() }}"></script>

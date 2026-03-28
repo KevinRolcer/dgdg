@@ -8,6 +8,7 @@ use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Permission\Models\Permission;
@@ -28,14 +29,16 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         /* Evita "There is no permission named …" si aún no corrió la migración de consulta */
-        foreach ([
-            'Mesas-Paz-consulta',
-            'Modulos-Temporales-Admin-consulta',
-            'Modulos-Temporales-consulta',
-            'Agenda-consulta',
-            'Chats-WhatsApp-Sensible',
-        ] as $permName) {
-            Permission::findOrCreate($permName, 'web');
+        if (Schema::hasTable('permissions')) {
+            foreach ([
+                'Mesas-Paz-consulta',
+                'Modulos-Temporales-Admin-consulta',
+                'Modulos-Temporales-consulta',
+                'Agenda-consulta',
+                'Chats-WhatsApp-Sensible',
+            ] as $permName) {
+                Permission::findOrCreate($permName, 'web');
+            }
         }
 
         Gate::define('mesas-paz-ver', function ($user) {
@@ -143,6 +146,22 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perMinute(5)->by($request->ip()),
                 Limit::perMinute(5)->by($email.'|'.$request->ip()),
             ];
+        });
+
+        /*
+         * Throttle numérico (throttle:600,1) comparte la misma clave por usuario entre rutas;
+         * muchos POST a folder-upload saturaban el contador y folder-finalize respondía 429.
+         */
+        RateLimiter::for('whatsapp-folder-upload', function (Request $request) {
+            return Limit::perMinute(2000)->by((string) ($request->user()?->getAuthIdentifier() ?? $request->ip()));
+        });
+
+        RateLimiter::for('whatsapp-folder-finalize', function (Request $request) {
+            return Limit::perMinute(60)->by((string) ($request->user()?->getAuthIdentifier() ?? $request->ip()));
+        });
+
+        RateLimiter::for('whatsapp-import-status-poll', function (Request $request) {
+            return Limit::perMinute(800)->by((string) ($request->user()?->getAuthIdentifier() ?? $request->ip()));
         });
 
         if (! app()->isLocal() && config('app.force_https', false)) {

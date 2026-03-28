@@ -63,6 +63,15 @@ return [
     */
     'folder_import_max_files' => max(50, min(100000, (int) env('WHATSAPP_FOLDER_IMPORT_MAX_FILES', 25000))),
 
+    'folder_import_request_max_files' => max(1, min(20, (int) env('WHATSAPP_FOLDER_IMPORT_REQUEST_MAX_FILES', 8))),
+
+    'folder_import_parallel_requests' => max(1, min(8, (int) env('WHATSAPP_FOLDER_IMPORT_PARALLEL_REQUESTS', 4))),
+
+    'folder_import_request_target_bytes' => max(
+        1024 * 1024,
+        min(128 * 1024 * 1024, (int) env('WHATSAPP_FOLDER_IMPORT_REQUEST_TARGET_MB', 24) * 1024 * 1024)
+    ),
+
     /*
     |--------------------------------------------------------------------------
     | KEK (clave maestra) — preferir variable de entorno en producción
