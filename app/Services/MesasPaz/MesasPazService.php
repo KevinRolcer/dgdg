@@ -995,30 +995,40 @@ class MesasPazService
             
             $presidente = null;
             $representante = null;
-            $asisteColumnSinReporteDelegado = $this->textoIndicaSinReporteDelegado($colAsiste);
+            
+            $esSr = $this->textoIndicaSinReporteDelegado($colAsiste) || $this->textoIndicaSinReporteDelegado($colModalidad);
+            $esSie = $this->textoIndicaSinInformacionEnlace($colAsiste) || $this->textoIndicaSinInformacionEnlace($colModalidad);
 
-            if ($asisteColumnSinReporteDelegado) {
-                // Columna H (asiste presidente): "Sin reporte del/de delegado" → mismo criterio que S/R en captura manual.
+            if ($esSr) {
+                // Caso: Sin reporte de delegado
                 $presidente = 'S/R';
                 $representante = null;
-            } elseif ($colAsiste === 'DIRECTOR DE SEGURIDAD MUNICIPAL' || strpos((string)$colAsiste, 'DIRECTOR') !== false) {
-                $presidente = 'Representante';
-                $representante = 'Director de seguridad municipal'; // o similar
-            } elseif ($colAsiste === 'NO' || $colAsiste === 'NINGUNO') {
+                $modalidadValida = 'Sin reporte de delegado';
+            } elseif ($esSie) {
+                // Caso: Sin registro de enlace
                 $presidente = 'No';
-            } elseif ($colAsiste === 'SI' || strpos((string)$colAsiste, 'PRESIDENTE') !== false) {
-                // Handle 'PRESIDENTE', 'PRESIDENTE MUNICIPAL', 'SI', etc.
-                $presidente = 'Si';
+                $representante = null;
+                $modalidadValida = 'Sin registro de enlace';
             } else {
-                $presidente = 'Representante'; // Fallback a representante con cargo custom
-                $representante = $colAsiste;
-            }
-            
-            $modalidadValida = 'Presencial'; // Default
-            if (str_contains($colModalidad, 'VIRTUAL')) {
-                $modalidadValida = 'Virtual';
-            } elseif (str_contains($colModalidad, 'SUSPENDI') || str_contains($colModalidad, 'SUSPENSION')) {
-                $modalidadValida = 'Suspención de mesa de Seguridad';
+                if ($colAsiste === 'DIRECTOR DE SEGURIDAD MUNICIPAL' || strpos((string)$colAsiste, 'DIRECTOR') !== false) {
+                    $presidente = 'Representante';
+                    $representante = 'Director de seguridad municipal'; // o similar
+                } elseif ($colAsiste === 'NO' || $colAsiste === 'NINGUNO') {
+                    $presidente = 'No';
+                } elseif ($colAsiste === 'SI' || strpos((string)$colAsiste, 'PRESIDENTE') !== false) {
+                    // Handle 'PRESIDENTE', 'PRESIDENTE MUNICIPAL', 'SI', etc.
+                    $presidente = 'Si';
+                } else {
+                    $presidente = 'Representante'; // Fallback a representante con cargo custom
+                    $representante = $colAsiste;
+                }
+                
+                $modalidadValida = 'Presencial'; // Default
+                if (str_contains($colModalidad, 'VIRTUAL')) {
+                    $modalidadValida = 'Virtual';
+                } elseif (str_contains($colModalidad, 'SUSPENDI') || str_contains($colModalidad, 'SUSPENSION')) {
+                    $modalidadValida = 'Suspención de mesa de Seguridad';
+                }
             }
 
             $acuerdosList = $this->normalizarAcuerdoItemsDesdeTexto($colAcuerdosRaw);
@@ -1030,7 +1040,8 @@ class MesasPazService
                 'representante' => $representante,
                 'modalidad' => $modalidadValida,
                 'acuerdosList' => $acuerdosList,
-                'asiste_column_sin_reporte_delegado' => $asisteColumnSinReporteDelegado,
+                'es_sr' => $esSr,
+                'es_sie' => $esSie,
             ];
             
             $municipioIdsYaVistos[] = $municipioDB->id;
@@ -1045,20 +1056,25 @@ class MesasPazService
         DB::beginTransaction();
         try {
             foreach ($registrosParseados as $rp) {
-                $esSrPorColumnaH = ! empty($rp['asiste_column_sin_reporte_delegado']);
+                $esSrFinal = ! empty($rp['es_sr']);
+                $esSieFinal = ! empty($rp['es_sie']);
 
                 $presidenteFinal = $rp['presidente'];
                 $asisteFinal = $this->resolverAsisteDesdePresidente($rp['presidente'], $rp['representante']);
                 $delegadoAsistioFinal = 'Si'; // asumimos Si si no viene de reglas
 
-                if ($esSrPorColumnaH) {
+                if ($esSrFinal) {
                     $presidenteFinal = 'S/R';
                     $asisteFinal = $this->resolverAsisteDesdePresidente('S/R', null);
                     $delegadoAsistioFinal = 'S/R';
+                } elseif ($esSieFinal) {
+                    $presidenteFinal = 'No';
+                    $asisteFinal = 'SIE';
+                    $delegadoAsistioFinal = 'No';
                 }
 
                 $override = $this->resolverReglaEspecialPorModalidad($rp['modalidad']);
-                if ($override !== null && ! $esSrPorColumnaH) {
+                if ($override !== null && ! $esSrFinal && ! $esSieFinal) {
                     $presidenteFinal = $override['presidente'];
                     $asisteFinal = $override['asiste'];
                     $delegadoAsistioFinal = $override['delegado_asistio'];
@@ -1067,14 +1083,14 @@ class MesasPazService
                 $esSuspensionModalidad = str_contains($this->quitarAcentos(mb_strtoupper((string) $rp['modalidad'], 'UTF-8')), 'SUSPENCION');
 
                 $parteItems = [];
-                if ($usarParte && ($esSuspensionModalidad || $esSrPorColumnaH)) {
+                if ($usarParte && ($esSuspensionModalidad || $esSrFinal || $esSieFinal)) {
                     $parteItems = ['S/R'];
                 }
                 
                 $acuerdoItems = $rp['acuerdosList'];
                 if (empty($acuerdoItems)) {
-                    $acuerdoItems = $esSuspensionModalidad
-                        ? ['Suspención de mesa de paz']
+                    $acuerdoItems = ($esSuspensionModalidad || $esSrFinal || $esSieFinal)
+                        ? ([$rp['modalidad'] ?: 'No se ha anotado nada'])
                         : ['No se ha anotado nada'];
                 }
 
@@ -1335,12 +1351,25 @@ class MesasPazService
         return str_contains($t, 'SIN REPORTE') && str_contains($t, 'DELEGADO');
     }
 
+    /**
+     * Texto de Excel/modalidad tipo "Sin información de enlace", "Sin registro de enlace", etc.
+     */
+    private function textoIndicaSinInformacionEnlace(string $texto): bool
+    {
+        $t = $this->quitarAcentos(mb_strtoupper(trim($texto), 'UTF-8'));
+        $t = (string) preg_replace('/\s+/u', ' ', $t);
+        if ($t === '') {
+            return false;
+        }
+
+        return (str_contains($t, 'SIN') && (str_contains($t, 'INFORMACION') || str_contains($t, 'REGISTRO')) && str_contains($t, 'ENLACE'));
+    }
+
     private function resolverReglaEspecialPorModalidad(string $modalidad): ?array
     {
-        $valor = mb_strtolower(trim($modalidad));
         $mod = $this->quitarAcentos(mb_strtoupper($modalidad, 'UTF-8'));
 
-        if (str_contains($mod, 'SUSPENCION')) {
+        if (str_contains($mod, 'SUSPENCION') || str_contains($mod, 'SUSPENDI')) {
             return [
                 'asiste' => 'Suspención',
                 'presidente' => 'No',
@@ -1356,7 +1385,7 @@ class MesasPazService
             ];
         }
 
-        if ($valor === mb_strtolower('Sin información de enlace')) {
+        if ($this->textoIndicaSinInformacionEnlace($modalidad)) {
             return [
                 'asiste' => 'SIE',
                 'presidente' => 'No',
@@ -1364,6 +1393,7 @@ class MesasPazService
             ];
         }
 
+        $valor = mb_strtolower(trim($modalidad));
         if (
             $valor === mb_strtolower('Fallecimiento')
             || $valor === mb_strtolower('Asueto')

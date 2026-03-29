@@ -266,10 +266,14 @@ document.addEventListener('DOMContentLoaded', function () {
             .trim();
     }
 
-    /** Alineado con MesasPazService::textoIndicaSinReporteDelegado (variantes con "del", texto extra). */
     function textoIndicaSinReporteDelegadoModalidad(texto) {
         const t = normalizarTextoModalidadRegla(texto);
         return t !== '' && t.includes('SIN REPORTE') && t.includes('DELEGADO');
+    }
+
+    function textoIndicaSinInformacionEnlaceModalidad(texto) {
+        const t = normalizarTextoModalidadRegla(texto);
+        return t !== '' && (t.includes('SIN INFORMACION') || t.includes('SIN REGISTRO')) && t.includes('ENLACE');
     }
 
     function obtenerReglaEspecialPorModalidad() {
@@ -285,14 +289,15 @@ document.addEventListener('DOMContentLoaded', function () {
             };
         }
 
-        if (modalidad === 'Sin información de enlace') {
+        if (textoIndicaSinInformacionEnlaceModalidad(modalidad)) {
             return {
                 delegadoAsistio: 'No',
                 presidente: 'No',
             };
         }
 
-        if (modalidad === 'Suspención de mesa de Seguridad' || modalidad === 'Suspención de la Mesa de Seguridad') {
+        const mNorm = normalizarTextoModalidadRegla(modalidad);
+        if (mNorm.includes('SUSPENCION') || mNorm.includes('SUSPENDI')) {
             return {
                 delegadoAsistio: 'No',
                 presidente: 'No',
@@ -311,8 +316,8 @@ document.addEventListener('DOMContentLoaded', function () {
             return false;
         }
 
-        const modalidad = String(modalidadGlobalSelect.value || '').trim();
-        return modalidad === 'Suspención de mesa de Seguridad' || modalidad === 'Suspención de la Mesa de Seguridad';
+        const mNorm = normalizarTextoModalidadRegla(modalidadGlobalSelect.value);
+        return mNorm.includes('SUSPENCION') || mNorm.includes('SUSPENDI');
     }
 
     function actualizarVisibilidadDelegadoAsistio() {

@@ -117,8 +117,8 @@
                         <option value="">Seleccionar</option>
                         <option value="Virtual" @if(($modalidadActual ?? '') === 'Virtual') selected @endif>Virtual</option>
                         <option value="Presencial" @if(($modalidadActual ?? '') === 'Presencial') selected @endif>Presencial</option>
-                        {{-- <option value="Sin reporte de Delegado" @if(($modalidadActual ?? '') === 'Sin reporte de Delegado') selected @endif>Sin reporte de Delegado</option> --}}
-                        {{-- <option value="Sin información de enlace" @if(($modalidadActual ?? '') === 'Sin información de enlace') selected @endif>Sin información de enlace</option> --}}
+                        <option value="Sin reporte de delegado" @if(($modalidadActual ?? '') === 'Sin reporte de delegado') selected @endif>Sin reporte de delegado</option>
+                        <option value="Sin registro de enlace" @if(($modalidadActual ?? '') === 'Sin registro de enlace') selected @endif>Sin registro de enlace</option>
                         <option value="Suspención de mesa de Seguridad" @if(($modalidadActual ?? '') === 'Suspención de mesa de Seguridad') selected @endif>Suspención de mesa de Seguridad</option>
                     </select>
 
