@@ -141,8 +141,10 @@ class TemporaryModuleAnalysisWordService
         $ts = $this->normalizeTableStyle($config);
         $ft = $ts['font_pt'];
         $cellTwips = $ts['cell_margin_twips'];
+        $titleFontSizePx = max(10, min(36, (int) ($config['title_font_size_px'] ?? 18)));
+        $titleFontSizePt = max(8, min(27, (int) round($titleFontSizePx * 0.75)));
         $exportFontName = $this->resolveExportFontName();
-        $logoPath = public_path('images/Gobierno de Puebla_1-Versión vertical.png');
+        $logoPath = public_path('images/LogoSegobHorizontal.png');
         $hasLogo = is_file($logoPath);
 
         $phpWord = new PhpWord;
@@ -165,24 +167,36 @@ class TemporaryModuleAnalysisWordService
         };
 
         if ($hasLogo) {
-            $section->addImage($logoPath, [
-                'height' => 52,
-                'positioning' => 'absolute',
-                'posHorizontal' => 'left',
-                'posHorizontalRel' => 'margin',
-                'posVertical' => 'top',
-                'posVerticalRel' => 'margin',
-                'wrappingStyle' => 'behind',
-            ]);
         }
 
-        $section->addText($docTitle, ['name' => $exportFontName, 'bold' => true, 'size' => 14, 'color' => '861E34'], ['alignment' => $titleJc, 'spaceAfter' => 160]);
-        $subtitle = trim((string) ($config['subtitle'] ?? ''));
-        if ($subtitle !== '') {
-            $section->addText($subtitle, ['name' => $exportFontName, 'size' => 10], ['alignment' => $titleJc, 'spaceAfter' => 100]);
-        }
         $fechaCorteStr = now()->format('d/m/Y H:i');
-        $section->addText('Fecha y hora de corte: '.$fechaCorteStr, ['name' => $exportFontName, 'size' => 9], ['alignment' => Jc::END, 'spaceAfter' => 200]);
+        $subtitle = trim((string) ($config['subtitle'] ?? ''));
+        // Header table: logo (left) + date (right) in row 1; title (+ subtitle) full-width in row 2
+        $hdrWidth = $orientation === SectionStyle::ORIENTATION_LANDSCAPE ? 14570 : 9638;
+        $hdrTbl = $section->addTable([
+            'borderSize' => 0,
+            'borderColor' => 'FFFFFF',
+            'cellMarginTop' => 0,
+            'cellMarginBottom' => 0,
+            'cellMarginLeft' => 0,
+            'cellMarginRight' => 0,
+        ]);
+        $hdrLogoW = (int) round($hdrWidth * 0.60);
+        $hdrDateW = $hdrWidth - $hdrLogoW;
+        $hdrTbl->addRow(800);
+        $hdrLogoCell = $hdrTbl->addCell($hdrLogoW, ['valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
+        if ($hasLogo) {
+            $hdrLogoRun = $hdrLogoCell->addTextRun(['alignment' => Jc::START]);
+            $hdrLogoRun->addImage($logoPath, ['height' => 52]);
+        }
+        $hdrDateCell = $hdrTbl->addCell($hdrDateW, ['valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
+        $hdrDateCell->addText('Fecha y hora de corte: '.$fechaCorteStr, ['name' => $exportFontName, 'size' => 9], ['alignment' => Jc::END, 'spaceAfter' => 0]);
+        $hdrTbl->addRow();
+        $hdrTitleCell = $hdrTbl->addCell($hdrWidth, ['gridSpan' => 2, 'borderSize' => 0, 'borderColor' => 'FFFFFF', 'cellMarginTop' => 80]);
+        $hdrTitleCell->addText($docTitle, ['name' => $exportFontName, 'bold' => true, 'size' => $titleFontSizePt, 'color' => '861E34'], ['alignment' => $titleJc, 'spaceAfter' => $subtitle !== '' ? 80 : 160]);
+        if ($subtitle !== '') {
+            $hdrTitleCell->addText($subtitle, ['name' => $exportFontName, 'size' => 10], ['alignment' => $titleJc, 'spaceAfter' => 100]);
+        }
         $section->addTextBreak(1);
 
         if ($includeSummary || $includeMrTable) {

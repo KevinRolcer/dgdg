@@ -489,7 +489,7 @@ class TemporaryModuleExportService
                 if ($label !== '' && $label !== $key) {
                     $col['header2'] = $label;
                 }
-                
+
                 // Aplicar grupo personalizado si existe
                 $group = (string) ($cfgCol['group'] ?? '');
                 if ($group !== '') {
@@ -501,6 +501,56 @@ class TemporaryModuleExportService
         }
 
         return $ordered ?: $exportColumns;
+    }
+
+    private function configuredColumnLabel(string $key, string $default): string
+    {
+        $cfg = $this->columnConfigByKey[$key] ?? null;
+        if (is_array($cfg)) {
+            $label = trim((string) ($cfg['label'] ?? ''));
+            if ($label !== '' && $label !== $key) {
+                return $label;
+            }
+        }
+
+        return $default;
+    }
+
+    private function shouldUppercaseTitle(): bool
+    {
+        return ! empty($this->exportConfig['title_uppercase']);
+    }
+
+    private function shouldUppercaseHeaders(): bool
+    {
+        return ! empty($this->exportConfig['headers_uppercase']);
+    }
+
+    private function normalizeExportHeading(string $text, bool $uppercase = false): string
+    {
+        $text = trim($text);
+
+        return $uppercase && $text !== '' ? mb_strtoupper($text, 'UTF-8') : $text;
+    }
+
+    private function transformCountTableLabels(array $countTable, bool $uppercase = false): array
+    {
+        if (! $uppercase || empty($countTable['groups']) || ! is_array($countTable['groups'])) {
+            return $countTable;
+        }
+
+        foreach ($countTable['groups'] as &$group) {
+            $group['label'] = $this->normalizeExportHeading((string) ($group['label'] ?? ''), true);
+            if (! empty($group['values']) && is_array($group['values'])) {
+                foreach ($group['values'] as &$value) {
+                    $value['label'] = $this->normalizeExportHeading((string) ($value['label'] ?? ''), true);
+                }
+                unset($value);
+            }
+        }
+        unset($group);
+
+        return $countTable;
     }
 
     private function mapCssColorToArgb(string $color): ?string
@@ -698,13 +748,30 @@ class TemporaryModuleExportService
             }
         }
 
-        $fixedHeaders = ['Ítem', 'Microrregión'];
+        $headersUppercase = $this->shouldUppercaseHeaders();
+        $titleUppercase = $this->shouldUppercaseTitle();
+        $fixedHeaders = [
+            $this->normalizeExportHeading($this->configuredColumnLabel('item', 'Ítem'), $headersUppercase),
+            $this->normalizeExportHeading($this->configuredColumnLabel('microrregion', 'Microrregión'), $headersUppercase),
+        ];
         $numFixed = count($fixedHeaders);
         $fechaCorteStr = $fechaCorte->format('d/m/Y H:i');
         $dataColumnsCount = $numFixed + count($exportColumns);
 
-        $titleRow = 1;
-        $dateRow = 2;
+        $titleRow = 2;
+        $dateRow = 3;
+        $logoFilePath = public_path('images/LogoSegobHorizontal.png');
+        if (is_file($logoFilePath)) {
+            $logoDrawing = new Drawing();
+            $logoDrawing->setName('Logo');
+            $logoDrawing->setPath($logoFilePath);
+            $logoDrawing->setHeight(38);
+            $logoDrawing->setCoordinates('A1');
+            $logoDrawing->setOffsetX(2);
+            $logoDrawing->setOffsetY(2);
+            $logoDrawing->setWorksheet($sheet);
+            $sheet->getRowDimension(1)->setRowHeight(30);
+        }
         $includeCountTable = !empty($this->exportConfig['include_count_table']);
         $countByFields = $includeCountTable && is_array($this->exportConfig['count_by_fields'] ?? null)
             ? array_values(array_filter(array_map('strval', $this->exportConfig['count_by_fields'])))
@@ -716,17 +783,19 @@ class TemporaryModuleExportService
         if ($includeCountTable) {
             $entriesForCount = (clone $entriesQuery)->get(['id', 'data']);
             $fieldLabels = [];
-            foreach ($temporaryModule->fields as $f) {
-                if ($f->type !== 'seccion') {
-                    $fieldLabels[$f->key] = (string) ($f->label ?? $f->key);
+            foreach ($exportColumns as $column) {
+                $field = $column['field'] ?? null;
+                if ($field && isset($field->key)) {
+                    $fieldLabels[(string) $field->key] = (string) ($column['header2'] ?? $field->label ?? $field->key);
                 }
             }
             $countData = $this->buildCountTableData($entriesForCount, $countByFields, $fieldLabels);
+            $countData = $this->transformCountTableLabels($countData, $headersUppercase);
             $groups = $countData['groups'];
             $colIdx = 1;
-            $groupRow = 3;
-            $valueRow = 4;
-            $dataRow = 5;
+            $groupRow = 4;
+            $valueRow = 5;
+            $dataRow = 6;
 
             // Primero: Escribir contenido y calcular ancho
             foreach ($groups as $gi => $group) {
@@ -814,9 +883,11 @@ class TemporaryModuleExportService
 
         // Título y Fecha con el ancho máximo real
         $titleText = !empty($this->exportConfig['title']) ? (string)$this->exportConfig['title'] : (string)$temporaryModule->name;
+        $titleText = $this->normalizeExportHeading($titleText, $titleUppercase);
+        $titleFontSizePx = max(10, min(36, (int) ($this->exportConfig['title_font_size_px'] ?? 18)));
         $sheet->setCellValue('A'.$titleRow, $titleText);
         $sheet->mergeCells('A'.$titleRow.':'.$lastColumnLetter.$titleRow);
-        $sheet->getStyle('A'.$titleRow)->getFont()->setSize(16)->setBold(true);
+        $sheet->getStyle('A'.$titleRow)->getFont()->setSize((int) round($titleFontSizePx * 0.75))->setBold(true);
 
         $titleAlign = Alignment::HORIZONTAL_CENTER;
         if (is_array($this->exportConfig) && isset($this->exportConfig['title_align'])) {
@@ -832,10 +903,10 @@ class TemporaryModuleExportService
         $sheet->getStyle('A'.$dateRow)->getFont()->setSize(10);
         $sheet->getStyle('A'.$dateRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT)->setVertical(Alignment::VERTICAL_TOP);
 
-        $headerStartRow = 3 + $countTableRows;
+        $headerStartRow = 4 + $countTableRows;
         if ($includeCountTable) {
-            $desgloseRow = 3 + $countTableRows;
-            $sheet->setCellValue('A'.$desgloseRow, 'Desglose');
+            $desgloseRow = 4 + $countTableRows;
+            $sheet->setCellValue('A'.$desgloseRow, $this->normalizeExportHeading('Desglose', $headersUppercase));
             $sheet->mergeCells('A'.$desgloseRow.':'.$lastColumnLetter.$desgloseRow);
             $sheet->getStyle('A'.$desgloseRow)->getFont()->setBold(true);
             $headerStartRow++;
@@ -853,9 +924,11 @@ class TemporaryModuleExportService
             $mergeHeader1 = null;
             foreach ($exportColumns as $col) {
                 $colLetter = Coordinate::stringFromColumnIndex($colIdx);
-                $sheet->setCellValue($colLetter.$r1, $col['header1'] ?? '');
-                $sheet->setCellValue($colLetter.$r2, $col['header2']);
-                $h1 = $col['header1'] ?? '';
+                $header1 = $this->normalizeExportHeading((string) ($col['header1'] ?? ''), $headersUppercase);
+                $header2 = $this->normalizeExportHeading((string) $col['header2'], $headersUppercase);
+                $sheet->setCellValue($colLetter.$r1, $header1);
+                $sheet->setCellValue($colLetter.$r2, $header2);
+                $h1 = $header1;
                 if ($h1 !== '') {
                     if ($mergeStart === null || $mergeHeader1 !== $h1) {
                         if ($mergeStart !== null) {
@@ -889,7 +962,7 @@ class TemporaryModuleExportService
             }
             $headerRowCount = 2;
         } else {
-            $headers = array_merge($fixedHeaders, array_map(fn ($c) => $c['header2'], $exportColumns));
+            $headers = array_merge($fixedHeaders, array_map(fn ($c) => $this->normalizeExportHeading((string) $c['header2'], $headersUppercase), $exportColumns));
             foreach ($headers as $i => $headerText) {
                 $sheet->setCellValue(Coordinate::stringFromColumnIndex($i + 1).$headerStartRow, $headerText);
             }

@@ -542,6 +542,15 @@
                                             @endif
                                         @endif
 
+                                        @if ($microsAsignadas->count() > 0)
+                                            <label class="tm-excel-municipio-container-el" style="margin-top:8px;">
+                                                Municipio de destino (si no se mapea Municipio)
+                                                <select class="tm-excel-municipio-input tm-input">
+                                                    <option value="">Selecciona un municipio</option>
+                                                </select>
+                                            </label>
+                                        @endif
+
                                         <div class="inline-alert inline-alert-error tm-hidden tm-excel-preview-err" role="alert" style="margin-top:10px;"></div>
                                         <div class="inline-alert inline-alert-success tm-hidden tm-excel-detect-note" style="margin-top:10px;" role="status"></div>
 
@@ -564,6 +573,10 @@
                                 <!-- PASO 2 -->
                                 <div class="tm-excel-step2-inner tm-hidden" style="display:flex; flex-direction:column; padding-top:20px; border-top: 1px dashed var(--clr-border); margin-top:20px;">
                                     <h4 class="tm-excel-step-title">Relacionar columnas</h4>
+                                    <label class="tm-excel-search-all-wrap tm-excel-auto-municipio-wrap-el" style="margin-bottom:10px;">
+                                        <input type="checkbox" class="tm-excel-auto-municipio-check" checked>
+                                        <span>Identificar municipio automáticamente (por columna Municipio)</span>
+                                    </label>
                                     <div class="tm-table-wrap tm-excel-map-table-wrap" style="margin-bottom:12px; border:1px solid var(--clr-border); border-radius:8px; background: rgba(0,0,0,0.02);">
                                         <table class="tm-table tm-table-sm tm-excel-map-table" style="font-size:12px; width:100%;">
                                             <thead>
@@ -2783,6 +2796,10 @@
             const headerRowInput = modal.querySelector('.tm-excel-header-row');
             const dataStartRowInput = modal.querySelector('.tm-excel-data-start-row');
             const mrInput = modal.querySelector('.tm-excel-mr-input');
+            const municipioInput = modal.querySelector('.tm-excel-municipio-input');
+            const municipioContainer = modal.querySelector('.tm-excel-municipio-container-el');
+            const autoMunicipioWrap = modal.querySelector('.tm-excel-auto-municipio-wrap-el');
+            const autoMunicipioCheck = modal.querySelector('.tm-excel-auto-municipio-check');
             const mapBody = modal.querySelector('.tm-excel-map-body');
             const previewTableWrap = modal.querySelector('.tm-excel-preview-table-wrap');
 
@@ -2797,6 +2814,7 @@
             let workbookData = null;
             let currentWorkbook = null;
             let currentSheetIdx = 0;
+            let excelFields = [];
 
             const switchToSheet = function(idx) {
                 if (!currentWorkbook) return;
@@ -2821,6 +2839,38 @@
                 container.innerHTML = html;
                 wrap.style.display = 'flex';
                 updateSheetArrows();
+            };
+
+            const renderMunicipioOptionsForModal = function () {
+                if (!mrInput || !municipioInput) return;
+                const mrId = String(mrInput.value || '');
+                const municipios = Array.isArray(microrregionesMunicipios[mrId]) ? microrregionesMunicipios[mrId] : [];
+                const prev = municipioInput.value;
+                municipioInput.innerHTML = '<option value="">Selecciona un municipio</option>';
+                municipios.forEach(function (m) {
+                    municipioInput.appendChild(new Option(m, m, false, prev === m));
+                });
+            };
+
+            const updateMunicipioImportModeForModal = function () {
+                const municipioField = Array.isArray(excelFields) ? excelFields.find(function (f) { return f && f.type === 'municipio'; }) : null;
+                const fieldKey = municipioField ? String(municipioField.key || '').replace(/"/g, '') : '';
+                const municipioMapSelect = fieldKey ? modal.querySelector('.tm-excel-map-select[data-field-key="' + fieldKey + '"]') : null;
+                const hasMunicipioMapped = !!(municipioMapSelect && municipioMapSelect.value !== '');
+
+                if (autoMunicipioWrap) autoMunicipioWrap.style.display = municipioMapSelect ? '' : 'none';
+                if (autoMunicipioCheck) {
+                    autoMunicipioCheck.disabled = !hasMunicipioMapped;
+                    if (!hasMunicipioMapped) autoMunicipioCheck.checked = false;
+                    if (hasMunicipioMapped && autoMunicipioCheck.dataset.userTouched !== '1') {
+                        autoMunicipioCheck.checked = true;
+                    }
+                }
+                const useManualMunicipio = !hasMunicipioMapped || !autoMunicipioCheck || !autoMunicipioCheck.checked;
+                if (municipioContainer) {
+                    const allMr = !!(searchAllCheck && searchAllCheck.checked);
+                    municipioContainer.style.display = (!allMr && useManualMunicipio) ? 'block' : 'none';
+                }
             };
 
             const updateSheetArrows = function() {
@@ -3280,7 +3330,19 @@
 
             searchAllCheck?.addEventListener('change', function() {
                 if (mrSelectContainer) mrSelectContainer.style.display = this.checked ? 'none' : 'block';
+                renderMunicipioOptionsForModal();
+                updateMunicipioImportModeForModal();
             });
+            mrInput?.addEventListener('change', function () {
+                renderMunicipioOptionsForModal();
+                updateMunicipioImportModeForModal();
+            });
+            autoMunicipioCheck?.addEventListener('change', function () {
+                this.dataset.userTouched = '1';
+                updateMunicipioImportModeForModal();
+            });
+            renderMunicipioOptionsForModal();
+            updateMunicipioImportModeForModal();
 
             modal.querySelector('.tm-excel-auto-detect')?.addEventListener('click', () => {
                 if (!workbookData) return;
@@ -3325,6 +3387,12 @@
                 .then(r => safeJsonParse(r))
                 .then(j => {
                     if (!j.success) throw new Error(j.message);
+                    excelFields = j.fields || [];
+                    const warnings = Array.isArray(j.warnings) ? j.warnings.filter(Boolean) : [];
+                    if (warnings.length && detectNoteEl) {
+                        detectNoteEl.textContent = warnings.join(' ');
+                        detectNoteEl.classList.remove('tm-hidden');
+                    }
 
                     if (j.preview_thumbnails) applyExcelPreviewThumbnails(j.preview_thumbnails);
 
@@ -3356,7 +3424,7 @@
 
                     if (mapBody) {
                         mapBody.innerHTML = '';
-                        (j.fields || []).forEach(f => {
+                        (excelFields || []).forEach(f => {
                             const tr = document.createElement('tr');
                             const sug = (j.suggested_map || {})[f.key];
                             const friendly = friendlyTypes[f.type] || f.type;
@@ -3370,9 +3438,13 @@
                         });
 
                         modal.querySelectorAll('.tm-excel-map-select').forEach(sel => {
-                            sel.addEventListener('change', updateMappedColumns);
+                            sel.addEventListener('change', function () {
+                                updateMappedColumns();
+                                updateMunicipioImportModeForModal();
+                            });
                         });
                         updateMappedColumns();
+                        updateMunicipioImportModeForModal();
                     }
                     if (step2) step2.classList.remove('tm-hidden');
                     const controlsSide = modal.querySelector('.tm-excel-controls-side');
@@ -3412,6 +3484,14 @@
                     const key = sel.getAttribute('data-field-key');
                     if (key) mapping[key] = sel.value === '' ? null : parseInt(sel.value, 10);
                 });
+                const municipioVisible = municipioContainer && municipioContainer.style.display !== 'none';
+                if (municipioVisible && municipioInput && !municipioInput.value) {
+                    if (errImportEl) {
+                        errImportEl.textContent = 'Selecciona un municipio de destino o mapea la columna Municipio para identificarlo automáticamente.';
+                        errImportEl.classList.remove('tm-hidden');
+                    }
+                    return;
+                }
                 const fd = new FormData();
                 fd.append('archivo_excel', file);
                 fd.append('header_row', headerRowInput.value || '1');
@@ -3419,6 +3499,8 @@
                 fd.append('mapping', JSON.stringify(mapping));
                 fd.append('all_microrregions', searchAllCheck?.checked ? '1' : '0');
                 fd.append('selected_microrregion_id', mrInput ? mrInput.value : '');
+                fd.append('selected_municipio', municipioInput ? municipioInput.value : '');
+                fd.append('auto_identify_municipio', autoMunicipioCheck?.checked ? '1' : '0');
                 fd.append('sheet_index', currentSheetIdx);
                 fd.append('_token', csrfToken);
 
@@ -3520,7 +3602,8 @@
                         }
                     }
 
-                    const msg = j.message;
+                    const warnings = Array.isArray(j.warnings) ? j.warnings.filter(Boolean) : [];
+                    const msg = warnings.length ? ((j.message || '') + ' ' + warnings.join(' ')).trim() : j.message;
 
                     // Persistir errores en sesión
                     if (j.row_errors && j.row_errors.length > 0) {
@@ -3571,6 +3654,8 @@
                 fd.append('mapping', JSON.stringify(mapping));
                 fd.append('all_microrregions', searchAllCheck?.checked ? '1' : '0');
                 fd.append('selected_microrregion_id', mrInput ? mrInput.value : '');
+                fd.append('selected_municipio', municipioInput ? municipioInput.value : '');
+                fd.append('auto_identify_municipio', autoMunicipioCheck?.checked ? '1' : '0');
                 fd.append('sheet_index', currentSheetIdx);
                 fd.append('_token', csrfToken);
 

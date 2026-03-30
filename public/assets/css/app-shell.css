@@ -1483,7 +1483,10 @@ small.wa-notify-phase {
     border-radius: 14px !important;
     border: 1px solid var(--clr-border) !important;
     width: min(28rem, calc(100vw - 2rem)) !important;
-    padding: 0.9rem 1rem !important;
+    padding: 1.4rem 1rem 1rem !important;
+    /* Swal2 sets overflow:hidden by default — remove it so the icon
+       zoom-in animation doesn't get clipped against the popup edges */
+    overflow: visible !important;
 }
 
 .swal2-title,
@@ -1500,14 +1503,41 @@ small.wa-notify-phase {
     line-height: 1.4 !important;
 }
 
-.swal2-icon {
-    width: 3rem !important;
-    height: 3rem !important;
-    margin: 0.6rem auto 0.5rem !important;
+/* Non-toast icon: scale via font-size so ALL internal em-based positions
+   (x-mark lines, check lines, icon-content) recalibrate proportionally.
+   SweetAlert2's icon is 5em × 5em; at font-size 11px → 55px icon. */
+.swal2-popup:not(.swal2-toast) .swal2-header {
+    overflow: visible !important;
 }
 
-.swal2-icon .swal2-icon-content {
-    font-size: 1.5rem !important;
+.swal2-popup:not(.swal2-toast) .swal2-icon {
+    font-size: 11px !important;
+    margin: 1em auto 0.6em !important;
+    overflow: visible !important;
+}
+
+/* SweetAlert2's default icon entrance is rotateX(100deg → 0) — a 3D flip
+   that temporarily places the icon behind the modal plane and clips it.
+   Replace with a flat 2D fade+scale. */
+.swal2-icon.swal2-icon-show {
+    animation: segob-icon-appear 0.38s cubic-bezier(0.18, 0.89, 0.32, 1.20) both !important;
+}
+
+@keyframes segob-icon-appear {
+    0%   { opacity: 0; transform: scale(0.5); }
+    75%  { transform: scale(1.06); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+/* X-mark default animation uses margin-top bounce which causes vertical
+   jitter and misalignment — replace with a clean fade-scale. */
+.swal2-icon.swal2-error.swal2-icon-show .swal2-x-mark {
+    animation: segob-xmark-appear 0.25s 0.28s ease-out both !important;
+}
+
+@keyframes segob-xmark-appear {
+    0%   { opacity: 0; transform: scale(0.5); }
+    100% { opacity: 1; transform: scale(1); }
 }
 
 .swal2-popup.swal2-toast {
@@ -1531,15 +1561,16 @@ small.wa-notify-phase {
 }
 
 .swal2-popup.swal2-toast .swal2-icon {
-    width: 1.02rem !important;
-    min-width: 1.02rem !important;
-    height: 1.02rem !important;
-    margin: 0 0.38rem 0 0 !important;
+    width: 1.55rem !important;
+    min-width: 1.55rem !important;
+    height: 1.55rem !important;
+    margin: 0 0.5rem 0 0 !important;
     border-width: 2px !important;
+    overflow: hidden !important;
 }
 
 .swal2-popup.swal2-toast .swal2-icon .swal2-icon-content {
-    font-size: 0.62rem !important;
+    font-size: 0.9rem !important;
     line-height: 1 !important;
 }
 
@@ -1548,15 +1579,15 @@ small.wa-notify-phase {
 }
 
 .swal2-popup.swal2-toast .swal2-x-mark {
-    width: 0.62rem !important;
-    height: 0.62rem !important;
+    width: 0.9rem !important;
+    height: 0.9rem !important;
 }
 
 .swal2-popup.swal2-toast .swal2-x-mark-line-left,
 .swal2-popup.swal2-toast .swal2-x-mark-line-right {
-    width: 0.62rem !important;
+    width: 0.9rem !important;
     height: 2px !important;
-    top: 0.3rem !important;
+    top: 0.44rem !important;
 }
 
 .swal2-popup.swal2-toast .swal2-x-mark-line-left {

@@ -20,6 +20,10 @@ class TemporaryModuleWordPdfService
      */
     public function export(int $moduleId, string $format, ?array $exportConfig = null): array
     {
+        // Tamaño de letra para encabezados de columnas
+        $headerFontSizePx = isset($exportConfig['headerFontPx']) ? max(9, min(28, (int) $exportConfig['headerFontPx'])) : 12;
+        $headerFontSizePt = max(7, min(21, (int) round($headerFontSizePx * 0.75)));
+    {
         $temporaryModule = TemporaryModule::query()->findOrFail($moduleId);
         $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$moduleId;
 
@@ -126,14 +130,20 @@ class TemporaryModuleWordPdfService
             mkdir($exportDir, 0755, true);
         }
 
-        $title = (string) ($exportConfig['title'] ?? $fileName);
+        $titleUppercase = !empty($exportConfig['title_uppercase']);
+        $headersUppercase = !empty($exportConfig['headers_uppercase']);
+        $title = $this->normalizeExportHeading((string) ($exportConfig['title'] ?? $fileName), $titleUppercase);
         $orientationConfig = ($exportConfig['orientation'] ?? 'portrait') === 'landscape' ? 'landscape' : 'portrait';
         $titleAlign = (string) ($exportConfig['title_align'] ?? 'center');
         $cellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['cell_font_size_px'] ?? null);
         $cellFontSizePt = $this->cellPxToWordPt($cellFontSizePx);
+        $titleFontSizePx = max(10, min(36, (int) ($exportConfig['title_font_size_px'] ?? 18)));
+        $titleFontSizePt = max(8, min(27, (int) round($titleFontSizePx * 0.75)));
         $exportFontName = $this->resolveExportFontName();
-        $logoPath = public_path('images/Gobierno de Puebla_1-Versión vertical.png');
+        $logoPath = public_path('images/LogoSegobHorizontal.png');
         $hasLogo = is_file($logoPath);
+
+        $columns = $this->transformExportColumns($columns, $headersUppercase);
 
         $columnWidthFractions = $this->computeColumnWidthFractions($columns);
         $usableTableTwips = $orientationConfig === 'landscape' ? 14570 : 9638;
@@ -146,10 +156,11 @@ class TemporaryModuleWordPdfService
         $countTable = null;
         if ($includeCountTable) {
             $fieldLabels = [];
-            foreach ($columnMap as $k => $c) {
-                $fieldLabels[$k] = $c['label'];
+            foreach ($columns as $column) {
+                $fieldLabels[(string) ($column['key'] ?? '')] = (string) ($column['label'] ?? '');
             }
             $countTable = $this->buildCountTableData($entries, $countByFields, $fieldLabels);
+            $countTable = $this->transformCountTableLabels($countTable, $headersUppercase);
         }
 
         if ($format === 'word') {
@@ -177,21 +188,31 @@ class TemporaryModuleWordPdfService
             };
 
             if ($hasLogo) {
-                $section->addImage($logoPath, [
-                    'height' => 52,
-                    'positioning' => 'absolute',
-                    'posHorizontal' => 'left',
-                    'posHorizontalRel' => 'margin',
-                    'posVertical' => 'top',
-                    'posVerticalRel' => 'margin',
-                    'wrappingStyle' => 'behind',
-                ]);
             }
 
-            $section->addText($title, ['name' => $exportFontName, 'bold' => true, 'size' => 14, 'color' => '861E34'], ['alignment' => $jc, 'spaceAfter' => 0]);
-
             $fechaCorteStr = now()->format('d/m/Y H:i');
-            $section->addText('Fecha y hora de corte: ' . $fechaCorteStr, ['name' => $exportFontName, 'size' => 9], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::END, 'spaceAfter' => 200]);
+            // Header table: logo (left) + date (right) in row 1; title full-width in row 2
+            $hdrTbl = $section->addTable([
+                'borderSize' => 0,
+                'borderColor' => 'FFFFFF',
+                'cellMarginTop' => 0,
+                'cellMarginBottom' => 0,
+                'cellMarginLeft' => 0,
+                'cellMarginRight' => 0,
+            ]);
+            $hdrLogoW = (int) round($usableTableTwips * 0.60);
+            $hdrDateW = $usableTableTwips - $hdrLogoW;
+            $hdrTbl->addRow(800);
+            $hdrLogoCell = $hdrTbl->addCell($hdrLogoW, ['valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
+            if ($hasLogo) {
+                $hdrLogoRun = $hdrLogoCell->addTextRun(['alignment' => Jc::START]);
+                $hdrLogoRun->addImage($logoPath, ['height' => 52]);
+            }
+            $hdrDateCell = $hdrTbl->addCell($hdrDateW, ['valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
+            $hdrDateCell->addText('Fecha y hora de corte: '.$fechaCorteStr, ['name' => $exportFontName, 'size' => 9], ['alignment' => Jc::END, 'spaceAfter' => 0]);
+            $hdrTbl->addRow();
+            $hdrTitleCell = $hdrTbl->addCell($usableTableTwips, ['gridSpan' => 2, 'borderSize' => 0, 'borderColor' => 'FFFFFF', 'cellMarginTop' => 80]);
+            $hdrTitleCell->addText($title, ['name' => $exportFontName, 'bold' => true, 'size' => $titleFontSizePt, 'color' => '861E34'], ['alignment' => $jc, 'spaceAfter' => 80]);
 
             $section->addTextBreak(1);
 
@@ -273,7 +294,7 @@ class TemporaryModuleWordPdfService
                     }
                 }
                 $section->addTextBreak(1);
-                $section->addText('Desglose', ['name' => $exportFontName, 'bold' => true, 'size' => 11], ['spaceAfter' => 120]);
+                $section->addText($this->normalizeExportHeading('Desglose', $headersUppercase), ['name' => $exportFontName, 'bold' => true, 'size' => 11], ['spaceAfter' => 120]);
             }
 
             $tblStyle = [
@@ -333,7 +354,7 @@ class TemporaryModuleWordPdfService
                 // Determinar color de fondo para encabezados dinámicos
                 $bgIdx = $this->getColumnBgColor($col, $idx);
                 $w = $columnTwips[$idx] ?? null;
-                $table->addCell($w, ['bgColor' => $bgIdx, 'valign' => 'center'])->addText((string) $col['label'], ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                $table->addCell($w, ['bgColor' => $bgIdx, 'valign' => 'center'])->addText((string) $col['label'], ['name' => $exportFontName, 'bold' => true, 'size' => $headerFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
             }
 
             // Filas
@@ -388,8 +409,10 @@ class TemporaryModuleWordPdfService
         $html = view('temporary_modules.admin.partials.export_pdf_table', [
             'title' => $title,
             'titleAlign' => $titleAlign,
+            'sectionLabel' => $this->normalizeExportHeading('Desglose', $headersUppercase),
             'fontFamily' => $exportFontName,
             'cellFontSizePx' => $cellFontSizePx,
+            'titleFontSizePx' => $titleFontSizePx,
             'logoDataUri' => $this->buildLogoDataUri($logoPath),
             'fechaCorteStr' => $fechaCorteStr,
             'orientation' => $orientationConfig,
@@ -419,7 +442,7 @@ class TemporaryModuleWordPdfService
             'url' => route('temporary-modules.admin.exports.download', ['file' => $pdfFileName])
         ];
     }
-
+    }
     /**
      * @param Collection $entries entries with 'data'
      * @param array<string> $countByFields
@@ -467,6 +490,52 @@ class TemporaryModuleWordPdfService
         }
 
         return ['groups' => $groups];
+    }
+
+    private function normalizeExportHeading(string $text, bool $uppercase = false): string
+    {
+        $text = trim($text);
+
+        return $uppercase && $text !== '' ? mb_strtoupper($text, 'UTF-8') : $text;
+    }
+
+    private function transformExportColumns(array $columns, bool $uppercase = false): array
+    {
+        if (! $uppercase) {
+            return $columns;
+        }
+
+        foreach ($columns as &$column) {
+            if (isset($column['label'])) {
+                $column['label'] = $this->normalizeExportHeading((string) $column['label'], true);
+            }
+            if (isset($column['group']) && (string) $column['group'] !== '') {
+                $column['group'] = $this->normalizeExportHeading((string) $column['group'], true);
+            }
+        }
+        unset($column);
+
+        return $columns;
+    }
+
+    private function transformCountTableLabels(array $countTable, bool $uppercase = false): array
+    {
+        if (! $uppercase || empty($countTable['groups']) || ! is_array($countTable['groups'])) {
+            return $countTable;
+        }
+
+        foreach ($countTable['groups'] as &$group) {
+            $group['label'] = $this->normalizeExportHeading((string) ($group['label'] ?? ''), true);
+            if (! empty($group['values']) && is_array($group['values'])) {
+                foreach ($group['values'] as &$value) {
+                    $value['label'] = $this->normalizeExportHeading((string) ($value['label'] ?? ''), true);
+                }
+                unset($value);
+            }
+        }
+        unset($group);
+
+        return $countTable;
     }
 
     private function cssColorToHex(string $color): string

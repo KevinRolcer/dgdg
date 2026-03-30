@@ -1482,6 +1482,7 @@ class TemporaryModuleController extends Controller
         }
 
         $importable = $this->excelImportService->importableFields($temporaryModule->fields);
+        $hasMediaImportFields = $importable->contains(fn ($f) => in_array((string) $f->type, ['image', 'file'], true));
         if ($importable->isEmpty()) {
             return response()->json([
                 'success' => false,
@@ -1532,6 +1533,12 @@ class TemporaryModuleController extends Controller
         if (!empty($preview['is_pdf'])) {
             $out['is_pdf'] = true;
         }
+        $pdfThumbs = is_array($preview['preview_thumbnails'] ?? null) ? $preview['preview_thumbnails'] : [];
+        if ($isPdf && $hasMediaImportFields && count($pdfThumbs) === 0) {
+            $out['warnings'] = [
+                'No se detectaron imágenes embebidas por fila en este PDF. Si las fotos están como enlace/texto o fuera de la tabla, no se podrán importar automáticamente.',
+            ];
+        }
         if (!empty($preview['preview_rows'])) {
             $out['preview_rows'] = $preview['preview_rows'];
         }
@@ -1557,6 +1564,8 @@ class TemporaryModuleController extends Controller
             'data_start_row' => ['nullable', 'integer', 'min:2', 'max:1000'],
             'mapping' => ['required', 'string'],
             'selected_microrregion_id' => ['nullable', 'integer'],
+            'selected_municipio' => ['nullable', 'string', 'max:255'],
+            'auto_identify_municipio' => ['nullable', 'boolean'],
             'all_microrregions' => ['nullable', 'boolean'],
             'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
         ]);
@@ -1604,6 +1613,17 @@ class TemporaryModuleController extends Controller
             $allowedMunicipioNames = array_values($municipios);
         }
 
+        $selectedMunicipio = trim((string) $request->input('selected_municipio', ''));
+        if ($selectedMunicipio !== '') {
+            $allowedNorm = array_map(fn ($m) => $this->excelImportService->normalizeLabel((string) $m), $allowedMunicipioNames);
+            if (! in_array($this->excelImportService->normalizeLabel($selectedMunicipio), $allowedNorm, true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El municipio seleccionado no pertenece al alcance permitido para esta importación.',
+                ], 422);
+            }
+        }
+
         $headerRow = (int) ($request->input('header_row') ?: 1);
         $dataStartRow = (int) ($request->input('data_start_row') ?: $headerRow + 1);
         $sheetIndex = (int) ($request->input('sheet_index') ?: 0);
@@ -1616,6 +1636,8 @@ class TemporaryModuleController extends Controller
                 'header_row' => $headerRow,
                 'data_start_row' => $dataStartRow,
                 'selected_microrregion_id' => $microrregionId,
+                'selected_municipio' => $selectedMunicipio !== '' ? $selectedMunicipio : null,
+                'auto_identify_municipio' => $request->boolean('auto_identify_municipio', true),
                 'all_microrregions' => $allMicrorregions,
                 'sheet_index' => $sheetIndex,
                 'file_path' => $file->getRealPath(),
@@ -1633,7 +1655,10 @@ class TemporaryModuleController extends Controller
             ], 422);
         }
 
-        return response()->json([
+        $importable = $this->excelImportService->importableFields($temporaryModule->fields);
+        $hasMediaImportFields = $importable->contains(fn ($f) => in_array((string) $f->type, ['image', 'file'], true));
+
+        $payload = [
             'success' => true,
             'imported' => $result['imported'],
             'skipped' => $result['skipped'],
@@ -1641,7 +1666,16 @@ class TemporaryModuleController extends Controller
             'message' => $result['imported'] > 0
                 ? "Se importaron {$result['imported']} registro(s)."
                 : 'No se importó ninguna fila (revisa mapeo y datos).',
-        ]);
+        ];
+
+        $pdfImagesSaved = (int) ($result['pdf_images_saved'] ?? 0);
+        if ($isPdf && $hasMediaImportFields && $pdfImagesSaved === 0) {
+            $payload['warnings'] = [
+                'No se pudieron extraer imágenes por fila desde este PDF. Verifica que sean imágenes embebidas en celdas de la tabla.',
+            ];
+        }
+
+        return response()->json($payload);
     }
 
     /**
@@ -2158,6 +2192,7 @@ class TemporaryModuleController extends Controller
             'table_align' => 'nullable|in:left,center,right,stretch',
             'summary_kpi_keys' => 'nullable|string|max:4000',
             'totals_column_keys' => 'nullable|string|max:4000',
+            'title_font_size_px' => 'nullable|integer|min:10|max:36',
         ]);
         $config = [
             'include_summary' => ($validated['include_summary'] ?? '1') === '1',
@@ -2174,6 +2209,7 @@ class TemporaryModuleController extends Controller
             'table_align' => $validated['table_align'] ?? 'left',
             'summary_kpi_keys' => $validated['summary_kpi_keys'] ?? '[]',
             'totals_column_keys' => $validated['totals_column_keys'] ?? '[]',
+            'title_font_size_px' => $validated['title_font_size_px'] ?? 18,
         ];
         $temporaryModule = TemporaryModule::query()->findOrFail($module);
         $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$module;

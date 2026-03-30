@@ -49,20 +49,39 @@ class TemporaryModuleExcelImportService
         $sheetIndex = max(0, min($sheetIndex, count($sheetNames) - 1));
         $sheet = $spreadsheet->getSheet($sheetIndex);
 
-        $highestCol = $sheet->getHighestDataColumn($headerRow);
-        $maxColIndex = Coordinate::columnIndexFromString($highestCol);
-
-        $headers = [];
-        for ($col = 1; $col <= $maxColIndex; $col++) {
-            $letter = Coordinate::stringFromColumnIndex($col);
-            $raw = $sheet->getCell($letter.$headerRow)->getValue();
-            $label = $this->stringifyCell($raw);
-            $headers[] = [
-                'index' => $col - 1,
-                'letter' => $letter,
-                'label' => $label,
-            ];
+        // Fallback: scan up to 5 rows starting from headerRow, pick the one with most non-empty cells
+        $bestHeaderRow = $headerRow;
+        $bestNonEmpty = 0;
+        $bestColCount = 0;
+        $bestLabels = [];
+        for ($tryRow = $headerRow; $tryRow < $headerRow + 5; $tryRow++) {
+            $highestCol = $sheet->getHighestDataColumn($tryRow);
+            $maxColIndex = Coordinate::columnIndexFromString($highestCol);
+            $labels = [];
+            $nonEmpty = 0;
+            for ($col = 1; $col <= $maxColIndex; $col++) {
+                $letter = Coordinate::stringFromColumnIndex($col);
+                $raw = $sheet->getCell($letter.$tryRow)->getValue();
+                $label = $this->stringifyCell($raw);
+                $labels[] = [
+                    'index' => $col - 1,
+                    'letter' => $letter,
+                    'label' => $label,
+                ];
+                if (trim($label) !== '') {
+                    $nonEmpty++;
+                }
+            }
+            if ($nonEmpty > $bestNonEmpty || ($nonEmpty === $bestNonEmpty && $maxColIndex > $bestColCount)) {
+                $bestHeaderRow = $tryRow;
+                $bestNonEmpty = $nonEmpty;
+                $bestColCount = $maxColIndex;
+                $bestLabels = $labels;
+            }
         }
+
+        $headers = $bestLabels;
+        $headerRow = $bestHeaderRow;
 
         $result = [
             'success' => true,
@@ -919,7 +938,7 @@ class TemporaryModuleExcelImportService
                 try {
                     $disk = ! empty(config('filesystems.disks.secure_shared')) ? 'secure_shared' : 'public';
                     if (Storage::disk($disk)->exists($v)) {
-                        $mime = Storage::disk($disk)->mimeType($v) ?: 'image/jpeg';
+                        $mime = Storage::mimeType($v) ?: 'image/jpeg';
                         $base64 = base64_encode(Storage::disk($disk)->get($v));
                         $error['data_urls'][$k] = "data:{$mime};base64,{$base64}";
                     }
@@ -1115,7 +1134,7 @@ class TemporaryModuleExcelImportService
                     try {
                         $disk = ! empty(config('filesystems.disks.secure_shared')) ? 'secure_shared' : 'public';
                         if (Storage::disk($disk)->exists($v)) {
-                            $mime = Storage::disk($disk)->mimeType($v) ?: 'image/jpeg';
+                            $mime = Storage::mimeType($v) ?: 'image/jpeg';
                             $base64 = base64_encode(Storage::disk($disk)->get($v));
                             $conflictData[$k] = "data:{$mime};base64,{$base64}";
                         }
@@ -1153,6 +1172,8 @@ class TemporaryModuleExcelImportService
         $rowOffset = (int) ($options['row_offset'] ?? 1);
         $allMicrorregions = (bool) ($options['all_microrregions'] ?? false);
         $microrregionId = $options['selected_microrregion_id'] ? (int) $options['selected_microrregion_id'] : null;
+        $selectedMunicipio = trim((string) ($options['selected_municipio'] ?? ''));
+        $autoIdentifyMunicipio = (bool) ($options['auto_identify_municipio'] ?? true);
         $userId = auth()->id();
 
         $importable = $module->fields->filter(fn ($f) => in_array($f->type, self::IMPORTABLE_TYPES, true));
@@ -1161,6 +1182,9 @@ class TemporaryModuleExcelImportService
 
         $municipioField = $importable->firstWhere('type', 'municipio');
         $municipioKey = $municipioField ? $municipioField->key : null;
+        $municipioMapped = $municipioKey !== null
+            && array_key_exists($municipioKey, $mapping)
+            && $mapping[$municipioKey] !== null;
 
         $microrregionesAsignadas = (new TemporaryModuleAccessService())->microrregionesConMunicipiosPorUsuario($userId);
         $suggestionBaseMunicipios = [];
@@ -1231,6 +1255,18 @@ class TemporaryModuleExcelImportService
                 if (trim($str) !== '') $hasAnyMappedData = true;
 
                 $values[$fieldKey] = $this->coerceValue($field, $raw, $raw, $str, $suggestionBaseMunicipios);
+            }
+
+            // Si el import no trae columna municipio (o no se desea auto-identificar),
+            // permite fijar un municipio manual para todas las filas.
+            if ($municipioKey !== null && $selectedMunicipio !== '') {
+                $rawMunicipio = trim((string) ($rawValues[$municipioKey] ?? ''));
+                $hasAutoMunicipio = $municipioMapped && $autoIdentifyMunicipio && $rawMunicipio !== '';
+                if (! $hasAutoMunicipio) {
+                    $values[$municipioKey] = $selectedMunicipio;
+                    $rawValues[$municipioKey] = $selectedMunicipio;
+                    $hasAnyMappedData = true;
+                }
             }
 
             if (!$hasAnyMappedData) {
@@ -1363,7 +1399,7 @@ class TemporaryModuleExcelImportService
                         try {
                             $disk = !empty(config('filesystems.disks.secure_shared')) ? 'secure_shared' : 'public';
                             if (\Storage::disk($disk)->exists($v)) {
-                                $mime = \Storage::disk($disk)->mimeType($v) ?: 'image/jpeg';
+                                $mime = \Storage::mimeType($v) ?: 'image/jpeg';
                                 $base64 = base64_encode(\Storage::disk($disk)->get($v));
                                 $conflictData[$k] = "data:{$mime};base64,{$base64}";
                             }

@@ -290,6 +290,13 @@
                                 </select>
                             </label>
 
+                            <label id="tmExcelMunicipioLabel" style="margin-top:8px;">
+                                Municipio de destino (cuando no se mapea columna Municipio)
+                                <select id="tmExcelSelectedMunicipio" class="tm-input">
+                                    <option value="">Selecciona un municipio</option>
+                                </select>
+                            </label>
+
                             <div id="tmExcelPreviewErr" class="inline-alert inline-alert-error tm-hidden" role="alert" style="margin-top:10px;"></div>
                             <div id="tmExcelDetectNote" class="inline-alert inline-alert-success tm-hidden" style="margin-top:10px;" role="status"></div>
 
@@ -306,6 +313,10 @@
                         <!-- PASO 2: Mapeo de columnas (Integrado) -->
                         <div id="tmExcelStep2" class="tm-hidden" style="display:flex; flex-direction:column; padding-top:20px; border-top: 1px dashed var(--clr-border); margin-top:20px;">
                             <h4 class="tm-excel-step-title">Relacionar columnas</h4>
+                                <label class="tm-excel-search-all-wrap" id="tmExcelAutoMunicipioWrap" style="margin-bottom:10px;">
+                                    <input type="checkbox" id="tmExcelAutoIdentifyMunicipio" checked>
+                                    <span>Identificar municipio automáticamente (por columna Municipio)</span>
+                                </label>
                             <div class="tm-table-wrap" style="margin-bottom:12px; border:1px solid var(--clr-border); border-radius:8px; background: rgba(0,0,0,0.02);">
                                 <table class="tm-table tm-table-sm tm-excel-map-table" style="font-size:12px; width:100%;">
                                     <thead><tr><th style="padding:10px 8px;">Campo del módulo</th><th style="padding:10px 8px;">Columna del Excel</th></tr></thead>
@@ -1578,13 +1589,63 @@
     const dInput = document.getElementById('tmExcelDataStartRow');
     const searchAllCheck = document.getElementById('tmExcelSearchAll');
     const mrLabel = document.getElementById('tmExcelMicrorregionLabel');
+    const mrSelect = document.getElementById('tmExcelMicrorregionId');
+    const municipioLabel = document.getElementById('tmExcelMunicipioLabel');
+    const municipioSelectImport = document.getElementById('tmExcelSelectedMunicipio');
+    const autoMunicipioWrap = document.getElementById('tmExcelAutoMunicipioWrap');
+    const autoMunicipioCheck = document.getElementById('tmExcelAutoIdentifyMunicipio');
+
+    function renderImportMunicipios() {
+        if (!mrSelect || !municipioSelectImport) return;
+        const mrId = String(mrSelect.value || '');
+        const municipios = Array.isArray(municipiosPorMicrorregion[mrId]) ? municipiosPorMicrorregion[mrId] : [];
+        const prev = municipioSelectImport.value;
+        municipioSelectImport.innerHTML = '<option value="">Selecciona un municipio</option>';
+        municipios.forEach(function (m) {
+            const opt = new Option(m, m, false, prev === m);
+            municipioSelectImport.appendChild(opt);
+        });
+    }
+
+    function updateMunicipioImportMode() {
+        const municipioField = Array.isArray(excelFields) ? excelFields.find(function (f) { return f && f.type === 'municipio'; }) : null;
+        const municipioMapSelect = municipioField
+            ? document.querySelector('.tm-excel-map-select[data-field-key="' + String(municipioField.key || '').replace(/"/g, '') + '"]')
+            : null;
+        const hasMunicipioColumnMapped = !!(municipioMapSelect && municipioMapSelect.value !== '');
+        if (autoMunicipioWrap) autoMunicipioWrap.style.display = municipioMapSelect ? '' : 'none';
+        if (autoMunicipioCheck) {
+            autoMunicipioCheck.disabled = !hasMunicipioColumnMapped;
+            if (!hasMunicipioColumnMapped) autoMunicipioCheck.checked = false;
+            if (hasMunicipioColumnMapped && autoMunicipioCheck.dataset.userTouched !== '1') {
+                autoMunicipioCheck.checked = true;
+            }
+        }
+        const useManualMunicipio = !hasMunicipioColumnMapped || !autoMunicipioCheck || !autoMunicipioCheck.checked;
+        if (municipioLabel) {
+            const shouldShow = !searchAllCheck?.checked && useManualMunicipio;
+            municipioLabel.style.display = shouldShow ? 'block' : 'none';
+        }
+    }
 
     hInput?.addEventListener('input', updateRowHighlights);
     dInput?.addEventListener('input', updateRowHighlights);
 
     searchAllCheck?.addEventListener('change', function() {
         if (mrLabel) mrLabel.style.display = this.checked ? 'none' : 'block';
+        renderImportMunicipios();
+        updateMunicipioImportMode();
     });
+    mrSelect?.addEventListener('change', function () {
+        renderImportMunicipios();
+        updateMunicipioImportMode();
+    });
+    autoMunicipioCheck?.addEventListener('change', function () {
+        this.dataset.userTouched = '1';
+        updateMunicipioImportMode();
+    });
+    renderImportMunicipios();
+    updateMunicipioImportMode();
 
     document.getElementById('tmExcelAutoDetect')?.addEventListener('click', function() {
         if (!workbookData) return;
@@ -1628,6 +1689,14 @@
                 excelHeaders = j.headers || [];
                 excelFields = j.fields || [];
                 excelSuggested = j.suggested_map || {};
+                const warnings = Array.isArray(j.warnings) ? j.warnings.filter(Boolean) : [];
+                if (warnings.length) {
+                    const detectNote = document.getElementById('tmExcelDetectNote');
+                    if (detectNote) {
+                        detectNote.textContent = warnings.join(' ');
+                        detectNote.classList.remove('tm-hidden');
+                    }
+                }
                 if (j.preview_thumbnails) applyExcelPreviewThumbnails(j.preview_thumbnails);
 
                 const updateMappedColumns = () => {
@@ -1672,9 +1741,13 @@
                     });
 
                     document.querySelectorAll('.tm-excel-map-select').forEach(sel => {
-                        sel.addEventListener('change', updateMappedColumns);
+                        sel.addEventListener('change', function () {
+                            updateMappedColumns();
+                            updateMunicipioImportMode();
+                        });
                     });
                     updateMappedColumns();
+                    updateMunicipioImportMode();
                 }
                 document.getElementById('tmExcelStep2')?.classList.remove('tm-hidden');
 
@@ -1722,6 +1795,15 @@
             const key = sel.getAttribute('data-field-key');
             if (key) mapping[key] = sel.value === '' ? null : parseInt(sel.value, 10);
         });
+        const municipioLabelVisible = municipioLabel && municipioLabel.style.display !== 'none';
+        if (municipioLabelVisible && municipioSelectImport && !municipioSelectImport.value) {
+            const errEl = document.getElementById('tmExcelImportErr');
+            if (errEl) {
+                errEl.textContent = 'Selecciona un municipio de destino o mapea la columna Municipio para identificarlo automáticamente.';
+                errEl.classList.remove('tm-hidden');
+            }
+            return;
+        }
         const fd = new FormData();
         fd.append('archivo_excel', file);
         fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
@@ -1729,6 +1811,8 @@
         fd.append('mapping', JSON.stringify(mapping));
         fd.append('all_microrregions', document.getElementById('tmExcelSearchAll')?.checked ? '1' : '0');
         fd.append('selected_microrregion_id', document.getElementById('tmExcelMicrorregionId')?.value || '');
+        fd.append('selected_municipio', document.getElementById('tmExcelSelectedMunicipio')?.value || '');
+        fd.append('auto_identify_municipio', document.getElementById('tmExcelAutoIdentifyMunicipio')?.checked ? '1' : '0');
         fd.append('sheet_index', currentSheetIdx);
         fd.append('_token', csrfToken);
 
@@ -1821,7 +1905,8 @@
                     }
                 }
 
-                const msg = j.message;
+                const warnings = Array.isArray(j.warnings) ? j.warnings.filter(Boolean) : [];
+                const msg = warnings.length ? ((j.message || '') + ' ' + warnings.join(' ')).trim() : j.message;
 
                 // Acumular registros importados
                 if (j.imported > 0) excelImportedCount += j.imported;

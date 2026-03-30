@@ -381,6 +381,18 @@
                             <label for="tmExportPersonalizeTitle">Título del documento</label>
                             <input type="text" id="tmExportPersonalizeTitle" class="tm-input" placeholder="Nombre del módulo">
                         </div>
+                    <div class="tm-export-personalize-field">
+                        <label class="tm-export-count-table-toggle">
+                            <input type="checkbox" id="tmExportTitleUppercase" value="1">
+                            Convertir el título del documento a MAYÚSCULAS
+                        </label>
+                    </div>
+                    <div class="tm-export-personalize-field">
+                        <label class="tm-export-count-table-toggle">
+                            <input type="checkbox" id="tmExportHeadersUppercase" value="1">
+                            Convertir encabezados y títulos de tabla a MAYÚSCULAS
+                        </label>
+                    </div>
                     <div class="tm-export-personalize-field tm-export-title-align">
                         <span class="tm-export-label-inline">Alineación del título</span>
                         <div class="tm-export-align-btns" role="group" aria-label="Alineación del título">
@@ -390,9 +402,18 @@
                         </div>
                     </div>
                     <div class="tm-export-personalize-field">
+                        <label for="tmExportTitleFontSize">Tamaño de letra del título (px)</label>
+                        <input type="number" id="tmExportTitleFontSize" class="tm-input" min="10" max="36" value="18">
+                    </div>
+                    <div class="tm-export-personalize-field">
                         <label for="tmExportCellFontSize">Tamaño de letra en celdas (px)</label>
                         <input type="number" id="tmExportCellFontSize" class="tm-input" min="9" max="24" value="12">
                         <p class="tm-analysis-hint" style="margin-top:6px;">Solo aplica al contenido de las celdas, no al título.</p>
+                    </div>
+                    <div class="tm-export-personalize-field">
+                        <label for="tmExportHeaderFontSize">Tamaño de letra de los títulos de las columnas (px)</label>
+                        <input type="number" id="tmExportHeaderFontSize" class="tm-input" min="9" max="28" value="12">
+                        <p class="tm-analysis-hint" style="margin-top:6px;">Aplica a los encabezados de las columnas de la tabla.</p>
                     </div>
                     <div class="tm-export-personalize-field tm-export-count-table-section">
                         <label class="tm-export-count-table-toggle">
@@ -556,6 +577,10 @@
                                 <button type="button" class="tm-export-align-btn" data-word-title-align="right">Der</button>
                             </div>
                         </div>
+                        <div class="tm-export-personalize-field">
+                            <label for="tmWordTitleFontPx">Tamaño de letra del título (px)</label>
+                            <input type="number" id="tmWordTitleFontPx" class="tm-input" min="10" max="36" value="18">
+                        </div>
                         <p class="tm-analysis-sidebar-title" style="margin-top:14px;">Qué tablas incluir en el informe</p>
                         <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeSummary" checked> Resumen (totales)</label>
                         <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeMrTable" checked> Tabla microregión / municipios</label>
@@ -637,6 +662,7 @@
                     <input type="hidden" name="table_cell_max_px" id="tmWordFormTableCellMax" value="140">
                     <input type="hidden" name="summary_kpi_keys" id="tmWordFormSummaryKpiKeys" value="[]">
                     <input type="hidden" name="totals_column_keys" id="tmWordFormTotalsColumnKeys" value="[]">
+                    <input type="hidden" name="title_font_size_px" id="tmWordFormTitleFontPx" value="18">
                     <button type="submit" class="tm-btn tm-btn-success">Generar Word con esta configuración</button>
                 </form>
             </div>
@@ -717,7 +743,7 @@
         const seedLogModuleEl = document.getElementById('tmSeedDiscardLogModule');
         const seedLogEmpty = document.getElementById('tmSeedDiscardLogEmpty');
         const seedLogTableWrap = document.getElementById('tmSeedDiscardLogTableWrap');
-        const TM_EXPORT_PREVIEW_LOGO_URL = @json(asset('images/Gobierno de Puebla_1-Versión vertical.png'));
+        const TM_EXPORT_PREVIEW_LOGO_URL = @json(asset('images/LogoSegobHorizontal.png'));
 
         function openSeedDiscardLog(moduleName, jsonId, registerUrl) {
             if (!seedLogModal || !seedLogTbody) return;
@@ -1184,6 +1210,7 @@
                 + '&table_align=' + encodeURIComponent((document.querySelector('#tmAnalysisWordPersonalizeModal .tm-word-table-align-btns .tm-export-align-btn.is-active') || {}).getAttribute ? (document.querySelector('#tmAnalysisWordPersonalizeModal .tm-word-table-align-btns .tm-export-align-btn.is-active').getAttribute('data-word-table-align') || 'left') : 'left')
                 + '&summary_kpi_keys=' + encodeURIComponent(tmWordSummaryKpiJson())
                 + '&totals_column_keys=' + encodeURIComponent(tmWordTotalsColumnJson())
+                + '&title_font_size_px=' + encodeURIComponent(document.getElementById('tmWordTitleFontPx') ? document.getElementById('tmWordTitleFontPx').value : '18')
                 + '&_=' + Date.now();
             applyWordPreviewSheetOrientation(orient);
             wordPersonalizePreview.innerHTML = '<div class="tm-analysis-preview-loading">Actualizando…</div>';
@@ -1266,8 +1293,9 @@
                 document.getElementById('tmWordFormTableCellMax').value = document.getElementById('tmWordTableCellMax') ? document.getElementById('tmWordTableCellMax').value : '140';
                 document.getElementById('tmWordFormSummaryKpiKeys').value = tmWordSummaryKpiJson();
                 document.getElementById('tmWordFormTotalsColumnKeys').value = tmWordTotalsColumnJson();
+                document.getElementById('tmWordFormTitleFontPx').value = document.getElementById('tmWordTitleFontPx') ? (document.getElementById('tmWordTitleFontPx').value || '18') : '18';
             });
-            ['tmWordTableFontPt', 'tmWordTableCellPad', 'tmWordTableCellMax'].forEach(function (id) {
+            ['tmWordTableFontPt', 'tmWordTableCellPad', 'tmWordTableCellMax', 'tmWordTitleFontPx'].forEach(function (id) {
                 var n = document.getElementById(id);
                 if (n) {
                     n.addEventListener('change', function () { loadWordPersonalizePreview(); });
@@ -1626,10 +1654,14 @@
                         '<input type="number" class="tm-export-col-width-input" min="2" max="60" value="' + String(approx) + '" data-key="' + escapeHtml(col.key) + '">' +
                         '</label>';
                 }
+                var currentLabel = (col.label != null && String(col.label).trim() !== '') ? String(col.label) : String(col.key || '');
                 item.innerHTML =
                     '<span class="tm-export-drag-handle" aria-hidden="true">&#9776;</span>' +
                     '<div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">' +
-                        '<span class="tm-export-col-label" style="font-weight: 600;">' + escapeHtml(col.label) + '</span>' +
+                        '<label style="display:flex; flex-direction:column; gap:4px;">' +
+                            '<span class="tm-export-col-label" style="font-weight: 600;">Título de columna</span>' +
+                            '<input type="text" class="tm-input tm-export-col-label-input" data-key="' + escapeHtml(col.key) + '" value="' + escapeHtml(currentLabel) + '" placeholder="Nombre de la columna">' +
+                        '</label>' +
                         '<div style="display: flex; align-items: center; gap: 8px;">' +
                             '<span style="font-size: 0.7rem; color: #666;">Grupo:</span>' + groupSelect +
                         '</div>' +
@@ -1668,6 +1700,8 @@
                 }
                 var gSel = item.querySelector('.tm-export-col-group-select');
                 if (gSel && sc.group) { gSel.value = sc.group; }
+                var labelInput = item.querySelector('.tm-export-col-label-input');
+                if (labelInput && sc.label != null) { labelInput.value = String(sc.label); }
                 var iw = item.querySelector('.tm-export-image-width');
                 var ih = item.querySelector('.tm-export-image-height');
                 if (iw && sc.image_width != null) { iw.value = String(sc.image_width); }
@@ -1793,13 +1827,19 @@
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12 };
+                return { title: '', titleAlign: 'center', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12, titleFontPx: 18 };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
+            const titleUppercaseEl = modal ? modal.querySelector('#tmExportTitleUppercase') : document.getElementById('tmExportTitleUppercase');
+            const headersUppercaseEl = modal ? modal.querySelector('#tmExportHeadersUppercase') : document.getElementById('tmExportHeadersUppercase');
             const cellFontEl = modal ? modal.querySelector('#tmExportCellFontSize') : document.getElementById('tmExportCellFontSize');
+            const titleFontEl = modal ? modal.querySelector('#tmExportTitleFontSize') : document.getElementById('tmExportTitleFontSize');
+            const headerFontEl = modal ? modal.querySelector('#tmExportHeaderFontSize') : document.getElementById('tmExportHeaderFontSize');
             const alignBtn = modal ? modal.querySelector('.tm-export-title-align .tm-export-align-btn.is-active') : null;
             const titleAlign = (alignBtn && alignBtn.getAttribute('data-title-align')) || 'center';
             const cellFontPx = cellFontEl && cellFontEl.value ? Math.max(9, Math.min(24, parseInt(cellFontEl.value, 10) || 12)) : 12;
+            const titleFontPx = titleFontEl && titleFontEl.value ? Math.max(10, Math.min(36, parseInt(titleFontEl.value, 10) || 18)) : 18;
+            const headerFontPx = headerFontEl && headerFontEl.value ? Math.max(9, Math.min(28, parseInt(headerFontEl.value, 10) || 12)) : 12;
             const items = Array.from(container.children).filter(function (el) {
                 return el.classList && el.classList.contains('tm-export-personalize-col');
             });
@@ -1809,6 +1849,10 @@
                 const color = colorTrigger ? (colorTrigger.getAttribute('data-color') || 'var(--clr-primary)') : 'var(--clr-primary)';
                 const groupSel = item.querySelector('.tm-export-col-group-select');
                 const group = groupSel ? groupSel.value : '';
+                const labelInput = item.querySelector('.tm-export-col-label-input');
+                const label = labelInput && String(labelInput.value || '').trim() !== ''
+                    ? String(labelInput.value).trim()
+                    : key;
                 let imageWidth = 120, imageHeight = 80;
                 const w = item.querySelector('.tm-export-image-width');
                 const h = item.querySelector('.tm-export-image-height');
@@ -1816,7 +1860,7 @@
                     imageWidth = parseInt(w.value, 10) || 120;
                     imageHeight = parseInt(h.value, 10) || 80;
                 }
-                return { key, color, imageWidth, imageHeight, group };
+                return { key, label, color, imageWidth, imageHeight, group };
             });
             var countTableColors = {};
             var countColorList = modal ? modal.querySelector('#tmExportCountTableColorList') : document.getElementById('tmExportCountTableColorList');
@@ -1845,7 +1889,19 @@
             var countTableCellWidthEl = modal ? modal.querySelector('#tmExportCountTableCellWidth') : document.getElementById('tmExportCountTableCellWidth');
             var countTableCellWidth = (countTableCellWidthEl && countTableCellWidthEl.value) ? (parseInt(countTableCellWidthEl.value, 10) || 12) : 12;
             var groups = (personalizeModal && personalizeModal._exportGroups) || [];
-            return { title: titleEl ? titleEl.value : '', titleAlign: titleAlign, columns: columns, countTableColors: countTableColors, countTableCellWidth: countTableCellWidth, cellFontPx: cellFontPx, groups: groups };
+            return {
+                title: titleEl ? titleEl.value : '',
+                titleAlign: titleAlign,
+                titleUppercase: !!(titleUppercaseEl && titleUppercaseEl.checked),
+                headersUppercase: !!(headersUppercaseEl && headersUppercaseEl.checked),
+                columns: columns,
+                countTableColors: countTableColors,
+                countTableCellWidth: countTableCellWidth,
+                cellFontPx: cellFontPx,
+                titleFontPx: titleFontPx,
+                headerFontPx: headerFontPx,
+                groups: groups
+            };
         }
 
         function readSampleRowFromPreview(previewEl) {
@@ -1866,6 +1922,11 @@
             return String(val);
         }
 
+        function normalizeExportHeadingText(text, uppercase) {
+            var value = text == null ? '' : String(text);
+            return uppercase ? value.toLocaleUpperCase() : value;
+        }
+
         function buildPersonalizePreview(columns, previewEl, sampleRow, previewEntries, microrregionMeta) {
             if (!previewEl) { return; }
             var modal = previewEl.closest && previewEl.closest('.tm-modal');
@@ -1876,7 +1937,10 @@
             const colorMap = {};
             state.columns.forEach(function (c) { colorMap[c.key] = c.color; });
             const cellFontPx = state.cellFontPx || 12;
+            const titleFontPx = state.titleFontPx || 18;
             const titleAlign = state.titleAlign || 'center';
+            const titleUppercase = !!state.titleUppercase;
+            const headersUppercase = !!state.headersUppercase;
             const titleStyle = 'text-align:' + (titleAlign === 'left' ? 'left' : titleAlign === 'right' ? 'right' : 'center');
             var countTableHtml = '';
             var root = modal || document;
@@ -1885,12 +1949,17 @@
             var countByFieldsEl = root.querySelector ? root.querySelector('#tmExportCountByFields') : document.getElementById('tmExportCountByFields');
             if (includeCountEl && includeCountEl.checked && countByFieldsEl) {
                 var totalCount = Array.isArray(entries) ? entries.length : 0;
-                var groups = [{ label: 'Total de registros', values: [{ label: '', count: totalCount }] }];
+                var currentLabelsByKey = {};
+                columns.forEach(function (col) {
+                    if (col && col.key) { currentLabelsByKey[col.key] = col.label || col.key; }
+                });
+                var groups = [{ label: normalizeExportHeadingText('Total de registros', headersUppercase), values: [{ label: '', count: totalCount }] }];
                 countByFieldsEl.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
                     var key = cb.getAttribute('data-count-key') || cb.value;
                     if (!key) { return; }
                     var labelEl = cb.closest('label');
-                    var fieldLabel = (labelEl && labelEl.textContent) ? labelEl.textContent.replace(/^\s+|\s+$/g, '') : key;
+                    var fieldLabel = currentLabelsByKey[key]
+                        || ((labelEl && labelEl.textContent) ? labelEl.textContent.replace(/^\s+|\s+$/g, '') : key);
                     var byVal = {};
                     var labelByLower = {};
                     if (Array.isArray(entries)) {
@@ -1906,9 +1975,9 @@
                     }
                     var values = [];
                     Object.keys(byVal).sort().forEach(function (lower) {
-                        values.push({ label: labelByLower[lower] || lower, count: byVal[lower] });
+                        values.push({ label: normalizeExportHeadingText(labelByLower[lower] || lower, headersUppercase), count: byVal[lower] });
                     });
-                    if (values.length) { groups.push({ label: fieldLabel, values: values }); }
+                    if (values.length) { groups.push({ label: normalizeExportHeadingText(fieldLabel, headersUppercase), values: values }); }
                 });
                 if (groups.length > 0) {
                     var countTableKeys = [];
@@ -1948,7 +2017,7 @@
                         var isRedundant = (g.values.length === 1 && (String(g.values[0].label).trim() === '' || String(g.values[0].label).trim() === String(g.label).trim())) || key === '_total';
                         var rs = (isRedundant && !showPct) ? ' rowspan="2"' : '';
                         var cs = showPct ? g.values.length * 2 : g.values.length;
-                        countTableHtml += '<th class="tm-export-preview-count-group-header" ' + rs + ' colspan="' + cs + '" style="background-color:' + escapeHtml(bg) + '">' + escapeHtml(g.label) + '</th>';
+                                countTableHtml += '<th class="tm-export-preview-count-group-header" ' + rs + ' colspan="' + cs + '" style="background-color:' + escapeHtml(bg) + '">' + escapeHtml(normalizeExportHeadingText(g.label, headersUppercase)) + '</th>';
                     });
                     countTableHtml += '</tr><tr>';
                     groups.forEach(function (g, gi) {
@@ -1964,10 +2033,10 @@
                             var subLabel = v.label !== '' ? v.label : g.label;
                             var bg = getCountColor(gi, 2, subLabel);
                             if (showPct && isRedundant) {
-                                countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + cellW + 'ch;">Cantidad</th>';
+                                countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + cellW + 'ch;">' + escapeHtml(normalizeExportHeadingText('Cantidad', headersUppercase)) + '</th>';
                                 countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + pctCellW + 'ch;font-size:0.75rem;">%</th>';
                             } else {
-                                countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + cellW + 'ch;min-width:' + cellW + 'ch;max-width:' + cellW + 'ch;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(subLabel) + '</th>';
+                                countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + cellW + 'ch;min-width:' + cellW + 'ch;max-width:' + cellW + 'ch;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(normalizeExportHeadingText(subLabel, headersUppercase)) + '</th>';
                                 if (showPct) {
                                     countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + pctCellW + 'ch;font-size:0.75rem;">%</th>';
                                 }
@@ -2000,17 +2069,24 @@
 
             // Área de Título y Fecha (superior)
             html += '<div class="tm-export-preview-header" style="width:100%;margin-bottom:15px;border-bottom:1px solid #eee;padding-bottom:10px;">';
-            html += '<table style="width:100%;border-collapse:collapse;table-layout:fixed;"><tr>';
+            html += '<table style="width:100%;border-collapse:collapse;table-layout:fixed;">';
             if (TM_EXPORT_PREVIEW_LOGO_URL) {
-                html += '<td style="width:72px;vertical-align:middle;padding-right:8px;">'
-                    + '<img src="' + escapeHtml(TM_EXPORT_PREVIEW_LOGO_URL) + '" alt="Gobierno de Puebla" style="height:56px;width:auto;display:block;">'
+                html += '<tr>';
+                html += '<td style="width:60%;vertical-align:bottom;padding-bottom:2px;">'
+                    + '<img src="' + escapeHtml(TM_EXPORT_PREVIEW_LOGO_URL) + '" alt="Gobierno de Puebla" style="height:52px;width:auto;display:block;">'
                     + '</td>';
+                html += '<td style="width:40%;text-align:right;vertical-align:bottom;font-size:0.8rem;color:#666;padding-bottom:2px;">' + escapeHtml(dateStr) + '</td>';
+                html += '</tr>';
+                html += '<tr><td colspan="2" style="padding-top:6px;">';
+                html += '<div class="tm-export-preview-title" style="' + titleStyle + ';font-size:' + titleFontPx + 'px;font-weight:bold;">' + escapeHtml(normalizeExportHeadingText(state.title || 'Título', titleUppercase)) + '</div>';
+                html += '</td></tr>';
+            } else {
+                html += '<tr><td>';
+                html += '<div class="tm-export-preview-title" style="' + titleStyle + ';font-size:' + titleFontPx + 'px;font-weight:bold;">' + escapeHtml(normalizeExportHeadingText(state.title || 'Título', titleUppercase)) + '</div>';
+                html += '</td></tr>';
+                html += '<tr><td style="text-align:right;font-size:0.8rem;color:#666;padding-top:6px;">' + escapeHtml(dateStr) + '</td></tr>';
             }
-            html += '<td style="vertical-align:middle;">';
-            html += '<div class="tm-export-preview-title" style="' + titleStyle + ';">' + escapeHtml(state.title || 'Título') + '</div>';
-            html += '</td>';
-            html += '</tr></table>';
-            html += '<div class="tm-export-preview-date" style="text-align:right;font-size:0.8rem;color:#666;margin-top:8px;">' + escapeHtml(dateStr) + '</div>';
+            html += '</table>';
             html += '</div>';
 
             // Tabla de Conteo (Resumen)
@@ -2021,7 +2097,7 @@
 
             // Fila de Desglose (dentro de la tabla para alineación)
             html += '<tr class="tm-export-preview-row">';
-            html += '<td class="tm-export-preview-cell tm-export-preview-desglose-label" style="font-weight:600;padding:12px 0 6px 0;border-left:0;border-right:0;border-bottom:0;" colspan="' + totalColSpan + '">Desglose</td>';
+            html += '<td class="tm-export-preview-cell tm-export-preview-desglose-label" style="font-weight:600;padding:12px 0 6px 0;border-left:0;border-right:0;border-bottom:0;" colspan="' + totalColSpan + '">' + escapeHtml(normalizeExportHeadingText('Desglose', headersUppercase)) + '</td>';
             html += '</tr>';
 
             // Encabezados (con Grupos si aplica)
@@ -2040,7 +2116,7 @@
                 html += '<tr class="tm-export-preview-row tm-export-preview-group-header">';
                 groupSpans.forEach(function (gs) {
                     var style = gs.label ? 'background-color:#64748b; color:white; border:1px solid #475569; font-weight:bold; border-bottom:none;' : 'border:none;';
-                    html += '<th class="tm-export-preview-cell" colspan="' + gs.span + '" style="' + style + '">' + (gs.label ? escapeHtml(gs.label) : '') + '</th>';
+                    html += '<th class="tm-export-preview-cell" colspan="' + gs.span + '" style="' + style + '">' + (gs.label ? escapeHtml(normalizeExportHeadingText(gs.label, headersUppercase)) : '') + '</th>';
                 });
                 html += '</tr>';
             }
@@ -2052,10 +2128,10 @@
                     const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
                     const w = (c.imageWidth || 120) + 'px';
                     const h = (c.imageHeight || 80) + 'px';
-                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell tm-export-preview-image-cell" style="background-color:' + escapeHtml(color) + ';width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + '"><span class="tm-export-preview-image-placeholder">Imagen</span></th>';
+                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell tm-export-preview-image-cell" style="background-color:' + escapeHtml(color) + ';width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + '"><span class="tm-export-preview-image-placeholder">' + escapeHtml(normalizeExportHeadingText('Imagen', headersUppercase)) + '</span></th>';
                 } else {
                     const ch = Math.min(col.max_width_chars || 24, 60);
-                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(color) + ';width:' + ch + 'ch">' + escapeHtml(col.label) + '</th>';
+                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(color) + ';width:' + ch + 'ch">' + escapeHtml(normalizeExportHeadingText(col.label, headersUppercase)) + '</th>';
                 }
             });
             html += '</tr>';
@@ -2112,6 +2188,11 @@
                 const base = map[key];
                 if (!base) { return; }
                 const col = Object.assign({}, base);
+                const labelInput = item.querySelector('.tm-export-col-label-input');
+                if (labelInput) {
+                    var customLabel = String(labelInput.value || '').trim();
+                    col.label = customLabel !== '' ? customLabel : (base.label || key);
+                }
 
                 const groupSel = item.querySelector('.tm-export-col-group-select');
                 if (groupSel) { col.group = groupSel.value; }
@@ -2280,7 +2361,10 @@
             const columnsEl = document.getElementById('tmExportPersonalizeColumns');
             const previewEl = document.getElementById('tmExportPersonalizePreview');
             const titleEl = document.getElementById('tmExportPersonalizeTitle');
+            const titleUppercaseEl = document.getElementById('tmExportTitleUppercase');
+            const headersUppercaseEl = document.getElementById('tmExportHeadersUppercase');
             const cellFontEl = document.getElementById('tmExportCellFontSize');
+            const titleFontEl = document.getElementById('tmExportTitleFontSize');
             const applyExcelSingleBtn = document.getElementById('tmExportApplyExcelSingle');
             const applyExcelMrBtn = document.getElementById('tmExportApplyExcelMr');
             const applyWordTableBtn = document.getElementById('tmExportApplyWordTable');
@@ -2365,6 +2449,8 @@
 
                     if (draftCfg) {
                         if (titleEl) { titleEl.value = draftCfg.title != null ? String(draftCfg.title) : (data.title || ''); }
+                        if (titleUppercaseEl) { titleUppercaseEl.checked = !!draftCfg.title_uppercase; }
+                        if (headersUppercaseEl) { headersUppercaseEl.checked = !!draftCfg.headers_uppercase; }
                         personalizeModal.querySelectorAll('.tm-export-title-align .tm-export-align-btn').forEach(function (b) {
                             b.classList.toggle('is-active', (b.getAttribute('data-title-align') || '') === (draftCfg.title_align || 'center'));
                         });
@@ -2397,6 +2483,10 @@
                             var cfn = parseInt(draftCfg.cell_font_size_px, 10);
                             if (!Number.isNaN(cfn)) { cellFontEl.value = String(Math.max(9, Math.min(24, cfn))); }
                         }
+                        if (titleFontEl && draftCfg.title_font_size_px != null) {
+                            var tfn = parseInt(draftCfg.title_font_size_px, 10);
+                            if (!Number.isNaN(tfn)) { titleFontEl.value = String(Math.max(10, Math.min(36, tfn))); }
+                        }
                         var orderedMerged = [];
                         draftCfg.columns.forEach(function (sc) {
                             var b = columns.find(function (c) { return c.key === sc.key; });
@@ -2418,6 +2508,8 @@
                         }
                     } else {
                         if (titleEl) { titleEl.value = data.title || ''; }
+                        if (titleUppercaseEl) { titleUppercaseEl.checked = false; }
+                        if (headersUppercaseEl) { headersUppercaseEl.checked = false; }
                         buildPersonalizeColumnsList(columns, columnsEl);
                     }
                     buildCountTableColorList(countTableColorListEl, countByFieldsEl, personalizeModal._previewEntries, draftCfg ? draftCfg.count_table_colors : null);
@@ -2481,9 +2573,19 @@
                     if (titleEl) {
                         titleEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
+                    if (titleUppercaseEl) {
+                        titleUppercaseEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
+                    if (headersUppercaseEl) {
+                        headersUppercaseEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
                     if (cellFontEl) {
                         cellFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                         cellFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
+                    if (titleFontEl) {
+                        titleFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        titleFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
 
                     if (restoreBtn && restoreWrap) {
@@ -2511,7 +2613,10 @@
                         return {
                             title: state.title || '',
                             title_align: state.titleAlign || 'center',
+                            title_uppercase: !!state.titleUppercase,
+                            headers_uppercase: !!state.headersUppercase,
                             cell_font_size_px: state.cellFontPx || 12,
+                            title_font_size_px: state.titleFontPx || 18,
                             orientation: orientation,
                             table_align: 'left',
                             include_count_table: includeCountTable,
