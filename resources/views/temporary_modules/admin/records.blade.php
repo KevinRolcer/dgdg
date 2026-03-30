@@ -185,12 +185,12 @@
 
                         $getMunicipioName = function ($entry) use ($moduleFields) {
                             $data = is_array($entry->data) ? $entry->data : (array)$entry->data;
-                            
+
                             // Iterate through all fields looking for "municipio"
                             foreach ($moduleFields as $field) {
                                 $label = $field->label ?? $field['label'] ?? '';
                                 $key = $field->key ?? $field['key'] ?? '';
-                                
+
                                 if (stripos($label, 'municipio') !== false || stripos((string)$key, 'municipio') !== false) {
                                     $val = $data[$key] ?? null;
                                     if (is_string($val) && trim($val) !== '') {
@@ -219,7 +219,7 @@
 
                         // First group by Microregión (Using explicit ID or mapped from string)
                         $groupedByMr = collect($module->entries)->groupBy($getMicrorregionName);
-                        
+
                         // Calculate unique municipalities
                         $uniqueMpiosCount = collect($module->entries)->map($getMunicipioName)->filter(function($mp) {
                             return $mp !== 'Sin municipio especificado';
@@ -245,7 +245,7 @@
                                 @php
                                     $mrLatestEntry = $mrEntries->sortByDesc('submitted_at')->first();
                                     $mrUsers = $mrEntries->pluck('user.name')->filter()->unique()->implode(', ');
-                                    
+
                                     // Second group by Municipio
                                     $groupedByMpio = $mrEntries->groupBy($getMunicipioName);
                                 @endphp
@@ -263,7 +263,7 @@
                                             <i class="fa-solid fa-chevron-down"></i>
                                         </div>
                                     </summary>
-                                    
+
                                     <div class="tm-admin-preview-detail tm-admin-preview-mpio-container">
                                         @foreach ($groupedByMpio as $mpioName => $mpioEntries)
                                             <details class="tm-mpio-group-details">
@@ -388,6 +388,11 @@
                             <button type="button" class="tm-export-align-btn is-active" data-title-align="center">Centro</button>
                             <button type="button" class="tm-export-align-btn" data-title-align="right">Der</button>
                         </div>
+                    </div>
+                    <div class="tm-export-personalize-field">
+                        <label for="tmExportCellFontSize">Tamaño de letra en celdas (px)</label>
+                        <input type="number" id="tmExportCellFontSize" class="tm-input" min="9" max="24" value="12">
+                        <p class="tm-analysis-hint" style="margin-top:6px;">Solo aplica al contenido de las celdas, no al título.</p>
                     </div>
                     <div class="tm-export-personalize-field tm-export-count-table-section">
                         <label class="tm-export-count-table-toggle">
@@ -712,6 +717,7 @@
         const seedLogModuleEl = document.getElementById('tmSeedDiscardLogModule');
         const seedLogEmpty = document.getElementById('tmSeedDiscardLogEmpty');
         const seedLogTableWrap = document.getElementById('tmSeedDiscardLogTableWrap');
+        const TM_EXPORT_PREVIEW_LOGO_URL = @json(asset('images/Gobierno de Puebla_1-Versión vertical.png'));
 
         function openSeedDiscardLog(moduleName, jsonId, registerUrl) {
             if (!seedLogModal || !seedLogTbody) return;
@@ -1598,7 +1604,7 @@
                 item.dataset.key = col.key;
                 item.dataset.index = String(index);
                 item.draggable = true;
-                
+
                 var groupSelect = '<select class="tm-export-col-group-select" data-key="' + escapeHtml(col.key) + '" style="font-size: 0.75rem; padding: 2px 4px; border: 1px solid #ddd; border-radius: 4px; max-width: 120px;">' +
                     '<option value="">Sin grupo</option>' +
                     groups.map(function(g) {
@@ -1787,11 +1793,13 @@
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12 };
+                return { title: '', titleAlign: 'center', columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12 };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
+            const cellFontEl = modal ? modal.querySelector('#tmExportCellFontSize') : document.getElementById('tmExportCellFontSize');
             const alignBtn = modal ? modal.querySelector('.tm-export-title-align .tm-export-align-btn.is-active') : null;
             const titleAlign = (alignBtn && alignBtn.getAttribute('data-title-align')) || 'center';
+            const cellFontPx = cellFontEl && cellFontEl.value ? Math.max(9, Math.min(24, parseInt(cellFontEl.value, 10) || 12)) : 12;
             const items = Array.from(container.children).filter(function (el) {
                 return el.classList && el.classList.contains('tm-export-personalize-col');
             });
@@ -1837,7 +1845,7 @@
             var countTableCellWidthEl = modal ? modal.querySelector('#tmExportCountTableCellWidth') : document.getElementById('tmExportCountTableCellWidth');
             var countTableCellWidth = (countTableCellWidthEl && countTableCellWidthEl.value) ? (parseInt(countTableCellWidthEl.value, 10) || 12) : 12;
             var groups = (personalizeModal && personalizeModal._exportGroups) || [];
-            return { title: titleEl ? titleEl.value : '', titleAlign: titleAlign, columns: columns, countTableColors: countTableColors, countTableCellWidth: countTableCellWidth, groups: groups };
+            return { title: titleEl ? titleEl.value : '', titleAlign: titleAlign, columns: columns, countTableColors: countTableColors, countTableCellWidth: countTableCellWidth, cellFontPx: cellFontPx, groups: groups };
         }
 
         function readSampleRowFromPreview(previewEl) {
@@ -1867,6 +1875,7 @@
             const state = getPersonalizeState();
             const colorMap = {};
             state.columns.forEach(function (c) { colorMap[c.key] = c.color; });
+            const cellFontPx = state.cellFontPx || 12;
             const titleAlign = state.titleAlign || 'center';
             const titleStyle = 'text-align:' + (titleAlign === 'left' ? 'left' : titleAlign === 'right' ? 'right' : 'center');
             var countTableHtml = '';
@@ -1986,12 +1995,21 @@
             }
             const totalColSpan = columns.length;
             const dateStr = 'Fecha y hora de corte: ' + new Date().toLocaleString();
-            
+
             let html = '';
-            
+
             // Área de Título y Fecha (superior)
             html += '<div class="tm-export-preview-header" style="width:100%;margin-bottom:15px;border-bottom:1px solid #eee;padding-bottom:10px;">';
-            html += '<div class="tm-export-preview-title" style="' + titleStyle + ';text-align:center;">' + escapeHtml(state.title || 'Título') + '</div>';
+            html += '<table style="width:100%;border-collapse:collapse;table-layout:fixed;"><tr>';
+            if (TM_EXPORT_PREVIEW_LOGO_URL) {
+                html += '<td style="width:72px;vertical-align:middle;padding-right:8px;">'
+                    + '<img src="' + escapeHtml(TM_EXPORT_PREVIEW_LOGO_URL) + '" alt="Gobierno de Puebla" style="height:56px;width:auto;display:block;">'
+                    + '</td>';
+            }
+            html += '<td style="vertical-align:middle;">';
+            html += '<div class="tm-export-preview-title" style="' + titleStyle + ';">' + escapeHtml(state.title || 'Título') + '</div>';
+            html += '</td>';
+            html += '</tr></table>';
             html += '<div class="tm-export-preview-date" style="text-align:right;font-size:0.8rem;color:#666;margin-top:8px;">' + escapeHtml(dateStr) + '</div>';
             html += '</div>';
 
@@ -2000,7 +2018,7 @@
 
             // Tabla de Datos (Desglose)
             html += '<table class="tm-export-preview-table" style="table-layout:fixed;width:auto;border-collapse:collapse;margin-top:10px;">';
-            
+
             // Fila de Desglose (dentro de la tabla para alineación)
             html += '<tr class="tm-export-preview-row">';
             html += '<td class="tm-export-preview-cell tm-export-preview-desglose-label" style="font-weight:600;padding:12px 0 6px 0;border-left:0;border-right:0;border-bottom:0;" colspan="' + totalColSpan + '">Desglose</td>';
@@ -2058,7 +2076,7 @@
                             const ch = Math.min(col.max_width_chars || 24, 60);
                             var val = '';
                             if (col.key === 'item') { val = String(itemNum++); } else if (col.key === 'microrregion') { val = mrLabel; } else { val = formatPreviewCellValue(entry.data && entry.data[col.key]); }
-                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="width:' + ch + 'ch;background:' + escapeHtml(cellColor) + '">' + escapeHtml(val) + '</td>';
+                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="width:' + ch + 'ch;background:' + escapeHtml(cellColor) + ';font-size:' + cellFontPx + 'px;">' + escapeHtml(val) + '</td>';
                         }
                     });
                     html += '</tr>';
@@ -2075,7 +2093,7 @@
                     } else {
                         const ch = Math.min(col.max_width_chars || 24, 60);
                         const val = (savedRow && savedRow[col.key] !== undefined) ? escapeHtml(savedRow[col.key]) : '';
-                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="width:' + ch + 'ch;background:' + escapeHtml(cellColor) + '" data-placeholder="Ejemplo">' + val + '</td>';
+                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="width:' + ch + 'ch;background:' + escapeHtml(cellColor) + ';font-size:' + cellFontPx + 'px;" data-placeholder="Ejemplo">' + val + '</td>';
                     }
                 });
                 html += '</tr>';
@@ -2094,7 +2112,7 @@
                 const base = map[key];
                 if (!base) { return; }
                 const col = Object.assign({}, base);
-                
+
                 const groupSel = item.querySelector('.tm-export-col-group-select');
                 if (groupSel) { col.group = groupSel.value; }
 
@@ -2109,7 +2127,7 @@
                 }
                 const colorTrigger = item.querySelector('.tm-export-color-trigger');
                 if (colorTrigger) { col.color = colorTrigger.getAttribute('data-color') || 'var(--clr-primary)'; }
-                
+
                 ordered.push(col);
             });
             return ordered.length ? ordered : columns.slice();
@@ -2262,6 +2280,7 @@
             const columnsEl = document.getElementById('tmExportPersonalizeColumns');
             const previewEl = document.getElementById('tmExportPersonalizePreview');
             const titleEl = document.getElementById('tmExportPersonalizeTitle');
+            const cellFontEl = document.getElementById('tmExportCellFontSize');
             const applyExcelSingleBtn = document.getElementById('tmExportApplyExcelSingle');
             const applyExcelMrBtn = document.getElementById('tmExportApplyExcelMr');
             const applyWordTableBtn = document.getElementById('tmExportApplyWordTable');
@@ -2374,6 +2393,10 @@
                             var cwn = parseInt(draftCfg.count_table_cell_width, 10);
                             if (!Number.isNaN(cwn)) { cwEl.value = String(Math.max(6, Math.min(40, cwn))); }
                         }
+                        if (cellFontEl && draftCfg.cell_font_size_px != null) {
+                            var cfn = parseInt(draftCfg.cell_font_size_px, 10);
+                            if (!Number.isNaN(cfn)) { cellFontEl.value = String(Math.max(9, Math.min(24, cfn))); }
+                        }
                         var orderedMerged = [];
                         draftCfg.columns.forEach(function (sc) {
                             var b = columns.find(function (c) { return c.key === sc.key; });
@@ -2458,6 +2481,10 @@
                     if (titleEl) {
                         titleEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
+                    if (cellFontEl) {
+                        cellFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        cellFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
 
                     if (restoreBtn && restoreWrap) {
                         restoreBtn.onclick = function () {
@@ -2484,6 +2511,7 @@
                         return {
                             title: state.title || '',
                             title_align: state.titleAlign || 'center',
+                            cell_font_size_px: state.cellFontPx || 12,
                             orientation: orientation,
                             table_align: 'left',
                             include_count_table: includeCountTable,

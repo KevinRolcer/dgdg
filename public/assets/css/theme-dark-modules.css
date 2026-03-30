@@ -1,4 +1,4 @@
-
+﻿
 html.theme-dark {
     --tm-surface: #1a1f28;
     --tm-surface-2: #222830;
@@ -736,7 +736,7 @@ html.theme-dark .tm-export-personalize-preview {
     background: transparent !important;
 }
 
-/* Paneles más oscuros: mezcla fuerte del matiz de marca sobre base casi negra */
+/* Paneles mÃ¡s oscuros: mezcla fuerte del matiz de marca sobre base casi negra */
 html.theme-dark .tm-export-format-section {
     background: color-mix(in srgb, var(--tm-surface) 88%, #080a0c) !important;
     border: 1px solid rgba(255, 255, 255, 0.06) !important;
@@ -940,3 +940,163 @@ html.theme-dark.theme-dark--slate .tm-shell .tm-table th,
 html.theme-dark.theme-dark--slate .supervision-layout table thead th {
     color: var(--clr-accent) !important;
 }
+
+/* ============================================================
+   WHATSAPP CHAT PREVIEW â€” DARK THEME OVERRIDES
+   ============================================================ */
+
+/*
+ * Los contenedores principales (wa-workspace-chat, wa-chat-txt-wrap,
+ * wa-workspace-panel, wa-panel-tabs, wa-panel-body, wa-stats-bar,
+ * wa-parts-bar) usan var(--clr-bg) en el CSS base, igual que
+ * tm-shell-main â€” no se necesita override de background.
+ */
+
+/* Bordes en dark */
+html.theme-dark .wa-workspace-chat { border-right-color: var(--clr-border) !important; }
+html.theme-dark .wa-stats-bar      { border-bottom-color: var(--clr-border) !important; }
+html.theme-dark .wa-parts-bar      { border-bottom-color: var(--clr-border) !important; }
+html.theme-dark .wa-workspace-panel { border-left-color: var(--clr-border) !important; }
+html.theme-dark .wa-panel-tabs     { border-bottom-color: var(--clr-border) !important; }
+
+/* Tabs de panel */
+html.theme-dark .wa-panel-tab {
+    color: var(--clr-text-light) !important;
+}
+html.theme-dark .wa-panel-tab:hover {
+    background: rgba(255,255,255,0.04) !important;
+    color: var(--clr-text-main) !important;
+}
+html.theme-dark .wa-panel-tab--active {
+    color: var(--clr-accent) !important;
+    background: rgba(199,155,102,0.08) !important;
+}
+
+/* Burbujas de mensajes â€” usan var(--clr-card) para diferenciarse del fondo */
+html.theme-dark .wa-msg-bubble {
+    background: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+html.theme-dark .wa-msg-body  { color: var(--clr-text-main) !important; }
+html.theme-dark .wa-msg-time,
+html.theme-dark .wa-msg-num   { color: var(--clr-text-light) !important; }
+
+/* Tabs de partes HTML */
+html.theme-dark .wa-part-tab {
+    background: transparent !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+html.theme-dark .wa-part-tab.wa-active-part {
+    background: rgba(199,155,102,0.18) !important;
+    border-color: var(--clr-accent) !important;
+    color: var(--clr-accent) !important;
+}
+
+/* Secciones de filtros */
+html.theme-dark .wa-filter-section      { border-bottom-color: var(--clr-border) !important; }
+html.theme-dark .wa-filter-section-label { color: var(--clr-accent) !important; }
+
+/* Inputs y selects */
+html.theme-dark .wa-input,
+html.theme-dark .wa-select {
+    background: var(--tm-input-bg) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+html.theme-dark .wa-input::placeholder { color: var(--clr-text-light) !important; }
+
+/* Toggle chips */
+html.theme-dark .wa-toggle-chip {
+    background: var(--tm-input-bg) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+html.theme-dark .wa-toggle-input:checked + .wa-toggle-chip {
+    background: rgba(199,155,102,0.18) !important;
+    border-color: var(--clr-accent) !important;
+    color: var(--clr-accent) !important;
+}
+
+/* Reset button */
+html.theme-dark .wa-filter-reset-btn {
+    background: var(--tm-input-bg) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+html.theme-dark .wa-filter-reset-btn:hover {
+    background: rgba(199,155,102,0.1) !important;
+    border-color: rgba(199,155,102,0.3) !important;
+    color: var(--clr-accent) !important;
+}
+
+/* Filtros activos */
+html.theme-dark .wa-active-filters {
+    background: rgba(199,155,102,0.1) !important;
+    border-color: rgba(199,155,102,0.25) !important;
+}
+
+/* BÃºsqueda */
+html.theme-dark .wa-search-input {
+    background: var(--tm-input-bg) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+html.theme-dark .wa-search-input::placeholder { color: var(--clr-text-light) !important; }
+
+html.theme-dark .wa-search-hit {
+    background: var(--clr-card) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+html.theme-dark .wa-search-hit:hover {
+    border-color: var(--clr-accent) !important;
+    background: rgba(199,155,102,0.14) !important;
+}
+
+/* Tarjetas de parte (modo HTML en panel) */
+html.theme-dark .wa-part-card {
+    background: var(--tm-input-bg) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+html.theme-dark .wa-part-card:hover         { border-color: var(--clr-accent) !important; background: rgba(199,155,102,0.1) !important; }
+html.theme-dark .wa-part-card.wa-active-part { background: rgba(199,155,102,0.18) !important; border-color: var(--clr-accent) !important; color: var(--clr-accent) !important; }
+
+/* Botones de cabecera */
+html.theme-dark .wa-back-btn,
+html.theme-dark .wa-panel-toggle-btn,
+html.theme-dark .wa-action-btn {
+    background: var(--tm-input-bg) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+html.theme-dark .wa-back-btn:hover,
+html.theme-dark .wa-panel-toggle-btn:hover {
+    background: rgba(199,155,102,0.1) !important;
+    border-color: rgba(199,155,102,0.3) !important;
+}
+html.theme-dark .wa-panel-toggle-btn[aria-expanded="true"] {
+    background: rgba(199,155,102,0.12) !important;
+    border-color: rgba(199,155,102,0.35) !important;
+    color: var(--clr-accent) !important;
+}
+html.theme-dark .wa-action-btn--danger { color: var(--clr-primary) !important; }
+
+/* Flatpickr */
+html.theme-dark .flatpickr-calendar {
+    background: var(--tm-surface) !important;
+    border-color: var(--clr-border) !important;
+    color: var(--clr-text-main) !important;
+}
+html.theme-dark .flatpickr-day            { color: var(--clr-text-main) !important; }
+html.theme-dark .flatpickr-day:hover      { background: rgba(255,255,255,0.06) !important; }
+
+/* Panel hint */
+html.theme-dark .wa-panel-hint {
+    background: rgba(36,98,87,0.12) !important;
+    border-color: rgba(36,98,87,0.25) !important;
+    color: var(--clr-secondary) !important;
+}
+

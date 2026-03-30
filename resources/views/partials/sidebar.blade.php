@@ -49,6 +49,15 @@
             }
         }
 
+        if (!empty($item['only_for_emails']) && is_array($item['only_for_emails'])) {
+            $allowedEmails = array_map(static function ($email) {
+                return mb_strtolower(trim((string) $email));
+            }, $item['only_for_emails']);
+            if ($userEmail === '' || !in_array($userEmail, $allowedEmails, true)) {
+                return false;
+            }
+        }
+
         return true;
     };
 
@@ -71,7 +80,13 @@
     };
 
     $hasActiveChild = static function (array $item) use (&$hasActiveChild, $currentRouteName): bool {
+        $activeRoutes = array_filter((array) ($item['active_routes'] ?? []));
+
         if (!empty($item['route']) && $item['route'] === $currentRouteName) {
+            return true;
+        }
+
+        if (!empty($activeRoutes) && in_array($currentRouteName, $activeRoutes, true)) {
             return true;
         }
 

@@ -50,7 +50,8 @@
 
     /** Aviso flotante (misma idea que #appToast en app-shell). */
     function showAgendaCalToast(message, durationMs) {
-        var ms = durationMs == null ? 4200 : durationMs;
+        var baseMs = durationMs == null ? 4200 : durationMs;
+        var ms = Math.max(900, baseMs - 500);
         var el = document.createElement('div');
         el.className = 'app-toast';
         el.setAttribute('role', 'status');

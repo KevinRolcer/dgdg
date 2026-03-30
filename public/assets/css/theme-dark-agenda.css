@@ -319,7 +319,7 @@ html.theme-dark .pa-search-input:focus {
 }
 
 html.theme-dark .pa-search-wrapper .pa-search-icon {
-    color: var(--clr-text-light) !important;
+    display: none !important;
 }
 
 html.theme-dark .pa-tabs-pills {
@@ -516,17 +516,18 @@ html.theme-dark .tm-swal-popup {
 }
 
 html.theme-dark .swal2-title.tm-swal-title {
-    background: var(--tm-muted-bg) !important;
-    color: var(--clr-text-main) !important;
-    border-bottom: 1px solid var(--clr-border) !important;
+    background: transparent !important;
+    color: #ffffff !important;
+    border-bottom: none !important;
 }
 
 html.theme-dark .swal2-html-container.tm-swal-text {
-    color: var(--clr-text-main) !important;
+    background: transparent !important;
+    color: #ffffff !important;
 }
 
 html.theme-dark .swal2-label {
-    color: var(--clr-text-main) !important;
+    color: #ffffff !important;
 }
 
 html.theme-dark .swal2-input,
@@ -538,8 +539,8 @@ html.theme-dark .swal2-select {
 }
 
 html.theme-dark .swal2-actions {
-    background: var(--tm-muted-bg) !important;
-    border-top: 1px solid var(--clr-border) !important;
+    background: transparent !important;
+    border-top: none !important;
 }
 
 html.theme-dark .swal2-cancel.tm-swal-cancel {

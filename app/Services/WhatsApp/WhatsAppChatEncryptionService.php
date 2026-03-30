@@ -3,6 +3,7 @@
 namespace App\Services\WhatsApp;
 
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -149,10 +150,30 @@ final class WhatsAppChatEncryptionService
         $total = count($toEncrypt);
         $done = 0;
         $count = 0;
+        $skippedCorrupted = 0;
 
         foreach ($toEncrypt as $file) {
-            $before = $disk->exists($file) ? strlen((string) $disk->get($file)) : 0;
-            $this->encryptDiskFile($disk, $file, $dek);
+            try {
+                $before = $disk->exists($file) ? strlen((string) $disk->get($file)) : 0;
+                $this->encryptDiskFile($disk, $file, $dek);
+            } catch (\Throwable $e) {
+                $msg = (string) $e->getMessage();
+                if (str_contains($msg, 'Corrupted path detected')) {
+                    $skippedCorrupted++;
+                    Log::warning('Skipping corrupted WhatsApp path during encryption tree.', [
+                        'path' => $file,
+                        'error' => $msg,
+                    ]);
+                    $done++;
+                    if ($onFileProgress !== null) {
+                        $onFileProgress($done, $total);
+                    }
+
+                    continue;
+                }
+
+                throw $e;
+            }
             if ($before > 0) {
                 $count++;
             }
@@ -160,6 +181,14 @@ final class WhatsAppChatEncryptionService
             if ($onFileProgress !== null) {
                 $onFileProgress($done, $total);
             }
+        }
+
+        if ($skippedCorrupted > 0) {
+            Log::warning('WhatsApp encryption tree completed with corrupted paths skipped.', [
+                'root' => $rootRelative,
+                'skipped' => $skippedCorrupted,
+                'total' => $total,
+            ]);
         }
 
         return $count;

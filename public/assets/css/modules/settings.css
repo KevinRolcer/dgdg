@@ -36,7 +36,7 @@
 
 @media (min-width: 1200px) {
     .settings-shell {
-        max-width: min(1280px, calc(100% - 24px));
+        max-width: min(1280px, calc(100% - 4px));
     }
 }
 
@@ -137,11 +137,11 @@
 .settings-shell-nav {
     background: var(--clr-bg);
     border-right: 1px solid var(--clr-border);
-    padding: 0.65rem 0.5rem 1rem;
+    padding: 0.65rem  1rem ;
 }
 
 .settings-shell-brand {
-    padding: 0.25rem 0.35rem 0.35rem;
+    padding: 0.25rem 0.2rem 0.35rem 0;
     border-bottom: 1px solid var(--clr-border);
     margin-bottom: 0.2rem;
 }
@@ -162,21 +162,31 @@
 
 .settings-shell-menu {
     display: flex;
+    padding-top: 10px;
     flex-direction: column;
-    gap: 2px;
+    gap: 8px;
+    padding-left: 0;
 }
 
 .settings-shell-item {
     display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.28rem 0.35rem;
+    align-items: flex-start;
+    gap: 0.45rem;
+    padding: 0.28rem 0.2rem 0.28rem 0;
     border-radius: 4px;
     text-decoration: none;
     color: var(--clr-text-main);
     font-size: 0.78rem;
     font-weight: 600;
     transition: background 0.12s ease;
+}
+
+.settings-shell-label {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    line-height: 1.28;
+    text-align: left;
 }
 
 .settings-shell-item:hover {
@@ -493,6 +503,7 @@ html.theme-dark .settings-row {
     flex-shrink: 0;
     width: 52px;
     height: 28px;
+    margin-bottom: 0;
 }
 
 .settings-toggle input {
@@ -552,9 +563,9 @@ html.theme-dark .settings-toggle input:checked + .settings-toggle-track {
 }
 
 .settings-dark-variants-label {
+    margin: 0 0 0.22rem;
     font-size: 0.62rem;
     font-weight: 800;
-    margin-bottom: 0.22rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--clr-text-light);
@@ -564,6 +575,7 @@ html.theme-dark .settings-toggle input:checked + .settings-toggle-track {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 0.25rem;
+    align-items: stretch;
 }
 
 @media (max-width: 560px) {
@@ -579,13 +591,17 @@ html.theme-dark .settings-toggle input:checked + .settings-toggle-track {
     justify-content: center;
     gap: 0.2rem;
     width: 100%;
-    min-height: 0;
-    padding: 0.22rem 0.2rem;
+    height: auto;
+    min-height: 3.1rem;
+    padding: 0.35rem 0.3rem 0.3rem;
     border: 1px solid var(--clr-border);
-    border-radius: 4px;
+    border-radius: 6px;
     background: transparent;
     cursor: pointer;
     transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: 1.1;
 }
 
 html.theme-dark .settings-variant-btn {
@@ -635,6 +651,7 @@ html.theme-dark .settings-variant-btn.is-active {
     font-weight: 700;
     color: var(--clr-text-main);
     text-align: center;
+    line-height: 1.1;
 }
 
 .settings-variant-btn.is-active .settings-variant-name {
@@ -961,6 +978,14 @@ html.theme-dark .inline-alert-error .settings-log-btn:hover {
 .settings-modal-dialog-log .settings-log-body {
     max-height: 70vh;
     overflow-y: auto;
+}
+
+.settings-modal-dialog-log {
+    max-width: 640px;
+}
+
+.settings-modal-dialog-list {
+    max-width: 560px;
 }
 .settings-log-dl {
     margin: 0;

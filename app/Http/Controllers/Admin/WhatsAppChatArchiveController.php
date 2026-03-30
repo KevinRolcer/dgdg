@@ -19,6 +19,8 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
@@ -122,18 +124,25 @@ class WhatsAppChatArchiveController extends Controller
 
     public function index(Request $request)
     {
+        $select = [
+            'id',
+            'title',
+            'original_zip_name',
+            'imported_at',
+            'message_parts_count',
+            'import_status',
+            'import_error',
+        ];
+
+        if (Schema::hasColumn('whatsapp_chat_archives', 'folder_total_files')) {
+            $select[] = 'folder_total_files';
+        }
+        if (Schema::hasColumn('whatsapp_chat_archives', 'folder_uploaded_files')) {
+            $select[] = 'folder_uploaded_files';
+        }
+
         $chats = WhatsAppChatArchive::query()
-            ->select([
-                'id',
-                'title',
-                'original_zip_name',
-                'imported_at',
-                'message_parts_count',
-                'import_status',
-                'import_error',
-                'folder_total_files',
-                'folder_uploaded_files',
-            ])
+            ->select($select)
             ->orderByDesc('imported_at')
             ->paginate(15)
             ->withQueryString();
@@ -209,6 +218,10 @@ class WhatsAppChatArchiveController extends Controller
 
     public function storeFolderFile(Request $request): JsonResponse
     {
+        if ($schemaError = $this->ensureFolderUploadSchemaReady()) {
+            return $schemaError;
+        }
+
         $maxKb = (int) config('whatsapp_chats.max_upload_kb', 786432);
         $maxMb = (int) config('whatsapp_chats.max_upload_mb', 768);
         $maxFiles = (int) config('whatsapp_chats.folder_import_max_files', 25000);
@@ -385,6 +398,10 @@ class WhatsAppChatArchiveController extends Controller
 
     public function finalizeFolderUpload(Request $request): JsonResponse
     {
+        if ($schemaError = $this->ensureFolderUploadSchemaReady()) {
+            return $schemaError;
+        }
+
         $validated = $request->validate([
             'folder_signature' => ['required', 'string', 'size:64'],
             'folder_total_files' => ['required', 'integer', 'min:1'],
@@ -478,12 +495,20 @@ class WhatsAppChatArchiveController extends Controller
             if ($seg === '' || $seg === '.') {
                 continue;
             }
+
+            $seg = mb_convert_encoding($seg, 'UTF-8', 'UTF-8,ISO-8859-1,Windows-1252');
+
             if ($seg === '..') {
                 throw ValidationException::withMessages([
                     'relative_path' => ['La ruta del archivo no es válida.'],
                 ]);
             }
             if (str_contains($seg, "\0")) {
+                throw ValidationException::withMessages([
+                    'relative_path' => ['La ruta del archivo no es válida.'],
+                ]);
+            }
+            if (! mb_check_encoding($seg, 'UTF-8') || preg_match('/[\x00-\x1F\x7F]/u', $seg) === 1) {
                 throw ValidationException::withMessages([
                     'relative_path' => ['La ruta del archivo no es válida.'],
                 ]);
@@ -499,9 +524,6 @@ class WhatsAppChatArchiveController extends Controller
         return implode('/', $segments);
     }
 
-    /**
-     * Serializa creación/consolidación por usuario + firma de carpeta (evita dos registros en subidas paralelas).
-     */
     private function resolveFolderUploadArchiveLocked(
         Request $request,
         string $folderSignature,
@@ -565,9 +587,6 @@ class WhatsAppChatArchiveController extends Controller
         ]);
     }
 
-    /**
-     * Varios lotes concurrentes podían crear más de un archivo con la misma firma; unifica en el registro de id menor.
-     */
     private function consolidateDuplicateFolderArchives(int $userId, string $folderSignature): void
     {
         $archives = WhatsAppChatArchive::query()
@@ -657,6 +676,41 @@ class WhatsAppChatArchiveController extends Controller
             ->first();
     }
 
+
+    private function ensureFolderUploadSchemaReady(): ?JsonResponse
+    {
+        $missing = [];
+
+        if (! Schema::hasTable('whatsapp_chat_archives')) {
+            $missing[] = 'whatsapp_chat_archives';
+        } else {
+            foreach (['folder_source_signature', 'folder_root_name', 'folder_total_files', 'folder_uploaded_files'] as $column) {
+                if (! Schema::hasColumn('whatsapp_chat_archives', $column)) {
+                    $missing[] = 'whatsapp_chat_archives.'.$column;
+                }
+            }
+        }
+
+        if (! Schema::hasTable('whatsapp_chat_archive_upload_files')) {
+            $missing[] = 'whatsapp_chat_archive_upload_files';
+        } elseif (! Schema::hasColumn('whatsapp_chat_archive_upload_files', 'relative_path_hash')) {
+            $missing[] = 'whatsapp_chat_archive_upload_files.relative_path_hash';
+        }
+
+        if ($missing === []) {
+            return null;
+        }
+
+        Log::warning('WhatsApp folder upload blocked due to incomplete schema.', [
+            'missing' => $missing,
+        ]);
+
+        return response()->json([
+            'message' => 'La carga por carpeta requiere completar migraciones de base de datos. Ejecuta php artisan migrate y vuelve a intentar.',
+            'missing_schema' => $missing,
+        ], 409);
+    }
+
     public function importStatus(Request $request, WhatsAppChatArchive $chat): JsonResponse
     {
         return response()->json([
@@ -731,6 +785,19 @@ class WhatsAppChatArchiveController extends Controller
         }
 
         $txtMessages = $txtMessages->map(function (array $msg) use ($chat) {
+            $msg['media_items'] = collect($msg['media_items'] ?? [])->map(function (array $item) use ($chat) {
+                if (! empty($item['media_rel_path'])) {
+                    $item['media_url'] = route('whatsapp-chats.admin.media', [
+                        'chat' => $chat->id,
+                        'file' => (string) $item['media_rel_path'],
+                    ]);
+                } else {
+                    $item['media_url'] = null;
+                }
+
+                return $item;
+            })->values()->all();
+
             if (! empty($msg['media_rel_path'])) {
                 $msg['media_url'] = route('whatsapp-chats.admin.media', [
                     'chat' => $chat->id,
@@ -857,13 +924,9 @@ class WhatsAppChatArchiveController extends Controller
                 'created_at' => now(),
             ]);
         } catch (\Throwable) {
-            // no bloquear flujo si falla auditoría
         }
     }
 
-    /**
-     * @return array{collection: Collection<int, array<string, mixed>>, truncated: bool}
-     */
     private function buildTxtMessagesCollection(
         WhatsAppChatArchive $chat,
         \Illuminate\Contracts\Filesystem\Filesystem $disk,
@@ -884,10 +947,7 @@ class WhatsAppChatArchiveController extends Controller
         return $this->parseTxtRawToMessages($raw, $mediaIndex, $maxMessages);
     }
 
-    /**
-     * @param  array<string,string>  $mediaIndex
-     * @return array{collection: Collection<int, array<string,mixed>>, truncated: bool}
-     */
+
     private function parseTxtRawToMessages(string $raw, array $mediaIndex, ?int $maxMessages = null): array
     {
         $lines = preg_split('/\\r\\n|\\r|\\n/u', $raw) ?: [];
@@ -898,8 +958,9 @@ class WhatsAppChatArchiveController extends Controller
 
         foreach ($lines as $line) {
             $line = (string) $line;
+            $line = (string) preg_replace('/^[\x{200E}\x{200F}\x{202A}-\x{202E}\x{2066}-\x{2069}\x{FEFF}]+/u', '', $line);
 
-            if (preg_match('/^\\[(.*?)\\]\\s([^:]+):\\s(.*)$/u', $line, $m)) {
+            if (preg_match('/^\\[(.*?)\\]\\s([^:]+):\\s?(.*)$/u', $line, $m)) {
                 if ($current !== null) {
                     $messages[] = $current;
                     if ($maxMessages !== null && count($messages) >= $maxMessages) {
@@ -932,29 +993,58 @@ class WhatsAppChatArchiveController extends Controller
         }
 
         $collection = collect($messages)->values()->map(function (array $msg, int $idx) use ($mediaIndex) {
-            $filename = $this->extractMediaFilenameFromText((string) ($msg['text'] ?? ''));
-            $mediaRelPath = null;
-            $mediaKind = null;
-            $mediaIsSticker = false;
+            $rawText = (string) ($msg['text'] ?? '');
+            $author = (string) ($msg['author'] ?? '');
+            $mediaFilenames = $this->extractMediaFilenamesFromText($rawText);
+            $cleanText = $this->stripAttachmentTokensFromText($rawText);
 
-            if (is_string($filename) && $filename !== '') {
-                $key = mb_strtolower($filename);
-                $mediaRelPath = $mediaIndex[$key] ?? null;
-                if (is_string($mediaRelPath) && $mediaRelPath !== '') {
-                    $mediaKind = $this->resolveMediaKindFromFilename($filename);
-                    $mediaIsSticker = $this->isStickerFilename($filename);
+            $reactions = [];
+            $textReactions = $this->extractEmojiTokens($cleanText);
+            if (! empty($textReactions)) {
+                $textWithoutEmoji = trim((string) preg_replace('/[\x{2600}-\x{27BF}\x{1F300}-\x{1FAFF}]|\x{FE0F}|\x{200D}|\x{1F3FB}|\x{1F3FC}|\x{1F3FD}|\x{1F3FE}|\x{1F3FF}/u', '', $cleanText));
+                if ($textWithoutEmoji === '') {
+                    $reactions = $textReactions;
+                    $cleanText = '';
                 }
             }
+
+            if ($cleanText === '' && empty($reactions)) {
+                $authorReactions = $this->extractEmojiTokens($author);
+                if (! empty($authorReactions)) {
+                    $reactions = $authorReactions;
+                    $cleanAuthor = trim((string) preg_replace('/[\x{2600}-\x{27BF}\x{1F300}-\x{1FAFF}]|\x{FE0F}|\x{200D}|\x{1F3FB}|\x{1F3FC}|\x{1F3FD}|\x{1F3FE}|\x{1F3FF}/u', '', $author));
+                    if ($cleanAuthor !== '') {
+                        $author = $cleanAuthor;
+                    }
+                }
+            }
+
+            $mediaItems = collect($mediaFilenames)->map(function (string $filename) use ($mediaIndex) {
+                $key = mb_strtolower($filename);
+                $mediaRelPath = $mediaIndex[$key] ?? null;
+                $exists = is_string($mediaRelPath) && $mediaRelPath !== '';
+
+                return [
+                    'filename' => $filename,
+                    'media_rel_path' => $exists ? $mediaRelPath : null,
+                    'media_kind' => $this->resolveMediaKindFromFilename($filename),
+                    'media_is_sticker' => $this->isStickerFilename($filename),
+                ];
+            })->values()->all();
+
+            $firstMedia = $mediaItems[0] ?? null;
 
             return [
                 'index' => $idx + 1,
                 'datetime_raw' => (string) ($msg['datetime_raw'] ?? ''),
-                'author' => (string) ($msg['author'] ?? ''),
-                'text' => (string) ($msg['text'] ?? ''),
-                'media_filename' => $filename,
-                'media_rel_path' => $mediaRelPath,
-                'media_kind' => $mediaKind,
-                'media_is_sticker' => $mediaIsSticker,
+                'author' => $author,
+                'text' => $cleanText,
+                'media_items' => $mediaItems,
+                'media_filename' => is_array($firstMedia) ? (string) ($firstMedia['filename'] ?? '') : null,
+                'media_rel_path' => is_array($firstMedia) ? ($firstMedia['media_rel_path'] ?? null) : null,
+                'media_kind' => is_array($firstMedia) ? ($firstMedia['media_kind'] ?? null) : null,
+                'media_is_sticker' => is_array($firstMedia) ? (bool) ($firstMedia['media_is_sticker'] ?? false) : false,
+                'reactions' => $reactions,
             ];
         });
 
@@ -964,9 +1054,6 @@ class WhatsAppChatArchiveController extends Controller
         ];
     }
 
-    /**
-     * @return array<string,string>
-     */
     private function buildMediaIndex(\Illuminate\Contracts\Filesystem\Filesystem $disk, string $chatRootRelativePath): array
     {
         $chatRootRelativePath = trim(str_replace('\\', '/', $chatRootRelativePath), '/');
@@ -989,17 +1076,98 @@ class WhatsAppChatArchiveController extends Controller
         return $index;
     }
 
-    private function extractMediaFilenameFromText(string $text): ?string
+    private function extractMediaFilenamesFromText(string $text): array
     {
         if ($text === '') {
-            return null;
+            return [];
         }
 
-        if (preg_match('/([A-Za-z0-9._\\-]+\\.(?:jpg|jpeg|png|gif|webp|bmp|mp4|mov|avi|mkv|3gp|opus|ogg|oga|mp3|m4a|aac|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|vcf))/iu', $text, $m)) {
-            return trim((string) $m[1]);
+        $result = [];
+
+        if (preg_match_all('/<\\s*adjunto\\s*:\\s*([^<>\\\\\/]+\\.(?:jpg|jpeg|png|gif|webp|bmp|mp4|mov|avi|mkv|3gp|opus|ogg|oga|mp3|m4a|aac|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|vcf))\\s*>/iu', $text, $matches)) {
+            foreach (($matches[1] ?? []) as $filename) {
+                $filename = trim((string) $filename);
+                if ($filename !== '') {
+                    $result[] = $filename;
+                }
+            }
         }
 
-        return null;
+        if (empty($result) && preg_match_all('/([A-Za-z0-9._\\-]+\\.(?:jpg|jpeg|png|gif|webp|bmp|mp4|mov|avi|mkv|3gp|opus|ogg|oga|mp3|m4a|aac|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|vcf))/iu', $text, $matches)) {
+            foreach (($matches[1] ?? []) as $filename) {
+                $filename = trim((string) $filename);
+                if ($filename !== '') {
+                    $result[] = $filename;
+                }
+            }
+        }
+
+        $seen = [];
+        $unique = [];
+        foreach ($result as $filename) {
+            $key = mb_strtolower($filename);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $unique[] = $filename;
+        }
+
+        return $unique;
+    }
+
+    private function extractMediaFilenameFromText(string $text): ?string
+    {
+        $all = $this->extractMediaFilenamesFromText($text);
+
+        return $all[0] ?? null;
+    }
+
+    private function stripAttachmentTokensFromText(string $text): string
+    {
+        if ($text === '') {
+            return '';
+        }
+
+        $clean = (string) preg_replace('/[\x{200E}\x{200F}\x{202A}-\x{202E}\x{2066}-\x{2069}\x{FEFF}]/u', '', $text);
+        $clean = (string) preg_replace('/<\\s*adjunto\\s*:\\s*[^>]+>/iu', ' ', $clean);
+        $clean = (string) preg_replace('/\\h+/u', ' ', $clean);
+        $clean = (string) preg_replace('/\\s*\\n\\s*/u', "\n", $clean);
+
+        return trim($clean);
+    }
+
+
+    private function extractEmojiTokens(string $value): array
+    {
+        if ($value === '') {
+            return [];
+        }
+
+        $matches = [];
+        @preg_match_all('/[\\x{2600}-\\x{27BF}\\x{1F300}-\\x{1FAFF}](?:\\x{FE0F}|\\x{1F3FB}|\\x{1F3FC}|\\x{1F3FD}|\\x{1F3FE}|\\x{1F3FF})*/u', $value, $matches);
+
+        $raw = array_values(array_filter(array_map(static function ($token) {
+            return trim((string) $token);
+        }, $matches[0] ?? []), static function ($token) {
+            return $token !== '';
+        }));
+
+        if (empty($raw)) {
+            return [];
+        }
+
+        $seen = [];
+        $unique = [];
+        foreach ($raw as $token) {
+            if (isset($seen[$token])) {
+                continue;
+            }
+            $seen[$token] = true;
+            $unique[] = $token;
+        }
+
+        return $unique;
     }
 
     private function resolveMediaKindFromFilename(string $filename): string
@@ -1025,9 +1193,6 @@ class WhatsAppChatArchiveController extends Controller
         return str_contains($name, '-sticker-') || str_ends_with($name, '.webp');
     }
 
-    /**
-     * Intento de parsear la marca de tiempo del export TXT (WhatsApp) para filtros por fecha.
-     */
     private function parseMessageDatetimeToTimestamp(string $raw): ?int
     {
         $raw = trim($raw);

@@ -17,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Honor reverse-proxy HTTPS headers in shared hosting / CDN setups.
         $middleware->trustProxies(at: '*');
+
+        // Handle API CORS before security headers (so OPTIONS requests are handled first)
+        $middleware->append(\App\Http\Middleware\HandleApiCors::class);
+
         $middleware->append(SecurityHeaders::class);
         $middleware->alias([
             'agenda.access' => \App\Http\Middleware\AgendaAccess::class,

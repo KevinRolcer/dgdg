@@ -1,5 +1,44 @@
 <?php
 
+$envFallback = static function (string $name, mixed $default = null): mixed {
+    static $parsed = null;
+
+    if ($parsed === null) {
+        $parsed = [];
+        $envPath = base_path('.env');
+        if (is_file($envPath) && is_readable($envPath)) {
+            foreach (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+                $line = trim((string) $line);
+                if ($line === '' || str_starts_with($line, '#') || ! str_contains($line, '=')) {
+                    continue;
+                }
+
+                [$k, $v] = explode('=', $line, 2);
+                $k = trim($k);
+                $v = trim($v);
+
+                if ((str_starts_with($v, '"') && str_ends_with($v, '"')) || (str_starts_with($v, "'") && str_ends_with($v, "'"))) {
+                    $v = substr($v, 1, -1);
+                }
+
+                $parsed[$k] = $v;
+            }
+        }
+    }
+
+    return $parsed[$name] ?? $default;
+};
+
+$appKey = env('APP_KEY');
+if (! is_string($appKey) || $appKey === '') {
+    $appKey = $envFallback('APP_KEY');
+}
+
+$appUrl = env('APP_URL');
+if (! is_string($appUrl) || $appUrl === '') {
+    $appUrl = (string) $envFallback('APP_URL', 'http://localhost');
+}
+
 return [
 
     /*
@@ -52,7 +91,7 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'http://localhost'),
+    'url' => $appUrl !== '' ? $appUrl : 'http://localhost',
 
     'force_https' => (bool) env('APP_FORCE_HTTPS', false),
 
@@ -99,7 +138,7 @@ return [
 
     'cipher' => 'AES-256-CBC',
 
-    'key' => env('APP_KEY'),
+    'key' => $appKey,
 
     'previous_keys' => [
         ...array_filter(

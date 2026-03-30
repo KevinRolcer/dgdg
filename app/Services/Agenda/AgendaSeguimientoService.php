@@ -56,36 +56,6 @@ class AgendaSeguimientoService
             ->withQueryString();
     }
 
-    /**
-     * Para admin: usuarios con al menos una actividad asignada (activa) y sus agendas con seguimiento.
-     *
-     * @return array<int, array{user: User, agendas: \Illuminate\Support\Collection}>
-     */
-    public function listarPorUsuarioParaAdmin(): array
-    {
-        $agendas = Agenda::query()
-            ->activas()
-            ->with(['usuariosAsignados', 'creador', 'padre'])
-            ->orderByDesc('fecha_inicio')
-            ->orderByDesc('id')
-            ->get();
-
-        $porUsuario = [];
-        foreach ($agendas as $agenda) {
-            foreach ($agenda->usuariosAsignados as $user) {
-                $id = $user->id;
-                if (! isset($porUsuario[$id])) {
-                    $porUsuario[$id] = ['user' => $user, 'agendas' => collect()];
-                }
-                $porUsuario[$id]['agendas']->push($agenda);
-            }
-        }
-
-        uasort($porUsuario, fn ($a, $b) => strcasecmp($a['user']->name ?? '', $b['user']->name ?? ''));
-
-        return $porUsuario;
-    }
-
     public function puedeGestionar(Agenda $agenda, User $user): bool
     {
         return $agenda->usuariosAsignados()->where('users.id', $user->id)->exists();

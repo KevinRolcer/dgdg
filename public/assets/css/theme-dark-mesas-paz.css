@@ -465,7 +465,7 @@ html.theme-dark .swal2-popup {
 
 html.theme-dark .swal2-title,
 html.theme-dark .swal2-html-container {
-    color: var(--clr-text-main) !important;
+    color: #ffffff !important;
 }
 
 html.theme-dark .swal2-styled.swal2-cancel {

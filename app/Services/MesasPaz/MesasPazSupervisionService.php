@@ -12,6 +12,7 @@ use Illuminate\Validation\Rule;
 
 class MesasPazSupervisionService
 {
+    /** Verifica permisos de supervisión */
     public function puedeSupervisarEvidencias($usuario): bool
     {
         if (!$usuario) {
@@ -31,6 +32,7 @@ class MesasPazSupervisionService
             || $usuario->can('Tablero Incidencias');
     }
 
+    /** Construye vista de supervisión */
     public function construirVistaEvidencias(Request $request, $usuario = null): array
     {
         $fechaLista = trim((string) $request->query('fecha_lista', Carbon::today()->toDateString()));
@@ -319,8 +321,6 @@ class MesasPazSupervisionService
 
         $microrregionLabel = function ($registro) {
             $id = (int) ($registro->microrregion_id ?? 0);
-            
-            // Intentar obtener de la relación directa, sino de la del delegado (respaldo)
             $micro = $registro->microrregion ?: optional($registro->delegado)->microrregion;
             $nombre = optional($micro)->cabecera ?: optional($micro)->microrregion;
 
@@ -514,7 +514,6 @@ class MesasPazSupervisionService
             }
         );
 
-        // Agrupar y mapear evidencias paginadas
         $evidencias = collect($registrosLista->items())
             ->groupBy(function ($registro) {
                 return Carbon::parse($registro->fecha_asist)->toDateString().'|'.$registro->user_id.'|'.$registro->microrregion_id;
@@ -617,7 +616,6 @@ class MesasPazSupervisionService
             ->sortByDesc('fecha_asist')
             ->values();
 
-        // Obtener fechas que tienen registros para el calendario (filtrado por permisos)
         $fechasConDatosQuery = MesaPazAsistencia::query();
         if (!empty($allowedMicroregionIds)) {
             $fechasConDatosQuery->whereIn('microrregion_id', $allowedMicroregionIds);

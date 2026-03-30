@@ -1,136 +1,156 @@
 {{-- Fragmento AJAX: tabla + paginación. $agendas = LengthAwarePaginator --}}
 <div id="agendaAjaxRoot">
-    <div class="agenda-table-wrap">
-        <table class="agenda-table">
-            <thead>
-                <tr>
-                    <th>Asunto</th>
-                    <th>Descripción</th>
-                    <th>Fecha y Hora</th>
-                    <th>Asignados</th>
-                    <th>Recordatorio</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($agendas as $item)
-                    <tr>
-                        <td>
-                            @php
-                                $semaforoClass = match($item->semaforo ?? null) {
-                                    'rojo' => 'dot-rojo',
-                                    'amarillo' => 'dot-amarillo',
-                                    'verde' => 'dot-verde',
-                                    default => null
-                                };
-                            @endphp
-                            @if($semaforoClass)
-                                <span class="status-dot {{ $semaforoClass }}" title="Semáforo: {{ ucfirst($item->semaforo) }}"></span>
+    <div class="ag-chats-grid">
+        @forelse ($agendas as $item)
+            @php
+                $semaforoClass = match($item->semaforo ?? null) {
+                    'rojo' => '#ef4444',
+                    'amarillo' => '#f59e0b',
+                    'verde' => '#10b981',
+                    default => 'var(--clr-primary, #1e293b)'
+                };
+                $estadoActivo = $item->fecha_inicio->isFuture() || $item->fecha_inicio->isToday();
+                $letraInicial = mb_strtoupper(mb_substr($item->asunto, 0, 1));
+            @endphp
+            <div class="ag-chat-card">
+                {{-- Card Head --}}
+                <div class="ag-card-head">
+                    <div class="ag-card-info">
+                        <h3 class="ag-card-title">{{ $item->asunto }}</h3>
+                        <p class="ag-card-subtitle">
+                            <i class="fa-regular fa-file" aria-hidden="true"></i>
+                            {{ ucfirst(str_replace('_', '-', $item->tipo)) }}
+                            @if($item->subtipo && $item->tipo != 'agenda')
+                                — {{ ucfirst($item->subtipo) }}
                             @endif
                             @if (!empty($item->es_actualizacion))
-                                <span class="agenda-pill-actualizacion" title="Seguimiento">Actualización</span>
+                                <span class="ag-badge-inline">Actualización</span>
                             @endif
-                            <strong>{{ $item->asunto }}</strong>
                             @if($item->repite)
-                                <span class="agenda-pill-recurrente"><i class="fa-solid fa-repeat"></i> Recurrente</span>
+                                <span class="ag-badge-inline" title="Recurrente"><i class="fa-solid fa-repeat"></i></span>
                             @endif
-                        </td>
-                        <td class="agenda-cell-descripcion">
-                            @if($item->descripcion)
-                                <button type="button" class="agenda-btn agenda-btn-ver-desc" data-descripcion="{{ e($item->descripcionConAforoPersonas()) }}" onclick="window.agendaVerDescripcion(this)" title="Ver descripción">
-                                    Ver
-                                </button>
-                            @else
-                                <span class="agenda-text-muted">—</span>
-                            @endif
-                        </td>
-                        <td>
-                            {{ $item->fecha_inicio->format('d/m/Y') }}
-                            @if($item->fecha_fin)
-                                – {{ $item->fecha_fin->format('d/m/Y') }}
-                            @endif
-                            @if($item->habilitar_hora && $item->hora)
-                                <small><i class="fa-regular fa-clock"></i> {{ \Carbon\Carbon::parse($item->hora)->format('H:i') }}</small>
-                            @endif
-                        </td>
-                        <td>
-                            @if($item->usuariosAsignados->isEmpty())
-                                <span class="agenda-text-muted">Sin asignar</span>
-                            @else
-                                <button type="button"
-                                        class="agenda-btn agenda-btn-secondary agenda-btn-icon agenda-btn-ver-usuarios"
-                                        title="Ver usuarios asignados"
-                                        onclick="window.agendaVerUsuariosAsignados(this)"
-                                        data-users='@json($item->usuariosAsignados->map(fn($u) => ["id" => $u->id, "name" => $u->name, "email" => $u->email])->values())'>
-                                    <i class="fa-solid fa-eye" aria-hidden="true"></i>
-                                </button>
-                            @endif
-                        </td>
-                        <td>
-                            {{ $item->reminder_label }}
+                        </p>
+                    </div>
+                    <span class="ag-status-badge {{ $estadoActivo ? 'ag-status-badge--active' : 'ag-status-badge--past' }}">
+                        <i class="{{ $estadoActivo ? 'fa-regular fa-circle-check' : 'fa-solid fa-check-double' }}"></i>
+                        {{ $estadoActivo ? 'Programado' : 'Realizado' }}
+                    </span>
+                </div>
+
+                {{-- Card Meta Info --}}
+                <div class="ag-card-meta">
+                    <div class="ag-card-meta-item" title="Fecha y Hora">
+                        <i class="fa-regular fa-calendar" aria-hidden="true"></i>
+                        {{ $item->fecha_inicio->format('d/m/Y') }}
+                        @if($item->fecha_fin)
+                            – {{ $item->fecha_fin->format('d/m/Y') }}
+                        @endif
+                        @if($item->habilitar_hora && $item->hora)
+                            a las {{ \Carbon\Carbon::parse($item->hora)->format('H:i') }}
+                        @endif
+                    </div>
+                    <div class="ag-card-meta-item" title="Recordatorio">
+                        <i class="fa-regular fa-bell" aria-hidden="true"></i>
+                        {{ $item->reminder_label }}
+                    </div>
+                    <div class="ag-card-meta-item" title="Asignados">
+                        <i class="fa-regular fa-user" aria-hidden="true"></i>
+                        @if($item->usuariosAsignados->isEmpty())
+                            Sin asignar
+                        @else
+                            {{ $item->usuariosAsignados->count() }} usuario(s)
                             @if(count($item->direcciones_adicionales ?? []) > 0)
-                                <small>+{{ count($item->direcciones_adicionales) }} correo(s)</small>
+                                +{{ count($item->direcciones_adicionales) }} correo(s)
                             @endif
-                        </td>
-                        <td>
-                            @php
-                                $estadoActivo = $item->fecha_inicio->isFuture() || $item->fecha_inicio->isToday();
-                            @endphp
-                            <span class="agenda-badge {{ $estadoActivo ? 'is-active' : 'is-pasado' }}">
-                                {{ $estadoActivo ? 'Programado' : 'Realizado' }}
-                            </span>
-                        </td>
-                        <td>
-                            <div class="agenda-actions-cell">
-                            @if (!empty($puedeEditarAgenda))
-                            <button type="button" class="agenda-btn agenda-btn-table agenda-btn-icon"
-                                    onclick="openAgendaModal({{ $item->id }})"
-                                    data-id="{{ $item->id }}"
-                                    data-tipo="{{ $item->tipo }}"
-                                    data-subtipo="{{ $item->subtipo ?? 'gira' }}"
-                                    data-asunto="{{ e($item->asunto) }}"
-                                    data-microrregion="{{ e($item->microrregion) }}"
-                                    data-municipio="{{ e($item->municipio) }}"
-                                    data-lugar="{{ e($item->lugar) }}"
-                                    data-semaforo="{{ $item->semaforo ?? '' }}"
-                                    data-seguimiento="{{ e($item->seguimiento) }}"
-                                    data-descripcion="{{ e($item->descripcion) }}"
-                                    data-fecha="{{ $item->fecha_inicio->format('Y-m-d') }}"
-                                    data-hora="{{ $item->hora }}"
-                                    data-recordatorio="{{ $item->recordatorio_minutos ?? 30 }}"
-                                    data-repite="{{ $item->repite ? '1' : '0' }}"
-                                    data-days='@json($item->dias_repeticion ?? [])'
-                                    data-users='@json($item->usuariosAsignados->pluck('id'))'
-                                    data-addresses='@json($item->direcciones_adicionales ?? [])'
-                                    title="Editar">
-                                <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Popup Flotante (solo CSS y JS) --}}
+                <div class="ag-card-popup" role="menu">
+                    @if (!empty($puedeEditarAgenda))
+                        <button type="button" class="ag-popup-item"
+                                onclick="openAgendaModal({{ $item->id }})"
+                                data-id="{{ $item->id }}"
+                                data-tipo="{{ $item->tipo }}"
+                                data-subtipo="{{ $item->subtipo ?? 'gira' }}"
+                                data-asunto="{{ e($item->asunto) }}"
+                                data-microrregion="{{ e($item->microrregion) }}"
+                                data-municipio="{{ e($item->municipio) }}"
+                                data-lugar="{{ e($item->lugar) }}"
+                                data-semaforo="{{ $item->semaforo ?? '' }}"
+                                data-seguimiento="{{ e($item->seguimiento) }}"
+                                data-descripcion="{{ e($item->descripcion) }}"
+                                data-fecha="{{ $item->fecha_inicio->format('Y-m-d') }}"
+                                data-hora="{{ $item->hora }}"
+                                data-recordatorio="{{ $item->recordatorio_minutos ?? 30 }}"
+                                data-repite="{{ $item->repite ? '1' : '0' }}"
+                                data-days='@json($item->dias_repeticion ?? [])'
+                                data-users='@json($item->usuariosAsignados->pluck('id'))'
+                                data-addresses='@json($item->direcciones_adicionales ?? [])'>
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i> Editar evento
+                        </button>
+                    @endif
+
+                    @if($item->descripcion)
+                        <button type="button" class="ag-popup-item" data-descripcion="{{ e($item->descripcionConAforoPersonas()) }}" onclick="window.agendaVerDescripcion(this)">
+                            <i class="fa-solid fa-align-left" aria-hidden="true"></i> Ver descripción
+                        </button>
+                    @endif
+
+                    @if($item->usuariosAsignados->isNotEmpty())
+                        <button type="button" class="ag-popup-item" onclick="window.agendaVerUsuariosAsignados(this)" data-users='@json($item->usuariosAsignados->map(fn($u) => ["id" => $u->id, "name" => $u->name, "email" => $u->email])->values())'>
+                            <i class="fa-solid fa-users" aria-hidden="true"></i> Ver asignados
+                        </button>
+                    @endif
+
+                    <a href="{{ $item->getGoogleCalendarUrl() }}" target="_blank" class="ag-popup-item">
+                        <i class="fa-brands fa-google" aria-hidden="true"></i> Guardar en Google
+                    </a>
+
+                    @if (!empty($puedeEditarAgenda))
+                        <div class="ag-popup-divider"></div>
+                        <form action="{{ route('agenda.destroy', $item->id) }}" method="POST" id="delete-form-{{ $item->id }}" class="js-ag-card-delete" style="margin:0;">
+                            @csrf
+                            @method('DELETE')
+                            <button type="button" class="ag-popup-item ag-popup-item--danger" onclick="confirmDelete({{ $item->id }})">
+                                <i class="fa-solid fa-trash" aria-hidden="true"></i> Eliminar
                             </button>
-                            <form action="{{ route('agenda.destroy', $item->id) }}" method="POST" id="delete-form-{{ $item->id }}" class="agenda-inline-form">
-                                @csrf
-                                @method('DELETE')
-                                <button type="button" class="agenda-btn agenda-btn-danger agenda-btn-icon" onclick="confirmDelete({{ $item->id }})" title="Eliminar">
-                                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                                </button>
-                            </form>
-                            @endif
-                            <a href="{{ $item->getGoogleCalendarUrl() }}" target="_blank" class="agenda-btn agenda-btn-table agenda-btn-icon" title="Google Calendar">
-                                <i class="fa-brands fa-google"></i>
-                            </a>
-                            </div>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="7" class="agenda-table-empty">
-                            No hay asuntos registrados en la agenda para mostrar.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
+                        </form>
+                    @endif
+                </div>
+            </div>
+        @empty
+            <div class="ag-empty-state">
+                <div class="ag-empty-icon"><i class="fa-regular fa-calendar-xmark"></i></div>
+                <p class="ag-empty-title">Sin eventos registrados</p>
+                <p class="ag-empty-desc">No se encontraron eventos en la agenda que coincidan con la búsqueda.</p>
+            </div>
+        @endforelse
     </div>
+
     <div class="agenda-pagination-wrap">
-        {{ $agendas->withQueryString()->links('pagination::tm') }}
+        @php
+            $total = (int) $agendas->total();
+            $currentPage = (int) $agendas->currentPage();
+            $lastPage = max(1, (int) $agendas->lastPage());
+            $n = (int) $agendas->count();
+            $first = $n > 0 ? (int) $agendas->firstItem() : 0;
+            $last = $n > 0 ? (int) $agendas->lastItem() : 0;
+        @endphp
+
+        <p class="agenda-pagination-info">
+            @if ($total === 0)
+                Sin registros.
+            @else
+                Página <strong>{{ $currentPage }}</strong> de <strong>{{ $lastPage }}</strong>
+                · Mostrando <strong>{{ $first }}</strong>–<strong>{{ $last }}</strong>
+                de <strong>{{ $total }}</strong> {{ $total === 1 ? 'registro' : 'registros' }}
+            @endif
+        </p>
+
+        @if ($agendas->hasPages())
+            {{ $agendas->withQueryString()->links('pagination::tm') }}
+        @endif
     </div>
 </div>

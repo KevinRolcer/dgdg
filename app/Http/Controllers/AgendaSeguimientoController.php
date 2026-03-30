@@ -16,15 +16,6 @@ class AgendaSeguimientoController extends Controller
         private readonly AgendaService $agendaService
     ) {}
 
-    public function adminSeguimiento(): View
-    {
-        $porUsuario = $this->seguimiento->listarPorUsuarioParaAdmin();
-
-        return view('agenda.seguimiento.admin', [
-            'porUsuario' => $porUsuario,
-        ]);
-    }
-
     public function index(Request $request): View
     {
         $items = $this->seguimiento->listarAsignadosActivosFiltrados($request->user(), [

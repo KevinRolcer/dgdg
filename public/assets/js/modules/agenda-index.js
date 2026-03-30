@@ -188,6 +188,25 @@
         }
     }
 
+    // Click event para el menú de las tarjetas de agenda
+    document.addEventListener('click', function(e) {
+        var clickedCard = e.target.closest('.ag-chat-card');
+        
+        // Cerrar siempre los menús de las tarjetas en las que no se hizo click
+        document.querySelectorAll('.ag-chat-card.ag-card--menu-open').forEach(function(el) {
+            if (el !== clickedCard) {
+                el.classList.remove('ag-card--menu-open');
+            }
+        });
+
+        if (clickedCard) {
+            // Si el click fue dentro del popup flotante, no cerramos ni alternamos
+            if (!e.target.closest('.ag-card-popup') && !e.target.closest('.js-ag-card-delete')) {
+                clickedCard.classList.toggle('ag-card--menu-open');
+            }
+        }
+    });
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initAgendaIndexPage);
     } else {

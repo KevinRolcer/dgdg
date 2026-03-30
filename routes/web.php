@@ -225,8 +225,6 @@ Route::middleware('auth')->group(function () {
         Route::delete('agenda/{agenda}', [AgendaController::class, 'destroy'])->name('agenda.destroy');
     });
 
-    Route::get('admin/agenda/seguimiento', [\App\Http\Controllers\AgendaSeguimientoController::class, 'adminSeguimiento'])->middleware('can:Modulos-Temporales-Admin')->name('agenda.seguimiento.admin');
-
     Route::prefix('admin/usuarios')->middleware('can:Administrar-Usuarios')->group(function () {
         Route::get('/', [\App\Http\Controllers\Admin\UserManagementController::class, 'index'])->name('admin.usuarios.index');
         Route::get('/crear', [\App\Http\Controllers\Admin\UserManagementController::class, 'create'])->name('admin.usuarios.create');

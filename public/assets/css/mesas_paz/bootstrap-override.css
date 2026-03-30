@@ -1,0 +1,273 @@
+
+.form-control,
+.form-control-sm,
+.form-control-lg {
+    height: var(--ui-input-height, 2.25rem) !important;
+    padding: 0 10px !important;
+    border: 1px solid var(--clr-border) !important;
+    border-radius: var(--ui-radius, 6px) !important;
+    font-family: var(--font-main) !important;
+    font-size: var(--fs-body, 0.875rem) !important;
+    line-height: var(--lh-body, 1.5) !important;
+    color: var(--clr-text-main) !important;
+    background: var(--clr-card) !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.form-control:focus,
+.form-control-sm:focus,
+.form-control-lg:focus {
+    outline: none !important;
+    border-color: var(--clr-accent) !important;
+    box-shadow: 0 0 0 3px rgba(199, 155, 102, 0.15) !important;
+    color: var(--clr-text-main) !important;
+}
+
+.form-control:disabled,
+.form-control-sm:disabled,
+.form-control-lg:disabled {
+    background: rgba(72, 71, 71, 0.06) !important;
+    color: var(--clr-text-light) !important;
+}
+
+textarea.form-control {
+    height: auto !important;
+    min-height: 100px !important;
+    padding: 8px 10px !important;
+}
+
+/* Select overrides */
+select.form-select,
+.form-select-sm,
+.form-select-lg {
+    height: var(--ui-input-height, 2.25rem) !important;
+    padding: 0 10px !important;
+    border: 1px solid var(--clr-border) !important;
+    border-radius: var(--ui-radius, 6px) !important;
+    font-family: var(--font-main) !important;
+    font-size: var(--fs-body, 0.875rem) !important;
+    line-height: var(--lh-body, 1.5) !important;
+    color: var(--clr-text-main) !important;
+    background: var(--clr-card) !important;
+}
+
+select.form-select:focus {
+    outline: none !important;
+    border-color: var(--clr-accent) !important;
+    box-shadow: 0 0 0 3px rgba(199, 155, 102, 0.15) !important;
+}
+
+/* Button overrides */
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-success,
+.btn-danger,
+.btn-warning,
+.btn-info,
+.btn-light,
+.btn-dark {
+    height: var(--ui-input-height, 2.25rem);
+    padding: 0 16px !important;
+    border-radius: var(--ui-radius, 6px) !important;
+    font-family: var(--font-main) !important;
+    font-size: var(--fs-body, 0.875rem) !important;
+    font-weight: 600 !important;
+    border: 1px solid transparent !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease !important;
+    white-space: nowrap;
+}
+
+.btn-sm {
+    height: auto;
+    padding: 4px 12px !important;
+    font-size: 0.75rem !important;
+}
+
+.btn-lg {
+    height: 44px;
+    padding: 0 20px !important;
+    font-size: 1rem !important;
+}
+
+/* Color scheme alignment */
+.btn-primary {
+    background: var(--clr-primary, #861e34) !important;
+    border-color: var(--clr-primary, #861e34) !important;
+    color: #fff !important;
+}
+
+.btn-primary:hover,
+.btn-primary:active {
+    background: var(--clr-primary-dark, #5f1b2d) !important;
+    border-color: var(--clr-primary-dark, #5f1b2d) !important;
+    color: #fff !important;
+}
+
+.btn-secondary {
+    background: var(--clr-secondary, #246257) !important;
+    border-color: var(--clr-secondary, #246257) !important;
+    color: #fff !important;
+}
+
+.btn-secondary:hover,
+.btn-secondary:active {
+    background: #1a4741 !important;
+    border-color: #1a4741 !important;
+    color: #fff !important;
+}
+
+/* Accent button for important actions */
+.btn-accent {
+    background: var(--clr-accent, #c79b66) !important;
+    border-color: var(--clr-accent, #c79b66) !important;
+    color: #fff !important;
+}
+
+.btn-accent:hover,
+.btn-accent:active {
+    background: #b08855 !important;
+    border-color: #b08855 !important;
+    color: #fff !important;
+}
+
+/* Form group spacing */
+.form-group {
+    margin-bottom: 14px;
+}
+
+.form-group label {
+    font-size: var(--fs-small, 0.8125rem);
+    font-weight: 600;
+    color: var(--clr-text-main);
+    margin-bottom: 4px;
+    text-transform: none;
+}
+
+/* Alert styling */
+.alert {
+    border-radius: var(--ui-radius-lg, 8px);
+    border: 1px solid rgba(72, 71, 71, 0.14);
+    font-size: var(--fs-body, 0.875rem);
+}
+
+/* Table styling */
+.table {
+    font-size: var(--fs-body, 0.875rem);
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+.table thead th {
+    background: rgba(72, 71, 71, 0.06);
+    color: var(--clr-text-main);
+    font-weight: 700;
+    border-bottom: 1px solid var(--clr-border);
+    padding: 8px 10px;
+}
+
+.table tbody td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--clr-border);
+    color: var(--clr-text-main);
+}
+
+.table tbody tr:hover {
+    background: rgba(72, 71, 71, 0.03);
+}
+
+/* Fix for Bootstrap utility classes conflict */
+.text-muted {
+    color: var(--clr-text-light) !important;
+}
+
+.text-primary {
+    color: var(--clr-primary) !important;
+}
+
+.text-secondary {
+    color: var(--clr-secondary) !important;
+}
+
+.text-success {
+    color: var(--clr-secondary) !important;
+}
+
+.text-danger {
+    color: #b02a37 !important;
+}
+
+.text-warning {
+    color: #d4a520 !important;
+}
+
+.bg-light {
+    background: var(--clr-bg) !important;
+}
+
+.bg-white {
+    background: var(--clr-card) !important;
+}
+
+/* Badge styling */
+.badge {
+    font-size: 0.7rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.badge-primary {
+    background: var(--clr-primary, #861e34);
+    color: #fff;
+}
+
+.badge-secondary {
+    background: var(--clr-secondary, #246257);
+    color: #fff;
+}
+
+.badge-accent {
+    background: var(--clr-accent, #c79b66);
+    color: #fff;
+}
+
+/* Tooltip customization */
+.tooltip {
+    font-size: 0.75rem;
+}
+
+/* Popover customization */
+.popover {
+    border-radius: var(--ui-radius-lg, 8px);
+    border: 1px solid var(--clr-border);
+}
+
+.popover-header {
+    background: rgba(72, 71, 71, 0.06);
+    border-bottom: 1px solid var(--clr-border);
+    font-weight: 700;
+}
+
+/* Dark theme compatibility */
+html.theme-dark .form-control,
+html.theme-dark .form-select,
+html.theme-dark button {
+    color: #fff;
+    background: #2a2a2a;
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+html.theme-dark .form-control:focus,
+html.theme-dark .form-select:focus {
+    background: #333333;
+    border-color: var(--clr-accent);
+    box-shadow: 0 0 0 3px rgba(199, 155, 102, 0.15);
+}
+
+html.theme-dark .form-control::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}

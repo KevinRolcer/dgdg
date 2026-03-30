@@ -22,8 +22,7 @@ class MesasPazPresentationService
     private const OFFICE_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
     /**
-     * Datos numéricos y textos que alimentan la diapositiva de reporte y la vista previa web.
-     *
+     * Datos para reporte y vista previa 
      * @return array{
      *     rango_formulario: string,
      *     fecha_generacion: string,
@@ -76,8 +75,7 @@ class MesasPazPresentationService
     }
 
     /**
-     * Genera un archivo PPTX a partir de la plantilla (slide 3: totales, gráfica PNG, cumplimiento, mesas sin registro semanal).
-     *
+     * Genera archivo PPTX
      * @return string Ruta absoluta del archivo generado.
      */
     public function generar(string $fechaInicio, string $fechaFin): string
@@ -317,7 +315,6 @@ class MesasPazPresentationService
     {
         $max = 0;
         for ($i = 0; $i < $zip->numFiles; $i++) {
-            $name = $zip->getNameIndex($i);
             if ($name !== false && preg_match('#^ppt/media/image(\d+)\.png$#i', $name, $m)) {
                 $max = max($max, (int) $m[1]);
             }
@@ -465,7 +462,6 @@ class MesasPazPresentationService
         $spPr = $dom->createElementNS(self::PRESENTATIONML_NS, 'p:spPr');
         $xfrm = $dom->createElementNS(self::DRAWINGML_NS, 'a:xfrm');
         $off = $dom->createElementNS(self::DRAWINGML_NS, 'a:off');
-        // Zona derecha de la diapositiva (junto al bloque "Semana del…"), EMU.
         $off->setAttribute('x', '4180000');
         $off->setAttribute('y', '1680000');
         $ext = $dom->createElementNS(self::DRAWINGML_NS, 'a:ext');
@@ -517,7 +513,6 @@ class MesasPazPresentationService
         $fontSize = 20;
         $barH = 32;
 
-        // Tres barras como en la plantilla: total mesas (dorado), asistencias (gris), inasistencias (guinda). Escala vs meta 1085.
         $filas = [
             ['val' => $totalRegistrado, 'color' => $dorado],
             ['val' => $asistencias, 'color' => $grisOscuro],
@@ -616,7 +611,6 @@ class MesasPazPresentationService
         $filas = MesaPazAsistencia::query()
             ->whereDate('fecha_asist', '>=', $desde)
             ->whereDate('fecha_asist', '<=', $hasta)
-            ->orderBy('fecha_asist')
             ->orderByDesc('created_at')
             ->get(['municipio_id', 'fecha_asist', 'asiste']);
 

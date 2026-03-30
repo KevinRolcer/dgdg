@@ -6,13 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class MesaPazAsistencia extends Model
 {
-    // Entidad persistente para asistencias de Mesas de Paz.
     protected $table = 'mesas_paz_asistencias';
-
-    // PK personalizada de la tabla.
     protected $primaryKey = 'asist_id';
-
-    // La tabla administra created_at manualmente, sin updated_at.
     public $timestamps = false;
 
     protected $fillable = [
@@ -36,7 +31,6 @@ class MesaPazAsistencia extends Model
         'created_at' => 'datetime',
     ];
 
-    // Datos derivados: expone los acuerdos como colección de cadenas para frontend y reportes.
     protected $appends = [
         'parte_items',
         'acuerdo_items',
@@ -253,25 +247,21 @@ class MesaPazAsistencia extends Model
         return json_encode($items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
-    // Relación: cada asistencia pertenece a un municipio.
     public function municipio()
     {
         return $this->belongsTo(Municipio::class, 'municipio_id');
     }
 
-    // Relación: cada asistencia pertenece a una microrregión.
     public function microrregion()
     {
         return $this->belongsTo(Microrregione::class, 'microrregion_id');
     }
 
-    // Relación: cada asistencia pertenece al perfil delegado que la capturó.
     public function delegado()
     {
         return $this->belongsTo(Delegado::class, 'delegado_id');
     }
 
-    // Relación: cada asistencia pertenece al usuario autenticado que registró la captura.
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');

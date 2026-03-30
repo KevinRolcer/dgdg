@@ -12,9 +12,9 @@
     background: var(--clr-bg);
     box-shadow: none;
     overflow: visible;
-    /* Escala más compacta a zoom 100% (similar sensación a ~90% del navegador) */
-    font-size: 0.75rem;
-    line-height: 1.42;
+    /* Alineado con escala global (fs-body = 0.875rem) */
+    font-size: 0.875rem;
+    line-height: 1.5;
     padding: 0;
 }
 

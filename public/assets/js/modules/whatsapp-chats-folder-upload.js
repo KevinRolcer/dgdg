@@ -125,6 +125,29 @@
         return batches;
     }
 
+    function waFolderResolveAdaptiveLimits(totalFiles, maxFiles, parallel) {
+        var adaptiveMaxFiles = maxFiles;
+        var adaptiveParallel = parallel;
+
+        // Keep within backend validation max (configured server-side) and
+        // reduce request explosion for large folders.
+        if (totalFiles > 3000) {
+            adaptiveMaxFiles = Math.min(maxFiles, 20);
+            adaptiveParallel = Math.min(parallel, 3);
+        } else if (totalFiles > 1200) {
+            adaptiveMaxFiles = Math.min(maxFiles, 16);
+            adaptiveParallel = Math.min(parallel, 4);
+        }
+
+        adaptiveMaxFiles = Math.max(1, adaptiveMaxFiles);
+        adaptiveParallel = Math.max(1, adaptiveParallel);
+
+        return {
+            maxFiles: adaptiveMaxFiles,
+            parallel: adaptiveParallel,
+        };
+    }
+
     async function waFolderParseResponse(res) {
         var text = await res.text();
         if (!text) return {};
@@ -186,6 +209,27 @@
             if (files.length === 0) return;
 
             var list = files.filter(function (f) {
+                return !waFolderSkipPath(f.webkitRelativePath || '');
+            });
+            if (list.length === 0) {
+                if (statusEl) statusEl.textContent = 'No quedaron archivos válidos (se omitieron metadatos del sistema).';
+                return;
+            }
+
+            if (labelInput && !labelInput.value.trim()) {
+                labelInput.value = waFolderDefaultLabelFromFiles(list);
+            }
+
+            startUploadSequence(list);
+        });
+
+        // Listen for resume upload events
+        input.addEventListener('wa-resume-upload', function () {
+            if (uploading) return;
+            var files = window.__waResumeFiles;
+            if (!files || files.length === 0) return;
+
+            var list = Array.from(files).filter(function (f) {
                 return !waFolderSkipPath(f.webkitRelativePath || '');
             });
             if (list.length === 0) {
@@ -304,9 +348,14 @@
             try {
                 setProgress(3, 'Calculando firma de la carpeta…');
                 var folderSignature = await waFolderSignature(list);
-                var batches = waFolderBuildBatches(list, requestMaxFiles, requestTargetBytes);
+                var limits = waFolderResolveAdaptiveLimits(total, requestMaxFiles, parallelRequests);
+                var batches = waFolderBuildBatches(list, limits.maxFiles, requestTargetBytes);
                 var batchCursor = 0;
                 var fatalError = null;
+
+                if (statusEl && total > 1200) {
+                    statusEl.textContent = 'Carga optimizada para carpeta grande: ' + batches.length + ' lotes, ' + limits.maxFiles + ' archivos por lote.';
+                }
 
                 async function uploadBatch(batch) {
                     var fd = new FormData();
@@ -377,7 +426,7 @@
                 }
 
                 var workers = [];
-                var workerCount = Math.min(parallelRequests, batches.length || 1);
+                var workerCount = Math.min(limits.parallel, batches.length || 1);
                 for (var workerIndex = 0; workerIndex < workerCount; workerIndex++) {
                     workers.push(worker());
                 }

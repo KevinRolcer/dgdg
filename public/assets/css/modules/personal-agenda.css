@@ -425,13 +425,13 @@
 .pa-search-input {
     width: 100%;
     height: var(--ui-input-height);
-    padding: 0 34px 0 40px;
+    padding: 0 16px;
     background-color: var(--clr-bg);
     border: 1px solid var(--clr-border);
-    border-radius: var(--ui-radius-lg);
-    font-size: 0.9rem;
+    border-radius: var(--ui-radius);
+    font-size: var(--fs-body);
     color: var(--clr-text-main);
-    transition: all 0.2s;
+    transition: border-color 0.15s ease;
 }
 
 /* type="search" añade una X nativa (WebKit/Blink); ya usamos .pa-search-clear */
@@ -483,13 +483,7 @@
 }
 
 .pa-search-wrapper .pa-search-icon {
-    position: absolute;
-    left: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--clr-text-light);
-    font-size: 0.9rem;
-    pointer-events: none;
+    display: none;
 }
 
 .pa-notes-calendar-meta {
@@ -1191,19 +1185,20 @@
 
 /* Professional SWAL Modal Overrides (Agenda Directiva Style) */
 .swal2-popup.pa-swal-popup, .tm-swal-popup {
-    border-radius: 20px !important;
+    border-radius: 14px !important;
     padding: 0 !important;
     overflow: hidden !important;
     border: 1px solid var(--clr-border) !important;
     box-shadow: 0 15px 50px rgba(0,0,0,0.1) !important;
+    width: min(28rem, calc(100vw - 2rem)) !important;
 }
 
 .swal2-title.tm-swal-title {
     background: #fff;
     color: var(--clr-primary-dark) !important;
     text-align: left !important;
-    padding: 20px 24px !important;
-    font-size: 1.25rem !important;
+    padding: 14px 18px !important;
+    font-size: 0.98rem !important;
     font-weight: 800 !important;
     border-bottom: 1px solid #f0f0f0 !important;
     margin: 0 !important;
@@ -1213,13 +1208,15 @@
 }
 
 .swal2-html-container.tm-swal-text {
-    padding: 16px 24px !important; /* Reduced top/bottom padding */
+    padding: 12px 18px !important;
     margin: 0 !important;
     text-align: left !important;
+    font-size: 0.82rem !important;
+    line-height: 1.4 !important;
 }
 
 .swal2-actions {
-    padding: 16px 24px !important;
+    padding: 12px 18px !important;
     background: #fafafa !important;
     border-top: 1px solid #f0f0f0 !important;
     margin: 0 !important;
@@ -1229,9 +1226,9 @@
 .swal2-confirm.tm-swal-confirm {
     background-color: var(--pa-primary) !important;
     border-radius: 8px !important;
-    padding: 10px 24px !important;
+    padding: 8px 16px !important;
     font-weight: 700 !important;
-    font-size: 0.9rem !important;
+    font-size: 0.78rem !important;
 }
 
 .swal2-cancel.tm-swal-cancel {
@@ -1239,9 +1236,9 @@
     color: var(--clr-text-main) !important;
     border: 1px solid var(--clr-border) !important;
     border-radius: 8px !important;
-    padding: 10px 24px !important;
+    padding: 8px 16px !important;
     font-weight: 700 !important;
-    font-size: 0.9rem !important;
+    font-size: 0.78rem !important;
 }
 
 .swal2-label {
@@ -1249,14 +1246,14 @@
     margin-bottom: 4px; /* Reduced from 6px */
     font-weight: 700;
     color: var(--clr-text-main);
-    font-size: 0.85rem;
+    font-size: 0.78rem;
 }
 
 .swal2-input, .swal2-textarea, .swal2-select {
     border: 1px solid var(--clr-border) !important;
     border-radius: 8px !important;
     box-shadow: none !important;
-    font-size: 0.9rem !important;
+    font-size: 0.82rem !important;
     transition: all 0.2s !important;
     margin: 0 0 12px 0 !important; /* Reduced from 16px */
     width: 100% !important;

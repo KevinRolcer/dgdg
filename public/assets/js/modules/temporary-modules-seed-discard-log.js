@@ -125,7 +125,7 @@
                                         icon: 'success',
                                         title: 'Listo',
                                         text: res.j.message || 'Registro creado.',
-                                        timer: 1800,
+                                        timer: 1300,
                                         showConfirmButton: false,
                                     });
                                 }

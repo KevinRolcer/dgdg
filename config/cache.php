@@ -2,6 +2,40 @@
 
 use Illuminate\Support\Str;
 
+$envFallback = static function (string $name, mixed $default = null): mixed {
+    static $parsed = null;
+
+    if ($parsed === null) {
+        $parsed = [];
+        $envPath = base_path('.env');
+        if (is_file($envPath) && is_readable($envPath)) {
+            foreach (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+                $line = trim((string) $line);
+                if ($line === '' || str_starts_with($line, '#') || ! str_contains($line, '=')) {
+                    continue;
+                }
+
+                [$k, $v] = explode('=', $line, 2);
+                $k = trim($k);
+                $v = trim($v);
+
+                if ((str_starts_with($v, '"') && str_ends_with($v, '"')) || (str_starts_with($v, "'") && str_ends_with($v, "'"))) {
+                    $v = substr($v, 1, -1);
+                }
+
+                $parsed[$k] = $v;
+            }
+        }
+    }
+
+    return $parsed[$name] ?? $default;
+};
+
+$cacheStore = env('CACHE_STORE');
+if (! is_string($cacheStore) || $cacheStore === '') {
+    $cacheStore = (string) $envFallback('CACHE_STORE', 'file');
+}
+
 return [
 
     /*
@@ -15,7 +49,7 @@ return [
     |
     */
 
-    'default' => env('CACHE_STORE', 'database'),
+    'default' => $cacheStore !== '' ? $cacheStore : 'file',
 
     /*
     |--------------------------------------------------------------------------

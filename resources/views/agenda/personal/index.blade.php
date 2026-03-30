@@ -53,7 +53,7 @@
             <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
                 <div class="pa-search-wrapper" id="pa-search-wrapper" style="margin: 0; width: 220px; flex-shrink: 0;">
                     <i class="pa-search-icon fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                    <input type="search" class="pa-search-input" placeholder="Buscar notas y carpetas…" id="pa-search" name="pa-search" autocomplete="off" enterkeyhint="search">
+                    <input type="search" class="pa-search-input" placeholder="Buscar..." id="pa-search" name="pa-search" autocomplete="off" enterkeyhint="search">
                     <button type="button" class="pa-search-clear" id="pa-search-clear" aria-label="Limpiar búsqueda" title="Limpiar" hidden>
                         <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                     </button>
@@ -179,7 +179,7 @@
                     <i class="fa-solid fa-chevron-left btn-cal-prev" role="button" tabindex="0" aria-label="Mes anterior" onclick="navCalendar('prev')"></i>
                     <span class="cal-current-month">{{ mb_strtoupper(now()->translatedFormat('M Y')) }}</span>
                     <i class="fa-solid fa-chevron-right btn-cal-next" role="button" tabindex="0" aria-label="Mes siguiente" onclick="navCalendar('next')"></i>
-                    
+
                 </div>
             </div>
 

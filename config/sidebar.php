@@ -24,6 +24,13 @@ return [
             'icon' => 'fa-solid fa-calendar-days',
             'title' => 'Agenda Directiva',
             'route' => 'agenda.index',
+            'active_routes' => [
+                'agenda.index',
+                'agenda.calendar',
+                'agenda.show',
+                'agenda.create',
+                'agenda.edit',
+            ],
             'permission_any' => ['Modulos-Temporales-Admin', 'Agenda-Directiva', 'Agenda-Seguimiento', 'Agenda-consulta'],
         ],
         [
@@ -37,12 +44,6 @@ return [
             'route' => 'agenda.seguimiento.index',
             'permission_any' => ['Modulos-Temporales-Admin', 'Agenda-Directiva', 'Agenda-Seguimiento', 'Agenda-consulta'],
             'hidden_if_can' => 'Modulos-Temporales-Admin',
-        ],
-        [
-            'icon' => 'fa-solid fa-user-check',
-            'title' => 'Asignaciones de agenda',
-            'route' => 'agenda.seguimiento.admin',
-            'permission' => 'Modulos-Temporales-Admin',
         ],
         /*
          * Eventos temporales: enlaces (Modulos-Temporales) capturan y ven registros;

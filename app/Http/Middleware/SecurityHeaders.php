@@ -86,6 +86,10 @@ class SecurityHeaders
 
     private function mustRedirectToCanonicalHost(Request $request): bool
     {
+        if ($request->isMethod('OPTIONS') || $request->headers->has('Access-Control-Request-Method')) {
+            return false;
+        }
+
         if (app()->isLocal()) {
             return false;
         }

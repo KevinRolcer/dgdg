@@ -28,17 +28,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        /* Evita "There is no permission named …" si aún no corrió la migración de consulta */
-        if (Schema::hasTable('permissions')) {
-            foreach ([
-                'Mesas-Paz-consulta',
-                'Modulos-Temporales-Admin-consulta',
-                'Modulos-Temporales-consulta',
-                'Agenda-consulta',
-                'Chats-WhatsApp-Sensible',
-            ] as $permName) {
-                Permission::findOrCreate($permName, 'web');
+        /* Evita 500 durante boot si la conexión aún no está disponible o el schema no existe. */
+        try {
+            if (Schema::hasTable('permissions')) {
+                foreach ([
+                    'Mesas-Paz-consulta',
+                    'Modulos-Temporales-Admin-consulta',
+                    'Modulos-Temporales-consulta',
+                    'Agenda-consulta',
+                    'Chats-WhatsApp-Sensible',
+                ] as $permName) {
+                    Permission::findOrCreate($permName, 'web');
+                }
             }
+        } catch (\Throwable) {
+            // No bloquear requests si la BD no está lista en este instante.
         }
 
         Gate::define('mesas-paz-ver', function ($user) {

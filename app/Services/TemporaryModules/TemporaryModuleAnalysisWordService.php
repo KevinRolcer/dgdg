@@ -141,9 +141,12 @@ class TemporaryModuleAnalysisWordService
         $ts = $this->normalizeTableStyle($config);
         $ft = $ts['font_pt'];
         $cellTwips = $ts['cell_margin_twips'];
+        $exportFontName = $this->resolveExportFontName();
+        $logoPath = public_path('images/Gobierno de Puebla_1-Versión vertical.png');
+        $hasLogo = is_file($logoPath);
 
         $phpWord = new PhpWord;
-        $phpWord->setDefaultFontName('Calibri');
+        $phpWord->setDefaultFontName($exportFontName);
         $phpWord->setDefaultFontSize(10);
         $section = $phpWord->addSection([
             'orientation' => $orientation,
@@ -160,11 +163,26 @@ class TemporaryModuleAnalysisWordService
             'right' => Jc::END,
             default => Jc::CENTER,
         };
-        $section->addText($docTitle, ['bold' => true, 'size' => 14, 'color' => '861E34'], ['alignment' => $titleJc, 'spaceAfter' => 160]);
+
+        if ($hasLogo) {
+            $section->addImage($logoPath, [
+                'height' => 52,
+                'positioning' => 'absolute',
+                'posHorizontal' => 'left',
+                'posHorizontalRel' => 'margin',
+                'posVertical' => 'top',
+                'posVerticalRel' => 'margin',
+                'wrappingStyle' => 'behind',
+            ]);
+        }
+
+        $section->addText($docTitle, ['name' => $exportFontName, 'bold' => true, 'size' => 14, 'color' => '861E34'], ['alignment' => $titleJc, 'spaceAfter' => 160]);
         $subtitle = trim((string) ($config['subtitle'] ?? ''));
         if ($subtitle !== '') {
-            $section->addText($subtitle, ['size' => 10], ['alignment' => $titleJc, 'spaceAfter' => 100]);
+            $section->addText($subtitle, ['name' => $exportFontName, 'size' => 10], ['alignment' => $titleJc, 'spaceAfter' => 100]);
         }
+        $fechaCorteStr = now()->format('d/m/Y H:i');
+        $section->addText('Fecha y hora de corte: '.$fechaCorteStr, ['name' => $exportFontName, 'size' => 9], ['alignment' => Jc::END, 'spaceAfter' => 200]);
         $section->addTextBreak(1);
 
         if ($includeSummary || $includeMrTable) {
@@ -173,8 +191,8 @@ class TemporaryModuleAnalysisWordService
                 $tableSum = $section->addTable(array_merge(['borderSize' => 6, 'borderColor' => '861E34', 'cellMargin' => $cellTwips], $tblBase));
                 foreach ($built['summary'] as $label => $value) {
                     $tableSum->addRow();
-                    $tableSum->addCell(3500)->addText((string) $label, ['bold' => true, 'size' => $ft]);
-                    $tableSum->addCell(8000)->addText((string) $value, ['size' => $ft]);
+                    $tableSum->addCell(3500)->addText((string) $label, ['name' => $exportFontName, 'bold' => true, 'size' => $ft]);
+                    $tableSum->addCell(8000)->addText((string) $value, ['name' => $exportFontName, 'size' => $ft]);
                 }
                 $section->addTextBreak(1);
             }
@@ -182,16 +200,16 @@ class TemporaryModuleAnalysisWordService
                 $t2 = $section->addTable(array_merge(['borderSize' => 6, 'borderColor' => '861E34', 'cellMargin' => $cellTwips], $tblBase));
                 $t2->addRow();
                 foreach ($built['headers'] as $h) {
-                    $t2->addCell(2000)->addText($h, ['bold' => true, 'size' => $ft]);
+                    $t2->addCell(2000)->addText($h, ['name' => $exportFontName, 'bold' => true, 'size' => $ft]);
                 }
                 foreach ($built['rows'] as $r) {
                     $t2->addRow();
-                    $t2->addCell(3200)->addText(Str::limit((string) $r['microrregion'], 80), ['size' => $ft]);
-                    $t2->addCell(1000)->addText((string) $r['registros'], ['size' => $ft], ['alignment' => Jc::CENTER]);
-                    $t2->addCell(1000)->addText((string) $r['municipios_capturados'], ['size' => $ft], ['alignment' => Jc::CENTER]);
-                    $t2->addCell(4000)->addText(Str::limit((string) $r['lista_capturados'], 400), ['size' => $ft]);
-                    $t2->addCell(900)->addText((string) $r['faltantes_count'], ['size' => $ft], ['alignment' => Jc::CENTER]);
-                    $t2->addCell(4000)->addText(Str::limit((string) $r['lista_faltantes'], 400), ['size' => $ft]);
+                    $t2->addCell(3200)->addText(Str::limit((string) $r['microrregion'], 80), ['name' => $exportFontName, 'size' => $ft]);
+                    $t2->addCell(1000)->addText((string) $r['registros'], ['name' => $exportFontName, 'size' => $ft], ['alignment' => Jc::CENTER]);
+                    $t2->addCell(1000)->addText((string) $r['municipios_capturados'], ['name' => $exportFontName, 'size' => $ft], ['alignment' => Jc::CENTER]);
+                    $t2->addCell(4000)->addText(Str::limit((string) $r['lista_capturados'], 400), ['name' => $exportFontName, 'size' => $ft]);
+                    $t2->addCell(900)->addText((string) $r['faltantes_count'], ['name' => $exportFontName, 'size' => $ft], ['alignment' => Jc::CENTER]);
+                    $t2->addCell(4000)->addText(Str::limit((string) $r['lista_faltantes'], 400), ['name' => $exportFontName, 'size' => $ft]);
                 }
                 $section->addTextBreak(1);
             }
@@ -206,19 +224,19 @@ class TemporaryModuleAnalysisWordService
             if ($headers !== []) {
                 $accSum = $full['accounting_summary'] ?? [];
                 if ($accSum !== []) {
-                    $section->addText('Resumen (indicadores)', ['bold' => true, 'size' => 10], ['spaceAfter' => 80]);
+                    $section->addText('Resumen (indicadores)', ['name' => $exportFontName, 'bold' => true, 'size' => 10], ['spaceAfter' => 80]);
                     $sumTbl = $section->addTable(array_merge(['borderSize' => 6, 'borderColor' => '861E34', 'cellMargin' => $cellTwips], $tblBase));
                     $sumTbl->addRow();
                     foreach ($accSum as $kpi) {
-                        $sumTbl->addCell(2000)->addText((string) ($kpi['label'] ?? ''), ['bold' => true, 'size' => $ft, 'color' => '861E34']);
+                        $sumTbl->addCell(2000)->addText((string) ($kpi['label'] ?? ''), ['name' => $exportFontName, 'bold' => true, 'size' => $ft, 'color' => '861E34']);
                     }
                     $sumTbl->addRow();
                     foreach ($accSum as $kpi) {
-                        $sumTbl->addCell(2000)->addText((string) ($kpi['value'] ?? ''), ['bold' => true, 'size' => $ft, 'color' => 'C00000']);
+                        $sumTbl->addCell(2000)->addText((string) ($kpi['value'] ?? ''), ['name' => $exportFontName, 'bold' => true, 'size' => $ft, 'color' => 'C00000']);
                     }
                     $section->addTextBreak(1);
                 }
-                $section->addText('Desglose por registro', ['bold' => true, 'size' => 11], ['spaceAfter' => 120, 'alignment' => $titleJc]);
+                $section->addText('Desglose por registro', ['name' => $exportFontName, 'bold' => true, 'size' => 11], ['spaceAfter' => 120, 'alignment' => $titleJc]);
                 $dynTwips = max(1400, min(3400, (int) round($ts['cell_max_px'] * 38)));
                 if ($stretch && count($headers) > 0) {
                     $dynTwips = (int) round(9000 / count($headers));
@@ -226,19 +244,19 @@ class TemporaryModuleAnalysisWordService
                 $tbl = $section->addTable(array_merge(['borderSize' => 4, 'borderColor' => '444444', 'cellMargin' => $cellTwips], $tblBase));
                 $tbl->addRow();
                 foreach ($headers as $h) {
-                    $tbl->addCell($dynTwips)->addText($h, ['bold' => true, 'size' => $ft]);
+                    $tbl->addCell($dynTwips)->addText($h, ['name' => $exportFontName, 'bold' => true, 'size' => $ft]);
                 }
                 foreach ($rows as $row) {
                     $tbl->addRow();
                     foreach ($row as $cell) {
-                        $tbl->addCell($dynTwips)->addText(Str::limit((string) $cell, 2000), ['size' => $ft]);
+                        $tbl->addCell($dynTwips)->addText(Str::limit((string) $cell, 2000), ['name' => $exportFontName, 'size' => $ft]);
                     }
                 }
                 $totalsRow = $full['totals_row'] ?? null;
                 if (is_array($totalsRow) && count($totalsRow) === count($headers)) {
                     $tbl->addRow();
                     foreach ($totalsRow as $i => $cell) {
-                        $tbl->addCell($dynTwips)->addText(Str::limit((string) $cell, 500), ['bold' => true, 'size' => $ft, 'color' => 'C00000']);
+                        $tbl->addCell($dynTwips)->addText(Str::limit((string) $cell, 500), ['name' => $exportFontName, 'bold' => true, 'size' => $ft, 'color' => 'C00000']);
                     }
                 }
             }
@@ -256,6 +274,32 @@ class TemporaryModuleAnalysisWordService
             'name' => $fileName,
             'url' => route('temporary-modules.admin.exports.download', ['file' => $fileName]),
         ];
+    }
+
+    private function resolveExportFontName(): string
+    {
+        $hasGilroy = false;
+
+        foreach ([
+            storage_path('fonts'),
+            resource_path('fonts/Fuente Gilroy'),
+            resource_path('fonts'),
+        ] as $fontDir) {
+            if (!is_dir($fontDir)) {
+                continue;
+            }
+
+            $files = @scandir($fontDir) ?: [];
+            foreach ($files as $file) {
+                $name = mb_strtolower((string) $file);
+                if (str_contains($name, 'gilroy') && str_ends_with($name, '.ttf')) {
+                    $hasGilroy = true;
+                    break 2;
+                }
+            }
+        }
+
+        return $hasGilroy ? 'Gilroy' : 'Arial';
     }
 
     /**

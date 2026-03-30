@@ -1,5 +1,7 @@
 @php
     $fieldTypesByKey = $fieldTypesByKey ?? [];
+    $fontFamily = $fontFamily ?? 'Gilroy';
+    $cellFontSizePx = max(9, min(24, (int) ($cellFontSizePx ?? 12)));
     $varsCss = ['var(--clr-primary)' => '#861E34', 'var(--clr-secondary)' => '#2d5a27', 'var(--clr-accent)' => '#c9a227'];
     $resolveCss = function ($css) use ($varsCss) {
         return isset($varsCss[$css]) ? $varsCss[$css] : (str_starts_with($css ?? '', '#') ? $css : '#861E34');
@@ -13,7 +15,7 @@
     <style>
         * { box-sizing: border-box; }
         body {
-            font-family: DejaVu Sans, Arial, Helvetica, sans-serif;
+            font-family: {{ $fontFamily }}, Arial, DejaVu Sans, sans-serif;
             font-size: 9px;
             margin: 15px;
             color: #333;
@@ -23,6 +25,29 @@
             color: #861E34;
             text-align: center;
             margin: 0 0 8px 0;
+        }
+        .doc-head-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0 0 4px 0;
+        }
+        .doc-head-table td {
+            border: none;
+            padding: 0;
+            vertical-align: middle;
+        }
+        .doc-head-logo-cell {
+            width: 62px;
+            text-align: left;
+            padding-right: 8px;
+        }
+        .doc-head-logo {
+            max-height: 56px;
+            width: auto;
+            display: block;
+        }
+        .doc-head-title-cell h1 {
+            margin: 0;
         }
         table.data-table {
             width: 100% !important;
@@ -42,6 +67,7 @@
             vertical-align: middle;
             word-wrap: break-word;
             overflow: visible;
+            font-size: {{ $cellFontSizePx }}px;
         }
         /*
          * Evitar page-break-inside: avoid en todas las filas: con Dompdf provoca saltos
@@ -74,7 +100,18 @@
     </style>
 </head>
 <body>
-<h1 style="margin-bottom: 2px;">{{ $title }}</h1>
+<table class="doc-head-table" role="presentation">
+    <tr>
+        @if (!empty($logoDataUri))
+            <td class="doc-head-logo-cell">
+                <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobierno de Puebla">
+            </td>
+        @endif
+        <td class="doc-head-title-cell">
+            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 2px;">{{ $title }}</h1>
+        </td>
+    </tr>
+</table>
 @if(isset($fechaCorteStr))
     <p style="text-align: right; margin: 0 0 10px 0; font-size: 10px;">Fecha y hora de corte: {{ $fechaCorteStr }}</p>
 @endif

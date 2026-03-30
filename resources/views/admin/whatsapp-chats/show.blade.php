@@ -1,8 +1,8 @@
 @extends('layouts.app')
 
 @push('css')
-<link rel="stylesheet" href="{{ asset('assets/css/modules/temporary-modules.css') }}?v={{ @filemtime(public_path('assets/css/modules/temporary-modules.css')) ?: time() }}">
-<link rel="stylesheet" href="{{ asset('assets/css/modules/whatsapp-chats-show.css') }}?v={{ @filemtime(public_path('assets/css/modules/whatsapp-chats-show.css')) ?: time() }}">
+<link rel="stylesheet" href="{{ asset('assets/css/modules/temporary-modules.css') }}?v={{ @filemtime(public_path('assets/css/modules/temporary-modules.css')) ?: time() }}&t={{ time() }}">
+<link rel="stylesheet" href="{{ asset('assets/css/modules/whatsapp-chats-show.css') }}?v={{ @filemtime(public_path('assets/css/modules/whatsapp-chats-show.css')) ?: time() }}&t={{ time() }}">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 @endpush
 
@@ -11,18 +11,38 @@
 @section('content')
 <section class="tm-page tm-shell app-density-compact">
     <div class="tm-shell-main">
-        <header class="tm-shell-head wa-preview-page-head">
-            <div>
-                <h1 class="tm-shell-title">WhatsApp: {{ $chat->title }}</h1>
-                <p class="tm-shell-desc">
-                    @if ($waPreviewMode === 'txt')
-                        Vista previa desde TXT: filtros a la izquierda, búsqueda y coincidencias a la derecha.
-                    @else
-                        Vista por partes HTML del ZIP. La búsqueda en texto está disponible si el export incluye <code>_chat.txt</code> parseable.
-                    @endif
-                </p>
+
+        {{-- HEADER COMPACTO --}}
+        <header class="wa-preview-page-head">
+            <div class="wa-preview-head-left">
+                <a href="{{ route('whatsapp-chats.admin.index') }}" class="wa-back-btn" title="Volver a la lista">
+                    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                </a>
+                <div class="wa-preview-head-info">
+                    <h1 class="wa-preview-title">
+                        <i class="fa-brands fa-whatsapp wa-preview-title-icon" aria-hidden="true"></i>
+                        {{ $chat->title }}
+                    </h1>
+                    <p class="wa-preview-subtitle">
+                        @if ($waPreviewMode === 'txt')
+                            <span class="wa-head-badge wa-head-badge--txt">
+                                <i class="fa-solid fa-file-lines" aria-hidden="true"></i> TXT
+                            </span>
+                            {{ $txtMessages->count() }} mensajes cargados
+                        @else
+                            <span class="wa-head-badge wa-head-badge--html">
+                                <i class="fa-solid fa-code" aria-hidden="true"></i> HTML
+                            </span>
+                            Vista por partes HTML del ZIP
+                        @endif
+                    </p>
+                </div>
             </div>
             <div class="wa-preview-head-actions">
+                <button type="button" class="wa-panel-toggle-btn" id="wasPanelToggle" title="Mostrar / ocultar panel derecho" aria-expanded="true" aria-controls="wasRightPanel">
+                    <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                    <span class="wa-panel-toggle-label">Filtros &amp; Búsqueda</span>
+                </button>
                 <form
                     class="js-wa-chat-delete-form"
                     method="POST"
@@ -32,158 +52,300 @@
                 >
                     @csrf
                     @method('DELETE')
-                    <button type="submit" class="tm-btn tm-btn-danger tm-btn-sm">Eliminar</button>
+                    <button type="submit" class="wa-action-btn wa-action-btn--danger" title="Eliminar chat">
+                        <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                    </button>
                 </form>
-                <a href="{{ route('whatsapp-chats.admin.index') }}" class="tm-btn tm-btn-outline tm-btn-sm">Volver</a>
             </div>
         </header>
 
-        <article class="content-card tm-card tm-card-in-shell wa-preview-card">
-            @if (!empty($txtPreviewSkippedLargeFile))
-                <div class="inline-alert inline-alert-warning" role="status" style="margin-bottom:14px;">
-                    El archivo de conversación TXT supera ~{{ (int) ($txtPreviewMaxFileMb ?? 15) }}&nbsp;MB. La vista previa por mensajes está desactivada para no saturar el navegador; usa las <strong>partes HTML</strong> del panel izquierdo. El respaldo completo sigue en el servidor.
+        @if (!empty($txtPreviewSkippedLargeFile))
+            <div class="inline-alert inline-alert-warning wa-inline-alert-warning" role="status">
+                El archivo TXT supera {{ (int) ($txtPreviewMaxFileMb ?? 15) }} MB. Usa las <strong>partes HTML</strong>. El respaldo completo está en el servidor.
+            </div>
+        @endif
+
+        {{-- LAYOUT PRINCIPAL: CHAT IZQUIERDA + PANEL DERECHA --}}
+        <div
+            class="wa-workspace"
+            id="waPreviewRoot"
+            data-wa-preview-mode="{{ $waPreviewMode }}"
+        >
+            {{-- COLUMNA IZQUIERDA: CHAT --}}
+            <div class="wa-workspace-chat" aria-label="Área de chat">
+
+                @if ($waPreviewMode === 'html')
+                    {{-- SELECTOR DE PARTES (horizontal cuando HTML) --}}
+                    @if(count($messageParts) > 1)
+                    <div class="wa-parts-bar" role="tablist" aria-label="Partes del chat">
+                        @foreach ($messageParts as $idx => $relPath)
+                            @php $isActive = ($idx === 0); @endphp
+                            <button
+                                type="button"
+                                role="tab"
+                                class="wa-part-tab {{ $isActive ? 'wa-active-part' : '' }}"
+                                data-part-index="{{ $idx }}"
+                                data-part-url="{{ $messageUrls->values()->all()[$idx] ?? '' }}"
+                                aria-selected="{{ $isActive ? 'true' : 'false' }}"
+                            >
+                                <i class="fa-solid fa-file-code" aria-hidden="true"></i>
+                                Parte {{ $idx + 1 }}
+                            </button>
+                        @endforeach
+                    </div>
+                    @endif
+                    <div class="wa-iframe-wrap">
+                        @php
+                            $messageUrlsArr = $messageUrls->values()->all();
+                            $activeUrl = $messageUrlsArr[0] ?? null;
+                        @endphp
+                        <iframe
+                            id="waChatIframe"
+                            class="wa-iframe"
+                            src="{{ $activeUrl }}"
+                            loading="lazy"
+                            title="Vista del chat"
+                        ></iframe>
+                    </div>
+
+                @else
+                    {{-- BARRA DE ESTADÍSTICAS --}}
+                    <div class="wa-stats-bar" id="waStatsBar" role="status" aria-live="polite">
+                        <div class="wa-stats-group" id="waStatsVisible" hidden>
+                            <i class="fa-solid fa-filter wa-stats-icon wa-stats-icon--accent" aria-hidden="true"></i>
+                            <span id="waStatsVisibleCount" class="wa-stats-num wa-stats-num--accent">0</span>
+                            <span class="wa-stats-lbl">visibles</span>
+                        </div>
+                        <div class="wa-stats-group">
+                            <i class="fa-solid fa-users wa-stats-icon" aria-hidden="true"></i>
+                            <span class="wa-stats-num">{{ ($txtMessages ?? collect())->pluck('author')->unique()->filter()->count() }}</span>
+                            <span class="wa-stats-lbl">participantes</span>
+                        </div>
+                    </div>
+
+                    {{-- ÁREA DE MENSAJES --}}
+                    <div class="wa-chat-txt-wrap" id="waChatTxtWrap" role="log" aria-live="polite">
+                        <div id="waChatSentinel" class="wa-sentinel"></div>
+                    </div>
+
+                    <script id="waMessagesData" type="application/json">
+                        @json($txtMessages ?? [])
+                    </script>
+                @endif
+            </div>
+
+            {{-- COLUMNA DERECHA: PANEL DE FILTROS Y BÚSQUEDA --}}
+            <aside class="wa-workspace-panel" id="wasRightPanel" aria-label="Filtros y búsqueda">
+
+                {{-- TABS DEL PANEL --}}
+                <div class="wa-panel-tabs" role="tablist">
+                    @if ($waPreviewMode === 'txt')
+                    <button
+                        type="button"
+                        class="wa-panel-tab wa-panel-tab--active"
+                        role="tab"
+                        id="wasTabFilterBtn"
+                        aria-selected="true"
+                        aria-controls="wasTabFilterContent"
+                    >
+                        <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                        Filtros
+                    </button>
+                    <button
+                        type="button"
+                        class="wa-panel-tab"
+                        role="tab"
+                        id="wasTabSearchBtn"
+                        aria-selected="false"
+                        aria-controls="wasTabSearchContent"
+                    >
+                        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                        Buscar
+                    </button>
+                    @else
+                    <button
+                        type="button"
+                        class="wa-panel-tab wa-panel-tab--active"
+                        role="tab"
+                        id="wasTabPartsBtn"
+                        aria-selected="true"
+                        aria-controls="wasTabPartsContent"
+                    >
+                        <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                        Partes ({{ count($messageParts) }})
+                    </button>
+                    @endif
                 </div>
-            @elseif (!empty($txtPreviewTruncated))
-                <div class="inline-alert inline-alert-warning" role="status" style="margin-bottom:14px;">
-                    Solo se muestran los primeros {{ (int) ($txtPreviewMaxMessages ?? 5000) }} mensajes en esta vista. El resto del chat sigue en los archivos importados.
-                </div>
-            @endif
-            <div
-                class="wa-preview-layout"
-                id="waPreviewRoot"
-                data-wa-preview-mode="{{ $waPreviewMode }}"
-            >
-                <div class="wa-preview-cols">
-                    {{-- Izquierda: filtros (TXT) o partes HTML --}}
-                    <aside class="wa-preview-side wa-preview-side--left" aria-label="Filtros y partes">
-                        @if ($waPreviewMode === 'txt')
-                            <div class="wa-side-card wa-side-card--filters">
-                                <h2 class="wa-side-title">Filtros</h2>
 
+                {{-- CONTENIDO DE TABS --}}
+                <div class="wa-panel-body">
+
+                    @if ($waPreviewMode === 'txt')
+
+                    {{-- TAB: FILTROS --}}
+                    <div
+                        class="wa-tab-content wa-tab-content--active"
+                        role="tabpanel"
+                        id="wasTabFilterContent"
+                        aria-labelledby="wasTabFilterBtn"
+                    >
+                        <div class="wa-filter-section">
+                            <p class="wa-filter-section-label">
+                                <i class="fa-regular fa-calendar" aria-hidden="true"></i>
+                                Rango de fechas
+                            </p>
+                            <div class="wa-field-row">
                                 <div class="wa-field">
-                                    <label class="wa-label" for="waFilterDateFrom">Fecha desde</label>
-                                    <input type="text" id="waFilterDateFrom" class="wa-input" placeholder="Seleccionar…" autocomplete="off">
+                                    <label class="wa-label" for="waFilterDateFrom">Desde</label>
+                                    <div class="wa-input-wrap">
+                                        <i class="fa-regular fa-calendar wa-input-icon" aria-hidden="true"></i>
+                                        <input type="text" id="waFilterDateFrom" class="wa-input wa-input-has-icon" placeholder="dd/mm/yyyy" autocomplete="off">
+                                    </div>
                                 </div>
                                 <div class="wa-field">
-                                    <label class="wa-label" for="waFilterDateTo">Fecha hasta</label>
-                                    <input type="text" id="waFilterDateTo" class="wa-input" placeholder="Seleccionar…" autocomplete="off">
+                                    <label class="wa-label" for="waFilterDateTo">Hasta</label>
+                                    <div class="wa-input-wrap">
+                                        <i class="fa-regular fa-calendar wa-input-icon" aria-hidden="true"></i>
+                                        <input type="text" id="waFilterDateTo" class="wa-input wa-input-has-icon" placeholder="dd/mm/yyyy" autocomplete="off">
+                                    </div>
                                 </div>
-
-                                <div class="wa-field">
-                                    <label class="wa-label" for="waFilterAuthor">Autor</label>
-                                    <select id="waFilterAuthor" class="wa-input wa-select">
-                                        <option value="">Todos</option>
-                                        @foreach (($txtMessages ?? collect())->pluck('author')->unique()->filter() as $authorName)
-                                            <option value="{{ $authorName }}">{{ $authorName }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <label class="wa-check">
-                                    <input type="checkbox" id="waFilterMediaOnly" value="1">
-                                    <span>Solo mensajes con archivo multimedia</span>
-                                </label>
-
-                                <label class="wa-check">
-                                    <input type="checkbox" id="waFilterLongOnly" value="1">
-                                    <span>Solo texto largo (más de 200 caracteres)</span>
-                                </label>
-
-                                <button type="button" class="wa-btn wa-btn-secondary wa-filter-reset" id="waFilterReset">
-                                    Restablecer filtros
-                                </button>
                             </div>
-                        @else
-                            <div class="wa-side-card wa-side-card--parts">
-                                <h2 class="wa-side-title">Partes del ZIP</h2>
-                                <p class="wa-side-hint">Cada parte es un fragmento HTML del export.</p>
-                                <div class="wa-parts-vertical" role="tablist" aria-label="Partes del chat">
-                                    @foreach ($messageParts as $idx => $relPath)
-                                        @php $isActive = ($idx === 0); @endphp
-                                        <button
-                                            type="button"
-                                            class="wa-part-btn wa-part-btn--block {{ $isActive ? 'wa-active-part' : '' }}"
-                                            data-part-index="{{ $idx }}"
-                                            data-part-url="{{ $messageUrls->values()->all()[$idx] ?? '' }}"
-                                        >
-                                            Parte {{ $idx + 1 }}
-                                        </button>
+                        </div>
+
+                        <div class="wa-filter-section">
+                            <p class="wa-filter-section-label">
+                                <i class="fa-solid fa-user" aria-hidden="true"></i>
+                                Participante
+                            </p>
+                            <div class="wa-input-wrap">
+                                <i class="fa-solid fa-chevron-down wa-select-arrow" aria-hidden="true"></i>
+                                <select id="waFilterAuthor" class="wa-input wa-select">
+                                    <option value="">Todos los participantes</option>
+                                    @foreach (($txtMessages ?? collect())->pluck('author')->unique()->filter() as $authorName)
+                                        <option value="{{ $authorName }}">{{ $authorName }}</option>
                                     @endforeach
-                                </div>
+                                </select>
                             </div>
-                        @endif
-                    </aside>
+                        </div>
 
-                    {{-- Centro: hilo --}}
-                    <main class="wa-preview-main" aria-label="Vista del chat">
-                        @if ($waPreviewMode === 'html')
-                            <div class="wa-iframe-wrap">
-                                @php
-                                    $messageUrlsArr = $messageUrls->values()->all();
-                                    $activeUrl = $messageUrlsArr[0] ?? null;
-                                @endphp
-                                <iframe
-                                    id="waChatIframe"
-                                    class="wa-iframe"
-                                    src="{{ $activeUrl }}"
-                                    loading="lazy"
-                                    title="Vista del chat importado"
-                                ></iframe>
-                            </div>
-                        @else
-                            <div class="wa-chat-txt-wrap" id="waChatTxtWrap" role="log" aria-live="polite">
-                                {{-- Messages rendered by JS --}}
-                                <div id="waChatSentinel" class="wa-sentinel"></div>
-                            </div>
-
-                            <script id="waMessagesData" type="application/json">
-                                @json($txtMessages ?? [])
-                            </script>
-                        @endif
-                    </main>
-
-                    {{-- Derecha: búsqueda + coincidencias --}}
-                    <aside class="wa-preview-side wa-preview-side--right" aria-label="Búsqueda">
-                        @if ($waPreviewMode === 'txt')
-                            <div class="wa-side-card wa-side-card--search">
-                                <h2 class="wa-side-title">Buscar</h2>
-                                <div class="wa-search-field">
-                                    <input
-                                        type="search"
-                                        id="waSearchInput"
-                                        class="wa-search-input"
-                                        placeholder="Texto en mensajes…"
-                                        autocomplete="off"
-                                        spellcheck="false"
-                                    >
-                                    <span class="wa-search-icon" aria-hidden="true">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        <div class="wa-filter-section">
+                            <p class="wa-filter-section-label">
+                                <i class="fa-solid fa-tag" aria-hidden="true"></i>
+                                Tipo de contenido
+                            </p>
+                            <div class="wa-toggle-group">
+                                <label class="wa-toggle-item" id="waToggleMediaLabel">
+                                    <input type="checkbox" id="waFilterMediaOnly" value="1" class="wa-toggle-input">
+                                    <span class="wa-toggle-chip">
+                                        <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
+                                        Con archivos
                                     </span>
-                                </div>
-                                <p class="wa-search-meta" id="waSearchMeta">Escribe para ver coincidencias entre los mensajes visibles (según filtros).</p>
-                                <div class="wa-search-results" id="waSearchResults" role="listbox" aria-label="Coincidencias">
-                                    <div id="waSearchSentinel" class="wa-sentinel"></div>
-                                </div>
+                                </label>
+                                <label class="wa-toggle-item" id="waToggleLongLabel">
+                                    <input type="checkbox" id="waFilterLongOnly" value="1" class="wa-toggle-input">
+                                    <span class="wa-toggle-chip">
+                                        <i class="fa-solid fa-align-left" aria-hidden="true"></i>
+                                        Texto largo
+                                    </span>
+                                </label>
                             </div>
-                        @else
-                            <div class="wa-side-card wa-side-card--search wa-side-card--muted">
-                                <h2 class="wa-side-title">Buscar en texto</h2>
-                                <p class="wa-side-hint">
-                                    No disponible en vista HTML. Si necesitas buscar y filtrar por fecha o número de mensaje, importa un ZIP que incluya el archivo de conversación en formato TXT (<code>_chat.txt</code>).
+                        </div>
+
+                        <div class="wa-filter-actions">
+                            <button type="button" class="wa-filter-reset-btn" id="waFilterReset">
+                                <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                                Restablecer filtros
+                            </button>
+                        </div>
+
+                        {{-- RESUMEN DE FILTROS ACTIVOS --}}
+                        <div class="wa-active-filters" id="waActiveFilters" hidden>
+                            <p class="wa-active-filters-title">
+                                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                                Filtros activos
+                            </p>
+                            <div class="wa-active-filters-chips" id="waActiveFiltersChips"></div>
+                        </div>
+                    </div>
+
+                    {{-- TAB: BÚSQUEDA --}}
+                    <div
+                        class="wa-tab-content"
+                        role="tabpanel"
+                        id="wasTabSearchContent"
+                        aria-labelledby="wasTabSearchBtn"
+                        hidden
+                    >
+                        <div class="wa-search-wrap">
+                            <div class="wa-search-field">
+                                <i class="fa-solid fa-magnifying-glass wa-search-icon" aria-hidden="true"></i>
+                                <input
+                                    type="search"
+                                    id="waSearchInput"
+                                    class="wa-search-input"
+                                    placeholder="Buscar en mensajes…"
+                                    autocomplete="off"
+                                    spellcheck="false"
+                                >
+                            </div>
+                            <p class="wa-search-meta" id="waSearchMeta">Escribe para buscar…</p>
+                            <div class="wa-search-results" id="waSearchResults" role="listbox" aria-label="Resultados de búsqueda">
+                                <div id="waSearchSentinel" class="wa-sentinel"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @else
+                    {{-- TAB: PARTES HTML --}}
+                    <div
+                        class="wa-tab-content wa-tab-content--active"
+                        role="tabpanel"
+                        id="wasTabPartsContent"
+                        aria-labelledby="wasTabPartsBtn"
+                    >
+                        <div class="wa-search-wrap">
+                            <p class="wa-panel-hint">
+                                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                                Selecciona una parte para visualizarla en el visor de chat.
+                            </p>
+                            <div class="wa-parts-list" role="tablist" aria-label="Partes del chat">
+                                @foreach ($messageParts as $idx => $relPath)
+                                    @php $isActive = ($idx === 0); @endphp
+                                    <button
+                                        type="button"
+                                        class="wa-part-card {{ $isActive ? 'wa-active-part' : '' }}"
+                                        data-part-index="{{ $idx }}"
+                                        data-part-url="{{ $messageUrls->values()->all()[$idx] ?? '' }}"
+                                    >
+                                        <span class="wa-part-card-num">{{ $idx + 1 }}</span>
+                                        <span class="wa-part-card-label">Parte {{ $idx + 1 }}</span>
+                                        <i class="fa-solid fa-chevron-right wa-part-card-arrow" aria-hidden="true"></i>
+                                    </button>
+                                @endforeach
+                            </div>
+
+                            <div class="wa-side-card--search wa-side-card--muted wa-side-card--search-gap">
+                                <p class="wa-panel-hint">
+                                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                                    La búsqueda en texto solo está disponible en modo TXT. Importa un ZIP con <code>_chat.txt</code> para habilitarla.
                                 </p>
                             </div>
-                        @endif
-                    </aside>
+                        </div>
+                    </div>
+                    @endif
+
                 </div>
-            </div>
-        </article>
+            </aside>
+        </div>
+
     </div>
 </section>
 
 @push('scripts')
-<script src="{{ asset('assets/js/modules/whatsapp-chats-admin-actions.js') }}?v={{ @filemtime(public_path('assets/js/modules/whatsapp-chats-admin-actions.js')) ?: time() }}"></script>
+<script src="{{ asset('assets/js/modules/whatsapp-chats-admin-actions.js') }}?v={{ @filemtime(public_path('assets/js/modules/whatsapp-chats-admin-actions.js')) ?: time() }}&t={{ time() }}"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/l10n/es.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="{{ asset('assets/js/modules/whatsapp-chats-show.js') }}?v={{ @filemtime(public_path('assets/js/modules/whatsapp-chats-show.js')) ?: time() }}"></script>
+<script src="{{ asset('assets/js/modules/whatsapp-chats-show.js') }}?v={{ @filemtime(public_path('assets/js/modules/whatsapp-chats-show.js')) ?: time() }}&t={{ time() }}"></script>
+<script src="{{ asset('assets/js/modules/whatsapp-chats-show-ui.js') }}?v={{ @filemtime(public_path('assets/js/modules/whatsapp-chats-show-ui.js')) ?: time() }}"></script>
 @endpush
 @endsection

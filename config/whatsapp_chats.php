@@ -9,7 +9,7 @@ if ($waMaxUploadMb > 3072) {
 }
 
 $waTxtPreviewMaxFileMb = max(1, (int) env('WHATSAPP_CHATS_TXT_PREVIEW_MAX_FILE_MB', 15));
-$waTxtPreviewMaxMessages = max(100, min(50000, (int) env('WHATSAPP_CHATS_TXT_PREVIEW_MAX_MESSAGES', 5000)));
+$waTxtPreviewMaxMessages = (int) env('WHATSAPP_CHATS_TXT_PREVIEW_MAX_MESSAGES', 999999);
 
 return [
 
@@ -63,7 +63,7 @@ return [
     */
     'folder_import_max_files' => max(50, min(100000, (int) env('WHATSAPP_FOLDER_IMPORT_MAX_FILES', 25000))),
 
-    'folder_import_request_max_files' => max(1, min(20, (int) env('WHATSAPP_FOLDER_IMPORT_REQUEST_MAX_FILES', 8))),
+    'folder_import_request_max_files' => max(1, min(20, (int) env('WHATSAPP_FOLDER_IMPORT_REQUEST_MAX_FILES', 20))),
 
     'folder_import_parallel_requests' => max(1, min(8, (int) env('WHATSAPP_FOLDER_IMPORT_PARALLEL_REQUESTS', 4))),
 

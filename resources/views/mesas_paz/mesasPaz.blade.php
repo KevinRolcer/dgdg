@@ -4,6 +4,7 @@
 
 @push('css')
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+<link href="{{ asset('assets/css/mesas_paz/bootstrap-override.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/bootstrap-override.css')) ?: time() }}" rel="stylesheet" />
 <link href="{{ asset('assets/css/mesas_paz/mesas-paz-shell.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesas-paz-shell.css')) ?: time() }}" rel="stylesheet" />
 <link href="{{ asset('assets/css/mesas_paz/mesaPaz.css') }}?v={{ @filemtime(public_path('assets/css/mesas_paz/mesaPaz.css')) ?: time() }}" rel="stylesheet" />
 <link href="{{ asset('assets/css/theme-dark-mesas-paz.css') }}?v={{ @filemtime(public_path('assets/css/theme-dark-mesas-paz.css')) ?: time() }}" rel="stylesheet" />
@@ -221,7 +222,6 @@
                                                 <option value="Representante" @if(optional($registroMunicipio)->presidente === 'Representante') selected @endif>Representante</option>
                                                 <option value="Ambos" @if(optional($registroMunicipio)->presidente === 'Ambos') selected @endif>Ambos (Presidente y Representante)</option>
                                                 <option value="S/R" @if(optional($registroMunicipio)->presidente === 'S/R') selected @endif>S/R (sin reporte del delegado)</option>
-                                                {{-- Municipio no presente" == "No" --}}
                                                 <option value="Ninguno" @if(in_array(optional($registroMunicipio)->presidente, ['No', 'Ninguno'])) selected @endif>Municipio no presente</option>
                                                 <option value="No" hidden @if(optional($registroMunicipio)->presidente === 'No') selected @endif>No</option>
                                             </select>
@@ -261,7 +261,6 @@
                                         <span class="badge bg-success">Registrado</span>
                                     </div>
                                     <div class="small text-muted mt-2 d-none contestado-detalle-item">
-                                        {{-- Compatibilidad visual: si existe histórico en BD con "No"/"Ninguno", se presenta como "Municipio no presente". --}}
                                         Asistió Presidente Municipal: {{ $item->presidente === 'Si' ? 'Sí' : ($item->presidente === 'Representante' ? 'Representante' : ($item->presidente === 'Ambos' ? 'Ambos (Presidente y Representante)' : ($item->presidente === 'S/R' ? 'S/R' : (in_array($item->presidente, ['No', 'Ninguno']) ? 'Municipio no presente' : $item->presidente)))) }}@if(!empty($item->asiste)) · Asiste: {{ str_ireplace(['Presidente y Representante', 'Director de seguridad', 'Secretario/Regidor de gobernación', 'Presidente'], ['Presidente y Representante', 'Director de Seguridad Municipal', 'Secretario/Regidor de Gobernación', 'Presidente Municipal'], $item->asiste) }}@endif
                                     </div>
                                 </li>
@@ -300,7 +299,7 @@
                     @else
                         <small class="text-muted d-block mb-3">Para habilitar evidencia, primero registra al menos un municipio hoy.</small>
                     @endif
-                    
+
                     <div id="dropzoneEvidencia" class="border border-2 border-dashed rounded p-3 mb-3 text-center @if(empty($canEditarEvidenciaHoy)) d-none @endif" style="min-height: 120px; background-color: rgba(72, 71, 71, 0.02); display: flex; flex-direction: column; justify-content: center; align-items: center;">
                         <div id="evidenciaActualBox" class="w-100"></div>
                         <div id="dropzonePlaceholder" class="py-3 @if(count($evidenciasActuales) > 0) d-none @endif">
@@ -335,7 +334,6 @@
 
                         <label id="acuerdo_observacion_label" for="acuerdo_observacion_hoy" class="form-label fw-bold mb-1">{{ $suspensionActivaActual ? 'Nota/Observación' : 'Acuerdos/Observaciones' }}</label>
                         @php
-                            // Edición dinamica de los acuerdos (Se ajustan a manera de lista y se almacenan como array en BD)
                             $acuerdoTextoInicial = collect($acuerdoItemsActual ?? [])->map(function ($item) {
                                 return '• '.$item;
                             })->implode("\n");

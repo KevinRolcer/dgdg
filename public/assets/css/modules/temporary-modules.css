@@ -3062,6 +3062,30 @@ a.tm-paginator-btn:hover {
 }
 
 /* SweetAlert: exportación (Excel / Word / PDF) vs informe de análisis */
+.tm-swal-export-options {
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.tm-swal-export-options strong {
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.tm-swal-export-options small {
+    font-size: 0.74rem;
+}
+
+.tm-swal-export-options input[type='radio'] {
+    width: 0.86rem;
+    height: 0.86rem;
+}
+
+html.theme-dark .tm-swal-export-options small,
+html.theme-dark .tm-swal-export-options strong {
+    color: #ffffff !important;
+}
+
 .tm-swal-export-section-title {
     margin: 0 0 8px;
     font-size: 0.72rem;
@@ -5180,34 +5204,29 @@ html.theme-dark .tm-record-item-header {
 }
 
 .tm-search-input-wrap i {
-    position: absolute;
-    left: 12px;
-    color: var(--clr-text-light);
-    font-size: 0.85rem;
-    pointer-events: none;
+    display: none;
 }
 
 .tm-search-input-small {
     width: 100%;
-    height: 34px;
-    padding: 0 36px 0 34px;
+    height: var(--ui-input-height);
+    padding: 0 16px;
     border: 1px solid var(--clr-border);
-    border-radius: 10px;
-    background: rgba(0, 0, 0, 0.02);
-    font-size: 0.8125rem;
+    border-radius: var(--ui-radius);
+    background: var(--clr-bg);
+    font-size: var(--fs-body);
     color: var(--clr-text-main);
-    transition: all 0.2s ease;
+    transition: border-color 0.15s ease;
 }
 
 html.theme-dark .tm-search-input-small {
-    background: rgba(255, 255, 255, 0.04);
+    background: #2a2a2a;
 }
 
 .tm-search-input-small:focus {
     outline: none;
     border-color: var(--clr-accent);
     background: var(--clr-bg);
-    box-shadow: 0 0 0 3px rgba(199, 155, 102, 0.12);
 }
 
 .tm-btn-clear-inline {

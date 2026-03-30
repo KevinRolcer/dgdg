@@ -128,6 +128,12 @@ class TemporaryModuleWordPdfService
 
         $title = (string) ($exportConfig['title'] ?? $fileName);
         $orientationConfig = ($exportConfig['orientation'] ?? 'portrait') === 'landscape' ? 'landscape' : 'portrait';
+        $titleAlign = (string) ($exportConfig['title_align'] ?? 'center');
+        $cellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['cell_font_size_px'] ?? null);
+        $cellFontSizePt = $this->cellPxToWordPt($cellFontSizePx);
+        $exportFontName = $this->resolveExportFontName();
+        $logoPath = public_path('images/Gobierno de Puebla_1-Versión vertical.png');
+        $hasLogo = is_file($logoPath);
 
         $columnWidthFractions = $this->computeColumnWidthFractions($columns);
         $usableTableTwips = $orientationConfig === 'landscape' ? 14570 : 9638;
@@ -151,7 +157,7 @@ class TemporaryModuleWordPdfService
             $fullPath = $exportDir.'/'.$wordFileName;
 
             $phpWord = new \PhpOffice\PhpWord\PhpWord();
-            $phpWord->setDefaultFontName('Calibri');
+            $phpWord->setDefaultFontName($exportFontName);
             $phpWord->setDefaultFontSize(10);
             $orientation = $orientationConfig === 'landscape'
                 ? \PhpOffice\PhpWord\Style\Section::ORIENTATION_LANDSCAPE
@@ -164,16 +170,28 @@ class TemporaryModuleWordPdfService
                 'marginRight' => 1134,
             ]);
 
-            $align = (string) ($exportConfig['title_align'] ?? 'center');
-            $jc = match ($align) {
+            $jc = match ($titleAlign) {
                 'left' => \PhpOffice\PhpWord\SimpleType\Jc::START,
                 'right' => \PhpOffice\PhpWord\SimpleType\Jc::END,
                 default => \PhpOffice\PhpWord\SimpleType\Jc::CENTER,
             };
-            $section->addText($title, ['bold' => true, 'size' => 14, 'color' => '861E34'], ['alignment' => $jc, 'spaceAfter' => 100]);
+
+            if ($hasLogo) {
+                $section->addImage($logoPath, [
+                    'height' => 52,
+                    'positioning' => 'absolute',
+                    'posHorizontal' => 'left',
+                    'posHorizontalRel' => 'margin',
+                    'posVertical' => 'top',
+                    'posVerticalRel' => 'margin',
+                    'wrappingStyle' => 'behind',
+                ]);
+            }
+
+            $section->addText($title, ['name' => $exportFontName, 'bold' => true, 'size' => 14, 'color' => '861E34'], ['alignment' => $jc, 'spaceAfter' => 0]);
 
             $fechaCorteStr = now()->format('d/m/Y H:i');
-            $section->addText('Fecha y hora de corte: ' . $fechaCorteStr, ['size' => 9], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::END, 'spaceAfter' => 200]);
+            $section->addText('Fecha y hora de corte: ' . $fechaCorteStr, ['name' => $exportFontName, 'size' => 9], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::END, 'spaceAfter' => 200]);
 
             $section->addTextBreak(1);
 
@@ -215,7 +233,7 @@ class TemporaryModuleWordPdfService
                     }
 
                     $cell = $countTbl->addCell(null, $cellStyle);
-                    $cell->addText((string) $group['label'], ['bold' => true, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                    $cell->addText((string) $group['label'], ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
                 }
                 $countTbl->addRow();
                 foreach ($countTable['groups'] as $gi => $group) {
@@ -229,13 +247,13 @@ class TemporaryModuleWordPdfService
                         $isRedundant = ($gi === 0 || (count($group['values']) === 1 && (trim((string)$v['label']) === '' || trim((string)$v['label']) === trim((string)$group['label']))));
 
                         if ($includePct) {
-                            $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText($isRedundant ? 'Cantidad' : (string) $subLabel, ['bold' => true, 'size' => 8, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
-                            $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText('%', ['bold' => true, 'size' => 8, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                            $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText($isRedundant ? 'Cantidad' : (string) $subLabel, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                            $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText('%', ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
                         } else {
                             if ($isRedundant) {
                                 $countTbl->addCell(null, ['bgColor' => $bgHex, 'vMerge' => 'continue']);
                             } else {
-                                $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText((string)$subLabel, ['bold' => true, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                                $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText((string)$subLabel, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
                             }
                         }
                     }
@@ -247,15 +265,15 @@ class TemporaryModuleWordPdfService
                     $gTotal = array_sum(array_column($group['values'], 'count'));
 
                     foreach ($group['values'] as $v) {
-                        $countTbl->addCell()->addText((string) $v['count'], ['color' => 'c00000']);
+                        $countTbl->addCell()->addText((string) $v['count'], ['name' => $exportFontName, 'size' => $cellFontSizePt, 'color' => 'c00000']);
                         if ($includePct) {
                             $pct = $gTotal > 0 ? round(($v['count'] / $gTotal) * 100, 2) : 0;
-                            $countTbl->addCell()->addText($pct . '%', ['color' => 'c00000', 'size' => 8]);
+                            $countTbl->addCell()->addText($pct . '%', ['name' => $exportFontName, 'size' => $cellFontSizePt, 'color' => 'c00000']);
                         }
                     }
                 }
                 $section->addTextBreak(1);
-                $section->addText('Desglose', ['bold' => true, 'size' => 11], ['spaceAfter' => 120]);
+                $section->addText('Desglose', ['name' => $exportFontName, 'bold' => true, 'size' => 11], ['spaceAfter' => 120]);
             }
 
             $tblStyle = [
@@ -315,7 +333,7 @@ class TemporaryModuleWordPdfService
                 // Determinar color de fondo para encabezados dinámicos
                 $bgIdx = $this->getColumnBgColor($col, $idx);
                 $w = $columnTwips[$idx] ?? null;
-                $table->addCell($w, ['bgColor' => $bgIdx, 'valign' => 'center'])->addText((string) $col['label'], ['bold' => true, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                $table->addCell($w, ['bgColor' => $bgIdx, 'valign' => 'center'])->addText((string) $col['label'], ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
             }
 
             // Filas
@@ -343,7 +361,7 @@ class TemporaryModuleWordPdfService
                         }
                     }
                     $w = $columnTwips[$idx] ?? null;
-                    $table->addCell($w)->addText($text);
+                    $table->addCell($w)->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt]);
                 }
             }
 
@@ -369,6 +387,10 @@ class TemporaryModuleWordPdfService
 
         $html = view('temporary_modules.admin.partials.export_pdf_table', [
             'title' => $title,
+            'titleAlign' => $titleAlign,
+            'fontFamily' => $exportFontName,
+            'cellFontSizePx' => $cellFontSizePx,
+            'logoDataUri' => $this->buildLogoDataUri($logoPath),
             'fechaCorteStr' => $fechaCorteStr,
             'orientation' => $orientationConfig,
             'columns' => $columns,
@@ -385,6 +407,7 @@ class TemporaryModuleWordPdfService
         $dompdf = new Dompdf([
             'defaultPaperSize' => 'A4',
             'isRemoteEnabled' => true,
+            'defaultFont' => strtolower($exportFontName) === 'gilroy' ? 'gilroy' : 'Arial',
         ]);
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper('A4', $orientationConfig === 'landscape' ? 'landscape' : 'portrait');
@@ -552,5 +575,61 @@ class TemporaryModuleWordPdfService
         }
 
         return $percents;
+    }
+
+    private function buildLogoDataUri(string $logoPath): ?string
+    {
+        if (!is_file($logoPath)) {
+            return null;
+        }
+
+        $binary = @file_get_contents($logoPath);
+        if ($binary === false || $binary === '') {
+            return null;
+        }
+
+        $mime = @mime_content_type($logoPath) ?: 'image/png';
+
+        return 'data:'.$mime.';base64,'.base64_encode($binary);
+    }
+
+    private function normalizeCellFontSizePx(mixed $value): int
+    {
+        if ($value === null || $value === '') {
+            return 12;
+        }
+
+        return max(9, min(24, (int) $value));
+    }
+
+    private function cellPxToWordPt(int $px): int
+    {
+        return max(7, min(18, (int) round($px * 0.75)));
+    }
+
+    private function resolveExportFontName(): string
+    {
+        $hasGilroy = false;
+
+        foreach ([
+            storage_path('fonts'),
+            resource_path('fonts/Fuente Gilroy'),
+            resource_path('fonts'),
+        ] as $fontDir) {
+            if (!is_dir($fontDir)) {
+                continue;
+            }
+
+            $files = @scandir($fontDir) ?: [];
+            foreach ($files as $file) {
+                $name = mb_strtolower((string) $file);
+                if (str_contains($name, 'gilroy') && str_ends_with($name, '.ttf')) {
+                    $hasGilroy = true;
+                    break 2;
+                }
+            }
+        }
+
+        return $hasGilroy ? 'Gilroy' : 'Arial';
     }
 }

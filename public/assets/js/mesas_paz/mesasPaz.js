@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let historialLastTrigger = null;
     let mostrarDetalleContestados = false;
 
+    /** Actualiza visualización de municipios contestados */
     function actualizarVistaDetalleContestados() {
         if (!listaContestados) {
             return;
@@ -85,6 +86,7 @@ document.addEventListener('DOMContentLoaded', function () {
         evidenciasHoy = [];
     }
 
+    /** Gestión de foco en modal historial */
     function setupHistorialModalFocusManagement() {
         if (!historialModal || historialModal.dataset.focusManaged === '1') {
             return;
@@ -107,6 +109,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    /** Renderiza evidencias de hoy */
     function renderizarEvidenciaActual() {
         if (!evidenciaActualBox) {
             return;
@@ -139,7 +142,7 @@ document.addEventListener('DOMContentLoaded', function () {
             + '</div>';
     }
 
-    // Convierte texto libre en acuerdos. Si detecta viñetas, toma cada bloque completo como un acuerdo.
+    /** Normaliza acuerdos desde texto */
     function normalizarAcuerdoItemsDesdeTexto(texto) {
         if (!texto) {
             return [];
@@ -252,7 +255,7 @@ document.addEventListener('DOMContentLoaded', function () {
         el.selectionEnd = nuevaPosicion;
     }
 
-    // Regla de captura: modalidad y asistencia del delegado son requisitos previos.
+    /** Verifica requisitos previos para captura */
     function puedeCapturarMunicipio() {
         return !!(modalidadGlobalSelect && modalidadGlobalSelect.value && delegadoAsistioGlobalSelect && delegadoAsistioGlobalSelect.value);
     }
@@ -486,7 +489,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Control y validación del campo de representante por municipio.
+    /** Gestión de representante por municipio */
     function actualizarRepresentante(municipioId) {
         const presidenteSelect = document.getElementById('presidente_' + municipioId);
         const representanteWrap = document.getElementById('representante_wrap_' + municipioId);
@@ -526,7 +529,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         listaContestados.innerHTML = items.map(function (item) {
-            // Ajuste de seguridad para evitar inyección de HTML en los nombres de municipios o presidentes.
             const municipio = escapeHtml(item.municipio || 'N/D');
             const presidente = escapeHtml(item.presidente || 'N/D');
             const asiste = item.asiste ? (' · Asiste: ' + escapeHtml(normalizarTextoCargo(item.asiste))) : '';
@@ -558,7 +560,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Mantiene visibles los municipios pendientes y oculta los capturados.
+    /** Control de visibilidad de municipios capturados */
     function actualizarVisibilidadMunicipios() {
         const cards = document.querySelectorAll('.municipio-card');
         const emptyState = document.getElementById('sinMunicipiosPendientes');
@@ -578,7 +580,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Acción de historial y carga en modal
+    /** Carga detalle en modal historial */
     function bindHistorialActions() {
         document.querySelectorAll('.btn-ver-historial-fecha').forEach(function (button) {
             if (button.dataset.bound === '1') {
@@ -663,7 +665,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     let modalHtml = '';
                     const groupEntries = Object.values(groups);
-                    
+
                     groupEntries.forEach(function (group, index) {
                         const rows = group.registros.map(function (reg, i) {
                             const asisteTexto = normalizarTextoCargo(reg.asiste || 'N/D');
@@ -702,7 +704,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                         modalHtml += '<div class="' + (index < groupEntries.length - 1 ? 'mb-4 border-bottom pb-4' : 'mb-2') + '">' +
                             '<h6 class="fw-bold mb-3" style="color: var(--clr-segob-red, #861e34);">' +
-                            '<i class="bi bi-geo-alt-fill me-1"></i> Microrregión: ' + escapeHtml(group.nombre) + 
+                            '<i class="bi bi-geo-alt-fill me-1"></i> Microrregión: ' + escapeHtml(group.nombre) +
                             (group.cabecera ? ' (' + escapeHtml(group.cabecera) + ')' : '') +
                             '</h6>' +
                             '<div class="table-responsive">' +
@@ -727,7 +729,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Formato de fechas dd/mm/yyyy para el historial.
+    /** Formato de fecha dd/mm/yyyy */
     function formatearFechaDDMMYYYY(fechaIso) {
         if (!fechaIso || typeof fechaIso !== 'string') {
             return 'N/D';
@@ -742,7 +744,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return partes[2] + '/' + partes[1] + '/' + partes[0];
     }
 
-    // Actualización del historial sin recargar la página.
+    /** Actualiza historial dinámicamente */
     function refrescarHistorialHoy(historialHoy) {
         if (!historialHoyWrapper) {
             return;
@@ -1064,11 +1066,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const archivosParaSubir = archivosValidos.slice(0, disponibles);
-        
+
         const textoOriginal = btnCargarEvidencia.innerHTML;
         btnCargarEvidencia.disabled = true;
         if (btnPegarEvidencia) btnPegarEvidencia.disabled = true;
-        
+
         btnCargarEvidencia.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Subiendo...';
 
         let cadena = Promise.resolve();
@@ -1092,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (btnPegarEvidencia) btnPegarEvidencia.disabled = false;
                 btnCargarEvidencia.innerHTML = textoOriginal;
                 if (inputEvidenciaHoy) inputEvidenciaHoy.value = '';
-                
+
                 if (dropzonePlaceholder) {
                     if (evidenciasHoy.length > 0) {
                         dropzonePlaceholder.classList.add('d-none');
@@ -1110,7 +1112,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 text: "Usa Ctrl+V para pegar una imagen desde tu portapapeles ahora mismo.",
                 icon: "info",
                 buttons: false,
-                timer: 3000
+                timer: 2500
             });
         });
     }
@@ -1160,7 +1162,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const items = (e.clipboardData || e.originalEvent.clipboardData).items;
         const files = [];
-        
+
         for (let i = 0; i < items.length; i++) {
             if (items[i].type.indexOf('image') !== -1) {
                 files.push(items[i].getAsFile());
@@ -1568,7 +1570,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const formData = new FormData(formImportarExcel);
-            const url = importarExcelUrl; 
+            const url = importarExcelUrl;
 
             btnConfirmarImportacion.disabled = true;
             spinnerImportacion.classList.remove('d-none');
@@ -1590,7 +1592,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (result.status >= 400 || !result.data.success) {
                     throw result.data;
                 }
-                
+
                 swal('Éxito', result.data.message || 'Datos importados correctamente.', 'success').then(function () {
                     const reloadUrl = new URL(window.location.href);
                     reloadUrl.searchParams.set('fecha', result.data.fecha_asist || formData.get('fecha_importacion'));
@@ -1600,7 +1602,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .catch(function (errorData) {
                 const backendErrors = errorData && errorData.data && errorData.data.errors ? Object.values(errorData.data.errors).flat() : [];
                 const message = backendErrors[0] || (errorData.data && errorData.data.message) || errorData.message || 'Error al importar datos del archivo Excel.';
-                
+
                 importarExcelError.textContent = message;
                 importarExcelError.classList.remove('d-none');
             })

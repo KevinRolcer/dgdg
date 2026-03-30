@@ -243,7 +243,7 @@
             toast: true,
             position: 'top-end',
             showConfirmButton: false,
-            timer: 3000,
+            timer: 2500,
             timerProgressBar: true,
             didOpen: (toast) => {
                 toast.addEventListener('mouseenter', Swal.stopTimer)
@@ -251,13 +251,35 @@
             }
         }) : null;
 
+        function resolveSegobToastIcon(defaultIcon, message) {
+            const text = String(message || '').toLowerCase();
+
+            // Eliminar / borrar -> icono X
+            if (/elimin|borr|vaciad|quitad/.test(text)) {
+                return 'error';
+            }
+
+            // Actualizar / editar -> icono i
+            if (/actualiz|modific|editad/.test(text)) {
+                return 'info';
+            }
+
+            // Crear / registrar -> paloma de confirmación
+            if (/cread|registrad|agregad|guardad/.test(text)) {
+                return 'success';
+            }
+
+            return defaultIcon;
+        }
+
         // Función para mostrar notificación emergente
         window.segobToast = function(icon, message) {
             if (Toast) {
-                let options = { icon: icon, title: message };
+                const mappedIcon = resolveSegobToastIcon(icon, message);
+                let options = { icon: mappedIcon, title: message };
                 // En modo oscuro, usar color accent para el texto de todos los avisos
                 if (document.documentElement.classList.contains('theme-dark')) {
-                    options.color = '#c79b66';
+                    options.color = '#ffffff';
                 }
                 Toast.fire(options);
             } else {

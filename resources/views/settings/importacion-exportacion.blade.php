@@ -124,7 +124,7 @@
     @php $dr = session('distribuir_result'); @endphp
     <div class="tm-modal settings-modal-log" id="modalLogDistribucion" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modalLogDistribucionTitle">
         <div class="tm-modal-backdrop" data-close-log-modal></div>
-        <div class="tm-modal-dialog settings-modal-dialog-log" style="max-width: 640px;">
+        <div class="tm-modal-dialog settings-modal-dialog-log">
             <div class="tm-modal-head">
                 <h3 id="modalLogDistribucionTitle">Detalle de distribución desde Excel</h3>
                 <button type="button" class="tm-modal-close" data-close-log-modal aria-label="Cerrar">
@@ -190,7 +190,7 @@
     {{-- Modal: lista de microrregiones y municipios --}}
     <div class="tm-modal settings-modal-microrregiones" id="modalListaMicroregiones" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modalListaMicroregionesTitle">
         <div class="tm-modal-backdrop" data-close-microrregiones-modal></div>
-        <div class="tm-modal-dialog settings-modal-dialog-list" style="max-width: 560px;">
+        <div class="tm-modal-dialog settings-modal-dialog-list">
             <div class="tm-modal-head">
                 <h3 id="modalListaMicroregionesTitle">Microregiones y municipios</h3>
                 <button type="button" class="tm-modal-close" data-close-microrregiones-modal aria-label="Cerrar">
@@ -218,101 +218,5 @@
         </div>
     </div>
 
-    <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var btn = document.getElementById('btnAbrirListaMicroregiones');
-        var modal = document.getElementById('modalListaMicroregiones');
-        if (!btn || !modal) return;
-        function openModal() {
-            modal.classList.add('is-open');
-            modal.setAttribute('aria-hidden', 'false');
-        }
-        function closeModal() {
-            modal.classList.remove('is-open');
-            modal.setAttribute('aria-hidden', 'true');
-        }
-        btn.addEventListener('click', openModal);
-        modal.querySelectorAll('[data-close-microrregiones-modal]').forEach(function (el) {
-            el.addEventListener('click', closeModal);
-        });
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
-        });
-
-        var btnLog = document.getElementById('btnAbrirLogDistribucion');
-        var modalLog = document.getElementById('modalLogDistribucion');
-        if (btnLog && modalLog) {
-            btnLog.addEventListener('click', function () {
-                modalLog.classList.add('is-open');
-                modalLog.setAttribute('aria-hidden', 'false');
-            });
-            modalLog.querySelectorAll('[data-close-log-modal]').forEach(function (el) {
-                el.addEventListener('click', function () {
-                    modalLog.classList.remove('is-open');
-                    modalLog.setAttribute('aria-hidden', 'true');
-                });
-            });
-            document.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape' && modalLog.classList.contains('is-open')) {
-                    modalLog.classList.remove('is-open');
-                    modalLog.setAttribute('aria-hidden', 'true');
-                }
-            });
-        }
-
-        var btnMicroHelp = document.getElementById('btnMicroHelp');
-        var microHelpPopover = document.getElementById('microHelpPopover');
-        if (btnMicroHelp && microHelpPopover) {
-            btnMicroHelp.addEventListener('click', function (e) {
-                e.preventDefault();
-                var isOpen = microHelpPopover.getAttribute('aria-hidden') !== 'true';
-                microHelpPopover.setAttribute('aria-hidden', isOpen ? 'true' : 'false');
-                btnMicroHelp.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
-                microHelpPopover.classList.toggle('is-open', !isOpen);
-            });
-            microHelpPopover.querySelector('.settings-help-popover-close').addEventListener('click', function () {
-                microHelpPopover.setAttribute('aria-hidden', 'true');
-                btnMicroHelp.setAttribute('aria-expanded', 'false');
-                microHelpPopover.classList.remove('is-open');
-            });
-        }
-        var btnMigrateHelp = document.getElementById('btnMigrateHelp');
-        var migrateHelpPopover = document.getElementById('migrateHelpPopover');
-        if (btnMigrateHelp && migrateHelpPopover) {
-            btnMigrateHelp.addEventListener('click', function (e) {
-                e.preventDefault();
-                var isOpen = migrateHelpPopover.getAttribute('aria-hidden') !== 'true';
-                migrateHelpPopover.setAttribute('aria-hidden', isOpen ? 'true' : 'false');
-                btnMigrateHelp.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
-                migrateHelpPopover.classList.toggle('is-open', !isOpen);
-            });
-            migrateHelpPopover.querySelector('.settings-help-popover-close').addEventListener('click', function () {
-                migrateHelpPopover.setAttribute('aria-hidden', 'true');
-                btnMigrateHelp.setAttribute('aria-expanded', 'false');
-                migrateHelpPopover.classList.remove('is-open');
-            });
-        }
-
-        var fileInput = document.getElementById('distribuir_excel_file');
-        var fileNameEl = document.getElementById('microFileName');
-        var uploadZone = document.getElementById('microUploadZone');
-        if (fileInput && fileNameEl && uploadZone) {
-            fileInput.addEventListener('change', function () {
-                fileNameEl.textContent = this.files && this.files[0] ? this.files[0].name : '—';
-                uploadZone.classList.toggle('has-file', !!(this.files && this.files[0]));
-            });
-            uploadZone.addEventListener('dragover', function (e) { e.preventDefault(); uploadZone.classList.add('is-dragover'); });
-            uploadZone.addEventListener('dragleave', function () { uploadZone.classList.remove('is-dragover'); });
-            uploadZone.addEventListener('drop', function (e) {
-                e.preventDefault();
-                uploadZone.classList.remove('is-dragover');
-                if (e.dataTransfer.files.length) {
-                    fileInput.files = e.dataTransfer.files;
-                    fileNameEl.textContent = e.dataTransfer.files[0].name;
-                    uploadZone.classList.add('has-file');
-                }
-            });
-        }
-    });
-    </script>
+    <script src="{{ asset('assets/js/modules/settings-import-export.js') }}?v={{ @filemtime(public_path('assets/js/modules/settings-import-export.js')) ?: time() }}"></script>
 @endsection

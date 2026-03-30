@@ -21,6 +21,7 @@ class MesasPazService
     private const MAX_EVIDENCIAS = 3;
     private ?bool $parteColumnAvailable = null;
 
+    /** Datos iniciales para Mesas de Paz */
     public function indexData(int $userId): array
     {
         $delegado = $this->delegadoPorUsuario($userId);
@@ -37,7 +38,6 @@ class MesasPazService
                 ->orderByRaw('CAST(microrregion AS UNSIGNED)')
                 ->get();
 
-            // Keep only microrregiones that actually exist to avoid null access downstream.
             $microrregionIds = $microrregionesAsignadas
                 ->pluck('id')
                 ->map(function ($id) {
@@ -94,9 +94,7 @@ class MesasPazService
                 if ($parsedDate->lte(Carbon::today()) && !$parsedDate->isWeekend()) {
                     $fechaCarbon = $parsedDate;
                 }
-            } catch (\Exception $e) {
-                // Ignore invalid date
-            }
+            } catch (\Exception $e) { }
         }
 
         $fechaHoyIso = $fechaCarbon->toDateString();
@@ -149,7 +147,6 @@ class MesasPazService
         }))->acuerdo_items ?? [];
 
         if (empty($acuerdoItemsActual)) {
-            // Check if there is a 'Sin Acuerdos' explicitly
             $acuerdoItemsActual = optional($registrosHoy->first(function ($registro) {
                 if (!empty($registro->acuerdo_items) && count($registro->acuerdo_items) === 1) {
                     $val = mb_strtolower(trim($registro->acuerdo_items[0]), 'UTF-8');
@@ -160,7 +157,6 @@ class MesasPazService
                 return false;
             }))->acuerdo_items ?? [];
             
-            // Default fallback to whatever is available
             if (empty($acuerdoItemsActual)) {
                 $acuerdoItemsActual = optional($registrosHoy->first(function ($registro) {
                     return !empty($registro->acuerdo_items);
@@ -208,6 +204,7 @@ class MesasPazService
         ];
     }
 
+    /** Guarda o actualiza evidencia de hoy */
     public function guardarEvidenciaHoy(int $userId, UploadedFile $archivo, ?int $selectedMicrorregionId = null, ?string $fecha = null): array
     {
         $fechaAsistencia = $this->resolverFechaAsistencia($userId, $fecha);
@@ -288,6 +285,7 @@ class MesasPazService
         ];
     }
 
+    /** Elimina evidencia de hoy */
     public function eliminarEvidenciaHoy(int $userId, string $evidenciaPathOrUrl, ?int $selectedMicrorregionId = null, ?string $fecha = null): array
     {
         $fechaAsistencia = $this->resolverFechaAsistencia($userId, $fecha);
@@ -383,6 +381,7 @@ class MesasPazService
         return count($microrregionIds) === 1 ? (int) $microrregionIds[0] : null;
     }
 
+    /** Registro de asistencia por municipio */
     public function guardarMunicipio(int $userId, array $data): array
     {
         $delegado = $this->delegadoPorUsuario($userId);
@@ -497,6 +496,7 @@ class MesasPazService
         ];
     }
 
+    /** Actualiza acuerdos de hoy */
     public function guardarAcuerdoHoy(int $userId, array $data): array
     {
         $fechaAsistencia = $this->resolverFechaAsistencia($userId, $data['fecha_asist'] ?? null);
@@ -626,6 +626,7 @@ class MesasPazService
         ];
     }
 
+    /** Detalle histórico por fecha */
     public function detallePorFecha(int $userId, string $fecha): array
     {
         $fechaNormalizada = Carbon::parse($fecha)->toDateString();
@@ -667,6 +668,7 @@ class MesasPazService
         ];
     }
 
+    /** Guarda múltiples asistencias */
     public function storeAsistencias(int $userId, array $data): array
     {
         $delegado = $this->delegadoPorUsuario($userId);
@@ -789,6 +791,7 @@ class MesasPazService
         ];
     }
 
+    /** Limpia registros de una microrregión */
     public function vaciarRegistrosMicrorregion(int $userId, string $fecha, int $microrregionId): array
     {
         $fechaObjetivo = $this->resolverFechaAsistencia($userId, $fecha);
@@ -820,6 +823,7 @@ class MesasPazService
         ];
     }
 
+    /** Importación masiva desde Excel */
     public function importarExcelData(int $userId, string $fechaImportacion, UploadedFile $archivo): array
     {
         $delegado = $this->delegadoPorUsuario($userId);
@@ -1000,12 +1004,10 @@ class MesasPazService
             $esSie = $this->textoIndicaSinInformacionEnlace($colAsiste) || $this->textoIndicaSinInformacionEnlace($colModalidad);
 
             if ($esSr) {
-                // Caso: Sin reporte de delegado
                 $presidente = 'S/R';
                 $representante = null;
                 $modalidadValida = 'Sin reporte de delegado';
             } elseif ($esSie) {
-                // Caso: Sin registro de enlace
                 $presidente = 'No';
                 $representante = null;
                 $modalidadValida = 'Sin registro de enlace';
@@ -1023,7 +1025,6 @@ class MesasPazService
                     $representante = $colAsiste;
                 }
                 
-                $modalidadValida = 'Presencial'; // Default
                 if (str_contains($colModalidad, 'VIRTUAL')) {
                     $modalidadValida = 'Virtual';
                 } elseif (str_contains($colModalidad, 'SUSPENDI') || str_contains($colModalidad, 'SUSPENSION')) {
@@ -1061,7 +1062,7 @@ class MesasPazService
 
                 $presidenteFinal = $rp['presidente'];
                 $asisteFinal = $this->resolverAsisteDesdePresidente($rp['presidente'], $rp['representante']);
-                $delegadoAsistioFinal = 'Si'; // asumimos Si si no viene de reglas
+                $delegadoAsistioFinal = 'Si';
 
                 if ($esSrFinal) {
                     $presidenteFinal = 'S/R';
@@ -1144,6 +1145,7 @@ class MesasPazService
         ];
     }
     
+    /** Normaliza acuerdos desde texto */
     private function normalizarAcuerdoItemsDesdeTexto(?string $texto): array
     {
         if (empty($texto)) {
@@ -1175,6 +1177,7 @@ class MesasPazService
     }
 
 
+    /** Remoción de acentos */
     private function quitarAcentos(string $cadena): string
     {
         $no_permitidas = array ("á","é","í","ó","ú","Á","É","Í","Ó","Ú","ñ","À","Ã","Ì","Ò","Ù","Ã™","Ã ","Ã¨","Ã¬","Ã²","Ã¹","ç","Ç","Ã¢","ê","Ã®","Ã´","Ã»","Ã‚","ÃŠ","ÃŽ","Ã”","Ã›","ü","Ã¶","Ã–","Ã¯","Ã¤","«","Ò","Ã","Ã„","Ã‹");
@@ -1182,6 +1185,7 @@ class MesasPazService
         return str_replace($no_permitidas, $permitidas ,$cadena);
     }
 
+    /** Delegado por usuario */
     private function delegadoPorUsuario(int $userId): ?Delegado
     {
         return Delegado::with('microrregion')
@@ -1337,9 +1341,7 @@ class MesasPazService
         return null;
     }
 
-    /**
-     * Texto de Excel/modalidad tipo "Sin reporte del delegado", "Sin reporte de Delegado modalidad", etc.
-     */
+    /** Valida si es sin reporte de delegado */
     private function textoIndicaSinReporteDelegado(string $texto): bool
     {
         $t = $this->quitarAcentos(mb_strtoupper(trim($texto), 'UTF-8'));
@@ -1351,9 +1353,7 @@ class MesasPazService
         return str_contains($t, 'SIN REPORTE') && str_contains($t, 'DELEGADO');
     }
 
-    /**
-     * Texto de Excel/modalidad tipo "Sin información de enlace", "Sin registro de enlace", etc.
-     */
+    /** Valida si es sin información de enlace */
     private function textoIndicaSinInformacionEnlace(string $texto): bool
     {
         $t = $this->quitarAcentos(mb_strtoupper(trim($texto), 'UTF-8'));
@@ -1409,6 +1409,7 @@ class MesasPazService
         return null;
     }
 
+    /** Resuelve evidencias de hoy */
     private function resolverEvidenciasHoy($registrosHoy): array
     {
         return collect($registrosHoy)
@@ -1630,6 +1631,7 @@ class MesasPazService
         return rtrim(strtr(base64_encode($path), '+/', '-_'), '=');
     }
 
+    /** Verifica existencia de columna parte */
     private function tieneColumnaParte(): bool
     {
         if ($this->parteColumnAvailable !== null) {

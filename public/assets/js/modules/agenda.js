@@ -545,7 +545,7 @@ function openAgendaModuloModal() {
                         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
                         .then(function (res) {
                             if (res.ok && res.j.ok) {
-                                if (typeof Swal !== 'undefined') Swal.fire({ icon: 'success', title: res.j.message || 'Listo', timer: 1800, showConfirmButton: false });
+                                if (typeof Swal !== 'undefined') Swal.fire({ icon: 'success', title: res.j.message || 'Listo', timer: 1300, showConfirmButton: false });
                                 openAgendaModuloModal();
                             } else {
                                 btn.disabled = false;

@@ -2,6 +2,55 @@
 
 use Illuminate\Support\Str;
 
+$envFallback = static function (string $name, mixed $default = null): mixed {
+    static $parsed = null;
+
+    if ($parsed === null) {
+        $parsed = [];
+        $envPath = base_path('.env');
+        if (is_file($envPath) && is_readable($envPath)) {
+            foreach (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+                $line = trim((string) $line);
+                if ($line === '' || str_starts_with($line, '#') || ! str_contains($line, '=')) {
+                    continue;
+                }
+
+                [$k, $v] = explode('=', $line, 2);
+                $k = trim($k);
+                $v = trim($v);
+
+                if ((str_starts_with($v, '"') && str_ends_with($v, '"')) || (str_starts_with($v, "'") && str_ends_with($v, "'"))) {
+                    $v = substr($v, 1, -1);
+                }
+
+                $parsed[$k] = $v;
+            }
+        }
+    }
+
+    return $parsed[$name] ?? $default;
+};
+
+$dbConnection = env('DB_CONNECTION');
+if (! is_string($dbConnection) || $dbConnection === '') {
+    $dbConnection = (string) $envFallback('DB_CONNECTION', 'mysql');
+}
+
+$dbDatabase = env('DB_DATABASE');
+if (! is_string($dbDatabase) || $dbDatabase === '') {
+    $dbDatabase = (string) $envFallback('DB_DATABASE', 'laravel');
+}
+
+$dbUsername = env('DB_USERNAME');
+if (! is_string($dbUsername) || $dbUsername === '') {
+    $dbUsername = (string) $envFallback('DB_USERNAME', 'root');
+}
+
+$dbPassword = env('DB_PASSWORD');
+if (! is_string($dbPassword)) {
+    $dbPassword = (string) $envFallback('DB_PASSWORD', '');
+}
+
 return [
 
     /*
@@ -16,7 +65,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => $dbConnection !== '' ? $dbConnection : 'mysql',
 
     /*
     |--------------------------------------------------------------------------
@@ -46,14 +95,14 @@ return [
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
-            'database' => env('DB_DATABASE', 'laravel'),
-            'username' => env('DB_USERNAME', 'root'),
-            'password' => env('DB_PASSWORD', ''),
-            'unix_socket' => env('DB_SOCKET', ''),
-            'charset' => env('DB_CHARSET', 'utf8mb4'),
-            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'host' => env('DB_HOST', (string) $envFallback('DB_HOST', '127.0.0.1')),
+            'port' => env('DB_PORT', (string) $envFallback('DB_PORT', '3306')),
+            'database' => $dbDatabase !== '' ? $dbDatabase : 'laravel',
+            'username' => $dbUsername !== '' ? $dbUsername : 'root',
+            'password' => $dbPassword,
+            'unix_socket' => env('DB_SOCKET', (string) $envFallback('DB_SOCKET', '')),
+            'charset' => env('DB_CHARSET', (string) $envFallback('DB_CHARSET', 'utf8mb4')),
+            'collation' => env('DB_COLLATION', (string) $envFallback('DB_COLLATION', 'utf8mb4_unicode_ci')),
             'prefix' => '',
             'prefix_indexes' => true,
             'strict' => true,
