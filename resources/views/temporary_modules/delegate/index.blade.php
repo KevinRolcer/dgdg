@@ -1795,75 +1795,87 @@
             initializeImagePreview(input);
         });
 
-        pasteButtons.forEach(function (button) {
-            button.addEventListener('click', function () {
-                const targetId = button.getAttribute('data-target-input') || '';
-                const input = targetId ? document.getElementById(targetId) : null;
+        const bindImageUploadInteractions = function (root) {
+            const scope = root instanceof HTMLElement ? root : document;
+
+            Array.from(scope.querySelectorAll('[data-paste-image-button]')).forEach(function (button) {
+                if (button.dataset.tmBoundPaste === '1') return;
+                button.dataset.tmBoundPaste = '1';
+                button.addEventListener('click', function () {
+                    const targetId = button.getAttribute('data-target-input') || '';
+                    const input = targetId ? document.getElementById(targetId) : null;
+                    if (!(input instanceof HTMLInputElement)) {
+                        return;
+                    }
+                    pasteImageFromClipboardApi(input);
+                });
+            });
+
+            Array.from(scope.querySelectorAll('[data-paste-upload-wrap]')).forEach(function (area) {
+                if (area.dataset.tmBoundDrop === '1') return;
+                area.dataset.tmBoundDrop = '1';
+
+                const input = area.querySelector(imageInputSelector);
                 if (!(input instanceof HTMLInputElement)) {
                     return;
                 }
 
-                pasteImageFromClipboardApi(input);
-            });
-        });
+                area.addEventListener('focusin', function () {
+                    lastFocusedImageInput = input;
+                });
 
-        pasteUploadAreas.forEach(function (area) {
-            const input = area.querySelector(imageInputSelector);
-            if (!(input instanceof HTMLInputElement)) {
-                return;
-            }
-
-            area.addEventListener('focusin', function () {
-                lastFocusedImageInput = input;
-            });
-
-            area.addEventListener('click', function (event) {
-                if (event.target.closest('[data-image-remove]') || event.target.closest('.tm-image-preview img')) {
-                    return;
-                }
-                input.click();
-            });
-
-            area.addEventListener('dragenter', function (event) {
-                event.preventDefault();
-                area.classList.add('is-dragover');
-            });
-
-            area.addEventListener('dragover', function (event) {
-                event.preventDefault();
-                area.classList.add('is-dragover');
-            });
-
-            area.addEventListener('dragleave', function () {
-                area.classList.remove('is-dragover');
-            });
-
-            area.addEventListener('drop', function (event) {
-                event.preventDefault();
-                area.classList.remove('is-dragover');
-
-                const imageFile = getImageFileFromFileList(event.dataTransfer ? event.dataTransfer.files : []);
-                if (!imageFile) {
-                    notify('Aviso', 'Solo se permiten imagenes al arrastrar.', 'warning');
-                    return;
-                }
-
-                const wasAssigned = setSelectedFileOnInput(input, imageFile);
-                if (!wasAssigned) {
-                    notify('Aviso', 'No se pudo adjuntar la imagen arrastrada.', 'warning');
-                }
-            });
-        });
-
-        Array.from(document.querySelectorAll('[data-upload-trigger]')).forEach(function (button) {
-            button.addEventListener('click', function () {
-                const targetId = button.getAttribute('data-target-input') || '';
-                const input = targetId ? document.getElementById(targetId) : null;
-                if (input instanceof HTMLInputElement) {
+                area.addEventListener('click', function (event) {
+                    if (event.target.closest('[data-image-remove]') || event.target.closest('.tm-image-preview img')) {
+                        return;
+                    }
                     input.click();
-                }
+                });
+
+                area.addEventListener('dragenter', function (event) {
+                    event.preventDefault();
+                    area.classList.add('is-dragover');
+                });
+
+                area.addEventListener('dragover', function (event) {
+                    event.preventDefault();
+                    area.classList.add('is-dragover');
+                });
+
+                area.addEventListener('dragleave', function () {
+                    area.classList.remove('is-dragover');
+                });
+
+                area.addEventListener('drop', function (event) {
+                    event.preventDefault();
+                    area.classList.remove('is-dragover');
+
+                    const imageFile = getImageFileFromFileList(event.dataTransfer ? event.dataTransfer.files : []);
+                    if (!imageFile) {
+                        notify('Aviso', 'Solo se permiten imagenes al arrastrar.', 'warning');
+                        return;
+                    }
+
+                    const wasAssigned = setSelectedFileOnInput(input, imageFile);
+                    if (!wasAssigned) {
+                        notify('Aviso', 'No se pudo adjuntar la imagen arrastrada.', 'warning');
+                    }
+                });
             });
-        });
+
+            Array.from(scope.querySelectorAll('[data-upload-trigger]')).forEach(function (button) {
+                if (button.dataset.tmBoundUpload === '1') return;
+                button.dataset.tmBoundUpload = '1';
+                button.addEventListener('click', function () {
+                    const targetId = button.getAttribute('data-target-input') || '';
+                    const input = targetId ? document.getElementById(targetId) : null;
+                    if (input instanceof HTMLInputElement) {
+                        input.click();
+                    }
+                });
+            });
+        };
+
+        bindImageUploadInteractions(document);
 
         const getPasteTargetInput = function (event) {
             const eventTarget = event.target instanceof HTMLElement ? event.target : null;
@@ -2256,6 +2268,7 @@
                 Array.from(host.querySelectorAll(imageInputSelector)).forEach(function (inp) {
                     initializeImagePreview(inp);
                 });
+                bindImageUploadInteractions(host);
             }).catch(function (err) {
                 console.error('Fragment load error:', err);
                 host.innerHTML = '<p class="inline-alert inline-alert-error">No se pudo cargar el listado. <a href="' + (recordsUrl ? recordsUrl + '?module=' + moduleId : '#') + '">Recargar página</a></p>';
@@ -3741,15 +3754,18 @@
         // Global Drag & Drop for Excel
         const globalOverlay = document.getElementById('tmGlobalExcelDropOverlay');
         let dragCounter = 0;
+        const getOpenExcelModal = () => document.querySelector('.tm-excel-import-modal.is-open');
 
         window.addEventListener('dragenter', (e) => {
-            if (e.dataTransfer.types.includes('Files')) {
+            if (!getOpenExcelModal()) return;
+            if (e.dataTransfer?.types?.includes('Files')) {
                 dragCounter++;
                 globalOverlay?.classList.add('is-active');
             }
         });
 
         window.addEventListener('dragleave', (e) => {
+            if (!getOpenExcelModal()) return;
             dragCounter--;
             if (dragCounter <= 0) {
                 globalOverlay?.classList.remove('is-active');
@@ -3758,10 +3774,13 @@
         });
 
         window.addEventListener('dragover', (e) => {
+            if (!getOpenExcelModal()) return;
             e.preventDefault();
         });
 
         window.addEventListener('drop', (e) => {
+            const openModal = getOpenExcelModal();
+            if (!openModal) return;
             e.preventDefault();
             dragCounter = 0;
             globalOverlay?.classList.remove('is-active');
@@ -3773,7 +3792,6 @@
             if (!name.endsWith('.xlsx') && !name.endsWith('.xls') && !name.endsWith('.csv') && !name.endsWith('.pdf')) return;
 
             // Encontrar modal de excel abierto
-            const openModal = document.querySelector('.tm-excel-import-modal.is-open');
             if (openModal && typeof openModal.__tmHandleFile === 'function') {
                 openModal.__tmHandleFile(file);
             }

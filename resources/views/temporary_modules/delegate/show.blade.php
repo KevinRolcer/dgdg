@@ -2200,15 +2200,18 @@
     // Global Drag & Drop for Excel / PDF
     const globalOverlay = document.getElementById('tmGlobalExcelDropOverlay');
     let dragCounter = 0;
+    const isImportModalOpen = () => !!(excelModal && excelModal.classList.contains('is-open'));
 
     window.addEventListener('dragenter', (e) => {
-        if (e.dataTransfer.types.includes('Files')) {
+        if (!isImportModalOpen()) return;
+        if (e.dataTransfer?.types?.includes('Files')) {
             dragCounter++;
             globalOverlay?.classList.add('is-active');
         }
     });
 
     window.addEventListener('dragleave', (e) => {
+        if (!isImportModalOpen()) return;
         dragCounter--;
         if (dragCounter <= 0) {
             globalOverlay?.classList.remove('is-active');
@@ -2217,10 +2220,12 @@
     });
 
     window.addEventListener('dragover', (e) => {
+        if (!isImportModalOpen()) return;
         e.preventDefault();
     });
 
     window.addEventListener('drop', (e) => {
+        if (!isImportModalOpen()) return;
         e.preventDefault();
         dragCounter = 0;
         globalOverlay?.classList.remove('is-active');

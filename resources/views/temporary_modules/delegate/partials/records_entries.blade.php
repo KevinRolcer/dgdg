@@ -352,18 +352,25 @@
                                     @elseif (in_array($field->type, ['image', 'file'], true))
                                         <div class="tm-upload-evidence">
                                             <input type="hidden" name="remove_images[{{ $field->key }}]" value="0" data-remove-flag>
+                                            <div class="tm-upload-evidence-toolbar">
+                                                <button type="button" class="tm-btn tm-btn-outline" data-upload-trigger data-target-input="{{ $id }}" aria-label="Cargar imagen">
+                                                    <i class="fa-solid fa-upload" aria-hidden="true"></i> Cargar
+                                                </button>
+                                                <button type="button" class="tm-btn tm-btn-outline" data-paste-image-button data-target-input="{{ $id }}" aria-label="Pegar imagen" title="Pegar imagen">
+                                                    <i class="fa-solid fa-paste" aria-hidden="true"></i> Pegar
+                                                </button>
+                                            </div>
+                                            <small class="tm-upload-evidence-hint">Arrastra aqui o usa los botones.</small>
                                             <div class="tm-upload-evidence-dropzone" data-paste-upload-wrap>
                                                 <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" class="d-none" {{ ($field->is_required && !$hasExistingImage) ? 'required' : '' }}>
+                                                <div class="tm-upload-evidence-placeholder" {{ $hasExistingImage ? 'hidden' : '' }}>
+                                                    <i class="fa-solid fa-images" aria-hidden="true"></i>
+                                                    <p>Suelta la imagen aqui</p>
+                                                </div>
                                                 <div class="tm-image-preview" data-image-preview {{ $hasExistingImage ? '' : 'hidden' }}>
                                                     <img src="{{ $hasExistingImage ? route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) : '' }}" data-image-preview-img>
                                                     <button type="button" class="tm-image-clear" data-image-remove>&times;</button>
                                                 </div>
-                                                @unless ($hasExistingImage)
-                                                    <div class="tm-upload-evidence-placeholder" data-upload-trigger data-target-input="{{ $id }}">
-                                                        <i class="fa-solid fa-images"></i>
-                                                        <p>Subir evidencia</p>
-                                                    </div>
-                                                @endunless
                                             </div>
                                         </div>
                                     @else
