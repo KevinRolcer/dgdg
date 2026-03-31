@@ -18,6 +18,16 @@ class MunicipioGeocodeService
      */
     public function coordinatesFor(Municipio $m): array
     {
+        // 1. Primary: Database columns (permanence)
+        if ($m->lat !== null && $m->lng !== null) {
+            return [
+                'lat' => (float) $m->lat,
+                'lng' => (float) $m->lng,
+                'source' => 'db',
+            ];
+        }
+
+        // 2. Secondary: Legacy Cache
         $key = 'municipio_geo_v1_'.$m->id;
         $cached = Cache::get($key);
         if (is_array($cached) && isset($cached['lat'], $cached['lng'])) {
@@ -42,6 +52,11 @@ class MunicipioGeocodeService
         if ($coords === null) {
             return null;
         }
+
+        // Save to DB (permanence)
+        $m->lat = $coords['lat'];
+        $m->lng = $coords['lng'];
+        $m->save();
 
         $key = 'municipio_geo_v1_'.$m->id;
         Cache::forever($key, $coords);

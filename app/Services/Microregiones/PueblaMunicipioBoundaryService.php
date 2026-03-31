@@ -31,6 +31,13 @@ class PueblaMunicipioBoundaryService
      */
     public function getCachedPolygonGeometry(Municipio $m): ?array
     {
+        // 1. Primary: Database (permanence)
+        if (!empty($m->geojson_boundary)) {
+            $data = json_decode($m->geojson_boundary, true);
+            return is_array($data) ? $data : null;
+        }
+
+        // 2. Secondary: Legacy Cache
         $raw = Cache::get(self::CACHE_PREFIX.$m->id);
         if (! is_array($raw) || empty($raw['geometry'])) {
             return null;
@@ -53,6 +60,11 @@ class PueblaMunicipioBoundaryService
             return null;
         }
 
+        // Save to DB
+        $m->geojson_boundary = json_encode($result['geometry']);
+        $m->save();
+
+        // Also save to cache for safety
         Cache::forever(self::CACHE_PREFIX.$m->id, $result);
 
         return $result;
