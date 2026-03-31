@@ -1024,7 +1024,8 @@ class MesasPazService
                     $presidente = 'Representante'; // Fallback a representante con cargo custom
                     $representante = $colAsiste;
                 }
-                
+
+                $modalidadValida = 'Presencial';
                 if (str_contains($colModalidad, 'VIRTUAL')) {
                     $modalidadValida = 'Virtual';
                 } elseif (str_contains($colModalidad, 'SUSPENDI') || str_contains($colModalidad, 'SUSPENSION')) {
