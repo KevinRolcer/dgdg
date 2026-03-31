@@ -56,6 +56,7 @@ class MicroregionesController extends Controller
             ->select(['delegados.id', 'delegados.user_id', 'delegados.microrregion_id', 'delegados.nombre', 'delegados.ap_paterno', 'delegados.ap_materno', 'delegados.telefono', 'delegados.email'])
             ->join('users', 'users.id', '=', 'delegados.user_id')
             ->where('users.activo', 1)
+            ->where('users.name', 'NOT LIKE', '%GESTION DE ENLACES%')
             ->orderBy('delegados.id')
             ->get()
             ->groupBy('microrregion_id');
@@ -63,6 +64,7 @@ class MicroregionesController extends Controller
         $userRows = DB::table('user_microrregion')
             ->join('users', 'users.id', '=', 'user_microrregion.user_id')
             ->where('users.activo', 1)
+            ->where('users.name', 'NOT LIKE', '%GESTION DE ENLACES%')
             ->select(['user_microrregion.microrregion_id', 'users.id as user_id', 'users.name', 'users.email'])
             ->orderBy('users.name')
             ->get()
@@ -83,6 +85,12 @@ class MicroregionesController extends Controller
                 if ($delegadoUserId !== null && (int) $u->user_id === $delegadoUserId) {
                     continue;
                 }
+                // Filter out special admin/system users by name if needed
+                $userName = mb_strtoupper((string) $u->name);
+                if (str_contains($userName, 'GESTION DE ENLACES')) {
+                    continue;
+                }
+
                 $enlace = [
                     'nombre' => (string) $u->name,
                     'email' => (string) $u->email,

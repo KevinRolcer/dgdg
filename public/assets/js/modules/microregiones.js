@@ -236,6 +236,15 @@
         }
     }
 
+    function openMicroOnMap(micro) {
+        if (!micro || !map) return;
+        var mk = markerByMicroId.get(micro.id);
+        if (mk) {
+            map.panTo(mk.getLatLng(), { animate: true });
+        }
+        renderDetail(micro, null);
+    }
+
     function placeholderMrSvg(num) {
         var label = 'MR' + String(num);
         return (
@@ -280,6 +289,11 @@
 
             sum.appendChild(img);
             sum.appendChild(title);
+
+            sum.addEventListener('click', function(e) {
+                // Focus map on this microregion
+                openMicroOnMap(micro);
+            });
 
             var body = document.createElement('div');
             body.className = 'microregiones-acc-body';

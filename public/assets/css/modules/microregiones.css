@@ -382,7 +382,6 @@ details[open] > .microregiones-acc-summary::after {
     height: 56px;
     border-radius: var(--ui-radius-lg);
     object-fit: contain;
-    background: var(--clr-card);
     flex-shrink: 0;
 }
 
