@@ -146,16 +146,9 @@ class SecurityHeaders
     private function buildContentSecurityPolicy(Request $request): string
     {
         $isLocal = app()->isLocal();
-        $imageSrc = $isLocal
-            ? "img-src 'self' data: blob: https: http:"
-            : "img-src 'self' data: blob: https:";
-        $mediaSrc = $isLocal
-            ? "media-src 'self' data: blob: https: http:"
-            : "media-src 'self' data: blob: https:";
-
         $connectSrc = $isLocal
-            ? "connect-src 'self' http: https: https://static.cloudflareinsights.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com"
-            : "connect-src 'self' https://static.cloudflareinsights.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com";
+            ? "connect-src 'self' http: https: https://static.cloudflareinsights.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://nominatim.openstreetmap.org"
+            : "connect-src 'self' https://static.cloudflareinsights.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://nominatim.openstreetmap.org";
 
         $directives = [
             "default-src 'self'",
@@ -165,8 +158,8 @@ class SecurityHeaders
             "object-src 'none'",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://static.cloudflareinsights.com",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
-            $imageSrc,
-            $mediaSrc,
+            "img-src 'self' data: blob: https: http: *.openstreetmap.org",
+            "media-src 'self' data: blob: https: http:",
             "font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
             // source maps y fetch desde los mismos CDNs ya permitidos en script-src/style-src
             $connectSrc,
