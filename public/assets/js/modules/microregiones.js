@@ -81,16 +81,29 @@
         return geometry;
     }
 
-    /* ── Color helpers ── */
-    function hueForMicro(id) {
-        return (id * 47) % 360;
-    }
+    /* ── Color helpers (Matte/Muted Image Palette) ── */
+    const MR_COLORS = {
+        1: '#db9e9e', 2: '#86b8ad', 3: '#d9d375', 4: '#95c7db', 5: '#cc90be',
+        6: '#4ea898', 7: '#d6978f', 8: '#b9d6c4', 9: '#d4b192', 10: '#cc7a74',
+        11: '#cfa186', 12: '#decb8a', 13: '#db9e9e', 14: '#5a9c78', 15: '#d6a863',
+        16: '#4d8ab3', 17: '#855d91', 18: '#b9d6c4', 19: '#2d5470', 20: '#d9bf64',
+        21: '#b199ba', 22: '#61a87e', 23: '#db9e9e', 24: '#7da88e', 25: '#97b7cf',
+        26: '#b59324', 27: '#9a7ab3', 28: '#d6cdb2', 29: '#88a6ba', 30: '#5e3a6e',
+        31: '#cc7a74'
+    };
 
-    function hslColor(id, alpha) {
-        var hue = hueForMicro(id);
-        return alpha !== undefined
-            ? 'hsla(' + hue + ', 62%, 48%, ' + alpha + ')'
-            : 'hsl(' + hue + ', 62%, 48%)';
+    function getMicroColor(micro, alpha) {
+        if (!micro) return '#94a3b8';
+        const num = parseInt(micro.numero, 10);
+        const hex = MR_COLORS[num] || '#94a3b8';
+        if (alpha !== undefined) {
+            // Simple hex to rgba conversion
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+        return hex;
     }
 
     /* ── Detail panel ── */
@@ -210,7 +223,7 @@
         var geom = geometryByMunicipioId.get(m.id);
 
         if (geom && map) {
-            var color = micro ? hslColor(micro.id) : '#f59e0b';
+            var color = micro ? getMicroColor(micro) : '#f59e0b';
             highlightedLayer = L.geoJSON({ type: 'Feature', geometry: geom }, {
                 pane: 'boundaryPane',
                 style: {
@@ -428,7 +441,7 @@
                 var arr = byMicro[mId];
                 var microId = parseInt(mId, 10);
                 var micro = findMicroById(microId);
-                var color = micro ? hslColor(micro.id) : 'hsl(160, 62%, 48%)';
+                var color = micro ? getMicroColor(micro) : '#94a3b8';
 
                 // Batch all municipality features into a single GeoJSON layer
                 var features = arr.map(function (item) {
@@ -596,8 +609,7 @@
         flatMunicipios = [];
 
         micros.forEach(function (micro) {
-            var hue = hueForMicro(micro.id);
-            var color = 'hsl(' + hue + ' 62% 48%)';
+            var color = getMicroColor(micro);
             var sumLat = 0, sumLng = 0, count = 0;
 
             var validMuns = micro.municipios.filter(function (m) {
