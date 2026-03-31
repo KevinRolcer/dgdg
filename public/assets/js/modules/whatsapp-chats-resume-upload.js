@@ -1,10 +1,6 @@
 (function () {
     'use strict';
 
-    /**
-     * Resume upload functionality for interrupted folder uploads
-     * Allows users to re-select and continue uploading a partially completed chat folder
-     */
     document.addEventListener('DOMContentLoaded', function () {
         var resumeBtns = document.querySelectorAll('.js-wa-resume-upload-btn');
         if (!resumeBtns.length) return;
@@ -24,7 +20,6 @@
                     return;
                 }
 
-                // Create hidden input for folder picker
                 var resumeInput = document.createElement('input');
                 resumeInput.type = 'file';
                 resumeInput.multiple = true;
@@ -38,7 +33,6 @@
                         return;
                     }
 
-                    // Filter out system files
                     var list = files.filter(function (f) {
                         var rel = f.webkitRelativePath || '';
                         var lower = rel.toLowerCase();
@@ -53,7 +47,6 @@
                         return;
                     }
 
-                    // Calculate signature of selected folder to verify it's the same one
                     calculateFolderSignature(list, function (newSignature) {
                         if (newSignature !== expectedSignature) {
                             var proceed = confirm(
@@ -69,12 +62,10 @@
                             }
                         }
 
-                        // Trigger upload flow (works for both resume and new independent upload)
                         triggerUploadFlow(list);
                     });
                 });
 
-                // Trigger folder picker
                 resumeInput.click();
             });
         });
@@ -120,7 +111,6 @@
         }
 
         function triggerUploadFlow(files) {
-            // Scroll to upload area
             var uploadBox = document.getElementById('waFolderUploadRoot');
             if (uploadBox) {
                 setTimeout(function () {
@@ -128,18 +118,14 @@
                 }, 100);
             }
 
-            // Store files in a global variable for the main upload script to pick up
             window.__waResumeFiles = files;
 
-            // Get the main folder input
             var mainInput = document.getElementById('waFolderInput');
             if (!mainInput) return;
 
-            // Trigger a custom event that the main script can listen to
             var event = new Event('wa-resume-upload', { bubbles: true });
             mainInput.dispatchEvent(event);
 
-            // Clean up after a delay
             setTimeout(function () {
                 delete window.__waResumeFiles;
             }, 1000);

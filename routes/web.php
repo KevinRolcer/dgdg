@@ -5,6 +5,7 @@ use App\Http\Controllers\AgendaController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\GilroyFontController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\MicroregionesController;
 use App\Http\Controllers\MesasPazController;
 use App\Http\Controllers\MesasPazSupervisionController;
 use App\Http\Controllers\PowerPointController;
@@ -37,6 +38,9 @@ Route::middleware(['signed', 'throttle:120,1'])->group(function () {
 Route::middleware('auth')->group(function () {
     Route::get('/csrf-token', fn () => response()->json(['token' => csrf_token()]))->name('csrf.refresh');
     Route::get('/home', [HomeController::class, 'index'])->name('home');
+    Route::get('/microregiones', [MicroregionesController::class, 'index'])->name('microregiones.index');
+    Route::get('/microregiones/data', [MicroregionesController::class, 'data'])->name('microregiones.data');
+    Route::get('/microregiones/boundaries', [MicroregionesController::class, 'boundaries'])->name('microregiones.boundaries');
     Route::get('/mi-perfil', [ProfileController::class, 'show'])->name('profile.show');
     Route::get('/ajustes', [SettingsController::class, 'index'])->name('settings.index');
     Route::get('/ajustes/apariencia', [SettingsController::class, 'apariencia'])->name('settings.apariencia');

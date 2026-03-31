@@ -155,7 +155,7 @@
                         <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
                     </div>
                     <p class="wai-empty-title">Sin chats importados</p>
-                    <p class="wai-empty-desc">Usa el panel de arriba para importar tu primera exportación de WhatsApp.</p>
+                    <p class="wai-empty-desc">Usa el panel superior cargar chats.</p>
                 </div>
             @else
                 <div class="wai-chats-grid" id="waiChatsGrid">

@@ -8,6 +8,12 @@ return [
             'route' => 'home',
         ],
         [
+            'icon' => 'fa-solid fa-map-location-dot',
+            'title' => 'Microrregiones',
+            'route' => 'microregiones.index',
+            'active_routes' => ['microregiones.index'],
+        ],
+        [
             'icon' => 'fa-solid fa-people-group',
             'title' => 'Mesas de Paz y Seguridad',
             'route' => 'mesas-paz',
