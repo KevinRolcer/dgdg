@@ -20,7 +20,7 @@ function paBuildUrl(path, params = {}) {
 }
 
 function paGetSearchQuery() {
-    const el = document.getElementById('pa-search');
+    const el = document.getElementById('pa-search-notes');
     if (!el) return '';
     let s = String(el.value || '').trim();
     if (s.length > 200) s = s.slice(0, 200);
@@ -28,7 +28,7 @@ function paGetSearchQuery() {
 }
 
 function paSyncSearchClearUi() {
-    const input = document.getElementById('pa-search');
+    const input = document.getElementById('pa-search-notes');
     const wrap = document.getElementById('pa-search-wrapper');
     const clearBtn = document.getElementById('pa-search-clear');
     if (!input || !wrap || !clearBtn) return;
@@ -698,7 +698,7 @@ window.emptyTrash = function() {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('pa-search');
+    const searchInput = document.getElementById('pa-search-notes');
     const searchClearBtn = document.getElementById('pa-search-clear');
     const tabs = document.querySelectorAll('.pa-tab');
 
@@ -836,22 +836,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!folderId) {
             // Go back to root view
-            setExplorerMode(true);
             updateBreadcrumb(null);
             
             if (currentFilter === 'archive') {
+                setExplorerMode(false);
                 loadNotes('archive');
                 const archivedFolderSec = document.getElementById('section-archived-folders');
                 if (archivedFolderSec) archivedFolderSec.style.display = 'block';
-                // Asegurarse de ocultar el de carpetas activas por si acaso
                 const folderSec = document.getElementById('section-folders');
                 if (folderSec) folderSec.style.display = 'none';
-            } else {
-                loadNotes('folders');
+            } else if (currentFilter === 'all') {
+                setExplorerMode(false);
+                // Force time filter to all when returning to root to avoid "disappearing" notes from previous weeks
+                document.querySelectorAll('.pa-tab-pill').forEach(i => i.classList.remove('is-active'));
+                loadNotes('all', 'all');
                 const folderSec = document.getElementById('section-folders');
                 if (folderSec) folderSec.style.display = 'block';
                 const archivedFolderSec = document.getElementById('section-archived-folders');
                 if (archivedFolderSec) archivedFolderSec.style.display = 'none';
+            } else {
+                setExplorerMode(currentFilter === 'folders');
+                loadNotes(currentFilter);
+                const folderSec = document.getElementById('section-folders');
+                const isFolderFilter = (currentFilter === 'folders' || currentFilter === 'all');
+                if (folderSec) folderSec.style.display = isFolderFilter ? 'block' : 'none';
+                const archivedFolderSec = document.getElementById('section-archived-folders');
+                if (archivedFolderSec) archivedFolderSec.style.display = (currentFilter === 'archive' ? 'block' : 'none');
             }
 
             const notesHeader = document.getElementById('notes-section-header');
@@ -979,21 +989,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const filter = this.dataset.filter;
             window.paCurrentFolderId = null;
-
-            if (filter === 'all') {
-                const ff = document.getElementById('filter-folder');
-                if (ff) ff.value = '';
-                document.querySelectorAll('.pa-filter-pill[data-priority].is-active').forEach(p => p.classList.remove('is-active'));
-                const cdf = document.getElementById('filter-creation-date');
-                if (cdf) cdf.value = '';
-                syncAllNotesPillState();
-            }
+            // Preservation: Not forced-clearing filters when switching root views to maintain user context.
+            syncAllNotesPillState();
 
             // UI adjustments based on filter
             const timeTabs = document.querySelector('.pa-tabs-pills');
 
+            if (filter === 'folders') {
+                // Force time filter to all when entering folders to list everything by default
+                document.querySelectorAll('.pa-tab-pill').forEach(i => i.classList.remove('is-active'));
+                if (filterAllNotes) filterAllNotes.classList.add('is-active');
+            }
+
             syncPersonalAgendaNavChrome(filter);
-            if (timeTabs) timeTabs.style.display = (filter === 'all' || filter === 'calendar') ? 'flex' : 'none';
+            // Allow time tabs to be visible in Folders view too
+            if (timeTabs) timeTabs.style.display = (filter === 'all' || filter === 'calendar' || filter === 'folders') ? 'flex' : 'none';
 
             if (filter === 'calendar') {
                 const monthPill = document.querySelector('.pa-tab-pill[data-tab="month"]');
@@ -1035,7 +1045,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (filter === 'folders') {
                 setExplorerMode(true);
-                if (notesTitle) notesTitle.textContent = 'Notas sin carpeta';
+                if (notesTitle) notesTitle.textContent = 'Todas las Notas';
                 if (showAllNotesLink) showAllNotesLink.style.display = 'none';
             } else {
                 setExplorerMode(false);
@@ -1116,8 +1126,10 @@ document.addEventListener('DOMContentLoaded', function() {
             priorityPills.forEach(p => p.classList.remove('is-active'));
             if (folderFilter) folderFilter.value = '';
             if (dateFilter) dateFilter.value = '';
+            // Clear time tab to show everything
+            document.querySelectorAll('.pa-tab-pill').forEach(i => i.classList.remove('is-active'));
             filterAllNotes.classList.add('is-active');
-            loadNotes();
+            loadNotes('all', 'all');
             updateHash();
             syncAllNotesPillState();
         });
@@ -1384,6 +1396,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function paPriorityLabel(p) {
+        if (!p || p === 'none' || p === 'all') return '';
         switch (p) {
             case 'high': return 'Alta';
             case 'medium': return 'Media';

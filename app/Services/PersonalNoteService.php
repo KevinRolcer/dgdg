@@ -122,18 +122,15 @@ class PersonalNoteService
             case 'all':
             default:
                 $query->where('is_archived', false);
-                // Si estamos navegando en una carpeta, forzar el filtro aunque el switch caiga en default/all
                 if ($folderId && $folderId !== 'all') {
                     $query->where('folder_id', (int)$folderId);
-                } else if ($filter === 'folder' || ($filter === 'folders' && $folderId)) {
-                    // Caso de seguridad: si pide carpeta pero no hay ID, mostrar vacío o filtrar nulos si fuera el caso
-                    $query->where('folder_id', -1); 
                 }
                 break;
         }
 
         // Apply Time Filter (Today, Week, Month) — no aplica a la vista Calendario: el mes ya se acota con month/year.
-        if ($timeFilter !== 'all' && $filter !== 'trash' && !$creationDate && $filter !== 'calendar') {
+        // Tampoco aplica si estamos viendo una CARPETA específica, para evitar que las notas "desaparezcan" por fecha dentro de la carpeta.
+        if ($timeFilter !== 'all' && $filter !== 'trash' && !$creationDate && $filter !== 'calendar' && !$folderId) {
             $dateField = ($filter === 'calendar') ? 'scheduled_date' : 'created_at';
 
             switch ($timeFilter) {

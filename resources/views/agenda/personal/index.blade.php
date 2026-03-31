@@ -53,7 +53,7 @@
             <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
                 <div class="pa-search-wrapper" id="pa-search-wrapper" style="margin: 0; width: 220px; flex-shrink: 0;">
                     <i class="pa-search-icon fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                    <input type="search" class="pa-search-input" placeholder="Buscar..." id="pa-search" name="pa-search" autocomplete="off" enterkeyhint="search">
+                    <input type="search" class="pa-search-input" placeholder="Buscar..." id="pa-search-notes" name="pa_internal_search_query" autocomplete="new-password" enterkeyhint="search" aria-autocomplete="none">
                     <button type="button" class="pa-search-clear" id="pa-search-clear" aria-label="Limpiar búsqueda" title="Limpiar" hidden>
                         <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                     </button>

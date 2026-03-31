@@ -106,6 +106,19 @@
         return hex;
     }
 
+    function darkenColor(hex, amount) {
+        if (!hex || hex[0] !== '#') return hex;
+        amount = amount || 0.3;
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        const f = (val) => Math.max(0, Math.floor(val * (1 - amount)));
+        const r2 = f(r).toString(16).padStart(2, '0');
+        const g2 = f(g).toString(16).padStart(2, '0');
+        const b2 = f(b).toString(16).padStart(2, '0');
+        return `#${r2}${g2}${b2}`;
+    }
+
     /* ── Detail panel ── */
     function renderDetail(micro, municipio) {
         detailEl.classList.remove('microregiones-floating-detail--hidden');
@@ -448,12 +461,14 @@
                     return { type: 'Feature', geometry: item.geometry, properties: { munId: item.id, microId: item.micro_id } };
                 });
 
+                var boundaryColor = darkenColor(color, 0.4);
+
                 var batchLayer = L.geoJSON({ type: 'FeatureCollection', features: features }, {
                     pane: 'boundaryPane',
                     style: {
-                        color: color,
-                        weight: 0.6,
-                        opacity: 0.5,
+                        color: boundaryColor,
+                        weight: 0.8,
+                        opacity: 0.6,
                         fillColor: color,
                         fillOpacity: 0.15,
                     },
@@ -481,7 +496,7 @@
                         }
                         L.geoJSON(unifiedGeo, {
                             pane: 'boundaryPane',
-                            style: { color: color, weight: 1.5, dashArray: '', fillOpacity: 0 },
+                            style: { color: darkenColor(color, 0.6), weight: 2.5, dashArray: '', fillOpacity: 0 },
                             interactive: false
                         }).addTo(map);
                     } catch (e) {
