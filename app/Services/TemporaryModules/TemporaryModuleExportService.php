@@ -706,20 +706,26 @@ class TemporaryModuleExportService
         foreach ($countByFields as $fieldKey) {
             $valueCounts = [];
             $labelByLower = [];
+            $sinRespuestaCount = 0;
             foreach ($entries as $entry) {
                 $val = $entry->data[$fieldKey] ?? null;
 
                 // Multiselect: count each option separately
                 if (is_array($val) && !isset($val['primary'])) {
+                    $hasAnyValue = false;
                     foreach ($val as $item) {
                         $key = is_scalar($item) ? trim((string) $item) : '';
                         if ($key !== '') {
+                            $hasAnyValue = true;
                             $lower = mb_strtolower($key);
                             $valueCounts[$lower] = ($valueCounts[$lower] ?? 0) + 1;
                             if (!isset($labelByLower[$lower])) {
                                 $labelByLower[$lower] = $key;
                             }
                         }
+                    }
+                    if (! $hasAnyValue) {
+                        $sinRespuestaCount++;
                     }
                     continue;
                 }
@@ -742,12 +748,17 @@ class TemporaryModuleExportService
                     if (!isset($labelByLower[$lower])) {
                         $labelByLower[$lower] = $key;
                     }
+                } else {
+                    $sinRespuestaCount++;
                 }
             }
             ksort($valueCounts, SORT_NATURAL);
             $values = [];
             foreach ($valueCounts as $lower => $count) {
                 $values[] = ['label' => $labelByLower[$lower] ?? $lower, 'count' => $count];
+            }
+            if ($sinRespuestaCount > 0) {
+                $values[] = ['label' => 'S/R', 'count' => $sinRespuestaCount];
             }
             if ($values !== []) {
                 $groups[] = [

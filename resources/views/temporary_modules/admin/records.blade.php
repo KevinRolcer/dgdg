@@ -37,7 +37,7 @@
         <form class="tm-admin-module-search" method="get" action="{{ route('temporary-modules.admin.records') }}" role="search">
             <label class="tm-admin-module-search__label" for="tm-admin-records-q">Buscar módulo</label>
             <div class="tm-admin-module-search__row">
-                <input type="search" id="tm-admin-records-q" name="q" value="{{ $searchQuery }}" autocomplete="off" placeholder="Nombre o descripción…" class="tm-admin-module-search__input">
+                <input type="search" id="tm-admin-records-q" name="q" value="{{ $searchQuery }}" autocomplete="off" placeholder="Nombre o descripción..." class="tm-admin-module-search__input">
                 <button type="submit" class="tm-btn tm-btn-primary tm-admin-module-search__submit">Buscar</button>
                 @if ($searchQuery !== '')
                     <a href="{{ route('temporary-modules.admin.records') }}" class="tm-btn tm-btn-ghost tm-admin-module-search__clear">Limpiar</a>
@@ -179,7 +179,7 @@
                         // Load mapping of Municipio names to Microregion names to fix entries imported without microrregion_id
                         $municipiosMap = \App\Models\Municipio::with('microrregion')->get()->mapWithKeys(function ($m) {
                             $norm = \Illuminate\Support\Str::slug($m->nombre, '');
-                            $mrName = $m->microrregion ? 'Microregión ' . $m->microrregion->microrregion . ' - ' . $m->microrregion->cabecera : 'Sin microregión asignada';
+                            $mrName = $m->microrregion ? 'Microrregión ' . $m->microrregion->microrregion . ' - ' . $m->microrregion->cabecera : 'Sin microrregión asignada';
                             return [$norm => $mrName];
                         })->toArray();
 
@@ -207,7 +207,7 @@
                         $getMicrorregionName = function ($entry) use ($getMunicipioName, $municipiosMap) {
                             // Option 1: It has an explicit microrregion relation already saved
                             if ($entry->microrregion && $entry->microrregion->microrregion) {
-                                return 'Microregión ' . $entry->microrregion->microrregion . ' - ' . $entry->microrregion->cabecera;
+                                return 'Microrregión ' . $entry->microrregion->microrregion . ' - ' . $entry->microrregion->cabecera;
                             }
                             // Option 2: Fallback to mapping the text municipio from $entry->data
                             $mpioName = $getMunicipioName($entry);
@@ -217,10 +217,10 @@
                                     return $municipiosMap[$norm];
                                 }
                             }
-                            return 'Sin microregión asignada';
+                            return 'Sin microrregión asignada';
                         };
 
-                        // First group by Microregión (Using explicit ID or mapped from string)
+                        // First group by Microrregión (Using explicit ID or mapped from string)
                         $groupedByMr = collect($module->entries)->groupBy($getMicrorregionName);
 
                         // Calculate unique municipalities
@@ -377,7 +377,7 @@
                 </button>
             </div>
             <div class="tm-modal-body">
-                <div class="tm-export-personalize-loading" id="tmExportPersonalizeLoading">Cargando estructura…</div>
+                <div class="tm-export-personalize-loading" id="tmExportPersonalizeLoading">Cargando estructura...</div>
                 <div class="tm-export-personalize-content" id="tmExportPersonalizeContent" hidden>
                     <div class="tm-export-personalize-form">
                         <div class="tm-export-personalize-field">
@@ -419,7 +419,7 @@
                         <p class="tm-analysis-hint" style="margin-top:6px;">Aplica a los encabezados de las columnas de la tabla.</p>
                     </div>
                     <div class="tm-export-personalize-field">
-                        <label for="tmExportMicrorregionSort">Orden por número de microregión</label>
+                        <label for="tmExportMicrorregionSort">Orden por número de microrregión</label>
                         <select id="tmExportMicrorregionSort" class="tm-input">
                             <option value="asc">Ascendente</option>
                             <option value="desc">Descendente</option>
@@ -471,10 +471,10 @@
 
                         <div class="tm-export-personalize-export-block">
                             <h4 class="tm-export-format-section__title">Exportación</h4>
-                            <p class="tm-export-format-section__hint">Excel (1 hoja o por microregión), Word y PDF</p>
+                            <p class="tm-export-format-section__hint">Excel (1 hoja o por microrregión), Word y PDF</p>
                             <div class="tm-export-personalize-export-buttons">
-                                <button type="button" class="tm-btn tm-btn-success" id="tmExportApplyExcelSingle" title="Todos los registros en una sola hoja">Excel — 1 hoja</button>
-                                <button type="button" class="tm-btn tm-btn-success tm-export-btn-excel-mr" id="tmExportApplyExcelMr" title="Una hoja por microregión">Excel — por MR</button>
+                                <button type="button" class="tm-btn tm-btn-success" id="tmExportApplyExcelSingle" title="Todos los registros en una sola hoja">Excel - 1 hoja</button>
+                                <button type="button" class="tm-btn tm-btn-success tm-export-btn-excel-mr" id="tmExportApplyExcelMr" title="Una hoja por microrregión">Excel - por MR</button>
                                 <button type="button" class="tm-btn tm-btn-primary tm-btn-word" id="tmExportApplyWordTable" title="Exportar a Word (.docx)">Word</button>
                                 <button type="button" class="tm-btn tm-btn-danger" id="tmExportApplyPdfTable" title="Exportar a PDF">PDF</button>
                             </div>
@@ -529,7 +529,7 @@
                 <aside class="tm-analysis-sidebar">
                     <p class="tm-analysis-sidebar-title">Qué incluir</p>
                     <label class="tm-analysis-check"><input type="checkbox" id="tmAnalysisIncludeSummary" checked> Resumen (totales)</label>
-                    <label class="tm-analysis-check"><input type="checkbox" id="tmAnalysisIncludeMrTable" checked> Tabla por microregión / municipios</label>
+                    <label class="tm-analysis-check"><input type="checkbox" id="tmAnalysisIncludeMrTable" checked> Tabla por microrregión / municipios</label>
                     <hr class="tm-analysis-hr">
                     <p class="tm-analysis-sidebar-title">Tabla vacía extra</p>
                     <div class="tm-analysis-grid-inputs">
@@ -543,7 +543,7 @@
                 <div class="tm-analysis-preview-panel">
                     <div class="tm-analysis-preview-label">Vista previa (estilo informe)</div>
                     <div class="tm-analysis-preview-doc" id="tmAnalysisPreviewDoc">
-                        <div class="tm-analysis-preview-loading" id="tmAnalysisPreviewLoading">Cargando…</div>
+                        <div class="tm-analysis-preview-loading" id="tmAnalysisPreviewLoading">Cargando...</div>
                     </div>
                 </div>
             </div>
@@ -561,7 +561,7 @@
         </div>
     </div>
 
-    {{-- Personalizar informe Word (.docx) — se abre con «Editar y exportar» --}}
+    {{-- Personalizar informe Word (.docx) - se abre con «Editar y exportar» --}}
     <div class="tm-modal tm-export-personalize-modal tm-analysis-word-personalize-modal" id="tmAnalysisWordPersonalizeModal" aria-hidden="true" role="dialog" aria-modal="true">
         <div class="tm-modal-backdrop" data-close-analysis-word-personalize></div>
         <div class="tm-modal-dialog tm-export-personalize-dialog tm-analysis-word-personalize-dialog">
@@ -574,7 +574,7 @@
                     <div class="tm-export-personalize-form tm-analysis-word-personalize-form">
                         <div class="tm-export-personalize-field">
                             <label for="tmWordDocTitle">Título del documento</label>
-                            <input type="text" id="tmWordDocTitle" class="tm-input" placeholder="Ej. Análisis general — nombre del módulo">
+                            <input type="text" id="tmWordDocTitle" class="tm-input" placeholder="Ej. Análisis general - nombre del módulo">
                         </div>
                         <div class="tm-export-personalize-field">
                             <label for="tmWordSubtitle">Subtítulo (opcional)</label>
@@ -593,7 +593,7 @@
                             <input type="number" id="tmWordTitleFontPx" class="tm-input" min="10" max="36" value="18">
                         </div>
                         <div class="tm-export-personalize-field">
-                            <label for="tmWordMicrorregionSort">Orden por número de microregión</label>
+                            <label for="tmWordMicrorregionSort">Orden por número de microrregión</label>
                             <select id="tmWordMicrorregionSort" class="tm-input">
                                 <option value="asc">Ascendente</option>
                                 <option value="desc">Descendente</option>
@@ -601,7 +601,7 @@
                         </div>
                         <p class="tm-analysis-sidebar-title" style="margin-top:14px;">Qué tablas incluir en el informe</p>
                         <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeSummary" checked> Resumen (totales)</label>
-                        <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeMrTable" checked> Tabla microregión / municipios</label>
+                        <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeMrTable" checked> Tabla microrregión / municipios</label>
                         <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeDynamic" checked> Tabla por registro (columnas elegidas)</label>
                         <p class="tm-analysis-sidebar-title" style="margin-top:12px;">Alineación / ancho de tablas</p>
                         <div class="tm-export-align-btns tm-word-table-align-btns" role="group" aria-label="Alineación tablas" style="flex-wrap:wrap;margin-bottom:10px;">
@@ -701,7 +701,7 @@
         <div class="tm-modal-backdrop" data-tm-seed-log-close></div>
         <div class="tm-modal-dialog tm-seed-log-dialog">
             <div class="tm-modal-head">
-                <h3 id="tmSeedDiscardLogTitle">Log — filas no cargadas</h3>
+                <h3 id="tmSeedDiscardLogTitle">Log - filas no cargadas</h3>
                 <button type="button" class="tm-modal-close" data-tm-seed-log-close aria-label="Cerrar">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
@@ -799,7 +799,7 @@
                     list.forEach(function (row) {
                         var tr = document.createElement('tr');
                         var esc = function (s) {
-                            if (s == null || s === '') return '—';
+                            if (s == null || s === '') return '-';
                             var d = document.createElement('div');
                             d.textContent = String(s);
                             return d.innerHTML;
@@ -810,7 +810,7 @@
                             '<td>' + esc(row.microrregion) + '</td>' +
                             '<td>' + esc(row.municipio) + '</td>' +
                             '<td class="tm-seed-log-accion">' + esc(row.accion) + '</td>' +
-                            '<td>—</td>';
+                            '<td>-</td>';
                         seedLogTbody.appendChild(tr);
                     });
                 }
@@ -898,7 +898,7 @@
                             html += '<td>' + escapeHtml(String(row.lista_faltantes || '').substring(0, 80)) + '</td>';
                             html += '</tr>';
                         });
-                        if (data.mr_table.length > 8) html += '<tr><td colspan="6">… +' + (data.mr_table.length - 8) + ' filas</td></tr>';
+                        if (data.mr_table.length > 8) html += '<tr><td colspan="6">... +' + (data.mr_table.length - 8) + ' filas</td></tr>';
                         html += '</tbody></table>';
                     }
                     if (data.custom_table && data.custom_table.rows) {
@@ -958,7 +958,7 @@
                     var label = key && fieldsByKey[key] ? fieldsByKey[key].label : '';
                     var slotBody = key
                         ? '<strong class="tm-word-slot-label">' + escapeHtml(label || key) + '</strong>'
-                            + '<div class="tm-word-slot-ref" title="' + escapeHtml(ref || '') + '">' + escapeHtml(ref || '—') + '</div>'
+                            + '<div class="tm-word-slot-ref" title="' + escapeHtml(ref || '') + '">' + escapeHtml(ref || '-') + '</div>'
                             + '<button type="button" class="tm-word-slot-clear" aria-label="Quitar">&times;</button>'
                         : '<span class="tm-word-slot-drop">Soltar campo aquí</span>';
                     slot.innerHTML = '<span class="tm-word-slot-num">' + (idx + 1) + '</span>'
@@ -1053,7 +1053,7 @@
                     inner += '<td style="' + cellStyle + (stretch ? '' : 'width:' + mrColW[5] + 'px') + '">' + escapeHtml(String(row.lista_faltantes || '').substring(0, 80)) + '</td>';
                     inner += '</tr>';
                 });
-                if (data.mr_table.length > 5) inner += '<tr><td colspan="6" style="' + cellStyle + '">… +' + (data.mr_table.length - 5) + ' filas</td></tr>';
+                if (data.mr_table.length > 5) inner += '<tr><td colspan="6" style="' + cellStyle + '">... +' + (data.mr_table.length - 5) + ' filas</td></tr>';
                 inner += '</tbody></table></div></div>';
             }
             if (data.dynamic_table && data.dynamic_table.headers && data.dynamic_table.headers.length) {
@@ -1235,12 +1235,12 @@
                 + '&microrregion_sort=' + encodeURIComponent(mrSort === 'desc' ? 'desc' : 'asc')
                 + '&_=' + Date.now();
             applyWordPreviewSheetOrientation(orient);
-            wordPersonalizePreview.innerHTML = '<div class="tm-analysis-preview-loading">Actualizando…</div>';
+            wordPersonalizePreview.innerHTML = '<div class="tm-analysis-preview-loading">Actualizando...</div>';
             fetch(u, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', cache: 'no-store' })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (title && !title.value.trim() && data.module_name) {
-                        title.value = 'Análisis general — ' + data.module_name;
+                        title.value = 'Análisis general - ' + data.module_name;
                     }
                     var fields = data.exportable_fields || [];
                     var byKey = {};
@@ -2020,21 +2020,61 @@
                         || ((labelEl && labelEl.textContent) ? labelEl.textContent.replace(/^\s+|\s+$/g, '') : key);
                     var byVal = {};
                     var labelByLower = {};
+                    var sinRespuesta = 0;
                     if (Array.isArray(entries)) {
                         entries.forEach(function (e) {
                             var v = (e.data && e.data[key]) !== undefined ? e.data[key] : null;
-                            var k = (typeof v === 'boolean') ? (v ? 'Sí' : 'No') : (v != null ? String(v) : '');
-                            if (k !== '') {
-                                var lower = k.toLowerCase();
-                                byVal[lower] = (byVal[lower] || 0) + 1;
-                                if (!labelByLower[lower]) { labelByLower[lower] = k; }
+
+                            if (Array.isArray(v)) {
+                                var hasAnyArrayValue = false;
+                                v.forEach(function (item) {
+                                    var itemLabel = '';
+                                    if (typeof item === 'boolean') {
+                                        itemLabel = item ? 'Sí' : 'No';
+                                    } else if (item != null) {
+                                        itemLabel = String(item).trim();
+                                    }
+                                    if (itemLabel !== '') {
+                                        hasAnyArrayValue = true;
+                                        var itemLower = itemLabel.toLowerCase();
+                                        byVal[itemLower] = (byVal[itemLower] || 0) + 1;
+                                        if (!labelByLower[itemLower]) { labelByLower[itemLower] = itemLabel; }
+                                    }
+                                });
+                                if (!hasAnyArrayValue) {
+                                    sinRespuesta++;
+                                }
+                                return;
                             }
+
+                            if (v && typeof v === 'object' && Object.prototype.hasOwnProperty.call(v, 'primary')) {
+                                v = v.primary;
+                            }
+
+                            var k = '';
+                            if (typeof v === 'boolean') {
+                                k = v ? 'Sí' : 'No';
+                            } else if (v != null) {
+                                k = String(v).trim();
+                            }
+
+                            if (k === '') {
+                                sinRespuesta++;
+                                return;
+                            }
+
+                            var lower = k.toLowerCase();
+                            byVal[lower] = (byVal[lower] || 0) + 1;
+                            if (!labelByLower[lower]) { labelByLower[lower] = k; }
                         });
                     }
                     var values = [];
                     Object.keys(byVal).sort().forEach(function (lower) {
                         values.push({ label: normalizeExportHeadingText(labelByLower[lower] || lower, headersUppercase), count: byVal[lower] });
                     });
+                    if (sinRespuesta > 0) {
+                        values.push({ label: normalizeExportHeadingText('S/R', headersUppercase), count: sinRespuesta });
+                    }
                     if (values.length) { groups.push({ label: normalizeExportHeadingText(fieldLabel, headersUppercase), values: values }); }
                 });
                 if (groups.length > 0) {
@@ -2197,7 +2237,7 @@
             if (Array.isArray(entries) && entries.length > 0) {
                 var itemNum = 1;
                 entries.forEach(function (entry) {
-                    var mrLabel = (meta[entry.microrregion_id] && meta[entry.microrregion_id].label) ? meta[entry.microrregion_id].label : 'Sin microregión';
+                    var mrLabel = (meta[entry.microrregion_id] && meta[entry.microrregion_id].label) ? meta[entry.microrregion_id].label : 'Sin microrregión';
                     html += '<tr class="tm-export-preview-row tm-export-preview-data">';
                     columns.forEach(function (col) {
                         const cellColor = '#f5f5f5';
@@ -2205,7 +2245,7 @@
                             const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
                             const w = (c.imageWidth || 120) + 'px';
                             const h = (c.imageHeight || 80) + 'px';
-                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">—</span></td>';
+                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">-</span></td>';
                         } else {
                             const ch = Math.min(col.max_width_chars || 24, 60);
                             var val = '';
@@ -2223,7 +2263,7 @@
                         const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
                         const w = (c.imageWidth || 120) + 'px';
                         const h = (c.imageHeight || 80) + 'px';
-                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" data-key="' + escapeHtml(col.key) + '" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">—</span></td>';
+                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" data-key="' + escapeHtml(col.key) + '" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">-</span></td>';
                     } else {
                         const ch = Math.min(col.max_width_chars || 24, 60);
                         const val = (savedRow && savedRow[col.key] !== undefined) ? escapeHtml(savedRow[col.key]) : '';
