@@ -79,6 +79,12 @@
                             </td>
                             <td>
                                 <a href="{{ route('temporary-modules.admin.edit', $module->id) }}" class="tm-btn">Editar</a>
+                                <form method="POST" action="{{ route('temporary-modules.admin.toggle-active', $module->id) }}" class="tm-inline-form">
+                                    @csrf
+                                    <button type="submit" class="tm-btn {{ $module->is_active ? 'tm-btn-warning' : 'tm-btn-success' }}">
+                                        {{ $module->is_active ? 'Desactivar' : 'Activar' }}
+                                    </button>
+                                </form>
                                 <form method="POST" action="{{ route('temporary-modules.admin.destroy', $module->id) }}" class="tm-inline-form" data-confirm-delete data-module-name="{{ $module->name }}">
                                     @csrf
                                     @method('DELETE')

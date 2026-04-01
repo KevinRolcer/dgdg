@@ -7,6 +7,7 @@
     }
 
     const dataUrl = root.getAttribute('data-data-url');
+    const searchUrl = root.getAttribute('data-search-url');
     const mapEl = document.getElementById('microregionesMap');
     const accordionEl = document.getElementById('microregionesAccordion');
     const detailEl = document.getElementById('microregionesDetail');
@@ -15,6 +16,7 @@
     const searchInput = document.getElementById('microregionesSearchInput');
     const searchGo = document.getElementById('microregionesSearchGo');
     const searchHint = document.getElementById('microregionesSearchHint');
+    const searchResultsEl = document.getElementById('microregionesSearchResults');
     const layoutEl = document.querySelector('.microregiones-layout');
     const toggleBtn = document.getElementById('microregionesToggleSidebar');
 
@@ -25,8 +27,13 @@
     const geometryByMunicipioId = new Map();
     const microById = new Map(); // Fast lookup instead of Array.find
     let highlightedLayer = null;
+    let searchAreaLayer = null;
+    let searchMarker = null;
     let micros = [];
     let flatMunicipios = [];
+    let remoteSearchDebounce = null;
+    let remoteSearchAbortController = null;
+    let remoteSearchResults = [];
 
     /* ── Geometry simplification ── */
     function simplifyCoords(coords, tolerance) {
@@ -120,15 +127,21 @@
     }
 
     /* ── Detail panel ── */
-    function renderDetail(micro, municipio) {
+    function renderDetail(micro, municipio, searchResult) {
         detailEl.classList.remove('microregiones-floating-detail--hidden');
         if (detailContentEl) detailContentEl.innerHTML = '';
 
         var card = document.createElement('div');
         card.className = 'microregiones-detail-card';
 
-        var head = document.createElement('div');
-        head.className = 'microregiones-detail-card-head';
+        var top = document.createElement('div');
+        top.className = 'microregiones-detail-top';
+
+        var main = document.createElement('div');
+        main.className = 'microregiones-detail-main';
+
+        var aside = document.createElement('div');
+        aside.className = 'microregiones-detail-aside';
 
         var img = document.createElement('img');
         img.className = 'microregiones-detail-mr-img';
@@ -145,7 +158,7 @@
             img.onerror = null;
             img.src = placeholderMrSvg(micro.numero);
         };
-        head.appendChild(img);
+        main.appendChild(img);
 
         var headText = document.createElement('div');
         headText.className = 'microregiones-detail-card-head-text';
@@ -159,27 +172,32 @@
             (municipio
                 ? 'Municipio: <strong>' + escapeHtml(municipio.nombre) + '</strong>'
                 : 'Microrregión seleccionada') +
-            '</p>';
+            '</p>' +
+            (searchResult && searchResult.label
+                ? '<p class="microregiones-detail-place">Coincidencia: <strong>' + escapeHtml(searchResult.label) + '</strong></p>'
+                : '');
 
-        head.appendChild(headText);
-        card.appendChild(head);
-
-        var contact = document.createElement('div');
-        contact.className = 'microregiones-contact';
+        main.appendChild(headText);
+        top.appendChild(main);
 
         if (micro.delegado && (micro.delegado.nombre || micro.delegado.telefono)) {
-            contact.appendChild(contactBlock('Delegado a cargo', { nombre: micro.delegado.nombre, telefono: micro.delegado.telefono, email: null }));
+            aside.appendChild(contactBlock('Delegado a cargo', {
+                nombre: micro.delegado.nombre,
+                telefono: micro.delegado.telefono,
+                email: null
+            }));
         } else {
-            contact.appendChild(emptyBlock('Delegado a cargo', 'Sin delegado registrado.'));
+            aside.appendChild(emptyBlock('Delegado a cargo', 'Sin delegado registrado.'));
         }
 
         if (micro.enlace) {
-            contact.appendChild(contactBlock('Enlace', { nombre: micro.enlace.nombre, email: null, telefono: '' }));
+            aside.appendChild(contactBlock('Enlace', { nombre: micro.enlace.nombre, email: null, telefono: '' }));
         } else {
-            contact.appendChild(emptyBlock('Enlace', 'Sin usuario de enlace distinto al delegado.'));
+            aside.appendChild(emptyBlock('Enlace', 'Sin usuario de enlace distinto al delegado.'));
         }
 
-        card.appendChild(contact);
+        top.appendChild(aside);
+        card.appendChild(top);
         if (detailContentEl) detailContentEl.appendChild(card);
     }
 
@@ -221,12 +239,56 @@
             .replace(/"/g, '&quot;');
     }
 
+    function normalizeText(value) {
+        return String(value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim();
+    }
+
     function findMicroById(id) {
         return microById.get(id) || null;
     }
 
+    function findMunicipioById(id) {
+        for (var i = 0; i < flatMunicipios.length; i++) {
+            if (flatMunicipios[i].id === id) {
+                return flatMunicipios[i];
+            }
+        }
+        return null;
+    }
+
+    function findMunicipioByName(name) {
+        var normalized = normalizeText(name);
+        for (var i = 0; i < flatMunicipios.length; i++) {
+            if (normalizeText(flatMunicipios[i].nombre) === normalized) {
+                return flatMunicipios[i];
+            }
+        }
+        return null;
+    }
+
+    function clearSearchResults() {
+        remoteSearchResults = [];
+        if (searchResultsEl) {
+            searchResultsEl.hidden = true;
+            searchResultsEl.innerHTML = '';
+        }
+    }
+
+    function clearSearchArea() {
+        if (searchAreaLayer && map) {
+            map.removeLayer(searchAreaLayer);
+            searchAreaLayer = null;
+        }
+    }
+
     /* ── Map interaction ── */
     function openMunicipioOnMap(m) {
+        clearSearchMarker();
+        clearSearchArea();
         if (highlightedLayer && map) {
             map.removeLayer(highlightedLayer);
             highlightedLayer = null;
@@ -264,11 +326,88 @@
 
     function openMicroOnMap(micro) {
         if (!micro || !map) return;
+        clearSearchMarker();
+        clearSearchArea();
         var mk = markerByMicroId.get(micro.id);
         if (mk) {
             map.panTo(mk.getLatLng(), { animate: true });
         }
         renderDetail(micro, null);
+    }
+
+    function clearSearchMarker() {
+        if (searchMarker && map) {
+            map.removeLayer(searchMarker);
+            searchMarker = null;
+        }
+    }
+
+    function placeSearchMarker(lat, lng) {
+        if (!map) return;
+
+        clearSearchMarker();
+
+        searchMarker = L.circleMarker([lat, lng], {
+            radius: 8,
+            color: '#0f172a',
+            weight: 2,
+            fillColor: '#f97316',
+            fillOpacity: 0.95
+        }).addTo(map);
+    }
+
+    function drawSearchArea(geometry) {
+        if (!map || !geometry) return;
+
+        clearSearchArea();
+
+        if (!map.getPane('boundaryPane')) {
+            map.createPane('boundaryPane');
+            map.getPane('boundaryPane').style.zIndex = 370;
+        }
+
+        searchAreaLayer = L.geoJSON({ type: 'Feature', geometry: geometry }, {
+            pane: 'boundaryPane',
+            style: {
+                color: '#f97316',
+                weight: 3,
+                dashArray: '10 8',
+                fillColor: '#f97316',
+                fillOpacity: 0.08
+            },
+            interactive: false
+        }).addTo(map);
+    }
+
+    function openAdvancedResult(result) {
+        if (!result) return;
+
+        clearSearchResults();
+
+        var municipio = result.municipio && result.municipio.id
+            ? findMunicipioById(result.municipio.id)
+            : findMunicipioByName(result.municipio ? result.municipio.nombre : '');
+        var micro = result.micro && result.micro.id ? findMicroById(result.micro.id) : null;
+
+        if (municipio && micro) {
+            openMunicipioOnMap(municipio);
+            renderDetail(micro, municipio, result);
+        } else if (micro) {
+            openMicroOnMap(micro);
+            renderDetail(micro, null, result);
+        }
+
+        if (map && typeof result.lat === 'number' && typeof result.lng === 'number') {
+            placeSearchMarker(result.lat, result.lng);
+            if (result.geometry) {
+                drawSearchArea(result.geometry);
+                if (searchAreaLayer) {
+                    map.fitBounds(searchAreaLayer.getBounds(), { padding: [34, 34], maxZoom: 14, animate: true });
+                }
+            } else {
+                map.setView([result.lat, result.lng], Math.max(map.getZoom(), 14), { animate: true });
+            }
+        }
     }
 
     function placeholderMrSvg(num) {
@@ -352,8 +491,92 @@
         accordionEl.appendChild(fragment); // Single DOM write
     }
 
+    function renderRemoteSearchResults(results) {
+        if (!searchResultsEl) return;
+
+        searchResultsEl.innerHTML = '';
+        remoteSearchResults = results || [];
+
+        if (!remoteSearchResults.length) {
+            searchResultsEl.hidden = true;
+            return;
+        }
+
+        if (searchHint) {
+            searchHint.hidden = true;
+        }
+
+        var fragment = document.createDocumentFragment();
+
+        remoteSearchResults.forEach(function (result, idx) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'microregiones-search-result';
+            btn.setAttribute('data-index', String(idx));
+            btn.innerHTML =
+                '<span class="microregiones-search-result-label">' + escapeHtml(result.label || result.display_name || 'Resultado') + '</span>' +
+                '<span class="microregiones-search-result-meta">' +
+                    escapeHtml((result.micro ? result.micro.micro_label : '') || '') +
+                    (result.municipio && result.municipio.nombre ? ' · ' + escapeHtml(result.municipio.nombre) : '') +
+                '</span>';
+            btn.addEventListener('click', function () {
+                openAdvancedResult(result);
+            });
+            fragment.appendChild(btn);
+        });
+
+        searchResultsEl.appendChild(fragment);
+        searchResultsEl.hidden = false;
+    }
+
+    function queueAdvancedSearch() {
+        if (!searchUrl || !searchInput) return;
+
+        var rawQuery = searchInput.value || '';
+        var query = rawQuery.trim();
+
+        if (remoteSearchDebounce) {
+            clearTimeout(remoteSearchDebounce);
+            remoteSearchDebounce = null;
+        }
+
+        if (remoteSearchAbortController) {
+            remoteSearchAbortController.abort();
+            remoteSearchAbortController = null;
+        }
+
+        if (query.length < 3) {
+            clearSearchResults();
+            return;
+        }
+
+        remoteSearchDebounce = setTimeout(function () {
+            remoteSearchAbortController = new AbortController();
+            fetch(searchUrl + '?q=' + encodeURIComponent(query), {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                signal: remoteSearchAbortController.signal,
+            })
+                .then(function (r) {
+                    if (!r.ok) throw new Error('Advanced search failed');
+                    return r.json();
+                })
+                .then(function (payload) {
+                    var results = payload && Array.isArray(payload.results) ? payload.results : [];
+                    renderRemoteSearchResults(results);
+                })
+                .catch(function (err) {
+                    if (err && err.name === 'AbortError') return;
+                    clearSearchResults();
+                })
+                .finally(function () {
+                    remoteSearchAbortController = null;
+                });
+        }, 320);
+    }
+
     function runSearch() {
-        var q = (searchInput && searchInput.value ? searchInput.value : '').trim().toLowerCase();
+        var q = normalizeText(searchInput && searchInput.value ? searchInput.value : '');
         searchHint.hidden = true;
 
         if (!q) {
@@ -368,12 +591,12 @@
             var item = accItems[idx];
             if (!item) return;
 
-            var matchLabel = (micro.micro_label || '').toLowerCase();
+            var matchLabel = normalizeText(micro.micro_label || '');
             var matchNum = 'mr' + micro.numero;
             var matchNum2 = 'mr ' + micro.numero;
-            var matchCab = (micro.cabecera || '').toLowerCase();
+            var matchCab = normalizeText(micro.cabecera || '');
             var matchMuns = micro.municipios.some(function(m) {
-                return m.nombre.toLowerCase().indexOf(q) !== -1;
+                return normalizeText(m.nombre).indexOf(q) !== -1;
             });
 
             var isMatch = matchLabel.indexOf(q) !== -1 ||
@@ -400,6 +623,9 @@
     function clearSearch() {
         if (searchInput) searchInput.value = '';
         if (searchHint) searchHint.hidden = true;
+        clearSearchResults();
+        clearSearchMarker();
+        clearSearchArea();
 
         var accItems = accordionEl.querySelectorAll('.microregiones-acc-item');
         accItems.forEach(function (item) {
@@ -716,10 +942,33 @@
         searchGo.addEventListener('click', clearSearch);
     }
     if (searchInput) {
-        searchInput.addEventListener('input', runSearch);
+        var searchLabel = document.querySelector('.microregiones-search-label[for="microregionesSearchInput"]');
+        if (searchLabel) {
+            searchLabel.textContent = 'Buscar municipio, calle, colonia, junta auxiliar o microrregion';
+        }
+        searchInput.placeholder = 'Ej. Cholula, Av. Juarez, La Paz, San Baltazar...';
+        searchInput.addEventListener('input', function () {
+            runSearch();
+            queueAdvancedSearch();
+        });
         searchInput.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
+                if (remoteSearchResults.length > 0) {
+                    openAdvancedResult(remoteSearchResults[0]);
+                }
+            }
+        });
+        searchInput.addEventListener('blur', function () {
+            setTimeout(function () {
+                if (searchResultsEl) {
+                    searchResultsEl.hidden = true;
+                }
+            }, 180);
+        });
+        searchInput.addEventListener('focus', function () {
+            if (searchResultsEl && remoteSearchResults.length > 0) {
+                searchResultsEl.hidden = false;
             }
         });
     }
@@ -737,4 +986,5 @@
             }
         });
     }
+
 })();

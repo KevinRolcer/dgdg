@@ -139,6 +139,9 @@
                 </tbody>
             </table>
         </div>
+        @if ($modules instanceof \Illuminate\Pagination\LengthAwarePaginator)
+            {{ $modules->links('vendor.pagination.tm') }}
+        @endif
         </article>
     </div>
 
@@ -415,6 +418,14 @@
                         <input type="number" id="tmExportHeaderFontSize" class="tm-input" min="9" max="28" value="12">
                         <p class="tm-analysis-hint" style="margin-top:6px;">Aplica a los encabezados de las columnas de la tabla.</p>
                     </div>
+                    <div class="tm-export-personalize-field">
+                        <label for="tmExportMicrorregionSort">Orden por número de microregión</label>
+                        <select id="tmExportMicrorregionSort" class="tm-input">
+                            <option value="asc">Ascendente</option>
+                            <option value="desc">Descendente</option>
+                        </select>
+                        <p class="tm-analysis-hint" style="margin-top:6px;">La vista previa y el archivo exportado seguirán este orden por MR.</p>
+                    </div>
                     <div class="tm-export-personalize-field tm-export-count-table-section">
                         <label class="tm-export-count-table-toggle">
                             <input type="checkbox" id="tmExportIncludeCountTable" value="1">
@@ -581,6 +592,13 @@
                             <label for="tmWordTitleFontPx">Tamaño de letra del título (px)</label>
                             <input type="number" id="tmWordTitleFontPx" class="tm-input" min="10" max="36" value="18">
                         </div>
+                        <div class="tm-export-personalize-field">
+                            <label for="tmWordMicrorregionSort">Orden por número de microregión</label>
+                            <select id="tmWordMicrorregionSort" class="tm-input">
+                                <option value="asc">Ascendente</option>
+                                <option value="desc">Descendente</option>
+                            </select>
+                        </div>
                         <p class="tm-analysis-sidebar-title" style="margin-top:14px;">Qué tablas incluir en el informe</p>
                         <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeSummary" checked> Resumen (totales)</label>
                         <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeMrTable" checked> Tabla microregión / municipios</label>
@@ -663,6 +681,7 @@
                     <input type="hidden" name="summary_kpi_keys" id="tmWordFormSummaryKpiKeys" value="[]">
                     <input type="hidden" name="totals_column_keys" id="tmWordFormTotalsColumnKeys" value="[]">
                     <input type="hidden" name="title_font_size_px" id="tmWordFormTitleFontPx" value="18">
+                    <input type="hidden" name="microrregion_sort" id="tmWordFormMicrorregionSort" value="asc">
                     <button type="submit" class="tm-btn tm-btn-success">Generar Word con esta configuración</button>
                 </form>
             </div>
@@ -1193,6 +1212,8 @@
             var align = alignBtn ? alignBtn.getAttribute('data-word-title-align') : 'center';
             var orientBtn = document.querySelector('#tmAnalysisWordPersonalizeModal .tm-word-orient-btn.is-active');
             var orient = orientBtn ? orientBtn.getAttribute('data-word-orient') : 'portrait';
+            var mrSortEl = document.getElementById('tmWordMicrorregionSort');
+            var mrSort = mrSortEl ? mrSortEl.value : 'asc';
             var sum = document.getElementById('tmWordIncludeSummary');
             var mr = document.getElementById('tmWordIncludeMrTable');
             var q = baseUrl.indexOf('?') === -1 ? '?' : '&';
@@ -1211,6 +1232,7 @@
                 + '&summary_kpi_keys=' + encodeURIComponent(tmWordSummaryKpiJson())
                 + '&totals_column_keys=' + encodeURIComponent(tmWordTotalsColumnJson())
                 + '&title_font_size_px=' + encodeURIComponent(document.getElementById('tmWordTitleFontPx') ? document.getElementById('tmWordTitleFontPx').value : '18')
+                + '&microrregion_sort=' + encodeURIComponent(mrSort === 'desc' ? 'desc' : 'asc')
                 + '&_=' + Date.now();
             applyWordPreviewSheetOrientation(orient);
             wordPersonalizePreview.innerHTML = '<div class="tm-analysis-preview-loading">Actualizando…</div>';
@@ -1238,6 +1260,7 @@
             if (document.getElementById('tmWordIncludeSummary')) document.getElementById('tmWordIncludeSummary').checked = s ? s.checked : true;
             if (document.getElementById('tmWordIncludeMrTable')) document.getElementById('tmWordIncludeMrTable').checked = m ? m.checked : true;
             if (document.getElementById('tmWordIncludeDynamic') && !document.getElementById('tmWordIncludeDynamic').dataset.touched) document.getElementById('tmWordIncludeDynamic').checked = true;
+            if (document.getElementById('tmWordMicrorregionSort') && !document.getElementById('tmWordMicrorregionSort').dataset.touched) document.getElementById('tmWordMicrorregionSort').value = 'asc';
             var titleIn = document.getElementById('tmWordDocTitle');
             if (titleIn && !titleIn.value.trim()) titleIn.value = '';
             wordPersonalizeModal.classList.add('is-open');
@@ -1294,11 +1317,15 @@
                 document.getElementById('tmWordFormSummaryKpiKeys').value = tmWordSummaryKpiJson();
                 document.getElementById('tmWordFormTotalsColumnKeys').value = tmWordTotalsColumnJson();
                 document.getElementById('tmWordFormTitleFontPx').value = document.getElementById('tmWordTitleFontPx') ? (document.getElementById('tmWordTitleFontPx').value || '18') : '18';
+                document.getElementById('tmWordFormMicrorregionSort').value = document.getElementById('tmWordMicrorregionSort') ? ((document.getElementById('tmWordMicrorregionSort').value === 'desc') ? 'desc' : 'asc') : 'asc';
             });
-            ['tmWordTableFontPt', 'tmWordTableCellPad', 'tmWordTableCellMax', 'tmWordTitleFontPx'].forEach(function (id) {
+            ['tmWordTableFontPt', 'tmWordTableCellPad', 'tmWordTableCellMax', 'tmWordTitleFontPx', 'tmWordMicrorregionSort'].forEach(function (id) {
                 var n = document.getElementById(id);
                 if (n) {
-                    n.addEventListener('change', function () { loadWordPersonalizePreview(); });
+                    n.addEventListener('change', function () {
+                        if (id === 'tmWordMicrorregionSort') { n.dataset.touched = '1'; }
+                        loadWordPersonalizePreview();
+                    });
                     if (id === 'tmWordTableCellMax') n.addEventListener('input', function () { clearTimeout(n._tmDeb); n._tmDeb = setTimeout(loadWordPersonalizePreview, 400); });
                 }
             });
@@ -1827,7 +1854,7 @@
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12, titleFontPx: 18 };
+                return { title: '', titleAlign: 'center', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12, titleFontPx: 18, microrregionSort: 'asc' };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
             const titleUppercaseEl = modal ? modal.querySelector('#tmExportTitleUppercase') : document.getElementById('tmExportTitleUppercase');
@@ -1835,6 +1862,7 @@
             const cellFontEl = modal ? modal.querySelector('#tmExportCellFontSize') : document.getElementById('tmExportCellFontSize');
             const titleFontEl = modal ? modal.querySelector('#tmExportTitleFontSize') : document.getElementById('tmExportTitleFontSize');
             const headerFontEl = modal ? modal.querySelector('#tmExportHeaderFontSize') : document.getElementById('tmExportHeaderFontSize');
+            const microrregionSortEl = modal ? modal.querySelector('#tmExportMicrorregionSort') : document.getElementById('tmExportMicrorregionSort');
             const alignBtn = modal ? modal.querySelector('.tm-export-title-align .tm-export-align-btn.is-active') : null;
             const titleAlign = (alignBtn && alignBtn.getAttribute('data-title-align')) || 'center';
             const cellFontPx = cellFontEl && cellFontEl.value ? Math.max(9, Math.min(24, parseInt(cellFontEl.value, 10) || 12)) : 12;
@@ -1900,7 +1928,8 @@
                 cellFontPx: cellFontPx,
                 titleFontPx: titleFontPx,
                 headerFontPx: headerFontPx,
-                groups: groups
+                groups: groups,
+                microrregionSort: (microrregionSortEl && microrregionSortEl.value === 'desc') ? 'desc' : 'asc'
             };
         }
 
@@ -1913,6 +1942,34 @@
                 if (key) { sample[key] = (cell.textContent || '').trim(); }
             });
             return sample;
+        }
+
+        function getPreviewMicrorregionNumber(entry, meta) {
+            if (!entry || !meta) { return Number.MAX_SAFE_INTEGER; }
+            var info = meta[entry.microrregion_id] || {};
+            var raw = info.number != null ? String(info.number) : '';
+            var parsed = parseInt(raw, 10);
+
+            return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed;
+        }
+
+        function sortPreviewEntriesByMicrorregion(entries, meta, direction) {
+            if (!Array.isArray(entries)) { return []; }
+            var dir = direction === 'desc' ? -1 : 1;
+
+            return entries.slice().sort(function (left, right) {
+                var leftNumber = getPreviewMicrorregionNumber(left, meta);
+                var rightNumber = getPreviewMicrorregionNumber(right, meta);
+
+                if (leftNumber !== rightNumber) {
+                    return (leftNumber - rightNumber) * dir;
+                }
+
+                var leftKey = left && left.microrregion_id != null ? String(left.microrregion_id) : '';
+                var rightKey = right && right.microrregion_id != null ? String(right.microrregion_id) : '';
+
+                return leftKey.localeCompare(rightKey) * dir;
+            });
         }
 
         function formatPreviewCellValue(val) {
@@ -1934,6 +1991,7 @@
             var meta = microrregionMeta || (modal && modal._previewMicrorregionMeta) || {};
             const savedRow = sampleRow || (entries && entries.length ? null : readSampleRowFromPreview(previewEl));
             const state = getPersonalizeState();
+            entries = sortPreviewEntriesByMicrorregion(entries, meta, state.microrregionSort);
             const colorMap = {};
             state.columns.forEach(function (c) { colorMap[c.key] = c.color; });
             const cellFontPx = state.cellFontPx || 12;
@@ -2451,6 +2509,8 @@
                         if (titleEl) { titleEl.value = draftCfg.title != null ? String(draftCfg.title) : (data.title || ''); }
                         if (titleUppercaseEl) { titleUppercaseEl.checked = !!draftCfg.title_uppercase; }
                         if (headersUppercaseEl) { headersUppercaseEl.checked = !!draftCfg.headers_uppercase; }
+                        var mrSortEl = document.getElementById('tmExportMicrorregionSort');
+                        if (mrSortEl) { mrSortEl.value = draftCfg.microrregion_sort === 'desc' ? 'desc' : (data.microrregion_sort || 'asc'); }
                         personalizeModal.querySelectorAll('.tm-export-title-align .tm-export-align-btn').forEach(function (b) {
                             b.classList.toggle('is-active', (b.getAttribute('data-title-align') || '') === (draftCfg.title_align || 'center'));
                         });
@@ -2510,6 +2570,8 @@
                         if (titleEl) { titleEl.value = data.title || ''; }
                         if (titleUppercaseEl) { titleUppercaseEl.checked = false; }
                         if (headersUppercaseEl) { headersUppercaseEl.checked = false; }
+                        var mrSortDefaultEl = document.getElementById('tmExportMicrorregionSort');
+                        if (mrSortDefaultEl) { mrSortDefaultEl.value = data.microrregion_sort || 'asc'; }
                         buildPersonalizeColumnsList(columns, columnsEl);
                     }
                     buildCountTableColorList(countTableColorListEl, countByFieldsEl, personalizeModal._previewEntries, draftCfg ? draftCfg.count_table_colors : null);
@@ -2587,6 +2649,10 @@
                         titleFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                         titleFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
+                    var microrregionSortEl = document.getElementById('tmExportMicrorregionSort');
+                    if (microrregionSortEl) {
+                        microrregionSortEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
 
                     if (restoreBtn && restoreWrap) {
                         restoreBtn.onclick = function () {
@@ -2623,6 +2689,7 @@
                             count_by_fields: countByFields,
                             count_table_colors: state.countTableColors || {},
                             count_table_cell_width: state.countTableCellWidth || 12,
+                            microrregion_sort: state.microrregionSort || 'asc',
                             groups: state.groups || [],
                             columns: orderedCols.map(function (col) {
                                 const colState = state.columns.find(function (c) { return c.key === col.key; }) || {};
@@ -2833,9 +2900,8 @@
                 if (!result.isConfirmed) { return; }
                 var choice = result.value && result.value.choice;
                 if (choice === 'word_table' || choice === 'pdf_table') {
-                    const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
                     const fmt = choice === 'pdf_table' ? 'pdf' : 'word';
-                    window.location.href = exportUrl + separator + 'mode=single&analysis=0&format=' + encodeURIComponent(fmt);
+                    submitTemporaryModuleExportPost(exportUrl, fmt, 'single', { microrregion_sort: 'asc' });
                     return;
                 }
                 if (choice === 'analysis_word') {
@@ -2852,7 +2918,7 @@
                     return;
                 }
                 const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
-                window.location.href = exportUrl + separator + 'mode=single&analysis=0';
+                submitTemporaryModuleExportPost(exportUrl, 'excel', 'single', { microrregion_sort: 'asc' });
             });
         }
 
@@ -2861,8 +2927,7 @@
                 const exportUrl = exportButton.getAttribute('data-export-url');
                 if (!exportUrl) { return; }
                 if (!templateSwal) {
-                    const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
-                    window.location.href = exportUrl + separator + 'mode=single&analysis=0';
+                    submitTemporaryModuleExportPost(exportUrl, 'excel', 'single', { microrregion_sort: 'asc' });
                     return;
                 }
                 openTemporaryModuleExportTypeDialog(exportButton);

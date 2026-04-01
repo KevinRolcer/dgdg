@@ -36,7 +36,10 @@ class SecurityHeaders
         $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
         $response->headers->set('X-Permitted-Cross-Domain-Policies', 'none');
         $response->headers->set('Cross-Origin-Resource-Policy', 'same-origin');
-        $response->headers->set('Content-Security-Policy', $this->buildContentSecurityPolicy($request));
+        $cspHeader = (bool) config('security.csp.report_only', false)
+            ? 'Content-Security-Policy-Report-Only'
+            : 'Content-Security-Policy';
+        $response->headers->set($cspHeader, $this->buildContentSecurityPolicy($request));
 
         if ($request->user() !== null) {
             $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
@@ -146,9 +149,39 @@ class SecurityHeaders
     private function buildContentSecurityPolicy(Request $request): string
     {
         $isLocal = app()->isLocal();
-        $connectSrc = $isLocal
-            ? "connect-src 'self' http: https: https://static.cloudflareinsights.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://nominatim.openstreetmap.org"
-            : "connect-src 'self' https://static.cloudflareinsights.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://nominatim.openstreetmap.org";
+        $csp = (array) config('security.csp', []);
+        $scriptSrc = $this->buildSourceList(
+            ["'self'"],
+            (array) ($csp['script_src'] ?? []),
+            [
+                'allowUnsafeInline' => (bool) ($csp['allow_unsafe_inline_scripts'] ?? true),
+                'allowUnsafeEval' => (bool) ($csp['allow_unsafe_eval_scripts'] ?? $isLocal),
+            ]
+        );
+        $styleSrc = $this->buildSourceList(
+            ["'self'"],
+            (array) ($csp['style_src'] ?? []),
+            ['allowUnsafeInline' => true]
+        );
+        $imgSrc = $this->buildSourceList(
+            ["'self'", 'data:', 'blob:', 'https:'],
+            (array) ($csp['img_src'] ?? []),
+            ['allowHttpScheme' => $isLocal]
+        );
+        $mediaSrc = $this->buildSourceList(
+            ["'self'", 'data:', 'blob:', 'https:'],
+            [],
+            ['allowHttpScheme' => $isLocal]
+        );
+        $fontSrc = $this->buildSourceList(
+            ["'self'", 'data:'],
+            (array) ($csp['font_src'] ?? []),
+        );
+        $connectSrc = $this->buildSourceList(
+            ["'self'", 'https:'],
+            (array) ($csp['connect_src'] ?? []),
+            ['allowHttpScheme' => $isLocal]
+        );
 
         $directives = [
             "default-src 'self'",
@@ -156,19 +189,56 @@ class SecurityHeaders
             "form-action 'self'",
             "frame-ancestors 'none'",
             "object-src 'none'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://static.cloudflareinsights.com",
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
-            "img-src 'self' data: blob: https: http: *.openstreetmap.org",
-            "media-src 'self' data: blob: https: http:",
-            "font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
-            // source maps y fetch desde los mismos CDNs ya permitidos en script-src/style-src
-            $connectSrc,
+            'script-src '.$scriptSrc,
+            'style-src '.$styleSrc,
+            'img-src '.$imgSrc,
+            'media-src '.$mediaSrc,
+            'font-src '.$fontSrc,
+            'connect-src '.$connectSrc,
         ];
 
         if ($request->isSecure()) {
             $directives[] = 'upgrade-insecure-requests';
         }
 
+        $reportUri = trim((string) ($csp['report_uri'] ?? ''));
+        if ($reportUri !== '') {
+            $directives[] = 'report-uri '.$reportUri;
+        }
+
         return implode('; ', $directives);
+    }
+
+    /**
+     * @param  array<int, string>  $baseSources
+     * @param  array<int, string>  $configuredSources
+     * @param  array<string, bool>  $options
+     */
+    private function buildSourceList(array $baseSources, array $configuredSources, array $options = []): string
+    {
+        $sources = $baseSources;
+
+        if (($options['allowUnsafeInline'] ?? false) === true) {
+            $sources[] = "'unsafe-inline'";
+        }
+
+        if (($options['allowUnsafeEval'] ?? false) === true) {
+            $sources[] = "'unsafe-eval'";
+        }
+
+        if (($options['allowHttpScheme'] ?? false) === true) {
+            $sources[] = 'http:';
+        }
+
+        foreach ($configuredSources as $source) {
+            $source = trim((string) $source);
+            if ($source !== '') {
+                $sources[] = $source;
+            }
+        }
+
+        $unique = array_values(array_unique($sources));
+
+        return implode(' ', $unique);
     }
 }

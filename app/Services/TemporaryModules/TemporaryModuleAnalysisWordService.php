@@ -25,6 +25,35 @@ class TemporaryModuleAnalysisWordService
         private readonly TemporaryModuleFieldService $fieldService,
     ) {}
 
+    private function resolveMicrorregionSortDirection(array $config): string
+    {
+        $direction = strtolower(trim((string) ($config['microrregion_sort'] ?? 'asc')));
+
+        return in_array($direction, ['asc', 'desc'], true) ? $direction : 'asc';
+    }
+
+    private function sortEntriesByMicrorregion(\Illuminate\Support\Collection $entries, string $direction): \Illuminate\Support\Collection
+    {
+        $descending = strtolower($direction) === 'desc';
+
+        return $entries->sort(function ($left, $right) use ($descending) {
+            $leftNumber = (int) ($left->microrregion->microrregion ?? 999999);
+            $rightNumber = (int) ($right->microrregion->microrregion ?? 999999);
+
+            if ($leftNumber !== $rightNumber) {
+                return $descending ? ($rightNumber <=> $leftNumber) : ($leftNumber <=> $rightNumber);
+            }
+
+            $leftSubmitted = optional($left->submitted_at)?->getTimestamp() ?? 0;
+            $rightSubmitted = optional($right->submitted_at)?->getTimestamp() ?? 0;
+            if ($leftSubmitted !== $rightSubmitted) {
+                return $rightSubmitted <=> $leftSubmitted;
+            }
+
+            return ((int) ($left->id ?? 0)) <=> ((int) ($right->id ?? 0));
+        })->values();
+    }
+
     /**
      * @param  array<string, mixed>  $config
      * @return array<string, mixed>
@@ -36,6 +65,7 @@ class TemporaryModuleAnalysisWordService
         $includeMrTable = (bool) ($config['include_mr_table'] ?? true);
         $includeDynamic = (bool) ($config['include_dynamic_table'] ?? true);
         $orientation = strtolower(trim((string) ($config['orientation'] ?? 'portrait'))) === 'landscape' ? 'landscape' : 'portrait';
+        $sortDirection = $this->resolveMicrorregionSortDirection($config);
 
         $columnKeys = $this->normalizeColumnKeys($config['column_keys'] ?? []);
         $tableStyle = $this->normalizeTableStyle($config);
@@ -59,7 +89,7 @@ class TemporaryModuleAnalysisWordService
         ];
 
         if ($includeSummary || $includeMrTable) {
-            $built = $this->buildAnalysisArrays($module);
+            $built = $this->buildAnalysisArrays($module, $sortDirection);
             if ($includeSummary) {
                 $out['summary'] = $built['summary'];
             }
@@ -71,7 +101,7 @@ class TemporaryModuleAnalysisWordService
 
         $summaryKpis = $this->normalizeColumnKeys($config['summary_kpi_keys'] ?? []);
         $totalsKeys = $this->normalizeColumnKeys($config['totals_column_keys'] ?? []);
-        $dyn = $this->buildDynamicTablePayload($module, $columnKeys, self::PREVIEW_ENTRY_LIMIT, $summaryKpis, $totalsKeys);
+        $dyn = $this->buildDynamicTablePayload($module, $columnKeys, self::PREVIEW_ENTRY_LIMIT, $summaryKpis, $totalsKeys, $sortDirection);
         $out['reference_row'] = $dyn['reference_row'] ?? null;
         if ($includeDynamic && $columnKeys !== []) {
             $out['dynamic_table'] = $dyn;
@@ -131,6 +161,7 @@ class TemporaryModuleAnalysisWordService
         $includeSummary = (bool) ($config['include_summary'] ?? true);
         $includeMrTable = (bool) ($config['include_mr_table'] ?? true);
         $includeDynamic = (bool) ($config['include_dynamic_table'] ?? true);
+        $sortDirection = $this->resolveMicrorregionSortDirection($config);
         $tableAlign = $this->normalizeTableAlign($config);
         $stretch = $tableAlign === 'stretch';
         $tblBase = $this->tableStyleForWord($stretch);
@@ -200,7 +231,7 @@ class TemporaryModuleAnalysisWordService
         $section->addTextBreak(1);
 
         if ($includeSummary || $includeMrTable) {
-            $built = $this->buildAnalysisArrays($module);
+            $built = $this->buildAnalysisArrays($module, $sortDirection);
             if ($includeSummary && $built['summary'] !== []) {
                 $tableSum = $section->addTable(array_merge(['borderSize' => 6, 'borderColor' => '861E34', 'cellMargin' => $cellTwips], $tblBase));
                 foreach ($built['summary'] as $label => $value) {
@@ -232,7 +263,7 @@ class TemporaryModuleAnalysisWordService
         if ($includeDynamic && $columnKeys !== []) {
             $summaryKpis = $this->normalizeColumnKeys($config['summary_kpi_keys'] ?? []);
             $totalsKeys = $this->normalizeColumnKeys($config['totals_column_keys'] ?? []);
-            $full = $this->buildDynamicTablePayload($module, $columnKeys, 5000, $summaryKpis, $totalsKeys);
+            $full = $this->buildDynamicTablePayload($module, $columnKeys, 5000, $summaryKpis, $totalsKeys, $sortDirection);
             $headers = $full['headers'];
             $rows = $full['rows'];
             if ($headers !== []) {
@@ -367,7 +398,7 @@ class TemporaryModuleAnalysisWordService
      * @param  list<string>  $totalsColumnKeys columnas con total al pie (suma numérica o conteo Sí)
      * @return array{headers:list<string>,rows:list<list<string>>,reference_row:?array<string,string>,accounting_summary:list<array{label:string,value:string}>,totals_row:?list<string>}
      */
-    private function buildDynamicTablePayload(TemporaryModule $module, array $columnKeys, int $entryLimit, array $summaryKpiKeys = [], array $totalsColumnKeys = []): array
+    private function buildDynamicTablePayload(TemporaryModule $module, array $columnKeys, int $entryLimit, array $summaryKpiKeys = [], array $totalsColumnKeys = [], string $sortDirection = 'asc'): array
     {
         $fieldsByKey = $module->fields->keyBy('key');
         $headers = [];
@@ -381,10 +412,17 @@ class TemporaryModuleAnalysisWordService
 
         $entries = TemporaryModuleEntry::query()
             ->where('temporary_module_id', $module->id)
-            ->with(['user:id,name', 'microrregion:id,microrregion'])
-            ->orderByDesc('submitted_at')
+            ->with(['user:id,name', 'microrregion:id,microrregion,cabecera'])
+            ->leftJoin('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
+            ->orderByRaw(
+                'CASE WHEN temporary_module_entries.microrregion_id IS NULL THEN 1 ELSE 0 END, '.
+                'CAST(COALESCE(microrregiones.microrregion, 0) AS UNSIGNED) '.strtoupper($sortDirection).', '.
+                'temporary_module_entries.submitted_at DESC'
+            )
+            ->select('temporary_module_entries.*')
             ->limit($entryLimit)
             ->get();
+        $entries = $this->sortEntriesByMicrorregion($entries, $sortDirection);
 
         $n = $entries->count();
         $referenceRow = null;
@@ -615,7 +653,7 @@ class TemporaryModuleAnalysisWordService
     /**
      * @return array{summary: array<string,string>, headers: list<string>, rows: list<array<string,mixed>>}
      */
-    private function buildAnalysisArrays(TemporaryModule $temporaryModule): array
+    private function buildAnalysisArrays(TemporaryModule $temporaryModule, string $sortDirection = 'asc'): array
     {
         $municipioFieldKey = null;
         foreach ($temporaryModule->fields as $field) {
@@ -656,7 +694,8 @@ class TemporaryModuleAnalysisWordService
             ->groupBy('microrregion_id')
             ->pluck('total', 'microrregion_id');
 
-        $allMicrorregiones = Microrregione::with('municipios')->orderBy('microrregion')->get();
+        $direction = strtolower($sortDirection) === 'desc' ? 'desc' : 'asc';
+        $allMicrorregiones = Microrregione::with('municipios')->orderBy('microrregion', $direction)->get();
 
         foreach ($allMicrorregiones as $mr) {
             $cantidadRegistros = (int) ($registrosPorMicrorregion[$mr->id] ?? 0);

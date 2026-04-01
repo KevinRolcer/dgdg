@@ -824,6 +824,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.navigateToFolder = async function(folderId) {
         window.paCurrentFolderId = folderId;
+        document.querySelectorAll('.pa-tab-pill').forEach(i => i.classList.remove('is-active'));
 
         // Sincronizar el select de filtros si existe
         const folderFilter = document.getElementById('filter-folder');
@@ -1002,8 +1003,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             syncPersonalAgendaNavChrome(filter);
-            // Allow time tabs to be visible in Folders view too
-            if (timeTabs) timeTabs.style.display = (filter === 'all' || filter === 'calendar' || filter === 'folders') ? 'flex' : 'none';
+            if (timeTabs) timeTabs.style.display = (filter === 'all' || filter === 'calendar') ? 'flex' : 'none';
 
             if (filter === 'calendar') {
                 const monthPill = document.querySelector('.pa-tab-pill[data-tab="month"]');
@@ -1045,6 +1045,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (filter === 'folders') {
                 setExplorerMode(true);
+                document.querySelectorAll('.pa-tab-pill').forEach(i => i.classList.remove('is-active'));
                 if (notesTitle) notesTitle.textContent = 'Todas las Notas';
                 if (showAllNotesLink) showAllNotesLink.style.display = 'none';
             } else {
@@ -1161,7 +1162,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateHash() {
         const filter = document.querySelector('.pa-nav-item.is-active')?.dataset.filter || 'all';
-        const tab = document.querySelector('.pa-tab-pill.is-active')?.dataset.tab || 'all';
+        const tab = (filter === 'folders' || window.paCurrentFolderId)
+            ? 'all'
+            : (document.querySelector('.pa-tab-pill.is-active')?.dataset.tab || 'all');
         const priority = document.querySelector('.pa-filter-pill[data-priority].is-active')?.dataset.priority || '';
         const folderId = folderFilter?.value || window.paCurrentFolderId || '';
         const creationDate = dateFilter?.value || '';
@@ -1207,6 +1210,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const activeTab = document.querySelector('.pa-tab-pill.is-active');
         timeFilter = timeFilter || (activeTab ? activeTab.dataset.tab : 'all');
+        if (filter === 'folders' || filter === 'folder') {
+            timeFilter = 'all';
+        }
 
         let priority = document.querySelector('.pa-filter-pill[data-priority].is-active')?.dataset.priority || '';
         let folderId = document.getElementById('filter-folder')?.value || window.paCurrentFolderId || '';

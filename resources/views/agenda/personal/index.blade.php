@@ -61,8 +61,8 @@
 
                 <div class="pa-tabs-pills">
                     <span class="pa-tab-pill" data-tab="todays">Hoy</span>
-                    <span class="pa-tab-pill is-active" data-tab="week">Semana</span>
-                    <span class="pa-tab-pill" data-tab="month">Mes</span>
+                    <span class="pa-tab-pill" data-tab="week">Semana</span>
+                    <span class="pa-tab-pill is-active" data-tab="month">Mes</span>
                 </div>
             </div>
 

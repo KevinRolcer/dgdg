@@ -93,6 +93,10 @@ class TemporaryModuleAccessService
 
     public function userCanAccessModule(TemporaryModule $module, int $userId): bool
     {
+        if (! $module->isAvailable()) {
+            return false;
+        }
+
         if ($module->applies_to_all) {
             return true;
         }

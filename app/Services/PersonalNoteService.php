@@ -10,21 +10,36 @@ use Illuminate\Support\Facades\Storage;
 
 class PersonalNoteService
 {
-    private const ENCRYPTION_ALGO = 'AES-256-CBC';
-    private const PBKDF2_ITERATIONS = 10000;
-    private const PBKDF2_SALT = 'segob_personal_note_salt'; // In a real app, this should be unique per note
+    private const ENCRYPTION_ALGO = 'aes-256-gcm';
+    private const LEGACY_ENCRYPTION_ALGO = 'AES-256-CBC';
+    private const PBKDF2_ITERATIONS = 120000;
+    private const LEGACY_PBKDF2_ITERATIONS = 10000;
+    private const LEGACY_PBKDF2_SALT = 'segob_personal_note_salt';
 
     /**
      * Encrypt content with a user-provided password.
      */
     public function encryptContent(string $content, string $password): string
     {
-        $key = $this->deriveKey($password);
-        $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length(self::ENCRYPTION_ALGO));
-        $encrypted = openssl_encrypt($content, self::ENCRYPTION_ALGO, $key, 0, $iv);
+        $salt = random_bytes(16);
+        $iv = random_bytes(openssl_cipher_iv_length(self::ENCRYPTION_ALGO));
+        $key = $this->deriveKey($password, $salt, self::PBKDF2_ITERATIONS);
+        $tag = '';
+        $encrypted = openssl_encrypt($content, self::ENCRYPTION_ALGO, $key, OPENSSL_RAW_DATA, $iv, $tag);
 
-        // Prepend IV to the encrypted content for later decryption
-        return base64_encode($iv . $encrypted);
+        if ($encrypted === false) {
+            throw new \RuntimeException('No se pudo cifrar la nota personal.');
+        }
+
+        return json_encode([
+            'v' => 2,
+            'alg' => self::ENCRYPTION_ALGO,
+            'iter' => self::PBKDF2_ITERATIONS,
+            'salt' => base64_encode($salt),
+            'iv' => base64_encode($iv),
+            'tag' => base64_encode($tag),
+            'data' => base64_encode($encrypted),
+        ], JSON_UNESCAPED_SLASHES);
     }
 
     /**
@@ -33,27 +48,47 @@ class PersonalNoteService
     public function decryptContent(string $encryptedData, string $password): ?string
     {
         try {
+            $payload = json_decode($encryptedData, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($payload) && (int) ($payload['v'] ?? 0) >= 2) {
+                $cipher = (string) ($payload['alg'] ?? self::ENCRYPTION_ALGO);
+                $salt = base64_decode((string) ($payload['salt'] ?? ''), true);
+                $iv = base64_decode((string) ($payload['iv'] ?? ''), true);
+                $tag = base64_decode((string) ($payload['tag'] ?? ''), true);
+                $cipherText = base64_decode((string) ($payload['data'] ?? ''), true);
+                $iterations = max((int) ($payload['iter'] ?? self::PBKDF2_ITERATIONS), 10000);
+
+                if (! is_string($salt) || ! is_string($iv) || ! is_string($tag) || ! is_string($cipherText)) {
+                    Log::warning('Decryption failed: invalid encrypted payload.');
+                    return null;
+                }
+
+                $key = $this->deriveKey($password, $salt, $iterations);
+                $decrypted = openssl_decrypt($cipherText, $cipher, $key, OPENSSL_RAW_DATA, $iv, $tag);
+
+                return $decrypted !== false ? $decrypted : null;
+            }
+
             $decoded = base64_decode($encryptedData, true);
             if ($decoded === false) {
-                Log::error('Decryption failed: Invalid base64 data.');
+                Log::warning('Decryption failed: invalid legacy base64 data.');
                 return null;
             }
 
-            $ivLength = openssl_cipher_iv_length(self::ENCRYPTION_ALGO);
+            $ivLength = openssl_cipher_iv_length(self::LEGACY_ENCRYPTION_ALGO);
             if (strlen($decoded) < $ivLength) {
-                Log::error('Decryption failed: Data too short for IV.');
+                Log::warning('Decryption failed: legacy data too short for IV.');
                 return null;
             }
 
             $iv = substr($decoded, 0, $ivLength);
             $cipherText = substr($decoded, $ivLength);
 
-            $key = $this->deriveKey($password);
-            $decrypted = openssl_decrypt($cipherText, self::ENCRYPTION_ALGO, $key, 0, $iv);
+            $key = $this->deriveKey($password, self::LEGACY_PBKDF2_SALT, self::LEGACY_PBKDF2_ITERATIONS);
+            $decrypted = openssl_decrypt($cipherText, self::LEGACY_ENCRYPTION_ALGO, $key, 0, $iv);
 
             return $decrypted !== false ? $decrypted : null;
         } catch (\Exception $e) {
-            Log::error('Decryption failed: ' . $e->getMessage());
+            Log::warning('Decryption failed: '.$e->getMessage());
             return null;
         }
     }
@@ -61,14 +96,15 @@ class PersonalNoteService
     /**
      * Derive a 256-bit key from a password using PBKDF2.
      */
-    private function deriveKey(string $password): string
+    private function deriveKey(string $password, string $salt, int $iterations): string
     {
-        return hash_pbkdf2('sha256', $password, self::PBKDF2_SALT, self::PBKDF2_ITERATIONS, 32, true);
+        return hash_pbkdf2('sha256', $password, $salt, $iterations, 32, true);
     }
 
     public function getNotes(int $userId, string $filter = 'all', string $timeFilter = 'all', $month = null, $year = null, $folderId = null, $priority = null, $creationDate = null, ?string $search = null)
     {
         $query = PersonalNote::forUser($userId);
+        $isFolderExplorer = in_array($filter, ['folder', 'folders'], true);
         if ($filter === 'archive') {
             // Carpetas archivadas (soft delete): mantener nombre en la nota cargando la carpeta eliminada
             $query->with(['folder' => function ($q) {
@@ -86,11 +122,6 @@ class PersonalNoteService
         // Apply Creation Date Filter
         if ($creationDate) {
             $query->whereDate('created_at', $creationDate);
-        }
-
-        // If navigating inside a specific folder
-        if ($folderId && $folderId !== 'all') {
-            $query->where('folder_id', (int)$folderId);
         }
 
         // Main filter (Sidebar/Context)
@@ -130,23 +161,35 @@ class PersonalNoteService
 
         // Apply Time Filter (Today, Week, Month) — no aplica a la vista Calendario: el mes ya se acota con month/year.
         // Tampoco aplica si estamos viendo una CARPETA específica, para evitar que las notas "desaparezcan" por fecha dentro de la carpeta.
-        if ($timeFilter !== 'all' && $filter !== 'trash' && !$creationDate && $filter !== 'calendar' && !$folderId) {
-            $dateField = ($filter === 'calendar') ? 'scheduled_date' : 'created_at';
-
+        if ($timeFilter !== 'all' && $filter !== 'trash' && !$creationDate && $filter !== 'calendar' && !$folderId && ! $isFolderExplorer) {
             switch ($timeFilter) {
                 case 'todays':
-                    $query->whereDate($dateField, now());
+                    $query->where(function ($q) {
+                        $q->whereDate('created_at', now())
+                            ->orWhereDate('scheduled_date', now());
+                    });
                     break;
                 case 'week':
-                    $query->whereBetween($dateField, [now()->startOfWeek(), now()->endOfWeek()]);
+                    $startOfWeek = now()->startOfWeek();
+                    $endOfWeek = now()->endOfWeek();
+                    $query->where(function ($q) use ($startOfWeek, $endOfWeek) {
+                        $q->whereBetween('created_at', [$startOfWeek, $endOfWeek])
+                            ->orWhereBetween('scheduled_date', [$startOfWeek->toDateString(), $endOfWeek->toDateString()]);
+                    });
                     break;
                 case 'month':
                     $m = $month ?: now()->month;
                     $y = $year ?: now()->year;
-                    $query->whereMonth($dateField, $m)->whereYear($dateField, $y);
+                    $query->where(function ($q) use ($m, $y) {
+                        $q->where(function ($q2) use ($m, $y) {
+                            $q2->whereMonth('created_at', $m)->whereYear('created_at', $y);
+                        })->orWhere(function ($q2) use ($m, $y) {
+                            $q2->whereMonth('scheduled_date', $m)->whereYear('scheduled_date', $y);
+                        });
+                    });
                     break;
             }
-        } else if ($month && $year && $filter !== 'trash' && $filter !== 'calendar') {
+        } else if ($month && $year && $filter !== 'trash' && $filter !== 'calendar' && ! $isFolderExplorer) {
             // Rango de fechas mensual (fuera de Calendario)
             $query->where(function ($q) use ($month, $year) {
                 $q->where(function ($q2) use ($month, $year) {
@@ -217,7 +260,11 @@ class PersonalNoteService
     public function getFolders(int $userId, ?string $search = null)
     {
         $query = \App\Models\PersonalNoteFolder::where('user_id', '=', $userId)
-            ->withCount('notes')
+            ->withCount([
+                'notes' => function ($q) {
+                    $q->where('is_archived', false);
+                }
+            ])
             ->orderByDesc('is_pinned')
             ->orderByDesc('pinned_at')
             ->orderBy('name');

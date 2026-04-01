@@ -12,6 +12,38 @@ use Dompdf\Dompdf;
 
 class TemporaryModuleWordPdfService
 {
+    private function resolveMicrorregionSortDirection(?array $exportConfig): string
+    {
+        $direction = strtolower(trim((string) ($exportConfig['microrregion_sort'] ?? 'asc')));
+
+        return in_array($direction, ['asc', 'desc'], true) ? $direction : 'asc';
+    }
+
+    private function sortEntriesByMicrorregion(Collection $entries, Collection $microrregionMeta, string $direction): Collection
+    {
+        $descending = strtolower($direction) === 'desc';
+
+        return $entries->sort(function ($left, $right) use ($microrregionMeta, $descending) {
+            $leftMeta = $microrregionMeta->get((int) ($left->microrregion_id ?? 0));
+            $rightMeta = $microrregionMeta->get((int) ($right->microrregion_id ?? 0));
+
+            $leftNumber = (int) ($leftMeta['number'] ?? 999999);
+            $rightNumber = (int) ($rightMeta['number'] ?? 999999);
+
+            if ($leftNumber !== $rightNumber) {
+                return $descending ? ($rightNumber <=> $leftNumber) : ($leftNumber <=> $rightNumber);
+            }
+
+            $leftSubmitted = optional($left->submitted_at)?->getTimestamp() ?? 0;
+            $rightSubmitted = optional($right->submitted_at)?->getTimestamp() ?? 0;
+            if ($leftSubmitted !== $rightSubmitted) {
+                return $rightSubmitted <=> $leftSubmitted;
+            }
+
+            return ((int) ($left->id ?? 0)) <=> ((int) ($right->id ?? 0));
+        })->values();
+    }
+
     /**
      * @param string $format 'word' or 'pdf'
      * @param array|null $exportConfig
@@ -88,6 +120,8 @@ class TemporaryModuleWordPdfService
         $totalCols = count($columns);
         $stretch = ($exportConfig['table_align'] ?? 'left') === 'stretch';
 
+        $sortDirection = strtoupper($this->resolveMicrorregionSortDirection($exportConfig));
+
         $microrregionIds = $temporaryModule->entries()
             ->withoutGlobalScopes()
             ->reorder()
@@ -120,9 +154,14 @@ class TemporaryModuleWordPdfService
         $entries = $temporaryModule->entries()
             ->withoutGlobalScopes()
             ->leftJoin('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
-            ->orderByRaw('CASE WHEN microrregion_id IS NULL THEN 1 ELSE 0 END, CAST(microrregiones.microrregion AS UNSIGNED) ASC, submitted_at DESC')
+            ->orderByRaw(
+                'CASE WHEN temporary_module_entries.microrregion_id IS NULL THEN 1 ELSE 0 END, '.
+                'CAST(COALESCE(microrregiones.microrregion, 0) AS UNSIGNED) '.$sortDirection.', '.
+                'temporary_module_entries.submitted_at DESC'
+            )
             ->select('temporary_module_entries.*')
             ->get(['microrregion_id', 'data', 'submitted_at']);
+        $entries = $this->sortEntriesByMicrorregion($entries, $microrregionMeta, $sortDirection);
 
         $baseSlug = Str::slug($fileName, '_') ?: 'modulo_temporal_'.$temporaryModule->id;
         $exportDir = storage_path('app/public/temporary-exports');

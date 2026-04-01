@@ -84,6 +84,13 @@ class TemporaryModuleController extends Controller
         }
     }
 
+    private function resolveMicrorregionSortDirection(?string $direction): string
+    {
+        $normalized = strtolower(trim((string) $direction));
+
+        return in_array($normalized, ['asc', 'desc'], true) ? $normalized : 'asc';
+    }
+
     private const FIELD_TYPES = [
         'text' => 'Texto',
         'textarea' => 'Texto largo',
@@ -208,7 +215,7 @@ class TemporaryModuleController extends Controller
             });
         }
 
-        $modules = $modulesQuery->latest()->get();
+        $modules = $modulesQuery->latest()->paginate(15)->withQueryString();
 
         return view('temporary_modules.admin.records', [
             'pageTitle' => 'Registros de modulos temporales',
@@ -899,14 +906,10 @@ class TemporaryModuleController extends Controller
 
         $allModulesQuery = TemporaryModule::query()
             ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all'])
-            ->where('is_active', true)
+            ->available()
             ->where(function ($query) use ($user) {
                 $query->where('applies_to_all', true)
                     ->orWhereHas('targetUsers', fn ($targetQuery) => $targetQuery->where('users.id', $user->id));
-            })
-            ->where(function ($query) {
-                $query->whereNull('expires_at')
-                    ->orWhere('expires_at', '>=', Carbon::now());
             })
             ->with([
                 'fields' => fn ($q) => $q->select('id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required', 'comment')->orderBy('sort_order'),
@@ -1010,14 +1013,10 @@ class TemporaryModuleController extends Controller
         $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
         $modules = TemporaryModule::query()
             ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all'])
-            ->where('is_active', true)
+            ->available()
             ->where(function ($query) use ($user) {
                 $query->where('applies_to_all', true)
                     ->orWhereHas('targetUsers', fn ($targetQuery) => $targetQuery->where('users.id', $user->id));
-            })
-            ->where(function ($query) {
-                $query->whereNull('expires_at')
-                    ->orWhere('expires_at', '>=', Carbon::now());
             })
             ->with([
                 'fields' => fn ($q) => $q->select('id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required', 'comment')->orderBy('sort_order'),
@@ -2062,11 +2061,17 @@ class TemporaryModuleController extends Controller
         abort_unless($request->user()->can('Modulos-Temporales-Admin'), 403);
 
         $exportColumns = $this->getExportColumnsForPreview($temporaryModule);
+        $sortDirection = $this->resolveMicrorregionSortDirection((string) $request->query('microrregion_sort', 'asc'));
 
         $maxWidths = [];
         $entries = $temporaryModule->entries()
             ->withoutGlobalScopes()
-            ->orderBy('submitted_at')
+            ->leftJoin('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
+            ->orderByRaw(
+                'CASE WHEN temporary_module_entries.microrregion_id IS NULL THEN 1 ELSE 0 END, '.
+                'CAST(COALESCE(microrregiones.microrregion, 0) AS UNSIGNED) '.strtoupper($sortDirection).', '.
+                'temporary_module_entries.submitted_at DESC'
+            )
             ->select(['data', 'microrregion_id'])
             ->limit(500)
             ->get();
@@ -2117,7 +2122,10 @@ class TemporaryModuleController extends Controller
                 $label = $number !== ''
                     ? ('MR '.str_pad($number, 2, '0', STR_PAD_LEFT).($name !== '' ? ' — '.$name : ''))
                     : ($name !== '' ? $name : 'Sin microrregión');
-                $microrregionMeta[(int) $row->id] = ['label' => $label];
+                $microrregionMeta[(int) $row->id] = [
+                    'label' => $label,
+                    'number' => $number,
+                ];
             }
         }
 
@@ -2126,6 +2134,7 @@ class TemporaryModuleController extends Controller
             'columns' => $columns,
             'entries' => $entries->map(fn ($e) => ['data' => $e->data, 'microrregion_id' => $e->microrregion_id])->values()->all(),
             'microrregion_meta' => $microrregionMeta,
+            'microrregion_sort' => $sortDirection,
         ]);
     }
 
@@ -2203,6 +2212,7 @@ class TemporaryModuleController extends Controller
             'summary_kpi_keys' => 'nullable|string|max:4000',
             'totals_column_keys' => 'nullable|string|max:4000',
             'title_font_size_px' => 'nullable|integer|min:10|max:36',
+            'microrregion_sort' => 'nullable|in:asc,desc',
         ]);
         $config = [
             'include_summary' => ($validated['include_summary'] ?? '1') === '1',
@@ -2220,6 +2230,7 @@ class TemporaryModuleController extends Controller
             'summary_kpi_keys' => $validated['summary_kpi_keys'] ?? '[]',
             'totals_column_keys' => $validated['totals_column_keys'] ?? '[]',
             'title_font_size_px' => $validated['title_font_size_px'] ?? 18,
+            'microrregion_sort' => $validated['microrregion_sort'] ?? 'asc',
         ];
         $temporaryModule = TemporaryModule::query()->findOrFail($module);
         $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$module;
@@ -2264,15 +2275,31 @@ class TemporaryModuleController extends Controller
         $path = $entryModel->data[$fieldKey] ?? null;
         abort_unless(is_string($path) && trim($path) !== '', 404);
 
-        if (filter_var($path, FILTER_VALIDATE_URL)) {
-            return redirect()->away($path);
-        }
-
         $fullPath = $this->entryDataService->resolveStoredFilePath($path);
 
         abort_unless(is_string($fullPath) && is_file($fullPath), 404);
 
+        if (! $this->entryDataService->pathCanBePreviewedInline($path)) {
+            return response()->download($fullPath, basename($fullPath), [
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        }
+
         return response()->file($fullPath);
+    }
+
+    public function toggleActive(Request $request, int $module): RedirectResponse
+    {
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+        $temporaryModule->update([
+            'is_active' => ! (bool) $temporaryModule->is_active,
+        ]);
+
+        $status = $temporaryModule->is_active ? 'activado' : 'desactivado';
+
+        return redirect()
+            ->route('temporary-modules.admin.index')
+            ->with('status', 'Módulo temporal '.$status.' correctamente.');
     }
 
     private function compressAndStoreImage(\Illuminate\Http\UploadedFile $file, string $directory): string

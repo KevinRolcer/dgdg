@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -66,5 +67,15 @@ class TemporaryModule extends Model
         }
 
         return $this->expires_at->greaterThanOrEqualTo(Carbon::now());
+    }
+
+    public function scopeAvailable(Builder $query): Builder
+    {
+        return $query
+            ->where('is_active', true)
+            ->where(function (Builder $builder) {
+                $builder->whereNull('expires_at')
+                    ->orWhere('expires_at', '>=', Carbon::now());
+            });
     }
 }

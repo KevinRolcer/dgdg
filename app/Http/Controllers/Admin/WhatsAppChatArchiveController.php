@@ -1061,19 +1061,23 @@ class WhatsAppChatArchiveController extends Controller
             return [];
         }
 
-        $files = $disk->allFiles($chatRootRelativePath);
-        $index = [];
+        $cacheKey = 'whatsapp_media_index_'.sha1($chatRootRelativePath);
 
-        foreach ($files as $fileRelPath) {
-            $fileRelPath = str_replace('\\', '/', (string) $fileRelPath);
-            $base = basename($fileRelPath);
-            if ($base === '' || strcasecmp($base, 'upload.zip') === 0) {
-                continue;
+        return Cache::remember($cacheKey, now()->addMinutes(30), function () use ($disk, $chatRootRelativePath) {
+            $files = $disk->allFiles($chatRootRelativePath);
+            $index = [];
+
+            foreach ($files as $fileRelPath) {
+                $fileRelPath = str_replace('\\', '/', (string) $fileRelPath);
+                $base = basename($fileRelPath);
+                if ($base === '' || strcasecmp($base, 'upload.zip') === 0) {
+                    continue;
+                }
+                $index[mb_strtolower($base)] = $fileRelPath;
             }
-            $index[mb_strtolower($base)] = $fileRelPath;
-        }
 
-        return $index;
+            return $index;
+        });
     }
 
     private function extractMediaFilenamesFromText(string $text): array

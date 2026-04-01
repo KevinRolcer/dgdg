@@ -6,9 +6,11 @@ use App\Models\Delegado;
 use App\Models\Microrregione;
 use App\Models\Municipio;
 use App\Services\Microregiones\MunicipioGeocodeService;
+use App\Services\Microregiones\NominatimPlaceSearchService;
 use App\Services\Microregiones\PueblaMunicipioBoundaryService;
 use App\Services\Microregiones\PueblaStateBounds;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -17,6 +19,7 @@ class MicroregionesController extends Controller
     public function __construct(
         private readonly MunicipioGeocodeService $geocode,
         private readonly PueblaMunicipioBoundaryService $boundary,
+        private readonly NominatimPlaceSearchService $placeSearch,
     ) {
     }
 
@@ -32,116 +35,89 @@ class MicroregionesController extends Controller
      */
     public function data(): JsonResponse
     {
-        $micros = Microrregione::query()
-            ->whereHas('municipios', static function ($q) {
-                $q->where(function ($q2) {
-                    $q2->whereIn('cve_edo', ['21', '021', 21])
-                        ->orWhereRaw('CAST(cve_edo AS UNSIGNED) = ?', [21]);
-                });
-            })
-            ->with([
-                'municipios' => static function ($q) {
-                    $q->select(['id', 'municipio', 'microrregion_id', 'cve_edo', 'cve_inegi'])
-                        ->where(function ($q2) {
-                            $q2->whereIn('cve_edo', ['21', '021', 21])
-                                ->orWhereRaw('CAST(cve_edo AS UNSIGNED) = ?', [21]);
-                        })
-                        ->orderBy('municipio');
-                },
-            ])
-            ->orderByRaw('CAST(microrregion AS UNSIGNED)')
-            ->get();
-
-        $delegadosByMicro = Delegado::query()
-            ->select(['delegados.id', 'delegados.user_id', 'delegados.microrregion_id', 'delegados.nombre', 'delegados.ap_paterno', 'delegados.ap_materno', 'delegados.telefono', 'delegados.email'])
-            ->join('users', 'users.id', '=', 'delegados.user_id')
-            ->where('users.activo', 1)
-            ->where('users.name', 'NOT LIKE', '%GESTION DE ENLACES%')
-            ->orderBy('delegados.id')
-            ->get()
-            ->groupBy('microrregion_id');
-
-        $userRows = DB::table('user_microrregion')
-            ->join('users', 'users.id', '=', 'user_microrregion.user_id')
-            ->where('users.activo', 1)
-            ->where('users.name', 'NOT LIKE', '%GESTION DE ENLACES%')
-            ->select(['user_microrregion.microrregion_id', 'users.id as user_id', 'users.name', 'users.email'])
-            ->orderBy('users.name')
-            ->get()
-            ->groupBy('microrregion_id');
-
-        $out = [];
-
-        foreach ($micros as $micro) {
-            $num = trim((string) $micro->microrregion);
-            $imgUrl = $this->resolveSeccionPngUrl($num);
-
-            $delegadoRow = optional($delegadosByMicro->get($micro->id)?->first());
-            $delegadoUserId = $delegadoRow ? (int) $delegadoRow->user_id : null;
-
-            $enlace = null;
-            $usersMicro = $userRows->get($micro->id) ?? collect();
-            foreach ($usersMicro as $u) {
-                if ($delegadoUserId !== null && (int) $u->user_id === $delegadoUserId) {
-                    continue;
-                }
-                // Filter out special admin/system users by name if needed
-                $userName = mb_strtoupper((string) $u->name);
-                if (str_contains($userName, 'GESTION DE ENLACES')) {
-                    continue;
-                }
-
-                $enlace = [
-                    'nombre' => (string) $u->name,
-                    'email' => (string) $u->email,
-                ];
-                break;
-            }
-
-            $municipios = [];
-            foreach ($micro->municipios as $mun) {
-                $coords = $this->geocode->coordinatesFor($mun);
-                $municipios[] = [
-                    'id' => (int) $mun->id,
-                    'micro_id' => (int) $micro->id,
-                    'nombre' => (string) $mun->municipio,
-                    'cve_inegi' => $mun->cve_inegi !== null ? (string) $mun->cve_inegi : null,
-                    'lat' => $coords['lat'],
-                    'lng' => $coords['lng'],
-                    'geo_source' => $coords['source'],
-                ];
-            }
-
-            $out[] = [
-                'id' => (int) $micro->id,
-                'numero' => $num,
-                'micro_label' => 'MR'.$num,
-                'cabecera' => (string) ($micro->cabecera ?? ''),
-                'image_url' => $imgUrl,
-                'delegado' => $delegadoRow ? [
-                    'nombre' => trim($delegadoRow->nombre.' '.$delegadoRow->ap_paterno.' '.$delegadoRow->ap_materno),
-                    'telefono' => (string) ($delegadoRow->telefono ?? ''),
-                    'email' => (string) ($delegadoRow->email ?? ''),
-                ] : null,
-                'enlace' => $enlace,
-                'municipios' => $municipios,
-            ];
-        }
+        $out = $this->buildMicrorregionesPayload();
 
         return response()->json([
             'microrregiones' => $out,
             'map' => [
                 'center' => [19.0, -97.75],
                 'zoom' => 8,
-                'attribution' => '© OpenStreetMap',
+                'attribution' => 'Â© OpenStreetMap',
                 'puebla_bounds' => PueblaStateBounds::asArray(),
             ],
             'boundaries_url' => route('microregiones.boundaries'),
+            'search_url' => route('microregiones.search'),
+        ]);
+    }
+
+    public function search(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->query('q', ''));
+        if (mb_strlen($query) < 3) {
+            return response()->json([
+                'results' => [],
+            ]);
+        }
+
+        $placeResults = $this->placeSearch->searchInPuebla($query, 5);
+        if ($placeResults === []) {
+            return response()->json([
+                'results' => [],
+            ]);
+        }
+
+        $micros = collect($this->buildMicrorregionesPayload())->keyBy('id');
+        $municipiosById = [];
+
+        foreach ($micros as $micro) {
+            foreach ($micro['municipios'] as $municipio) {
+                $municipiosById[(int) $municipio['id']] = $municipio + [
+                    'micro' => $micro,
+                ];
+            }
+        }
+
+        $results = [];
+
+        foreach ($placeResults as $item) {
+            $municipio = $municipiosById[(int) $item['municipio_id']] ?? null;
+            if ($municipio === null) {
+                continue;
+            }
+
+            $micro = $municipio['micro'];
+
+            $results[] = [
+                'display_name' => $item['display_name'],
+                'label' => $item['label'],
+                'lat' => $item['lat'],
+                'lng' => $item['lng'],
+                'type' => $item['type'],
+                'osm_type' => $item['osm_type'],
+                'geometry' => $item['geometry'],
+                'resolution_source' => $item['resolution_source'],
+                'municipio' => [
+                    'id' => (int) $municipio['id'],
+                    'nombre' => $municipio['nombre'],
+                ],
+                'micro' => [
+                    'id' => (int) $micro['id'],
+                    'numero' => $micro['numero'],
+                    'micro_label' => $micro['micro_label'],
+                    'cabecera' => $micro['cabecera'],
+                ],
+                'delegado' => $micro['delegado'],
+                'enlace' => $micro['enlace'],
+            ];
+        }
+
+        return response()->json([
+            'results' => $results,
         ]);
     }
 
     /**
-     * Polígonos de municipios (Puebla) ya resueltos y guardados en caché (Nominatim).
+     * PolÃ­gonos de municipios (Puebla) ya resueltos y guardados en cachÃ© (Nominatim).
      */
     public function boundaries(): JsonResponse
     {
@@ -193,5 +169,109 @@ class MicroregionesController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildMicrorregionesPayload(): array
+    {
+        $micros = Microrregione::query()
+            ->whereHas('municipios', static function ($q) {
+                $q->where(function ($q2) {
+                    $q2->whereIn('cve_edo', ['21', '021', 21])
+                        ->orWhereRaw('CAST(cve_edo AS UNSIGNED) = ?', [21]);
+                });
+            })
+            ->with([
+                'municipios' => static function ($q) {
+                    $q->select(['id', 'municipio', 'microrregion_id', 'cve_edo', 'cve_inegi', 'lat', 'lng'])
+                        ->where(function ($q2) {
+                            $q2->whereIn('cve_edo', ['21', '021', 21])
+                                ->orWhereRaw('CAST(cve_edo AS UNSIGNED) = ?', [21]);
+                        })
+                        ->orderBy('municipio');
+                },
+            ])
+            ->orderByRaw('CAST(microrregion AS UNSIGNED)')
+            ->get();
+
+        $delegadosByMicro = Delegado::query()
+            ->select(['delegados.id', 'delegados.user_id', 'delegados.microrregion_id', 'delegados.nombre', 'delegados.ap_paterno', 'delegados.ap_materno', 'delegados.telefono', 'delegados.email'])
+            ->join('users', 'users.id', '=', 'delegados.user_id')
+            ->where('users.activo', 1)
+            ->where('users.name', 'NOT LIKE', '%GESTION DE ENLACES%')
+            ->orderBy('delegados.id')
+            ->get()
+            ->groupBy('microrregion_id');
+
+        $userRows = DB::table('user_microrregion')
+            ->join('users', 'users.id', '=', 'user_microrregion.user_id')
+            ->where('users.activo', 1)
+            ->where('users.name', 'NOT LIKE', '%GESTION DE ENLACES%')
+            ->select(['user_microrregion.microrregion_id', 'users.id as user_id', 'users.name', 'users.email'])
+            ->orderBy('users.name')
+            ->get()
+            ->groupBy('microrregion_id');
+
+        $out = [];
+
+        foreach ($micros as $micro) {
+            $num = trim((string) $micro->microrregion);
+            $imgUrl = $this->resolveSeccionPngUrl($num);
+
+            $delegadoRow = optional($delegadosByMicro->get($micro->id)?->first());
+            $delegadoUserId = $delegadoRow ? (int) $delegadoRow->user_id : null;
+
+            $enlace = null;
+            $usersMicro = $userRows->get($micro->id) ?? collect();
+            foreach ($usersMicro as $u) {
+                if ($delegadoUserId !== null && (int) $u->user_id === $delegadoUserId) {
+                    continue;
+                }
+
+                $userName = mb_strtoupper((string) $u->name);
+                if (str_contains($userName, 'GESTION DE ENLACES')) {
+                    continue;
+                }
+
+                $enlace = [
+                    'nombre' => (string) $u->name,
+                    'email' => (string) $u->email,
+                ];
+                break;
+            }
+
+            $municipios = [];
+            foreach ($micro->municipios as $mun) {
+                $coords = $this->geocode->coordinatesFor($mun);
+                $municipios[] = [
+                    'id' => (int) $mun->id,
+                    'micro_id' => (int) $micro->id,
+                    'nombre' => (string) $mun->municipio,
+                    'cve_inegi' => $mun->cve_inegi !== null ? (string) $mun->cve_inegi : null,
+                    'lat' => $coords['lat'],
+                    'lng' => $coords['lng'],
+                    'geo_source' => $coords['source'],
+                ];
+            }
+
+            $out[] = [
+                'id' => (int) $micro->id,
+                'numero' => $num,
+                'micro_label' => 'MR'.$num,
+                'cabecera' => (string) ($micro->cabecera ?? ''),
+                'image_url' => $imgUrl,
+                'delegado' => $delegadoRow ? [
+                    'nombre' => trim($delegadoRow->nombre.' '.$delegadoRow->ap_paterno.' '.$delegadoRow->ap_materno),
+                    'telefono' => (string) ($delegadoRow->telefono ?? ''),
+                    'email' => (string) ($delegadoRow->email ?? ''),
+                ] : null,
+                'enlace' => $enlace,
+                'municipios' => $municipios,
+            ];
+        }
+
+        return $out;
     }
 }

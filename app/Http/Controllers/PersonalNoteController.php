@@ -8,9 +8,20 @@ use App\Services\PersonalNoteService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rules\Password;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PersonalNoteController extends Controller
 {
+    private const ATTACHMENT_ALLOWED_EXTENSIONS = [
+        'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp',
+        'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv',
+    ];
+
+    private const INLINE_ATTACHMENT_EXTENSIONS = [
+        'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'pdf', 'txt', 'csv',
+    ];
+
     public function __construct(
         private readonly PersonalNoteService $personalNoteService
     ) {}
@@ -19,7 +30,10 @@ class PersonalNoteController extends Controller
     {
         $user = $request->user();
         $filter = $request->get('filter', 'all');
-        $timeFilter = $request->get('time_filter', 'all');
+        $timeFilter = $request->get('time_filter');
+        if (! is_string($timeFilter) || $timeFilter === '') {
+            $timeFilter = $filter === 'all' ? 'month' : 'all';
+        }
         $month = $request->get('month');
         $year = $request->get('year');
         $folderId = $request->get('folder_id');
@@ -37,8 +51,6 @@ class PersonalNoteController extends Controller
             $year = now()->year;
         }
 
-        // Si se pide una carpeta específica, ignoramos los filtros de fecha/prioridad de la vista general 
-        // para evitar "leaks" de notas de la raíz o de otras carpetas.
         if ($folderId && $folderId !== 'all') {
             $month = null;
             $year = null;
@@ -104,6 +116,7 @@ class PersonalNoteController extends Controller
                     'folders_html' => view('agenda.personal.partials.folders_grid', compact('folders'))->render(),
                 ]);
             }
+
             return view('agenda.personal.partials.notes_grid', compact('notes', 'filter'))->render();
         }
 
@@ -129,19 +142,21 @@ class PersonalNoteController extends Controller
             'content' => 'nullable|string',
             'folder_id' => 'nullable|exists:personal_note_folders,id',
             'is_encrypted' => 'boolean',
-            'password' => 'nullable|string|min:4',
+            'password' => ['nullable', 'string', Password::min(10)->letters()->mixedCase()->numbers()],
             'color' => 'nullable|string|max:20',
             'priority' => 'required|in:none,low,medium,high',
             'reminder_at' => 'nullable|date',
             'scheduled_date' => 'nullable|date',
             'scheduled_time' => 'nullable',
+            'attachments' => 'nullable|array|max:20',
+            'attachments.*' => 'file|max:10240|mimes:'.implode(',', self::ATTACHMENT_ALLOWED_EXTENSIONS),
         ]);
 
         $note = $this->personalNoteService->createNote($validated, $request->user()->id);
 
         if ($request->hasFile('attachments')) {
-            $newImages = collect($request->file('attachments'))->filter(fn ($f) => str_contains($f->getMimeType(), 'image'));
-            $newDocs   = collect($request->file('attachments'))->reject(fn ($f) => str_contains($f->getMimeType(), 'image'));
+            $newImages = collect($request->file('attachments'))->filter(fn ($f) => $this->isImageAttachment($f->getClientOriginalExtension()));
+            $newDocs = collect($request->file('attachments'))->reject(fn ($f) => $this->isImageAttachment($f->getClientOriginalExtension()));
 
             if ($newImages->count() > 10 || $newDocs->count() > 10) {
                 return response()->json(['success' => false, 'message' => 'Máximo 10 imágenes y 10 archivos por nota.'], 422);
@@ -152,7 +167,7 @@ class PersonalNoteController extends Controller
                 $note->attachments()->create([
                     'file_path' => $path,
                     'file_name' => $file->getClientOriginalName(),
-                    'file_type' => str_contains($file->getMimeType(), 'image') ? 'image' : 'document',
+                    'file_type' => $this->isImageAttachment($file->getClientOriginalExtension()) ? 'image' : 'document',
                     'file_size' => $file->getSize(),
                 ]);
             }
@@ -169,6 +184,7 @@ class PersonalNoteController extends Controller
     {
         abort_unless($note->user_id === $request->user()->id, 403);
         $this->personalNoteService->archiveNote($note);
+
         return response()->json(['success' => true]);
     }
 
@@ -209,21 +225,23 @@ class PersonalNoteController extends Controller
             'content' => 'nullable|string',
             'folder_id' => 'nullable|exists:personal_note_folders,id',
             'is_encrypted' => 'boolean',
-            'password' => 'nullable|string|min:4',
+            'password' => ['nullable', 'string', Password::min(10)->letters()->mixedCase()->numbers()],
             'color' => 'nullable|string|max:20',
             'priority' => 'required|in:none,low,medium,high',
             'reminder_at' => 'nullable|date',
             'scheduled_date' => 'nullable|date',
             'scheduled_time' => 'nullable',
+            'attachments' => 'nullable|array|max:20',
+            'attachments.*' => 'file|max:10240|mimes:'.implode(',', self::ATTACHMENT_ALLOWED_EXTENSIONS),
         ]);
 
         $this->personalNoteService->updateNote($note, $validated);
 
         if ($request->hasFile('attachments')) {
             $existingImages = $note->attachments()->where('file_type', 'image')->count();
-            $existingDocs   = $note->attachments()->where('file_type', 'document')->count();
-            $newImages = collect($request->file('attachments'))->filter(fn ($f) => str_contains($f->getMimeType(), 'image'));
-            $newDocs   = collect($request->file('attachments'))->reject(fn ($f) => str_contains($f->getMimeType(), 'image'));
+            $existingDocs = $note->attachments()->where('file_type', 'document')->count();
+            $newImages = collect($request->file('attachments'))->filter(fn ($f) => $this->isImageAttachment($f->getClientOriginalExtension()));
+            $newDocs = collect($request->file('attachments'))->reject(fn ($f) => $this->isImageAttachment($f->getClientOriginalExtension()));
 
             if (($existingImages + $newImages->count()) > 10 || ($existingDocs + $newDocs->count()) > 10) {
                 return response()->json(['success' => false, 'message' => 'Máximo 10 imágenes y 10 archivos por nota.'], 422);
@@ -234,7 +252,7 @@ class PersonalNoteController extends Controller
                 $note->attachments()->create([
                     'file_path' => $path,
                     'file_name' => $file->getClientOriginalName(),
-                    'file_type' => str_contains($file->getMimeType(), 'image') ? 'image' : 'document',
+                    'file_type' => $this->isImageAttachment($file->getClientOriginalExtension()) ? 'image' : 'document',
                     'file_size' => $file->getSize(),
                 ]);
             }
@@ -259,9 +277,6 @@ class PersonalNoteController extends Controller
         return redirect()->route('personal-agenda.index')->with('toast', 'Nota eliminada.');
     }
 
-    /**
-     * Folder Actions
-     */
     public function storeFolder(Request $request)
     {
         $validated = $request->validate([
@@ -290,9 +305,6 @@ class PersonalNoteController extends Controller
         return response()->json(['success' => true, 'folder' => $folder->fresh()]);
     }
 
-    /**
-     * Archiva la carpeta (soft delete): las notas pasan a sin carpeta.
-     */
     public function archiveFolder(Request $request, \App\Models\PersonalNoteFolder $folder)
     {
         abort_unless($folder->user_id === $request->user()->id, 403);
@@ -302,9 +314,6 @@ class PersonalNoteController extends Controller
         return response()->json(['success' => true]);
     }
 
-    /**
-     * Restaurar carpeta archivada (soft delete): vuelve a la lista de carpetas activas.
-     */
     public function restoreFolder(Request $request, int $folderId)
     {
         $folder = \App\Models\PersonalNoteFolder::onlyTrashed()
@@ -354,23 +363,22 @@ class PersonalNoteController extends Controller
             'password' => 'required|string',
         ]);
 
-        if (!Hash::check($request->password, $note->password_verify_hash)) {
+        if (! Hash::check($request->password, $note->password_verify_hash)) {
             return response()->json(['success' => false, 'message' => 'Contraseña incorrecta.'], 422);
         }
 
         $decryptedContent = $this->personalNoteService->decryptContent($note->content, $request->password);
 
         if ($decryptedContent === null) {
-            // Content might not be properly encrypted — return raw content as fallback
             return response()->json([
-                'success' => true,
-                'content' => $note->content ?? ''
-            ]);
+                'success' => false,
+                'message' => 'No fue posible descifrar la nota con la contraseña proporcionada.',
+            ], 422);
         }
 
         return response()->json([
             'success' => true,
-            'content' => $decryptedContent
+            'content' => $decryptedContent,
         ]);
     }
 
@@ -391,11 +399,9 @@ class PersonalNoteController extends Controller
     {
         abort_unless($attachment->note->user_id === $request->user()->id, 403);
 
-        foreach (['secure_shared', 'public'] as $disk) {
-            if (Storage::disk($disk)->exists($attachment->file_path)) {
-                Storage::disk($disk)->delete($attachment->file_path);
-                break;
-            }
+        [$disk, $path] = $this->resolveAttachmentStorage($attachment);
+        if ($disk !== null && $path !== null) {
+            Storage::disk($disk)->delete($path);
         }
 
         $attachment->delete();
@@ -403,16 +409,65 @@ class PersonalNoteController extends Controller
         return response()->json(['success' => true]);
     }
 
-    public function serveAttachment(Request $request, PersonalNoteAttachment $attachment)
+    public function serveAttachment(Request $request, PersonalNoteAttachment $attachment): BinaryFileResponse
     {
         abort_unless($attachment->note->user_id === $request->user()->id, 403);
 
+        [$disk, $path] = $this->resolveAttachmentStorage($attachment);
+        abort_unless($disk !== null && $path !== null, 404);
+
+        $absolutePath = Storage::disk($disk)->path($path);
+        $downloadName = $this->safeAttachmentDownloadName($attachment);
+
+        if ($this->isInlineAttachment($downloadName)) {
+            return response()->file($absolutePath, [
+                'Content-Disposition' => 'inline; filename="'.$downloadName.'"',
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        }
+
+        return response()->download($absolutePath, $downloadName, [
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    private function resolveAttachmentStorage(PersonalNoteAttachment $attachment): array
+    {
+        $normalizedPath = ltrim(str_replace('\\', '/', trim((string) $attachment->file_path)), '/');
+        if ($normalizedPath === '' || ! str_starts_with($normalizedPath, 'personal-notes/attachments/')) {
+            return [null, null];
+        }
+
         foreach (['secure_shared', 'public'] as $disk) {
-            if (Storage::disk($disk)->exists($attachment->file_path)) {
-                return response()->file(Storage::disk($disk)->path($attachment->file_path));
+            if (Storage::disk($disk)->exists($normalizedPath)) {
+                return [$disk, $normalizedPath];
             }
         }
 
-        abort(404);
+        return [null, null];
+    }
+
+    private function safeAttachmentDownloadName(PersonalNoteAttachment $attachment): string
+    {
+        $name = trim((string) $attachment->file_name);
+        if ($name === '') {
+            $name = basename((string) $attachment->file_path);
+        }
+
+        $sanitized = preg_replace('/[^\w.\- ]+/u', '_', $name) ?? 'adjunto';
+
+        return trim($sanitized) !== '' ? $sanitized : 'adjunto';
+    }
+
+    private function isInlineAttachment(string $fileName): bool
+    {
+        $extension = strtolower((string) pathinfo($fileName, PATHINFO_EXTENSION));
+
+        return in_array($extension, self::INLINE_ATTACHMENT_EXTENSIONS, true);
+    }
+
+    private function isImageAttachment(?string $extension): bool
+    {
+        return in_array(strtolower((string) $extension), ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'], true);
     }
 }

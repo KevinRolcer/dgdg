@@ -36,6 +36,27 @@ class TemporaryModuleExportService
     ) {
     }
 
+    private function resolveMicrorregionSortDirection(): string
+    {
+        $direction = strtolower(trim((string) ($this->exportConfig['microrregion_sort'] ?? 'asc')));
+
+        return in_array($direction, ['asc', 'desc'], true) ? $direction : 'asc';
+    }
+
+    private function orderEntriesByMicrorregion($query)
+    {
+        $direction = strtoupper($this->resolveMicrorregionSortDirection());
+
+        return $query
+            ->leftJoin('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
+            ->orderByRaw(
+                'CASE WHEN temporary_module_entries.microrregion_id IS NULL THEN 1 ELSE 0 END, '.
+                'CAST(COALESCE(microrregiones.microrregion, 0) AS UNSIGNED) '.$direction.', '.
+                'temporary_module_entries.submitted_at DESC'
+            )
+            ->select('temporary_module_entries.*');
+    }
+
     public function exportExcel(int $moduleId, string $mode = 'single', bool $includeAnalysis = true, ?array $exportConfig = null): array
     {
         set_time_limit(0);
@@ -124,12 +145,13 @@ class TemporaryModuleExportService
 
         if ($mode === 'mr') {
             // Obtenemos los grupos directamente de la base de datos para no cargar todo en memoria a la vez
+            $groupDirection = strtoupper($this->resolveMicrorregionSortDirection());
             $groups = $temporaryModule->entries()
                 ->withoutGlobalScopes()
                 ->reorder() // evitamos ordenar por submitted_at en una consulta DISTINCT
                 ->select('microrregion_id')
                 ->join('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
-                ->orderByRaw('CAST(microrregiones.microrregion AS UNSIGNED) ASC')
+                ->orderByRaw('CAST(microrregiones.microrregion AS UNSIGNED) '.$groupDirection)
                 ->distinct()
                 ->pluck('microrregion_id')
                 ->values();
@@ -153,9 +175,11 @@ class TemporaryModuleExportService
                     );
                     $targetSheet->setTitle($this->uniqueSheetTitle($baseTitle, $usedTitles));
 
-                    $entriesQuery = $temporaryModule->entries()
-                        ->where('microrregion_id', $microrregionId)
-                        ->latest('submitted_at');
+                    $entriesQuery = $this->orderEntriesByMicrorregion(
+                        $temporaryModule->entries()
+                            ->withoutGlobalScopes()
+                            ->where('temporary_module_entries.microrregion_id', $microrregionId)
+                    );
 
                     $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta, $fechaCorte);
                     $this->applyPrintSetup($targetSheet, $orientation);
@@ -177,13 +201,14 @@ class TemporaryModuleExportService
                     $targetSheet->setTitle($sheetTitle);
 
                     $catKey = $categoriaField->key;
-                    $entriesQuery = $temporaryModule->entries()
-                        ->withoutGlobalScopes()
-                        ->latest('submitted_at')
-                        ->where(function ($q) use ($catKey, $catName) {
-                            $q->where('data->'.$catKey, $catName)
-                                ->orWhere('data->'.$catKey, 'like', $catName.' > %');
-                        });
+                    $entriesQuery = $this->orderEntriesByMicrorregion(
+                        $temporaryModule->entries()
+                            ->withoutGlobalScopes()
+                            ->where(function ($q) use ($catKey, $catName) {
+                                $q->where('data->'.$catKey, $catName)
+                                    ->orWhere('data->'.$catKey, 'like', $catName.' > %');
+                            })
+                    );
                     $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta, $fechaCorte);
                     $this->applyPrintSetup($targetSheet);
                 }
@@ -195,11 +220,10 @@ class TemporaryModuleExportService
             } else {
                 $targetSheet = $createDataSheet();
                 $targetSheet->setTitle('Registros');
-                $entriesQuery = $temporaryModule->entries()
-                    ->withoutGlobalScopes()
-                    ->leftJoin('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
-                    ->orderByRaw('CASE WHEN microrregion_id IS NULL THEN 1 ELSE 0 END, CAST(microrregiones.microrregion AS UNSIGNED) ASC, submitted_at DESC')
-                    ->select('temporary_module_entries.*');
+                $entriesQuery = $this->orderEntriesByMicrorregion(
+                    $temporaryModule->entries()
+                        ->withoutGlobalScopes()
+                );
 
                 $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta, $fechaCorte);
                 $this->applyPrintSetup($targetSheet, $orientation);

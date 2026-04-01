@@ -1578,17 +1578,20 @@ class MesasPazService
             return true;
         }
 
-        // Para delegados regulares, validamos que la evidencia les pertenezca.
-        $escaped = str_replace('/', '\\/', $normalized);
+        foreach (
+            MesaPazAsistencia::query()
+                ->where('user_id', $userId)
+                ->whereNotNull('evidencia')
+                ->select(['evidencia'])
+                ->cursor() as $registro
+        ) {
+            $paths = $this->decodeEvidencePaths($registro->evidencia);
+            if (in_array($normalized, $paths, true)) {
+                return true;
+            }
+        }
 
-        $query = MesaPazAsistencia::query()
-            ->whereNotNull('evidencia')
-            ->where(function ($q) use ($normalized, $escaped) {
-                $q->where('evidencia', 'like', '%' . $normalized . '%')
-                  ->orWhere('evidencia', 'like', '%' . $escaped . '%');
-            });
-
-        return $query->where('user_id', $userId)->exists();
+        return false;
     }
 
     private function deleteEvidenceFile(string $path): void

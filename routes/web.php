@@ -41,6 +41,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/microregiones', [MicroregionesController::class, 'index'])->name('microregiones.index');
     Route::get('/microregiones/data', [MicroregionesController::class, 'data'])->name('microregiones.data');
     Route::get('/microregiones/boundaries', [MicroregionesController::class, 'boundaries'])->name('microregiones.boundaries');
+    Route::get('/microregiones/search', [MicroregionesController::class, 'search'])->name('microregiones.search');
     Route::get('/mi-perfil', [ProfileController::class, 'show'])->name('profile.show');
     Route::get('/ajustes', [SettingsController::class, 'index'])->name('settings.index');
     Route::get('/ajustes/apariencia', [SettingsController::class, 'apariencia'])->name('settings.apariencia');
@@ -50,10 +51,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/ajustes/imagenes/migrar', [AdminSettingsController::class, 'migrateImages'])
         ->middleware('can:Modulos-Temporales-Admin')
         ->name('settings.images.migrate');
-    Route::post('/ajustes/microrregiones/distribuir-excel', [AdminSettingsController::class, 'distribuirMunicipiosExcel'])
-        ->middleware('can:Modulos-Temporales-Admin')
-        ->name('settings.images.migrate'); // Using same name as previous for distribute excel
-
     Route::post('/ajustes/microrregiones/distribuir-excel', [AdminSettingsController::class, 'distribuirMunicipiosExcel'])
         ->middleware('can:Modulos-Temporales-Admin')
         ->name('settings.microrregiones.distribuir-excel');
@@ -158,6 +155,10 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.export');
+            Route::post('/{module}/toggle-active', [TemporaryModuleController::class, 'toggleActive'])
+                ->whereNumber('module')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.toggle-active');
             Route::post('/{module}/normalizar-municipio', [TemporaryModuleController::class, 'normalizeMunicipioField'])
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')

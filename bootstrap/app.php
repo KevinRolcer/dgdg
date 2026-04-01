@@ -5,8 +5,10 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
-// Hostgator include path
-ini_set('include_path', '/home3/kevinast/php:'.ini_get('include_path'));
+$includePathPrefix = trim((string) env('PHP_INCLUDE_PATH_PREFIX', ''));
+if ($includePathPrefix !== '') {
+    ini_set('include_path', $includePathPrefix.PATH_SEPARATOR.ini_get('include_path'));
+}
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(

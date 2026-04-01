@@ -14,11 +14,11 @@ class TemporaryModuleEntryDataService
 
     public function deleteStoredPath(string $path): void
     {
-        if (trim($path) === '' || filter_var($path, FILTER_VALIDATE_URL)) {
+        $normalizedPath = $this->normalizeStoredPath($path);
+        if ($normalizedPath === null) {
             return;
         }
 
-        $normalizedPath = ltrim(str_replace('\\', '/', $path), '/');
         foreach ([self::PRIMARY_DISK, self::LEGACY_DISK] as $disk) {
             if (Storage::disk($disk)->exists($normalizedPath)) {
                 Storage::disk($disk)->delete($normalizedPath);
@@ -28,11 +28,10 @@ class TemporaryModuleEntryDataService
 
     public function resolveStoredFilePath(string $path): ?string
     {
-        if (trim($path) === '' || filter_var($path, FILTER_VALIDATE_URL)) {
+        $normalizedPath = $this->normalizeStoredPath($path);
+        if ($normalizedPath === null) {
             return null;
         }
-
-        $normalizedPath = ltrim(str_replace('\\', '/', $path), '/');
 
         foreach ([self::PRIMARY_DISK, self::LEGACY_DISK] as $disk) {
             if (Storage::disk($disk)->exists($normalizedPath)) {
@@ -51,6 +50,13 @@ class TemporaryModuleEntryDataService
         }
 
         return null;
+    }
+
+    public function pathCanBePreviewedInline(string $path): bool
+    {
+        $extension = strtolower((string) pathinfo($path, PATHINFO_EXTENSION));
+
+        return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'pdf', 'txt', 'csv'], true);
     }
 
     /** Elimina una entrada y sus archivos asociados (imagen/file). */
@@ -155,5 +161,20 @@ class TemporaryModuleEntryDataService
             Storage::disk(self::PRIMARY_DISK)->delete($uniqueFiles);
             Storage::disk(self::LEGACY_DISK)->delete($uniqueFiles);
         }
+    }
+
+    private function normalizeStoredPath(string $path): ?string
+    {
+        $value = trim($path);
+        if ($value === '' || filter_var($value, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+
+        $normalizedPath = ltrim(str_replace('\\', '/', $value), '/');
+        if ($normalizedPath === '' || str_contains($normalizedPath, '..')) {
+            return null;
+        }
+
+        return $normalizedPath;
     }
 }
