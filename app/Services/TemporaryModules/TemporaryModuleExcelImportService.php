@@ -22,7 +22,7 @@ class TemporaryModuleExcelImportService
 {
     /** Tipos que se pueden llenar desde Excel (sin archivo/imagen). */
     public const IMPORTABLE_TYPES = [
-        'text', 'textarea', 'number', 'date', 'datetime', 'select', 'multiselect', 'linked', 'boolean', 'categoria', 'municipio', 'geopoint', 'image', 'semaforo',
+        'text', 'textarea', 'number', 'date', 'datetime', 'select', 'multiselect', 'linked', 'boolean', 'categoria', 'municipio', 'geopoint', 'image', 'semaforo', 'delegado',
     ];
 
     public function importableFields(Collection $fields): Collection

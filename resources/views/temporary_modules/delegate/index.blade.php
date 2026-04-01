@@ -377,6 +377,16 @@
                                         <input id="{{ $id }}" type="date" name="{{ $name }}" value="{{ is_scalar($value) ? $value : '' }}" {{ $field->is_required ? 'required' : '' }}>
                                     @elseif ($field->type === 'datetime')
                                         <input id="{{ $id }}" type="datetime-local" name="{{ $name }}" value="{{ is_scalar($value) ? $value : '' }}" {{ $field->is_required ? 'required' : '' }}>
+                                    @elseif ($field->type === 'delegado')
+                                        <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
+                                            <option value="">Selecciona delegado</option>
+                                            @foreach (($delegados ?? collect()) as $del)
+                                                <option value="{{ $del->name }}" @selected($value === $del->name)>
+                                                    {{ $del->name }}
+                                                    @if(!empty($del->microrregion)) (MR {{ str_pad((string) $del->microrregion, 2, '0', STR_PAD_LEFT) }}) @endif
+                                                </option>
+                                            @endforeach
+                                        </select>
                                     @elseif ($field->type === 'select')
                                         <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
                                             <option value="">Selecciona una opcion</option>

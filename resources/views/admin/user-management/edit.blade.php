@@ -90,7 +90,13 @@
                     <select id="microrregion_id" name="microrregion_id">
                         <option value="">— Selecciona —</option>
                         @foreach($microrregiones as $mr)
-                            @php $sel = old('microrregion_id', $user->microrregionesAsignadas->first()?->id) == $mr->id ? 'selected' : ''; @endphp
+                            @php
+                                $assignedId = $user->microrregionesAsignadas->first()?->id;
+                                if (!$assignedId && $user->delegado) {
+                                    $assignedId = $user->delegado->microrregion_id;
+                                }
+                                $sel = (old('microrregion_id', $assignedId) == $mr->id) ? 'selected' : '';
+                            @endphp
                             <option value="{{ $mr->id }}" {{ $sel }}>MR {{ $mr->microrregion }} – {{ $mr->cabecera }}</option>
                         @endforeach
                     </select>

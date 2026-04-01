@@ -303,6 +303,7 @@ class TemporaryModuleFieldService
                 return [...$rules, 'string', 'max:255', Rule::in($allowed)];
             })(),
             'municipio' => [...$rules, Rule::in($municipios)],
+            'delegado' => [...$rules, 'string', 'max:255'],
             'boolean' => [...$rules, 'boolean'],
             'semaforo' => (function () use ($required, $rules) {
                 $allowed = self::SEMAFORO_VALUES;

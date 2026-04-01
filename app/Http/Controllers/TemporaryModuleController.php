@@ -100,6 +100,7 @@ class TemporaryModuleController extends Controller
         'seccion' => 'Sección',
         'geopoint' => 'Georreferencia',
         'image' => 'Imagen',
+        'delegado' => 'Lista de Delegados (Personal activo)',
     ];
 
     private function findDuplicateEntryId(TemporaryModule $temporaryModule, int $microrregionId, array $values, ?int $excludeEntryId = null): ?int
@@ -399,6 +400,8 @@ class TemporaryModuleController extends Controller
             } elseif ($field->type === 'seccion' && is_array($field->options)) {
                 $row['options_title'] = (string) ($field->options['title'] ?? '');
                 $row['options_subsections'] = implode("\n", (array) ($field->options['subsections'] ?? []));
+            } elseif ($field->type === 'delegado') {
+                $row['options'] = '';
             } else {
                 $row['options'] = is_array($field->options) ? implode(', ', $field->options) : '';
             }
@@ -883,7 +886,7 @@ class TemporaryModuleController extends Controller
         $user = $request->user();
 
         if (Gate::forUser($user)->allows('modulos-temporales-admin-ver')) {
-            return $this->adminIndex();
+            return $this->adminIndex($request);
         }
 
         [, $municipios] = $this->accessService->delegadoMunicipios((int) $user->id);
@@ -969,6 +972,7 @@ class TemporaryModuleController extends Controller
             'fragmentUploadUrl' => route('temporary-modules.fragment.upload'),
             'fragmentRecordsUrl' => route('temporary-modules.fragment.records'),
             'delegateScriptPayload' => $delegateScriptPayload,
+            'delegados' => $this->accessService->onlyDelegates(),
         ]);
     }
 
@@ -1103,12 +1107,17 @@ class TemporaryModuleController extends Controller
             ->limit(500)
             ->get();
 
-        $fieldsPayload = $temporaryModule->fields->filter(fn ($f) => $f->type !== 'seccion')->values()->map(function ($f) {
+        $delegadosList = $this->accessService->onlyDelegates()->map(function ($del) {
+            $label = $del->name . (!empty($del->microrregion) ? ' (MR ' . str_pad((string) $del->microrregion, 2, '0', STR_PAD_LEFT) . ')' : '');
+            return ['value' => $del->name, 'label' => $label];
+        })->values()->all();
+
+        $fieldsPayload = $temporaryModule->fields->filter(fn ($f) => $f->type !== 'seccion')->values()->map(function ($f) use ($delegadosList) {
             return [
                 'key' => $f->key,
                 'label' => $f->label,
                 'type' => $f->type,
-                'options' => $f->options,
+                'options' => $f->type === 'delegado' ? $delegadosList : $f->options,
                 'is_required' => (bool) $f->is_required,
                 'comment' => $f->comment,
             ];
@@ -1189,6 +1198,7 @@ class TemporaryModuleController extends Controller
             'entries' => $entries,
             'fieldTypes' => self::FIELD_TYPES,
             'editingEntry' => $editingEntry,
+            'delegados' => $this->accessService->onlyDelegates(),
         ]);
     }
 

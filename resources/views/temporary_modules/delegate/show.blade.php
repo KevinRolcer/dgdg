@@ -151,6 +151,16 @@
                                     <option value="{{ $option }}" @selected($value === $option)>{{ $option }}</option>
                                 @endforeach
                             </select>
+                        @elseif ($field->type === 'delegado')
+                            <select id="{{ $id }}" name="{{ $name }}" {{ $field->is_required ? 'required' : '' }}>
+                                <option value="">Selecciona delegado</option>
+                                @foreach ($delegados as $del)
+                                    <option value="{{ $del->name }}" @selected($value === $del->name)>
+                                        {{ $del->name }}
+                                        @if(!empty($del->microrregion)) (MR {{ str_pad((string) $del->microrregion, 2, '0', STR_PAD_LEFT) }}) @endif
+                                    </option>
+                                @endforeach
+                            </select>
                         @elseif ($field->type === 'municipio')
                             <select
                                 id="{{ $id }}"

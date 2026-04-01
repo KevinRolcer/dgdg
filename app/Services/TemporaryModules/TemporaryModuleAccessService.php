@@ -189,4 +189,26 @@ class TemporaryModuleAccessService
             ->sortBy('name')
             ->values();
     }
+
+    public function onlyDelegates(): Collection
+    {
+        return DB::table('delegados as d')
+            ->join('users as u', 'u.id', '=', 'd.user_id')
+            ->join('microrregiones as m', 'm.id', '=', 'd.microrregion_id')
+            ->where('u.activo', 1)
+            ->where('u.area_id', 8)
+            ->where('u.cargo_id', 250)
+            ->select([
+                'u.id',
+                'u.name',
+                'u.email',
+                'm.microrregion',
+                'm.cabecera',
+                DB::raw("'Delegado' as scope"),
+            ])
+            ->orderByRaw('CAST(m.microrregion AS UNSIGNED)')
+            ->orderBy('u.name')
+            ->distinct()
+            ->get();
+    }
 }

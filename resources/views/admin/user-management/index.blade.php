@@ -69,7 +69,13 @@
                 </div>
                 <div class="um-card-body">
                     <div><span class="um-card-label">Microregiones</span>
-                        @php $nums = $user->microrregionesAsignadas->pluck('microrregion')->sort()->values(); @endphp
+                        @php
+                            $nums = $user->microrregionesAsignadas->pluck('microrregion')->toBase();
+                            if ($user->delegado && $user->delegado->microrregion) {
+                                $nums->push($user->delegado->microrregion->microrregion);
+                            }
+                            $nums = $nums->unique()->sort()->values();
+                        @endphp
                         <span>{{ $nums->isNotEmpty() ? $nums->implode(', ') : '—' }}</span>
                     </div>
                     <div><span class="um-card-label">Estado</span>
@@ -116,7 +122,11 @@
                         </td>
                         <td>
                             @php
-                                $nums = $user->microrregionesAsignadas->pluck('microrregion')->sort()->values();
+                                $nums = $user->microrregionesAsignadas->pluck('microrregion')->toBase();
+                                if ($user->delegado && $user->delegado->microrregion) {
+                                    $nums->push($user->delegado->microrregion->microrregion);
+                                }
+                                $nums = $nums->unique()->sort()->values();
                             @endphp
                             @if($nums->isNotEmpty())
                                 <span class="um-micros-text">{{ $nums->implode(', ') }}</span>
