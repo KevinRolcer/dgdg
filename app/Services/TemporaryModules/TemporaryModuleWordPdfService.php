@@ -405,7 +405,22 @@ class TemporaryModuleWordPdfService
             // Filas
             $itemNumber = 1;
             foreach ($entries as $entry) {
-                $table->addRow();
+                // Ajustar alto de fila para que la imagen quede dentro de la celda.
+                $hasImageInRow = false;
+                foreach ($columns as $c) {
+                    $k = (string) ($c['key'] ?? '');
+                    if ($k === '' || $k === 'item' || $k === 'microrregion') {
+                        continue;
+                    }
+                    $v = $entry->data[$k] ?? null;
+                    $t = (string) ($fieldTypesByKey[$k] ?? '');
+                    if ($this->resolveImageAbsolutePath($v, $t) !== null) {
+                        $hasImageInRow = true;
+                        break;
+                    }
+                }
+                $rowHeightTwips = $hasImageInRow ? $this->pxToTwips(72 + 12) : null;
+                $table->addRow($rowHeightTwips);
                 foreach ($columns as $idx => $col) {
                     $key = $col['key'];
                     $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
@@ -429,7 +444,7 @@ class TemporaryModuleWordPdfService
                     $imagePath = $this->resolveImageAbsolutePath($val, $fieldType);
                     if ($imagePath !== null) {
                         $w = $columnTwips[$idx] ?? null;
-                        $imgCell = $table->addCell($w);
+                        $imgCell = $table->addCell($w, ['valign' => 'center']);
                         $imgCell->addImage($imagePath, [
                             'height' => 72,
                             'alignment' => Jc::CENTER,
@@ -834,6 +849,12 @@ class TemporaryModuleWordPdfService
         }
 
         return $fullPath;
+    }
+
+    private function pxToTwips(int $px): int
+    {
+        // Aproximación: 96dpi → 1px ≈ 15 twips (1440 twips / 96 px).
+        return max(0, (int) round($px * 15));
     }
 
     private function isImageTypeOrValue(string $fieldType, string $value): bool

@@ -1169,8 +1169,10 @@ class TemporaryModuleExportService
                                         $drawing->setHeight($height);
                                         $drawing->setWorksheet($sheet);
                                         $currentRowHeight = (float) $sheet->getRowDimension($rowIndex)->getRowHeight();
-                                        if ($height > $currentRowHeight || $currentRowHeight < 0) {
-                                            $sheet->getRowDimension($rowIndex)->setRowHeight($height + 4);
+                                        // PhpSpreadsheet usa puntos (pt) para el alto de fila; convertir px → pt aprox (0.75).
+                                        $heightPt = ($height * 0.75) + 4;
+                                        if ($heightPt > $currentRowHeight || $currentRowHeight < 0) {
+                                            $sheet->getRowDimension($rowIndex)->setRowHeight($heightPt);
                                         }
                                     } else {
                                         // Fallback: dejar vínculo visible.
@@ -1195,8 +1197,9 @@ class TemporaryModuleExportService
                                         $drawing->setWorksheet($sheet);
                                         // Asegurar que el alto de la fila sea suficiente para la imagen más alta en ella
                                         $currentRowHeight = (float) $sheet->getRowDimension($rowIndex)->getRowHeight();
-                                        if ($height > $currentRowHeight || $currentRowHeight < 0) {
-                                            $sheet->getRowDimension($rowIndex)->setRowHeight($height + 4);
+                                        $heightPt = ($height * 0.75) + 4;
+                                        if ($heightPt > $currentRowHeight || $currentRowHeight < 0) {
+                                            $sheet->getRowDimension($rowIndex)->setRowHeight($heightPt);
                                         }
                                     } else {
                                         $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
