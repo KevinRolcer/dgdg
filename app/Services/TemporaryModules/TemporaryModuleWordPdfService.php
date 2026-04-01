@@ -192,13 +192,14 @@ class TemporaryModuleWordPdfService
         $countByFields = $includeCountTable && is_array($exportConfig['count_by_fields'] ?? null)
             ? array_values(array_filter(array_map('strval', $exportConfig['count_by_fields'])))
             : [];
+        $countTableColors = is_array($exportConfig['count_table_colors'] ?? null) ? $exportConfig['count_table_colors'] : [];
         $countTable = null;
         if ($includeCountTable) {
             $fieldLabels = [];
             foreach ($columns as $column) {
                 $fieldLabels[(string) ($column['key'] ?? '')] = (string) ($column['label'] ?? '');
             }
-            $countTable = $this->buildCountTableData($entries, $countByFields, $fieldLabels);
+            $countTable = $this->buildCountTableData($entries, $countByFields, $fieldLabels, $countTableColors);
             $countTable = $this->transformCountTableLabels($countTable, $headersUppercase);
         }
 
@@ -258,7 +259,6 @@ class TemporaryModuleWordPdfService
             if ($countTable !== null && isset($countTable['groups'])) {
                 $countTblStyle = ['borderSize' => 6, 'borderColor' => '444444', 'cellMargin' => 80];
                 $countTbl = $section->addTable($countTblStyle);
-                $countTableColors = is_array($exportConfig['count_table_colors'] ?? null) ? $exportConfig['count_table_colors'] : [];
                 $resolveCountColor = function ($key, int $rowNum, ?string $valueLabel = null) use ($countTableColors): string {
                     $c = $countTableColors[$key] ?? null;
                     if (is_string($c) && $c !== '') {
@@ -486,9 +486,10 @@ class TemporaryModuleWordPdfService
      * @param Collection $entries entries with 'data'
      * @param array<string> $countByFields
      * @param array<string, string> $fieldLabels key => label
+     * @param array<string, mixed> $countTableColors key => personalization config
      * @return array{groups: list<array{label: string, values: list<array{label: string, count: int}>}>}
      */
-    private function buildCountTableData(Collection $entries, array $countByFields, array $fieldLabels = []): array
+    private function buildCountTableData(Collection $entries, array $countByFields, array $fieldLabels = [], array $countTableColors = []): array
     {
         $total = $entries->count();
         $groups = [
@@ -496,6 +497,8 @@ class TemporaryModuleWordPdfService
         ];
 
         foreach ($countByFields as $fieldKey) {
+            $fieldCfg = is_array($countTableColors[$fieldKey] ?? null) ? $countTableColors[$fieldKey] : [];
+            $includeSR = !array_key_exists('showSR', $fieldCfg) || !empty($fieldCfg['showSR']);
             $valueCounts = [];
             $labelByLower = [];
             $sinRespuestaCount = 0;
@@ -544,7 +547,7 @@ class TemporaryModuleWordPdfService
             foreach ($valueCounts as $lower => $count) {
                 $values[] = ['label' => $labelByLower[$lower] ?? $lower, 'count' => $count];
             }
-            if ($sinRespuestaCount > 0) {
+            if ($includeSR && $sinRespuestaCount > 0) {
                 $values[] = ['label' => 'S/R', 'count' => $sinRespuestaCount];
             }
             if ($values !== []) {

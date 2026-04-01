@@ -1760,8 +1760,11 @@
                     row1: (t1 && t1.getAttribute('data-color')) ? t1.getAttribute('data-color') : 'var(--clr-primary)',
                     row2: (t2 && t2.getAttribute('data-color')) ? t2.getAttribute('data-color') : 'var(--clr-secondary)',
                     showPct: !!(pctCheck && pctCheck.checked),
+                    showSR: true,
                     row2Values: {}
                 };
+                var srCheck = row.querySelector('.tm-export-count-sr-check');
+                if (srCheck) { savedColors[k].showSR = !!srCheck.checked; }
                 row.querySelectorAll('.tm-export-count-table-value-color').forEach(function (vrow) {
                     var v = vrow.getAttribute('data-value');
                     var vt = vrow.querySelector('.tm-export-color-trigger');
@@ -1780,7 +1783,12 @@
                 var c1 = (colors && colors.row1) ? colors.row1 : defaultRow1;
                 var c2 = (colors && colors.row2) ? colors.row2 : defaultRow2;
                 var showPct = !!(colors && colors.showPct);
+                var showSR = key === '_total' ? false : !(colors && colors.showSR === false);
                 var row2Values = (colors && colors.row2Values) ? colors.row2Values : {};
+                var srControl = key === '_total' ? '' :
+                    '<label class="tm-export-count-pct-item-check" title="Incluir S/R (sin respuesta) para este campo" style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.75rem;color:var(--clr-text-main);">' +
+                    '<input type="checkbox" class="tm-export-count-sr-check"' + (showSR ? ' checked' : '') + '> S/R' +
+                    '</label>';
                 var block = '<span class="tm-export-col-label">' + escapeHtml(label) + '</span>' +
                     '<div class="tm-export-count-table-two-colors">' +
                     '<div class="tm-export-col-color" title="Fila 1: títulos de grupo">' +
@@ -1796,6 +1804,7 @@
                     '<label class="tm-export-count-pct-item-check" title="Incluir columna de porcentaje (%) para este campo" style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.75rem;color:var(--clr-text-main);margin-left:auto;">' +
                     '<input type="checkbox" class="tm-export-count-pct-check"' + (showPct ? ' checked' : '') + '> %' +
                     '</label>' +
+                    srControl +
                     '</div>';
                 if (valueLabels && valueLabels.length > 0) {
                     block += '<div class="tm-export-count-table-row2-values"><span class="tm-export-color-row-label">Fila 2 por valor:</span><div class="tm-export-count-table-value-colors">';
@@ -1911,6 +1920,8 @@
                     if (Object.keys(row2Values).length) { obj.row2Values = row2Values; }
                     var pctCheck = row.querySelector('.tm-export-count-pct-check');
                     obj.showPct = !!(pctCheck && pctCheck.checked);
+                    var srCheck = row.querySelector('.tm-export-count-sr-check');
+                    if (srCheck) { obj.showSR = !!srCheck.checked; }
                     countTableColors[k] = obj;
                 });
             }
@@ -2018,6 +2029,8 @@
                     var labelEl = cb.closest('label');
                     var fieldLabel = currentLabelsByKey[key]
                         || ((labelEl && labelEl.textContent) ? labelEl.textContent.replace(/^\s+|\s+$/g, '') : key);
+                    var groupCfg = (state.countTableColors && state.countTableColors[key]) ? state.countTableColors[key] : {};
+                    var includeSR = key === '_total' ? false : !(groupCfg && groupCfg.showSR === false);
                     var byVal = {};
                     var labelByLower = {};
                     var sinRespuesta = 0;
@@ -2072,7 +2085,7 @@
                     Object.keys(byVal).sort().forEach(function (lower) {
                         values.push({ label: normalizeExportHeadingText(labelByLower[lower] || lower, headersUppercase), count: byVal[lower] });
                     });
-                    if (sinRespuesta > 0) {
+                    if (includeSR && sinRespuesta > 0) {
                         values.push({ label: normalizeExportHeadingText('S/R', headersUppercase), count: sinRespuesta });
                     }
                     if (values.length) { groups.push({ label: normalizeExportHeadingText(fieldLabel, headersUppercase), values: values }); }
@@ -2647,7 +2660,7 @@
                                 }
                                 if (menu) { menu.hidden = true; }
                                 buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
-                            } else if (e.target.closest('.tm-export-count-pct-check')) {
+                            } else if (e.target.closest('.tm-export-count-pct-check') || e.target.closest('.tm-export-count-sr-check')) {
                                 buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
                             }
                         });
