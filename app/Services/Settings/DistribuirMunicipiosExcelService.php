@@ -2,6 +2,7 @@
 
 namespace App\Services\Settings;
 
+use App\Jobs\SyncMunicipioGeographyJob;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -159,6 +160,7 @@ class DistribuirMunicipiosExcelService
             $missingMunicipios = [];
             $missingMicrorregiones = [];
 
+            $affectedMicroIds = [];
             for ($r = $firstDataRow; $r <= $lastDataRow; $r++) {
                 $valMicro = $this->getCellValue($sheet, $idxMicro, $r);
                 $valMunicipio = $this->getCellValue($sheet, $idxMunicipio, $r);
@@ -193,7 +195,24 @@ class DistribuirMunicipiosExcelService
                     ->where('id', $municipioId)
                     ->where('microrregion_id', '!=', $currentMicroId)
                     ->update(['microrregion_id' => $currentMicroId, 'updated_at' => now()]);
-                $updated += $n;
+                
+                if ($n > 0) {
+                    $updated += $n;
+                    $affectedMicroIds[$currentMicroId] = true;
+                    // Background sync of geography
+                    SyncMunicipioGeographyJob::dispatch($municipioId)->delay(now()->addSeconds($updated * 1.5));
+                }
+            }
+
+            // Sync counters for affected microrregions
+            foreach (array_keys($affectedMicroIds) as $mid) {
+                $count = DB::table('municipios')->where('microrregion_id', $mid)->count();
+                DB::table('microrregiones')
+                    ->where('id', $mid)
+                    ->update([
+                        'municipios' => $count,
+                        'updated_at' => now()
+                    ]);
             }
 
             if (count($missingMicrorregiones) > 0) {

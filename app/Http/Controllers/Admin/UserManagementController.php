@@ -77,6 +77,7 @@ class UserManagementController extends Controller
         $user->assignRole(ucfirst($validated['role']));
 
         if ($validated['role'] === 'auditor') {
+            $user->delegado()->delete();
         } elseif ($validated['role'] === 'delegado') {
             $user->microrregionesAsignadas()->sync(
                 isset($validated['microrregion_id']) ? [$validated['microrregion_id']] : []
@@ -93,6 +94,7 @@ class UserManagementController extends Controller
 
             Delegado::updateOrCreate(['user_id' => $user->id], $delegadoPayload);
         } elseif ($validated['role'] === 'enlace') {
+            $user->delegado()->delete();
             $user->microrregionesAsignadas()->sync($validated['microrregion_ids'] ?? []);
         }
 
@@ -146,6 +148,7 @@ class UserManagementController extends Controller
         $user->syncRoles([ucfirst($validated['role'])]);
 
         if ($validated['role'] === 'auditor') {
+            $user->delegado()->delete();
             $user->microrregionesAsignadas()->sync([]);
         } elseif ($validated['role'] === 'delegado') {
             $user->microrregionesAsignadas()->sync(
@@ -163,6 +166,7 @@ class UserManagementController extends Controller
 
             Delegado::updateOrCreate(['user_id' => $user->id], $delegadoPayload);
         } elseif ($validated['role'] === 'enlace') {
+            $user->delegado()->delete();
             $user->microrregionesAsignadas()->sync($validated['microrregion_ids'] ?? []);
         }
 
