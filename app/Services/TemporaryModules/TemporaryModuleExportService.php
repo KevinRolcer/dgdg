@@ -1148,11 +1148,35 @@ class TemporaryModuleExportService
                             continue;
                         }
 
-                        if ($fieldType === 'image') {
+                        if ($this->shouldRenderAsImageCell($fieldType, $cell)) {
                             if (is_string($cell) && trim($cell) !== '') {
                                 $rawValue = trim($cell);
                                 if (filter_var($rawValue, FILTER_VALIDATE_URL)) {
-                                    $sheet->setCellValue($cellCoordinate, $rawValue);
+                                    // Intentar resolver a archivo local si la URL viene de /storage/...
+                                    $localFromUrl = $this->tryResolveLocalPathFromUrl($rawValue);
+                                    if (is_string($localFromUrl) && is_file($localFromUrl)) {
+                                        $drawing = new Drawing();
+                                        $drawing->setPath($localFromUrl);
+                                        $drawing->setCoordinates($cellCoordinate);
+                                        $drawing->setOffsetX(2);
+                                        $drawing->setOffsetY(2);
+                                        $drawing->setResizeProportional(true);
+                                        $height = 80;
+                                        $fieldCfg = $this->columnConfigByKey[(string) $field->key] ?? null;
+                                        if (is_array($fieldCfg) && isset($fieldCfg['image_height']) && is_numeric($fieldCfg['image_height'])) {
+                                            $height = max(20, min((int) $fieldCfg['image_height'], 400));
+                                        }
+                                        $drawing->setHeight($height);
+                                        $drawing->setWorksheet($sheet);
+                                        $currentRowHeight = (float) $sheet->getRowDimension($rowIndex)->getRowHeight();
+                                        if ($height > $currentRowHeight || $currentRowHeight < 0) {
+                                            $sheet->getRowDimension($rowIndex)->setRowHeight($height + 4);
+                                        }
+                                    } else {
+                                        // Fallback: dejar vínculo visible.
+                                        $sheet->setCellValue($cellCoordinate, $rawValue);
+                                        $sheet->getCell($cellCoordinate)->getHyperlink()->setUrl($rawValue);
+                                    }
                                 } else {
                                     $fullPath = $this->entryDataService->resolveStoredFilePath($rawValue);
                                     if (is_string($fullPath) && is_file($fullPath)) {
@@ -1311,5 +1335,78 @@ class TemporaryModuleExportService
         $usedTitles[] = $candidate;
 
         return $candidate;
+    }
+
+    private function isImageLikeStoredValue(mixed $value): bool
+    {
+        if (!is_scalar($value)) {
+            return false;
+        }
+
+        $path = trim((string) $value);
+        if ($path === '') {
+            return false;
+        }
+
+        $extension = strtolower((string) pathinfo(parse_url($path, PHP_URL_PATH) ?? $path, PATHINFO_EXTENSION));
+
+        return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'], true);
+    }
+
+    private function shouldRenderAsImageCell(string $fieldType, mixed $value): bool
+    {
+        if (!is_scalar($value)) {
+            return false;
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return false;
+        }
+
+        if ($fieldType === 'image') {
+            return true;
+        }
+
+        if ($fieldType !== 'file') {
+            return false;
+        }
+
+        if ($this->isImageLikeStoredValue($raw)) {
+            return true;
+        }
+
+        if (filter_var($raw, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        $fullPath = $this->entryDataService->resolveStoredFilePath($raw);
+        if (!is_string($fullPath) || !is_file($fullPath)) {
+            return false;
+        }
+
+        $mime = strtolower((string) (@mime_content_type($fullPath) ?: ''));
+
+        return str_starts_with($mime, 'image/');
+    }
+
+    private function tryResolveLocalPathFromUrl(string $url): ?string
+    {
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
+        $path = ltrim($path, '/');
+        if ($path === '') {
+            return null;
+        }
+
+        if (str_starts_with($path, 'storage/')) {
+            $path = substr($path, 8) ?: '';
+        }
+
+        if ($path === '') {
+            return null;
+        }
+
+        $resolved = $this->entryDataService->resolveStoredFilePath($path);
+        return (is_string($resolved) && is_file($resolved)) ? $resolved : null;
     }
 }

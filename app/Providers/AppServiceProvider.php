@@ -168,7 +168,9 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(800)->by((string) ($request->user()?->getAuthIdentifier() ?? $request->ip()));
         });
 
-        if (! app()->isLocal() && config('app.force_https', false)) {
+        // Evitar "mixed content": si la petición llega por HTTPS, genera URLs en https://
+        // (útil en local cuando se usa HTTPS en segob.test).
+        if (config('app.force_https', false) || request()->isSecure()) {
             URL::forceScheme('https');
         }
 

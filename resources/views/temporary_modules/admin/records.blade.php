@@ -2872,7 +2872,7 @@
             const exportUrl = exportBtnRef.getAttribute('data-export-url');
             if (!exportUrl || !templateSwal) { return; }
             var savedChoice = null;
-            var choiceAllow = { single: 1, word_table: 1, pdf_table: 1, analysis_word: 1 };
+            var choiceAllow = { single: 1, analysis_word: 1 };
             try {
                 var dr = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
                 if (dr) {
@@ -2888,15 +2888,7 @@
                 html: '<div class="tm-swal-export-options tm-swal-export-options--stacked" style="text-align:left">'
                     + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.5rem;cursor:pointer;">'
                     + '<input type="radio" name="tm-export-choice" value="single" checked style="margin-top:.2rem;"> '
-                    + '<span><strong>Excel</strong><br><small style="color:#64748b">Todos los registros en una hoja.</small></span>'
-                    + '</label>'
-                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.5rem;cursor:pointer;">'
-                    + '<input type="radio" name="tm-export-choice" value="word_table" style="margin-top:.2rem;"> '
-                    + '<span><strong>Word</strong><br><small style="color:#64748b">Tabla de registros (.docx).</small></span>'
-                    + '</label>'
-                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.75rem;cursor:pointer;">'
-                    + '<input type="radio" name="tm-export-choice" value="pdf_table" style="margin-top:.2rem;"> '
-                    + '<span><strong>PDF</strong><br><small style="color:#64748b">Tabla de registros (.pdf).</small></span>'
+                    + '<span><strong>Excel, PDF, Word</strong><br><small style="color:#64748b">Todos los registros · diferentes formatos.</small></span>'
                     + '</label>'
                     + '<p class="tm-swal-export-section-title" style="margin-top:4px;">Informe</p>'
                     + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.75rem;cursor:pointer;">'
@@ -2952,11 +2944,6 @@
             }).then(function (result) {
                 if (!result.isConfirmed) { return; }
                 var choice = result.value && result.value.choice;
-                if (choice === 'word_table' || choice === 'pdf_table') {
-                    const fmt = choice === 'pdf_table' ? 'pdf' : 'word';
-                    submitTemporaryModuleExportPost(exportUrl, fmt, 'single', { microrregion_sort: 'asc' });
-                    return;
-                }
                 if (choice === 'analysis_word') {
                     var previewUrl = exportBtnRef.getAttribute('data-analysis-preview-url');
                     var wordUrl = exportBtnRef.getAttribute('data-analysis-word-url');

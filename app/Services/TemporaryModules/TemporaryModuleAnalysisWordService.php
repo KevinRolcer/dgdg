@@ -245,7 +245,8 @@ class TemporaryModuleAnalysisWordService
                 $t2 = $section->addTable(array_merge(['borderSize' => 6, 'borderColor' => '861E34', 'cellMargin' => $cellTwips], $tblBase));
                 $t2->addRow();
                 foreach ($built['headers'] as $h) {
-                    $t2->addCell(2000)->addText($h, ['name' => $exportFontName, 'bold' => true, 'size' => $ft]);
+                    $t2->addCell(2000, ['bgColor' => '861E34', 'valign' => 'center'])
+                        ->addText($h, ['name' => $exportFontName, 'bold' => true, 'size' => $ft, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                 }
                 foreach ($built['rows'] as $r) {
                     $t2->addRow();
@@ -289,7 +290,8 @@ class TemporaryModuleAnalysisWordService
                 $tbl = $section->addTable(array_merge(['borderSize' => 4, 'borderColor' => '444444', 'cellMargin' => $cellTwips], $tblBase));
                 $tbl->addRow();
                 foreach ($headers as $h) {
-                    $tbl->addCell($dynTwips)->addText($h, ['name' => $exportFontName, 'bold' => true, 'size' => $ft]);
+                    $tbl->addCell($dynTwips, ['bgColor' => '861E34', 'valign' => 'center'])
+                        ->addText($h, ['name' => $exportFontName, 'bold' => true, 'size' => $ft, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                 }
                 foreach ($rows as $row) {
                     $tbl->addRow();

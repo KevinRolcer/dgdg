@@ -1,5 +1,6 @@
 @php
     $fieldTypesByKey = $fieldTypesByKey ?? [];
+    $pdfImageDataByPath = $pdfImageDataByPath ?? [];
     $fontFamily = $fontFamily ?? 'Gilroy';
     $cellFontSizePx = max(9, min(24, (int) ($cellFontSizePx ?? 12)));
     $titleFontSizePx = max(10, min(36, (int) ($titleFontSizePx ?? 18)));
@@ -303,11 +304,46 @@
                             } else {
                                 $cellText = '';
                             }
+                            $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
+                            $isImageType = $fieldType === 'image' || $fieldType === 'file' || $fieldType === 'foto';
+                            $lookupRaw = (string) $cellText;
+                            $lookupTrimmed = trim($lookupRaw);
+                            $lookupNormalized = preg_replace('/[\x00-\x1F\x7F]+/u', '', $lookupTrimmed);
+                            $lookupNormalized = is_string($lookupNormalized) ? $lookupNormalized : $lookupTrimmed;
+                            $lookupNormalized = preg_replace('/\s*\/\s*/u', '/', $lookupNormalized);
+                            $lookupNormalized = is_string($lookupNormalized) ? $lookupNormalized : $lookupTrimmed;
+                            $lookupCompact = preg_replace('/\s+/u', '', $lookupNormalized);
+                            $lookupCompact = is_string($lookupCompact) ? $lookupCompact : $lookupNormalized;
+                            if (preg_match('~^temporary[\s_-]*modules/~iu', $lookupCompact)) {
+                                $lookupCompact = preg_replace('~^temporary[\s_-]*modules/~iu', 'temporary-modules/', $lookupCompact) ?? $lookupCompact;
+                            }
+                            $lookupAltA = str_replace('temporary_modules/', 'temporary-modules/', $lookupNormalized);
+                            $lookupAltB = str_replace('temporary-modules/', 'temporary_modules/', $lookupNormalized);
+                            $lookupAltC = str_replace('temporary_modules/', 'temporary-modules/', $lookupCompact);
+                            $lookupAltD = str_replace('temporary-modules/', 'temporary_modules/', $lookupCompact);
+                            $imageSrc = null;
+                            if ($isImageType && $lookupTrimmed !== '') {
+                                $imageSrc = $pdfImageDataByPath[$lookupRaw]
+                                    ?? $pdfImageDataByPath[$lookupTrimmed]
+                                    ?? $pdfImageDataByPath[$lookupNormalized]
+                                    ?? $pdfImageDataByPath[$lookupCompact]
+                                    ?? $pdfImageDataByPath[$lookupAltA]
+                                    ?? $pdfImageDataByPath[$lookupAltB]
+                                    ?? $pdfImageDataByPath[$lookupAltC]
+                                    ?? $pdfImageDataByPath[$lookupAltD]
+                                    ?? null;
+                            }
                             $tdAlign = '';
                             if ($key === 'municipio') $tdAlign = 'text-align: left;';
                             if ($key === 'estatus')   $tdAlign = 'text-align: center;';
                         @endphp
-                        <td style="{{ $baseW }} {{ $tdAlign }}">{{ $cellText }}</td>
+                        <td style="{{ $baseW }} {{ $tdAlign }}">
+                            @if($imageSrc)
+                                <img src="{{ $imageSrc }}" alt="Imagen" style="max-width: 110px; max-height: 85px; display: block; margin: 0 auto;">
+                            @else
+                                {{ $cellText }}
+                            @endif
+                        </td>
                     @endif
                 @endforeach
             </tr>

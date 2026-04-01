@@ -414,6 +414,13 @@ class TemporaryModuleFieldService
 
     public function canonicalFieldType(string $type): string
     {
+        $type = strtolower(trim($type));
+
+        // Normalización histórica: algunos módulos guardan "foto" como tipo.
+        if ($type === 'foto' || $type === 'photo') {
+            return 'image';
+        }
+
         return $type === 'file' ? 'image' : $type;
     }
 

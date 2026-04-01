@@ -9,9 +9,15 @@ use Illuminate\Support\Str;
 use PhpOffice\PhpWord\SimpleType\Jc;
 use PhpOffice\PhpWord\Style\Section as SectionStyle;
 use Dompdf\Dompdf;
+use Illuminate\Support\Facades\Storage;
 
 class TemporaryModuleWordPdfService
 {
+    public function __construct(
+        private readonly TemporaryModuleEntryDataService $entryDataService,
+    ) {
+    }
+
     private function resolveMicrorregionSortDirection(?array $exportConfig): string
     {
         $direction = strtolower(trim((string) ($exportConfig['microrregion_sort'] ?? 'asc')));
@@ -402,14 +408,33 @@ class TemporaryModuleWordPdfService
                 $table->addRow();
                 foreach ($columns as $idx => $col) {
                     $key = $col['key'];
+                    $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
                     if ($key === 'item') {
                         $text = (string) $itemNumber;
                         $itemNumber++;
-                    } elseif ($key === 'microrregion') {
+                        $w = $columnTwips[$idx] ?? null;
+                        $table->addCell($w)->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt]);
+                        continue;
+                    }
+
+                    if ($key === 'microrregion') {
                         $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                         $text = (string) ($meta['label'] ?? $meta->label ?? '');
+                        $w = $columnTwips[$idx] ?? null;
+                        $table->addCell($w)->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt]);
+                        continue;
+                    }
+
+                    $val = $entry->data[$key] ?? null;
+                    $imagePath = $this->resolveImageAbsolutePath($val, $fieldType);
+                    if ($imagePath !== null) {
+                        $w = $columnTwips[$idx] ?? null;
+                        $imgCell = $table->addCell($w);
+                        $imgCell->addImage($imagePath, [
+                            'height' => 72,
+                            'alignment' => Jc::CENTER,
+                        ]);
                     } else {
-                        $val = $entry->data[$key] ?? null;
                         if (is_bool($val)) {
                             $text = $val ? 'Sí' : 'No';
                         } elseif (is_array($val)) {
@@ -419,9 +444,9 @@ class TemporaryModuleWordPdfService
                         } else {
                             $text = '';
                         }
+                        $w = $columnTwips[$idx] ?? null;
+                        $table->addCell($w)->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt]);
                     }
-                    $w = $columnTwips[$idx] ?? null;
-                    $table->addCell($w)->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt]);
                 }
             }
 
@@ -444,6 +469,7 @@ class TemporaryModuleWordPdfService
             : [];
         $countTableColors = is_array($exportConfig['count_table_colors'] ?? null) ? $exportConfig['count_table_colors'] : [];
         $columnWidthPercents = $this->fractionsToPercents($columnWidthFractions);
+        $pdfImageDataByPath = $this->buildPdfImageDataByPath($entries, $columns, $fieldTypesByKey);
 
         $html = view('temporary_modules.admin.partials.export_pdf_table', [
             'title' => $title,
@@ -464,6 +490,7 @@ class TemporaryModuleWordPdfService
             'countTableColorKeys' => $countTableColorKeys,
             'countTableColors' => $countTableColors,
             'fieldTypesByKey' => $fieldTypesByKey,
+            'pdfImageDataByPath' => $pdfImageDataByPath,
         ])->render();
 
         $dompdf = new Dompdf([
@@ -769,5 +796,228 @@ class TemporaryModuleWordPdfService
         }
 
         return $hasGilroy ? 'Gilroy' : 'Arial';
+    }
+
+    private function resolveImageAbsolutePath(mixed $value, string $fieldType): ?string
+    {
+        if (!is_scalar($value)) {
+            return null;
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+
+        if (!$this->isImageTypeOrValue($fieldType, $raw)) {
+            return null;
+        }
+
+        // Si viene como URL (p.ej. /storage/... o https://dominio/storage/...), intentamos resolver a ruta local
+        // para poder incrustar (PhpWord requiere path local).
+        if (filter_var($raw, FILTER_VALIDATE_URL)) {
+            $localFromUrl = $this->tryResolveLocalPathFromUrl($raw);
+            if ($localFromUrl !== null) {
+                return $localFromUrl;
+            }
+            // Evitar SSRF: solo descargamos si es del mismo host que la app
+            $downloaded = $this->tryDownloadImageFromSameHostUrl($raw);
+            if ($downloaded !== null) {
+                return $downloaded;
+            }
+            return null;
+        }
+
+        $fullPath = $this->entryDataService->resolveStoredFilePath($raw);
+        if (!is_string($fullPath) || !is_file($fullPath)) {
+            return null;
+        }
+
+        return $fullPath;
+    }
+
+    private function isImageTypeOrValue(string $fieldType, string $value): bool
+    {
+        $ft = strtolower(trim($fieldType));
+        if ($ft === 'image' || $ft === 'foto' || $ft === 'photo') {
+            return true;
+        }
+
+        $extension = strtolower((string) pathinfo(parse_url($value, PHP_URL_PATH) ?? $value, PATHINFO_EXTENSION));
+        if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'], true)) {
+            return true;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        $fullPath = $this->entryDataService->resolveStoredFilePath($value);
+        if (!is_string($fullPath) || !is_file($fullPath)) {
+            return false;
+        }
+
+        $mime = strtolower((string) (@mime_content_type($fullPath) ?: ''));
+
+        return str_starts_with($mime, 'image/');
+    }
+
+    private function tryResolveLocalPathFromUrl(string $url): ?string
+    {
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
+        $path = ltrim($path, '/');
+        if ($path === '') {
+            return null;
+        }
+
+        // Casos típicos: storage/temporary-modules/... o temporary-modules/...
+        if (str_starts_with($path, 'storage/')) {
+            $path = substr($path, 8) ?: '';
+        }
+
+        if ($path === '') {
+            return null;
+        }
+
+        $resolved = $this->entryDataService->resolveStoredFilePath($path);
+        return (is_string($resolved) && is_file($resolved)) ? $resolved : null;
+    }
+
+    private function tryDownloadImageFromSameHostUrl(string $url): ?string
+    {
+        $appUrl = (string) config('app.url');
+        $appHost = (string) (parse_url($appUrl, PHP_URL_HOST) ?? '');
+        $urlHost = (string) (parse_url($url, PHP_URL_HOST) ?? '');
+
+        if ($appHost === '' || $urlHost === '' || strcasecmp($appHost, $urlHost) !== 0) {
+            return null;
+        }
+
+        $ctx = stream_context_create([
+            'http' => ['timeout' => 6, 'follow_location' => 1],
+            'https' => ['timeout' => 6, 'follow_location' => 1],
+        ]);
+        $bin = @file_get_contents($url, false, $ctx);
+        if (!is_string($bin) || $bin === '') {
+            return null;
+        }
+
+        $tmpRel = 'temporary-exports/tmp/'.Str::random(18).'.img';
+        Storage::disk('local')->put($tmpRel, $bin);
+        $tmpAbs = storage_path('app/'.$tmpRel);
+        return is_file($tmpAbs) ? $tmpAbs : null;
+    }
+
+    private function buildPdfImageDataByPath(Collection $entries, array $columns, array $fieldTypesByKey): array
+    {
+        $map = [];
+
+        foreach ($entries as $entry) {
+            foreach ($columns as $column) {
+                $key = (string) ($column['key'] ?? '');
+                if ($key === '' || $key === 'item' || $key === 'microrregion') {
+                    continue;
+                }
+
+                $value = $entry->data[$key] ?? null;
+                if (!is_scalar($value)) {
+                    continue;
+                }
+
+                $original = (string) $value;
+                $raw = trim($original);
+                if ($raw === '') {
+                    continue;
+                }
+
+                $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
+
+                if (filter_var($raw, FILTER_VALIDATE_URL)) {
+                    if (!$this->isImageTypeOrValue($fieldType, $raw)) {
+                        continue;
+                    }
+
+                    // Preferir inline base64 si la URL mapea a archivo local.
+                    $localFromUrl = $this->tryResolveLocalPathFromUrl($raw);
+                    if ($localFromUrl !== null) {
+                        $binary = @file_get_contents($localFromUrl);
+                        if ($binary !== false && $binary !== '') {
+                            $mime = @mime_content_type($localFromUrl) ?: 'image/jpeg';
+                            $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
+                            foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
+                                $map[$lookupKey] = $dataUri;
+                            }
+                            continue;
+                        }
+                    }
+
+                    foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
+                        $map[$lookupKey] = $raw;
+                    }
+                    continue;
+                }
+
+                if (!$this->isImageTypeOrValue($fieldType, $raw)) {
+                    continue;
+                }
+
+                $fullPath = $this->entryDataService->resolveStoredFilePath($raw);
+                if (!is_string($fullPath) || !is_file($fullPath)) {
+                    continue;
+                }
+
+                $binary = @file_get_contents($fullPath);
+                if ($binary === false || $binary === '') {
+                    continue;
+                }
+
+                $mime = @mime_content_type($fullPath) ?: 'image/jpeg';
+                $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
+
+                foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
+                    $map[$lookupKey] = $dataUri;
+                }
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function pdfImageLookupKeys(string $value): array
+    {
+        $keys = [];
+        $original = (string) $value;
+
+        $push = static function (string $candidate) use (&$keys): void {
+            $candidate = trim($candidate);
+            if ($candidate === '' || in_array($candidate, $keys, true)) {
+                return;
+            }
+            $keys[] = $candidate;
+        };
+
+        $push($original);
+
+        $normalized = preg_replace('/[\x00-\x1F\x7F]+/u', '', $original);
+        $normalized = is_string($normalized) ? $normalized : $original;
+        $normalized = preg_replace('/\s*\/\s*/u', '/', $normalized);
+        $normalized = is_string($normalized) ? $normalized : $original;
+        $compact = preg_replace('/\s+/u', '', $normalized);
+        $compact = is_string($compact) ? $compact : $normalized;
+        if (preg_match('~^temporary[\s_-]*modules/~i', $compact) === 1) {
+            $compact = preg_replace('~^temporary[\s_-]*modules/~iu', 'temporary-modules/', $compact) ?? $compact;
+        }
+        $push($normalized);
+        $push($compact);
+
+        $push(str_replace('temporary_modules/', 'temporary-modules/', $normalized));
+        $push(str_replace('temporary-modules/', 'temporary_modules/', $normalized));
+        $push(str_replace('temporary_modules/', 'temporary-modules/', $compact));
+        $push(str_replace('temporary-modules/', 'temporary_modules/', $compact));
+
+        return $keys;
     }
 }

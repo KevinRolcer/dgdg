@@ -28,25 +28,27 @@ class TemporaryModuleEntryDataService
 
     public function resolveStoredFilePath(string $path): ?string
     {
-        $normalizedPath = $this->normalizeStoredPath($path);
-        if ($normalizedPath === null) {
+        $candidatePaths = $this->candidateStoredPaths($path);
+        if ($candidatePaths === []) {
             return null;
         }
 
-        foreach ([self::PRIMARY_DISK, self::LEGACY_DISK] as $disk) {
-            if (Storage::disk($disk)->exists($normalizedPath)) {
-                return Storage::disk($disk)->path($normalizedPath);
+        foreach ($candidatePaths as $candidatePath) {
+            foreach ([self::PRIMARY_DISK, self::LEGACY_DISK] as $disk) {
+                if (Storage::disk($disk)->exists($candidatePath)) {
+                    return Storage::disk($disk)->path($candidatePath);
+                }
             }
-        }
 
-        $publicPath = public_path($normalizedPath);
-        if (is_file($publicPath)) {
-            return $publicPath;
-        }
+            $publicPath = public_path($candidatePath);
+            if (is_file($publicPath)) {
+                return $publicPath;
+            }
 
-        $prefixedPublicPath = public_path('storage/'.$normalizedPath);
-        if (is_file($prefixedPublicPath)) {
-            return $prefixedPublicPath;
+            $prefixedPublicPath = public_path('storage/'.$candidatePath);
+            if (is_file($prefixedPublicPath)) {
+                return $prefixedPublicPath;
+            }
         }
 
         return null;
@@ -165,9 +167,24 @@ class TemporaryModuleEntryDataService
 
     private function normalizeStoredPath(string $path): ?string
     {
-        $value = trim($path);
+        $value = preg_replace('/[\x00-\x1F\x7F]+/u', '', $path) ?? $path;
+        $value = trim($value);
         if ($value === '' || filter_var($value, FILTER_VALIDATE_URL)) {
             return null;
+        }
+
+        // Normalize accidental spacing around slashes from wrapped/copied values.
+        $value = preg_replace('~\s*/\s*~u', '/', $value) ?? $value;
+        // If a temporary-modules path is wrapped (Word/PDF/HTML), it may contain whitespace between letters.
+        // Stored paths never contain whitespace, so stripping it is safe here.
+        if (preg_match('~^temporary~iu', $value) === 1) {
+            $value = preg_replace('~\s+~u', '', $value) ?? $value;
+        }
+        // For temporary module stored paths, spaces are never expected and may come
+        // from wrapped text copied from documents/logs.
+        $value = preg_replace('~^(temporary[\s_-]*modules/)~iu', 'temporary-modules/', $value) ?? $value;
+        if (preg_match('~^temporary[-_]modules/~i', $value) === 1) {
+            $value = preg_replace('/\s+/u', '', $value) ?? $value;
         }
 
         $normalizedPath = ltrim(str_replace('\\', '/', $value), '/');
@@ -176,5 +193,30 @@ class TemporaryModuleEntryDataService
         }
 
         return $normalizedPath;
+    }
+
+    /**
+     * Build path candidates to support legacy prefixes and minor path formatting differences.
+     *
+     * @return array<int, string>
+     */
+    private function candidateStoredPaths(string $path): array
+    {
+        $normalizedPath = $this->normalizeStoredPath($path);
+        if ($normalizedPath === null) {
+            return [];
+        }
+
+        $candidates = [$normalizedPath];
+
+        if (str_starts_with($normalizedPath, 'temporary_modules/')) {
+            $candidates[] = 'temporary-modules/'.substr($normalizedPath, strlen('temporary_modules/'));
+        }
+
+        if (str_starts_with($normalizedPath, 'temporary-modules/')) {
+            $candidates[] = 'temporary_modules/'.substr($normalizedPath, strlen('temporary-modules/'));
+        }
+
+        return array_values(array_unique(array_filter($candidates, static fn ($v) => is_string($v) && $v !== '')));
     }
 }
