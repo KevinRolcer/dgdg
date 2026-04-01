@@ -36,8 +36,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
-
-# Documentación local (no subir)
+.env.example# Documentación local (no subir)
 /docs/
 /README.md/SECURITY.md
 /SECURE_GEMINI_AWS_PROMPT.md
