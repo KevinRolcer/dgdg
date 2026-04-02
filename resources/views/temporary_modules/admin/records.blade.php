@@ -1786,8 +1786,8 @@
                 var showSR = key === '_total' ? false : !(colors && colors.showSR === false);
                 var row2Values = (colors && colors.row2Values) ? colors.row2Values : {};
                 var srControl = key === '_total' ? '' :
-                    '<label class="tm-export-count-pct-item-check" title="Incluir S/R (sin respuesta) para este campo" style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.75rem;color:var(--clr-text-main);">' +
-                    '<input type="checkbox" class="tm-export-count-sr-check"' + (showSR ? ' checked' : '') + '> S/R' +
+                    '<label class="tm-export-count-pct-item-check" title="Incluir No aplica para este campo" style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.75rem;color:var(--clr-text-main);">' +
+                    '<input type="checkbox" class="tm-export-count-sr-check"' + (showSR ? ' checked' : '') + '> No aplica' +
                     '</label>';
                 var block = '<span class="tm-export-col-label">' + escapeHtml(label) + '</span>' +
                     '<div class="tm-export-count-table-two-colors">' +
@@ -2086,7 +2086,7 @@
                         values.push({ label: normalizeExportHeadingText(labelByLower[lower] || lower, headersUppercase), count: byVal[lower] });
                     });
                     if (includeSR && sinRespuesta > 0) {
-                        values.push({ label: normalizeExportHeadingText('S/R', headersUppercase), count: sinRespuesta });
+                        values.push({ label: normalizeExportHeadingText('No aplica', headersUppercase), count: sinRespuesta });
                     }
                     if (values.length) { groups.push({ label: normalizeExportHeadingText(fieldLabel, headersUppercase), values: values }); }
                 });

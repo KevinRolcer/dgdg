@@ -493,12 +493,19 @@ class TemporaryModuleExcelImportService
 
         if ($t === 'boolean') {
             if ($str === '') {
-                return false;
+                return null;
             }
             $u = mb_strtoupper($str, 'UTF-8');
 
-            return in_array($u, ['1', 'SI', 'SÍ', 'YES', 'TRUE', 'VERDADERO'], true)
-                || $u === 'X';
+            if (in_array($u, ['1', 'SI', 'SÍ', 'YES', 'TRUE', 'VERDADERO', 'X'], true)) {
+                return true;
+            }
+
+            if (in_array($u, ['0', 'NO', 'FALSE', 'FALSO'], true)) {
+                return false;
+            }
+
+            return null;
         }
 
         if ($t === 'semaforo') {
@@ -966,7 +973,7 @@ class TemporaryModuleExcelImportService
         // Limpiar datos: asegurar que existen todas las llaves para evitar offsets
         foreach ($fields as $field) {
             if (! array_key_exists($field->key, $data)) {
-                $data[$field->key] = $field->type === 'boolean' ? false : null;
+                $data[$field->key] = null;
             }
         }
 
@@ -1382,7 +1389,9 @@ class TemporaryModuleExcelImportService
             }
 
             foreach ($importable as $field) {
-                if (!array_key_exists($field->key, $values)) $values[$field->key] = $field->type === 'boolean' ? false : null;
+                if (!array_key_exists($field->key, $values)) {
+                    $values[$field->key] = null;
+                }
             }
             $rowSignature = $this->buildDuplicateSignature($values);
             $microKey = (int)$rowMrId;

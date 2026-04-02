@@ -1326,7 +1326,11 @@ class TemporaryModuleController extends Controller
             }
 
             if ($field->type === 'boolean') {
-                $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($value === null || (is_string($value) && trim($value) === '')) {
+                    $value = null;
+                } else {
+                    $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                }
             }
 
             if ($field->type === 'multiselect') {
