@@ -26,7 +26,7 @@ return [
         'report_only' => (bool) env('SECURITY_CSP_REPORT_ONLY', false),
         'report_uri' => trim((string) env('SECURITY_CSP_REPORT_URI', '')),
         'allow_unsafe_inline_scripts' => (bool) env('SECURITY_CSP_ALLOW_UNSAFE_INLINE_SCRIPTS', true),
-        'allow_unsafe_eval_scripts' => (bool) env('SECURITY_CSP_ALLOW_UNSAFE_EVAL_SCRIPTS', $isLocal),
+        'allow_unsafe_eval_scripts' => (bool) env('SECURITY_CSP_ALLOW_UNSAFE_EVAL_SCRIPTS', true),
         'script_src' => $csv((string) env('SECURITY_CSP_SCRIPT_SRC', $defaultScriptSrc)),
         'style_src' => $csv((string) env('SECURITY_CSP_STYLE_SRC', $defaultStyleSrc)),
         'img_src' => $csv((string) env('SECURITY_CSP_IMG_SRC', $defaultImgSrc)),

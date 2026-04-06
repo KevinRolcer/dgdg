@@ -416,8 +416,8 @@
             'data:image/svg+xml,' +
             encodeURIComponent(
                 '<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56"><rect width="56" height="56" rx="12" fill="%231e293b"/><text x="28" y="34" text-anchor="middle" fill="%23e2e8f0" font-size="14" font-family="system-ui,sans-serif" font-weight="600">' +
-                    label.replace(/&/g, '&amp;').replace(/</g, '&lt;') +
-                    '</text></svg>'
+                label.replace(/&/g, '&amp;').replace(/</g, '&lt;') +
+                '</text></svg>'
             )
         );
     }
@@ -455,7 +455,7 @@
             sum.appendChild(img);
             sum.appendChild(title);
 
-            sum.addEventListener('click', function(e) {
+            sum.addEventListener('click', function (e) {
                 // Focus map on this microregion
                 openMicroOnMap(micro);
             });
@@ -495,12 +495,16 @@
         if (!searchResultsEl) return;
 
         searchResultsEl.innerHTML = '';
-        remoteSearchResults = results || [];
+        // Limit to max 5 results as requested
+        remoteSearchResults = (results || []).slice(0, 5);
 
         if (!remoteSearchResults.length) {
             searchResultsEl.hidden = true;
             return;
         }
+
+        searchResultsEl.hidden = false;
+
 
         if (searchHint) {
             searchHint.hidden = true;
@@ -516,8 +520,8 @@
             btn.innerHTML =
                 '<span class="microregiones-search-result-label">' + escapeHtml(result.label || result.display_name || 'Resultado') + '</span>' +
                 '<span class="microregiones-search-result-meta">' +
-                    escapeHtml((result.micro ? result.micro.micro_label : '') || '') +
-                    (result.municipio && result.municipio.nombre ? ' · ' + escapeHtml(result.municipio.nombre) : '') +
+                escapeHtml((result.micro ? result.micro.micro_label : '') || '') +
+                (result.municipio && result.municipio.nombre ? ' · ' + escapeHtml(result.municipio.nombre) : '') +
                 '</span>';
             btn.addEventListener('click', function () {
                 openAdvancedResult(result);
@@ -595,16 +599,16 @@
             var matchNum = 'mr' + micro.numero;
             var matchNum2 = 'mr ' + micro.numero;
             var matchCab = normalizeText(micro.cabecera || '');
-            var matchMuns = micro.municipios.some(function(m) {
+            var matchMuns = micro.municipios.some(function (m) {
                 return normalizeText(m.nombre).indexOf(q) !== -1;
             });
 
             var isMatch = matchLabel.indexOf(q) !== -1 ||
-                         String(micro.numero) === q ||
-                         matchNum.indexOf(q) !== -1 ||
-                         matchNum2.indexOf(q) !== -1 ||
-                         matchCab.indexOf(q) !== -1 ||
-                         matchMuns;
+                String(micro.numero) === q ||
+                matchNum.indexOf(q) !== -1 ||
+                matchNum2.indexOf(q) !== -1 ||
+                matchCab.indexOf(q) !== -1 ||
+                matchMuns;
 
             if (isMatch) {
                 item.style.display = '';
@@ -866,8 +870,8 @@
                 var avgLng = sumLng / count;
 
                 var html = '<div class="microregiones-map-pin" style="background-color: ' + color + ';">' +
-                             '<span>' + micro.numero + '</span>' +
-                             '</div>';
+                    '<span>' + micro.numero + '</span>' +
+                    '</div>';
 
                 var customIcon = L.divIcon({
                     html: html,
@@ -946,11 +950,15 @@
         if (searchLabel) {
             searchLabel.textContent = 'Buscar municipio, calle, colonia, junta auxiliar o microrregion';
         }
-        searchInput.placeholder = 'Ej. Cholula, Av. Juarez, La Paz, San Baltazar...';
+        searchInput.placeholder = 'Ej. Cholula, Av. Juarez, La Paz...';
         searchInput.addEventListener('input', function () {
+            if (searchGo) {
+                searchGo.hidden = !searchInput.value;
+            }
             runSearch();
             queueAdvancedSearch();
         });
+
         searchInput.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
