@@ -164,6 +164,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const modalEl = document.getElementById('rangoFechasPresentacionModal');
         const btnVistaPrevia = document.getElementById('btnVistaPreviaPresentacion');
         const btnDescargar = document.getElementById('btnDescargarPresentacion');
+        const btnDescargarPdf = document.getElementById('btnDescargarPresentacionPdf');
         const inputRango = document.getElementById('fechaRangoPresentacion');
         const elLoading = document.getElementById('mpPptPreviewLoading');
         const elEmpty = document.getElementById('mpPptPreviewEmpty');
@@ -177,16 +178,44 @@ document.addEventListener('DOMContentLoaded', function () {
         const elReplicaSinReg = document.getElementById('mpPptReplicaSinReg');
         const elErr = document.getElementById('mpPptPreviewErr');
         const stepNote = document.getElementById('mpPptStepNote');
+        const modeTabs = document.getElementById('mpPptPreviewModeTabs');
+        const tabBtnResumen = document.getElementById('mpPptTabBtnResumen');
+        const tabBtnCompleto = document.getElementById('mpPptTabBtnCompleto');
+        const panelResumen = document.getElementById('mpPptPanelResumen');
+        const panelCompleto = document.getElementById('mpPptPanelCompleto');
+        const officeIframe = document.getElementById('mpPptOfficeIframe');
+        const htmlDeck = document.getElementById('mpPptHtmlDeck');
+        const officeFallback = document.getElementById('mpPptOfficeFallback');
+        const linkVistaPagina = document.getElementById('mpPptLinkVistaPagina');
+        const linkSignedFile = document.getElementById('mpPptLinkSignedFile');
+        const calendarMonthLabel = document.getElementById('mpPptCalendarMonthLabel');
+        const pptLogoUrl = pageContainer.getAttribute('data-ppt-logo-url') || '';
+        const pptSegobLogoUrl = pageContainer.getAttribute('data-ppt-segob-logo-url') || '';
+        const pptCoverBgUrl = pageContainer.getAttribute('data-ppt-cover-bg-url') || '';
 
         if (!btnAbrir || !modalEl || !btnVistaPrevia || !btnDescargar || !inputRango) return;
 
         const modal = new bootstrap.Modal(modalEl);
         const urlVistaPrevia = pageContainer.getAttribute('data-url-ppt-vista-previa');
         let lastPreviewDownloadUrl = null;
+        let lastPreviewDownloadPdfUrl = null;
 
         const disableWeekends = function(date) {
             const day = date.getDay();
             return day === 0 || day === 6;
+        };
+
+        const monthNames = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ];
+        const actualizarEtiquetaMesCalendario = function(instance) {
+            if (!calendarMonthLabel || !instance) {
+                return;
+            }
+            const m = monthNames[instance.currentMonth] || '';
+            const y = instance.currentYear || '';
+            calendarMonthLabel.textContent = (m + ' ' + y).trim();
         };
 
         const fp = flatpickr(inputRango, {
@@ -197,7 +226,14 @@ document.addEventListener('DOMContentLoaded', function () {
             disable: [disableWeekends],
             onReady: function(selectedDates, dateStr, instance) {
                 instance.calendarContainer.classList.add('flatpickr-premium');
-            }
+                actualizarEtiquetaMesCalendario(instance);
+            },
+            onMonthChange: function(selectedDates, dateStr, instance) {
+                actualizarEtiquetaMesCalendario(instance);
+            },
+            onYearChange: function(selectedDates, dateStr, instance) {
+                actualizarEtiquetaMesCalendario(instance);
+            },
         });
 
         const clearSlideReplica = function() {
@@ -247,9 +283,292 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
 
+        const formatearFechaCorta = function(value) {
+            if (!value) return '';
+            const d = new Date(value + 'T00:00:00');
+            if (isNaN(d.getTime())) return String(value);
+            return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        };
+
+        const formatearFechaLarga = function(date) {
+            return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+        };
+
+        const formatearSemanaTitulo = function(desde, hasta) {
+            if (!desde || !hasta) {
+                return '';
+            }
+            const d1 = new Date(desde + 'T00:00:00');
+            const d2 = new Date(hasta + 'T00:00:00');
+            if (isNaN(d1.getTime()) || isNaN(d2.getTime())) {
+                return '';
+            }
+            const dia1 = d1.getDate();
+            const dia2 = d2.getDate();
+            const mes = d2.toLocaleDateString('es-MX', { month: 'long' });
+            const anio = d2.getFullYear();
+            return 'Semana del ' + dia1 + ' al ' + dia2 + ' de ' + mes + ' de ' + anio;
+        };
+
+        const clampPct = function(value) {
+            const n = Number(value || 0);
+            if (isNaN(n)) return 0;
+            return Math.max(0, Math.min(100, n));
+        };
+
+        const donutChartHtml = function(asistencias, inasistencias, meta) {
+            const asi = Number(asistencias || 0);
+            const ina = Number(inasistencias || 0);
+            const m = Number(meta || 0);
+            const sinRegistro = Math.max(0, m - (asi + ina));
+            const total = Math.max(1, asi + ina + sinRegistro);
+
+            const pAsi = clampPct((asi / total) * 100);
+            const pIna = clampPct((ina / total) * 100);
+            const pSin = clampPct(100 - pAsi - pIna);
+            const stop1 = pAsi.toFixed(2);
+            const stop2 = (pAsi + pIna).toFixed(2);
+
+            return ''
+                + '<div class="mp-ppt-donut-wrap">'
+                + '  <div class="mp-ppt-donut" style="--a:' + stop1 + '%; --b:' + stop2 + '%; --c:' + pSin.toFixed(2) + '%;">'
+                + '    <div class="mp-ppt-donut-center">'
+                + '      <span class="mp-ppt-donut-total">' + String(asi + ina) + '</span>'
+                + '      <small>registros</small>'
+                + '    </div>'
+                + '  </div>'
+                + '  <ul class="mp-ppt-donut-legend">'
+                + '    <li><span class="dot dot-asi"></span>Asistencias: ' + String(asi) + '</li>'
+                + '    <li><span class="dot dot-ina"></span>Inasistencias: ' + String(ina) + '</li>'
+                + '    <li><span class="dot dot-sin"></span>Sin registro: ' + String(sinRegistro) + '</li>'
+                + '  </ul>'
+                + '</div>';
+        };
+
+        const renderHtmlDeck = function(resumen, chartUrl, startDate, endDate) {
+            if (!htmlDeck) return;
+
+            const rangeLabel = formatearFechaCorta(startDate) + ' al ' + formatearFechaCorta(endDate);
+            const todayLabel = formatearFechaLarga(new Date());
+            const weekLabel = resumen && resumen.semana_contada_desde && resumen.semana_contada_hasta
+                ? formatearSemanaTitulo(resumen.semana_contada_desde, resumen.semana_contada_hasta)
+                : (resumen && resumen.texto_semana_analizada ? resumen.texto_semana_analizada : '');
+            const resumenSemanaMarcada = (window.__mpPptResumenSemanaMarcada && typeof window.__mpPptResumenSemanaMarcada === 'object')
+                ? window.__mpPptResumenSemanaMarcada
+                : ((window.__mpPptResumenSemanaAnterior && typeof window.__mpPptResumenSemanaAnterior === 'object')
+                    ? window.__mpPptResumenSemanaAnterior
+                    : null);
+            const weekLabelMarcada = resumenSemanaMarcada && resumenSemanaMarcada.semana_contada_desde && resumenSemanaMarcada.semana_contada_hasta
+                ? formatearSemanaTitulo(resumenSemanaMarcada.semana_contada_desde, resumenSemanaMarcada.semana_contada_hasta)
+                : '';
+            const porDia = resumen && resumen.por_dia && typeof resumen.por_dia === 'object' ? resumen.por_dia : {};
+            const rows = Object.keys(porDia).sort();
+            const microregions = [
+                'MR1 XICOTEPEC',
+                'MR2 HUAUCHINANGO',
+                'MR3 CHIGNAHUAPAN',
+                'MR4 ZACAPOAXTLA',
+                'MR5 LIBRES',
+                'MR6 TEZIUTLAN',
+                'MR7 SAN MARTIN TEXMELUCAN',
+                'MR8 HUEJOTZINGO',
+                'MR9 PUEBLA',
+                'MR10 PUEBLA',
+                'MR11 PUEBLA',
+                'MR12 AMOZOC',
+                'MR13 TEPEACA',
+                'MR14 CALCHICOMULA DE SESMA',
+                'MR15 TECAMACHALCO',
+                'MR16 PUEBLA',
+                'MR17 PUEBLA',
+                'MR18 CHOLULA',
+                'MR19 PUEBLA',
+                'MR20 PUEBLA',
+                'MR21 ATLIXCO',
+                'MR22 IZUCAR DE MATAMOROS',
+                'MR23 ACATLAN DE OSORIO',
+                'MR24 TEHUACAN',
+                'MR25 TEHUACAN',
+                'MR26 AJALPAN',
+                'MR27 CUAUTEMPAN',
+                'MR28 CHIAUTLA',
+                'MR29 TEPEXI DE RODRIGUEZ',
+                'MR30 ACATZINGO',
+                'MR31 TLATLAUQUITEPEC'
+            ];
+
+            let tableRows = '';
+            rows.forEach(function(key) {
+                const row = porDia[key] || {};
+                tableRows += '<tr>'
+                    + '<td>' + formatearFechaCorta(key) + '</td>'
+                    + '<td>' + (row.mesas != null ? String(row.mesas) : '0') + '</td>'
+                    + '<td>' + (row.asistencias != null ? String(row.asistencias) : '0') + '</td>'
+                    + '<td>' + (row.inasistencias != null ? String(row.inasistencias) : '0') + '</td>'
+                    + '</tr>';
+            });
+            if (!tableRows) {
+                tableRows = '<tr><td colspan="4">Sin registros por día en el rango seleccionado</td></tr>';
+            }
+
+            const logoMain = pptLogoUrl ? '<img src="' + pptLogoUrl + '" alt="Gobierno de Puebla">' : '';
+            const logoSegob = pptSegobLogoUrl ? '<img src="' + pptSegobLogoUrl + '" alt="SEGOB Puebla">' : '';
+            const coverStyle = pptCoverBgUrl ? ' style="background-image: linear-gradient(rgba(109,21,48,.88), rgba(109,21,48,.92)), url(\'' + pptCoverBgUrl + '\');"' : '';
+
+            const html = ''
+                + '<article class="mp-ppt-html-slide">'
+                + '  <header class="mp-ppt-html-slide-head"><span>Diapositiva 1</span><span>Portada</span></header>'
+                + '  <div class="mp-ppt-html-slide-cover"' + coverStyle + '>'
+                + '    <div class="mp-ppt-html-logos">' + logoMain + logoSegob + '</div>'
+                + '    <p class="mb-1">' + rangeLabel + '</p>'
+                + '    <h2 class="mp-ppt-html-kicker">MESAS DE PAZ Y SEGURIDAD</h2>'
+                + '    <p class="mp-ppt-html-sub">Dirección General de Delegaciones de Gobierno</p>'
+                + '    <p class="mp-ppt-html-date-bottom">' + todayLabel + '</p>'
+                + '  </div>'
+                + '</article>'
+                + '<article class="mp-ppt-html-slide">'
+                + '  <header class="mp-ppt-html-slide-head"><span>Diapositiva 2</span><span>Orden del dia</span></header>'
+                + '  <div class="mp-ppt-html-slide-body mp-ppt-html-agenda">'
+                + '    <h3>ORDEN DEL DIA</h3>'
+                + '    <p class="mp-ppt-html-subhead">' + todayLabel + '</p>'
+                + '    <ol>'
+                + '      <li>Reporte General.</li>'
+                + '      <li>Reporte Diario.</li>'
+                + '      <li>Reporte por Microrregion.</li>'
+                + '      <li>Reportes Diarios por Microrregion.</li>'
+                + '    </ol>'
+                + '  </div>'
+                + '</article>'
+                + '<article class="mp-ppt-html-slide">'
+                + '  <header class="mp-ppt-html-slide-head"><span>Diapositiva 3</span><span>Reporte general</span></header>'
+                + '  <div class="mp-ppt-html-slide-body">'
+                + '    <p class="mp-ppt-html-slide-title">1. REPORTE GENERAL</p>'
+                + '    <div class="mp-ppt-html-metrics">'
+                + '      <div class="mp-ppt-html-card"><div class="mp-ppt-html-card-num">' + (resumen.total_mesas != null ? String(resumen.total_mesas) : '0') + '</div><div class="mp-ppt-html-card-label">Mesas de seguridad</div></div>'
+                + '      <div class="mp-ppt-html-card"><div class="mp-ppt-html-card-num">' + (resumen.mesas_con_asistencia != null ? String(resumen.mesas_con_asistencia) : '0') + '</div><div class="mp-ppt-html-card-label">Asistencias</div></div>'
+                + '      <div class="mp-ppt-html-card"><div class="mp-ppt-html-card-num">' + (resumen.mesas_con_inasistencia != null ? String(resumen.mesas_con_inasistencia) : '0') + '</div><div class="mp-ppt-html-card-label">Inasistencias</div></div>'
+                + '    </div>'
+                + '    <div class="mp-ppt-html-kpis">'
+                + '      <span><strong>Cumplimiento:</strong> ' + (Number(resumen.porcentaje_cumplimiento || 0)).toFixed(2) + '%</span>'
+                + '      <span><strong>Meta:</strong> ' + (resumen.meta_mesas != null ? String(resumen.meta_mesas) : '0') + '</span>'
+                + '      <span><strong>Mesas sin registro:</strong> ' + (resumen.mesas_sin_registro_semanal != null ? String(resumen.mesas_sin_registro_semanal) : '0') + '</span>'
+                + '      <span><strong>Semana:</strong> ' + weekLabel + '</span>'
+                + '    </div>'
+                + '    <div class="mp-ppt-html-chart">'
+                + donutChartHtml(
+                    resumen.mesas_con_asistencia,
+                    resumen.mesas_con_inasistencia,
+                    resumen.meta_mesas
+                )
+                + '    </div>'
+                + '  </div>'
+                + '</article>'
+                + '<article class="mp-ppt-html-slide">'
+                + '  <header class="mp-ppt-html-slide-head"><span>Diapositiva 4</span><span>Reporte general</span></header>'
+                + '  <div class="mp-ppt-html-slide-body">'
+                + '    <p class="mp-ppt-html-slide-title">1. REPORTE GENERAL</p>'
+                + '    <div class="mp-ppt-html-metrics">'
+                + '      <div class="mp-ppt-html-card"><div class="mp-ppt-html-card-num">' + (resumenSemanaMarcada && resumenSemanaMarcada.total_mesas != null ? String(resumenSemanaMarcada.total_mesas) : '0') + '</div><div class="mp-ppt-html-card-label">Mesas de seguridad</div></div>'
+                + '      <div class="mp-ppt-html-card"><div class="mp-ppt-html-card-num">' + (resumenSemanaMarcada && resumenSemanaMarcada.mesas_con_asistencia != null ? String(resumenSemanaMarcada.mesas_con_asistencia) : '0') + '</div><div class="mp-ppt-html-card-label">Asistencias</div></div>'
+                + '      <div class="mp-ppt-html-card"><div class="mp-ppt-html-card-num">' + (resumenSemanaMarcada && resumenSemanaMarcada.mesas_con_inasistencia != null ? String(resumenSemanaMarcada.mesas_con_inasistencia) : '0') + '</div><div class="mp-ppt-html-card-label">Inasistencias</div></div>'
+                + '    </div>'
+                + '    <div class="mp-ppt-html-kpis">'
+                + '      <span><strong>Semana:</strong> ' + (weekLabelMarcada || weekLabel) + '</span>'
+                + '      <span><strong>Cumplimiento:</strong> ' + (resumenSemanaMarcada && resumenSemanaMarcada.porcentaje_cumplimiento != null ? Number(resumenSemanaMarcada.porcentaje_cumplimiento).toFixed(2) : '0.00') + '%</span>'
+                + '    </div>'
+                + '    <div class="mp-ppt-html-chart">'
+                + donutChartHtml(
+                    resumenSemanaMarcada ? resumenSemanaMarcada.mesas_con_asistencia : 0,
+                    resumenSemanaMarcada ? resumenSemanaMarcada.mesas_con_inasistencia : 0,
+                    resumenSemanaMarcada ? resumenSemanaMarcada.meta_mesas : 0
+                )
+                + '    </div>'
+                + '  </div>'
+                + '</article>'
+                + '<article class="mp-ppt-html-slide">'
+                + '  <header class="mp-ppt-html-slide-head"><span>Diapositiva 5</span><span>Reporte diario semanal</span></header>'
+                + '  <div class="mp-ppt-html-slide-body">'
+                + '    <p class="mp-ppt-html-slide-title">1. REPORTE DIARIO SEMANAL</p>'
+                + '    <div class="mp-ppt-html-two-col">'
+                + '      <section><h4>' + weekLabel + '</h4><div class="mp-ppt-html-image-placeholder">Contorno de tabla semanal</div></section>'
+                + '      <section><h4>' + rangeLabel + '</h4><div class="mp-ppt-html-image-placeholder">Contorno de tabla semanal</div></section>'
+                + '    </div>'
+                + '  </div>'
+                + '    <div class="mt-3">'
+                + '    <table class="mp-ppt-html-table">'
+                + '      <thead><tr><th>Fecha</th><th>Mesas</th><th>Asistencias</th><th>Inasistencias</th></tr></thead>'
+                + '      <tbody>' + tableRows + '</tbody>'
+                + '    </table>'
+                + '    </div>'
+                + '  </div>'
+                + '</article>';
+
+            let htmlFull = html;
+            microregions.forEach(function(name, index) {
+                const slideNumber = index + 6;
+                htmlFull += ''
+                    + '<article class="mp-ppt-html-slide">'
+                    + '  <header class="mp-ppt-html-slide-head"><span>Diapositiva ' + slideNumber + '</span><span>Reporte por microrregion</span></header>'
+                    + '  <div class="mp-ppt-html-slide-body">'
+                    + '    <p class="mp-ppt-html-slide-title">3. REPORTE POR MICRORREGION</p>'
+                    + '    <p class="mp-ppt-html-mr-title">' + name + '</p>'
+                    + '    <div class="mp-ppt-html-kpis"><span><strong>Semana:</strong> ' + weekLabel + '</span></div>'
+                    + '    <div class="mp-ppt-html-grid-2">'
+                    + '      <div class="mp-ppt-html-image-placeholder">Contorno de mapa / indicador</div>'
+                    + '      <div class="mp-ppt-html-image-placeholder">Contorno de grafica / tabla</div>'
+                    + '    </div>'
+                    + '  </div>'
+                    + '</article>';
+            });
+
+            htmlDeck.innerHTML = htmlFull;
+            htmlDeck.classList.remove('d-none');
+        };
+
+        const setPptPreviewTab = function(mode) {
+            const isResumen = mode === 'resumen';
+            if (tabBtnResumen && tabBtnCompleto) {
+                tabBtnResumen.classList.toggle('active', isResumen);
+                tabBtnCompleto.classList.toggle('active', !isResumen);
+                tabBtnResumen.setAttribute('aria-selected', isResumen ? 'true' : 'false');
+                tabBtnCompleto.setAttribute('aria-selected', !isResumen ? 'true' : 'false');
+            }
+            if (panelResumen) {
+                panelResumen.classList.toggle('d-none', !isResumen);
+            }
+            if (panelCompleto) {
+                panelCompleto.classList.toggle('d-none', isResumen);
+            }
+        };
+
         const resetPptPreviewUi = function() {
             lastPreviewDownloadUrl = null;
+            lastPreviewDownloadPdfUrl = null;
             clearSlideReplica();
+            if (officeIframe) {
+                officeIframe.src = 'about:blank';
+            }
+            if (htmlDeck) {
+                htmlDeck.innerHTML = '';
+                htmlDeck.classList.add('d-none');
+            }
+            if (officeFallback) {
+                officeFallback.classList.add('d-none');
+            }
+            if (linkSignedFile) {
+                linkSignedFile.classList.add('d-none');
+                linkSignedFile.setAttribute('href', '#');
+            }
+            if (linkVistaPagina) {
+                linkVistaPagina.setAttribute('href', '#');
+            }
+            if (btnDescargarPdf) {
+                btnDescargarPdf.classList.add('d-none');
+            }
+            if (modeTabs) {
+                modeTabs.classList.add('d-none');
+            }
+            setPptPreviewTab('completo');
             if (elContent) {
                 elContent.classList.add('d-none');
             }
@@ -265,11 +584,22 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             if (stepNote) {
                 stepNote.innerHTML =
-                    'Seleccione fechas y pulse <strong>Actualizar vista previa</strong> para ver una réplica de la diapositiva con los mismos datos que el .pptx. <strong>Descargar</strong> genera el archivo.';
+                    'Actualice la vista previa para cargar la versión final en PDF y PowerPoint.';
             }
         };
 
         modalEl.addEventListener('hidden.bs.modal', resetPptPreviewUi);
+
+        if (tabBtnResumen) {
+            tabBtnResumen.addEventListener('click', function() {
+                setPptPreviewTab('resumen');
+            });
+        }
+        if (tabBtnCompleto) {
+            tabBtnCompleto.addEventListener('click', function() {
+                setPptPreviewTab('completo');
+            });
+        }
 
         btnAbrir.addEventListener('click', function() {
             modal.show();
@@ -342,6 +672,45 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
+        if (btnDescargarPdf) {
+            btnDescargarPdf.addEventListener('click', function() {
+                if (!lastPreviewDownloadPdfUrl) {
+                    if (typeof swal === 'function') {
+                        swal('Atención', 'Primero actualice la vista previa para generar el PDF.', 'warning');
+                    } else {
+                        alert('Primero actualice la vista previa para generar el PDF.');
+                    }
+                    return;
+                }
+
+                fetch(lastPreviewDownloadPdfUrl, { credentials: 'same-origin' })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            throw new Error('No se pudo descargar');
+                        }
+                        return response.blob();
+                    })
+                    .then(function(blob) {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'mesas_paz.pdf';
+                        a.rel = 'noopener';
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                    })
+                    .catch(function() {
+                        if (typeof swal === 'function') {
+                            swal('Error', 'No se pudo descargar el PDF. Intente de nuevo.', 'error');
+                        } else {
+                            alert('No se pudo descargar el PDF.');
+                        }
+                    });
+            });
+        }
+
         btnVistaPrevia.addEventListener('click', function() {
             if (!urlVistaPrevia) {
                 if (typeof swal === 'function') {
@@ -376,10 +745,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const fd = new FormData(form);
+            fd.append('_preview_nonce', String(Date.now()));
             btnVistaPrevia.disabled = true;
 
             fetch(urlVistaPrevia, {
                 method: 'POST',
+                cache: 'no-store',
                 body: fd,
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
@@ -437,14 +808,58 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
 
                     lastPreviewDownloadUrl = data.download_url;
+                    lastPreviewDownloadPdfUrl = data.download_pdf_url || null;
+                    window.__mpPptResumenSemanaMarcada = data.resumen_semana_marcada || null;
+                    window.__mpPptResumenSemanaAnterior = data.resumen_semana_anterior || null;
 
                     if (stepNote) {
-                        stepNote.innerHTML =
-                            'Réplica de la diapositiva con los datos que llevará el PowerPoint. <strong>Descargar .pptx</strong> obtiene el archivo ya generado (sin volver a calcular).';
+                        stepNote.innerHTML = 'Vista previa actualizada. Puede descargar la presentación en PPTX y PDF cuando esté disponible.';
                     }
 
                     if (elContent) {
                         elContent.classList.remove('d-none');
+                    }
+
+                    if (modeTabs) {
+                        modeTabs.classList.remove('d-none');
+                    }
+                    setPptPreviewTab('completo');
+
+                    const vistaPagina = data.vista_previa_url || '';
+                    if (btnDescargarPdf && data.download_pdf_url) {
+                        btnDescargarPdf.classList.remove('d-none');
+                    }
+                    if (linkVistaPagina && vistaPagina) {
+                        linkVistaPagina.setAttribute('href', vistaPagina);
+                    }
+
+                    if (officeIframe && data.signed_pdf_url) {
+                        officeIframe.classList.remove('d-none');
+                        officeIframe.src = data.signed_pdf_url;
+                        if (htmlDeck) {
+                            htmlDeck.classList.add('d-none');
+                            htmlDeck.innerHTML = '';
+                        }
+                        if (officeFallback) {
+                            officeFallback.classList.add('d-none');
+                        }
+                    } else if (officeIframe) {
+                        officeIframe.classList.add('d-none');
+                        officeIframe.src = 'about:blank';
+                        renderHtmlDeck(
+                            data.resumen || {},
+                            data.signed_chart_url || '',
+                            document.getElementById('inputStart') ? document.getElementById('inputStart').value : '',
+                            document.getElementById('inputEnd') ? document.getElementById('inputEnd').value : ''
+                        );
+                        if (officeFallback) {
+                            officeFallback.classList.add('d-none');
+                        }
+                        if (linkSignedFile && data.signed_file_url) {
+                            linkSignedFile.setAttribute('href', data.signed_file_url);
+                            linkSignedFile.textContent = 'Abrir .pptx';
+                            linkSignedFile.classList.remove('d-none');
+                        }
                     }
 
                     fillSlideReplica(data.resumen);

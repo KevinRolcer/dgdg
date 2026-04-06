@@ -29,4 +29,19 @@ return [
     */
     'ppt_office_online_embed' => filter_var(env('MESAS_PAZ_PPT_OFFICE_EMBED', true), FILTER_VALIDATE_BOOLEAN),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Vista previa PDF idéntica al PPTX
+    |--------------------------------------------------------------------------
+    |
+    | Para que el PDF sea el mismo resultado visual de la plantilla PPTX,
+    | se convierte el .pptx final con LibreOffice (soffice) en modo headless.
+    |
+    | - MESAS_PAZ_PPT_PDF_CONVERTER_BIN: ruta absoluta a soffice(.exe), opcional.
+    | - ppt_pdf_require_identical=true: si falla la conversión, no genera PDF alterno.
+    |
+    */
+    'ppt_pdf_converter_bin' => env('MESAS_PAZ_PPT_PDF_CONVERTER_BIN', ''),
+    'ppt_pdf_require_identical' => filter_var(env('MESAS_PAZ_PPT_PDF_REQUIRE_IDENTICAL', true), FILTER_VALIDATE_BOOLEAN),
+
 ];

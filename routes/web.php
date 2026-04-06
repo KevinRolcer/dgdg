@@ -30,6 +30,9 @@ Route::middleware(['signed', 'throttle:120,1'])->group(function () {
     Route::get('/ppt/preview-archivo/{token}', [PowerPointController::class, 'previewArchivo'])
         ->where('token', '[A-Za-z0-9]{40}')
         ->name('ppt.preview-archivo');
+    Route::get('/ppt/preview-pdf/{token}', [PowerPointController::class, 'previewPdf'])
+        ->where('token', '[A-Za-z0-9]{40}')
+        ->name('ppt.preview-pdf');
     Route::get('/ppt/preview-chart/{token}', [PowerPointController::class, 'previewChart'])
         ->where('token', '[A-Za-z0-9]{40}')
         ->name('ppt.preview-chart');
@@ -103,6 +106,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/ppt/vista-previa/{token}/descargar', [PowerPointController::class, 'descargarVistaPrevia'])
         ->where('token', '[A-Za-z0-9]{40}')
         ->name('ppt.vista-previa.descargar')
+        ->middleware('can:Tableros-incidencias');
+    Route::get('/ppt/vista-previa/{token}/descargar-pdf', [PowerPointController::class, 'descargarVistaPreviaPdf'])
+        ->where('token', '[A-Za-z0-9]{40}')
+        ->name('ppt.vista-previa.descargar-pdf')
         ->middleware('can:Tableros-incidencias');
 
     Route::get('/mesas-paz/historial-detalle', [MesasPazController::class, 'detallePorFecha'])->name('mesas-paz.historial-detalle')->middleware('can:mesas-paz-ver');

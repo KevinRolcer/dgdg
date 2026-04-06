@@ -30,7 +30,8 @@ class SecurityHeaders
             $response->headers->set('Content-Type', 'text/html; charset=UTF-8');
         }
 
-        $response->headers->set('X-Frame-Options', 'DENY');
+        $allowSameOriginFrame = $request->routeIs('ppt.preview-pdf');
+        $response->headers->set('X-Frame-Options', $allowSameOriginFrame ? 'SAMEORIGIN' : 'DENY');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
@@ -183,11 +184,15 @@ class SecurityHeaders
             ['allowHttpScheme' => $isLocal]
         );
 
+        $frameAncestors = $request->routeIs('ppt.preview-pdf')
+            ? "frame-ancestors 'self'"
+            : "frame-ancestors 'none'";
+
         $directives = [
             "default-src 'self'",
             "base-uri 'self'",
             "form-action 'self'",
-            "frame-ancestors 'none'",
+            $frameAncestors,
             "object-src 'none'",
             'script-src '.$scriptSrc,
             'style-src '.$styleSrc,

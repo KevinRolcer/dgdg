@@ -11,10 +11,6 @@
 @section('content')
 <section class="tm-page tm-shell app-density-compact">
     <div class="tm-shell-main">
-        <header class="tm-shell-head tm-shell-head--no-rule">
-            <h1 class="tm-shell-title">Eventos temporales</h1>
-            <p class="tm-shell-desc">Administración de módulos: crear, editar, vigencia y exportación de registros.</p>
-        </header>
 
         <article class="content-card tm-card tm-card-in-shell">
         @if (session('status'))

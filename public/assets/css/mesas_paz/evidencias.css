@@ -226,122 +226,269 @@
     z-index: 1000;
 }
 
-/* Presentación PPTX — modal compacto (una sola columna con scroll interno) */
-.mp-ppt-modal-dialog {
-    max-width: min(1180px, 96vw);
-    width: min(1180px, 96vw);
-    max-height: 88vh;
+/* Presentación PPTX — modal (tema claro / oscuro vía variables) */
+#rangoFechasPresentacionModal {
+    --mp-ppt-shell-bg: #eef2f8;
+    --mp-ppt-panel-bg: #ffffff;
+    --mp-ppt-panel-border: #d8e0ed;
+    --mp-ppt-header-bg: #ffffff;
+    --mp-ppt-header-border: #e4e9f2;
+    --mp-ppt-title-color: #0f1419;
+    --mp-ppt-text-muted: #5c6578;
+    --mp-ppt-info-bg: #f0f4fb;
+    --mp-ppt-info-text: #1a2433;
+    --mp-ppt-info-border: #d3deef;
+    --mp-ppt-icon-info: var(--clr-primary, #861e34);
+    --mp-ppt-sheet-bg: #ffffff;
+    --mp-ppt-sheet-border: #d8e0ed;
+    --mp-ppt-empty-icon: rgba(15, 20, 30, 0.14);
+    --mp-ppt-empty-title: #1a2230;
+    --mp-ppt-empty-desc: #5c6578;
+    --mp-ppt-spinner: #6b7280;
+    --mp-ppt-loading-text: #5c6578;
+    --mp-ppt-iframe-bg: #e4e9f2;
+    --mp-ppt-month-label: #0f1419;
+    --mp-ppt-calendar-bg: #ffffff;
+    --mp-ppt-calendar-border: #d0d8e6;
+    --mp-ppt-tab-inactive-fg: #374151;
+    --mp-ppt-tab-inactive-border: #c5cedd;
+    --mp-ppt-tab-inactive-hover: rgba(15, 23, 42, 0.06);
+    --mp-ppt-fallback-bg: #f4f7fc;
+    --mp-ppt-fallback-text: #334155;
+    --mp-ppt-fallback-border: #d8e0ed;
+    --mp-ppt-modal-shadow: 0 22px 55px rgba(15, 23, 42, 0.14);
+}
+
+html.theme-dark #rangoFechasPresentacionModal {
+    --mp-ppt-shell-bg: #12151c;
+    --mp-ppt-panel-bg: #1b2029;
+    --mp-ppt-panel-border: rgba(255, 255, 255, 0.1);
+    --mp-ppt-header-bg: #1b2029;
+    --mp-ppt-header-border: rgba(255, 255, 255, 0.1);
+    --mp-ppt-title-color: #f1f5f9;
+    --mp-ppt-text-muted: #94a3b8;
+    --mp-ppt-info-bg: #232b36;
+    --mp-ppt-info-text: #e8edf4;
+    --mp-ppt-info-border: rgba(255, 255, 255, 0.12);
+    --mp-ppt-icon-info: #c79b66;
+    --mp-ppt-sheet-bg: #1b2029;
+    --mp-ppt-sheet-border: rgba(255, 255, 255, 0.1);
+    --mp-ppt-empty-icon: rgba(255, 255, 255, 0.2);
+    --mp-ppt-empty-title: #f1f5f9;
+    --mp-ppt-empty-desc: #94a3b8;
+    --mp-ppt-spinner: #94a3b8;
+    --mp-ppt-loading-text: #94a3b8;
+    --mp-ppt-iframe-bg: #121820;
+    --mp-ppt-month-label: #f8fafc;
+    --mp-ppt-calendar-bg: #232b36;
+    --mp-ppt-calendar-border: rgba(255, 255, 255, 0.12);
+    --mp-ppt-tab-inactive-fg: #e2e8f0;
+    --mp-ppt-tab-inactive-border: rgba(255, 255, 255, 0.22);
+    --mp-ppt-tab-inactive-hover: rgba(255, 255, 255, 0.08);
+    --mp-ppt-fallback-bg: #232b36;
+    --mp-ppt-fallback-text: #e2e8f0;
+    --mp-ppt-fallback-border: rgba(255, 255, 255, 0.12);
+    --mp-ppt-modal-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
+}
+
+#rangoFechasPresentacionModal .mp-ppt-modal-dialog {
+    max-width: min(1320px, 96vw);
+    width: min(1320px, 96vw);
+    max-height: 90vh;
     margin: 1vh auto;
 }
 
-.mp-ppt-modal-dialog .modal-content {
-    max-height: 88vh;
+#rangoFechasPresentacionModal .mp-ppt-modal-dialog .modal-content {
+    max-height: 90vh;
     display: flex;
     flex-direction: column;
+    border-radius: 18px;
+    border: 1px solid var(--mp-ppt-panel-border) !important;
+    box-shadow: var(--mp-ppt-modal-shadow);
+    overflow: hidden;
+    background: var(--mp-ppt-panel-bg) !important;
+    color: var(--mp-ppt-title-color) !important;
 }
 
-.mp-ppt-modal-dialog .modal-header {
+#rangoFechasPresentacionModal .mp-ppt-modal-dialog .modal-header {
     flex-shrink: 0;
-    padding: 0.5rem 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--mp-ppt-header-bg) !important;
+    border-bottom: 1px solid var(--mp-ppt-header-border) !important;
 }
 
-.mp-ppt-modal-dialog .modal-title {
+#rangoFechasPresentacionModal .mp-ppt-modal-dialog .modal-title {
     font-size: 1rem;
+    font-weight: 700;
+    color: var(--mp-ppt-title-color) !important;
 }
 
-.mp-ppt-modal-body {
+#rangoFechasPresentacionModal .mp-ppt-modal-dialog .btn-close {
+    filter: none;
+}
+
+html.theme-dark #rangoFechasPresentacionModal .mp-ppt-modal-dialog .btn-close {
+    filter: invert(1) grayscale(1);
+    opacity: 0.75;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-modal-body {
     overflow: hidden;
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    padding: 0;
-    max-height: calc(88vh - 52px);
+    padding: 0.85rem !important;
+    max-height: calc(90vh - 56px);
+    background: var(--mp-ppt-shell-bg) !important;
+    color: var(--mp-ppt-title-color) !important;
 }
 
-.mp-ppt-preview-container {
+#rangoFechasPresentacionModal .mp-ppt-preview-container {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.85rem;
     flex: 1;
     min-height: 0;
     max-height: 100%;
-    background: var(--mesas-shell-bg, var(--clr-bg, #f8f9fa));
+    background: transparent;
 }
 
-.mp-ppt-preview-side {
+#rangoFechasPresentacionModal .mp-ppt-controls-side,
+#rangoFechasPresentacionModal .mp-ppt-preview-side {
+    background: var(--mp-ppt-panel-bg);
+    border: 1px solid var(--mp-ppt-panel-border);
+    border-radius: 14px;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-controls-side {
+    flex-shrink: 0;
+    padding: 0.85rem;
+    overflow-y: auto;
+    max-height: 46vh;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-controls-head {
+    margin-bottom: 0.7rem;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-controls-title {
+    color: var(--mp-ppt-title-color) !important;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-controls-sub {
+    color: var(--mp-ppt-text-muted) !important;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-calendar-month-label {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--mp-ppt-month-label);
+    text-align: center;
+    margin-bottom: 0.4rem;
+    letter-spacing: 0.02em;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-controls-side .calendar-wrapper {
+    margin-top: 0.15rem;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-controls-side .flatpickr-calendar.flatpickr-premium {
+    max-width: 100% !important;
+    width: 100%;
+    transform: none;
+    background: var(--mp-ppt-calendar-bg) !important;
+    border: 1px solid var(--mp-ppt-calendar-border) !important;
+    border-radius: 12px;
+    box-shadow: none;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-controls-side .flatpickr-innerContainer,
+#rangoFechasPresentacionModal .mp-ppt-controls-side .flatpickr-rContainer {
+    width: 100%;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-controls-side .flatpickr-days {
+    width: 100% !important;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-controls-side .dayContainer {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-controls-side .flatpickr-day {
+    max-width: 14.28% !important;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-preview-side {
     display: flex;
     flex-direction: column;
     min-height: 0;
     flex: 1;
-    padding: 0.5rem 0.65rem;
-    border-bottom: 1px solid var(--clr-border, #dee2e6);
+    padding: 0.75rem;
     overflow: hidden;
 }
 
-.mp-ppt-controls-side {
-    flex-shrink: 0;
-    padding: 0 0.65rem 0.65rem;
-    overflow-y: auto;
-    max-height: 42vh;
-}
-
-.mp-ppt-selection-info {
-    font-size: 0.72rem;
-    line-height: 1.35;
-    color: var(--clr-text-main, #212529);
-    padding: 0.45rem 0.6rem;
-    background: var(--clr-card, #fff);
-    border-radius: 6px;
-    border: 1px solid var(--clr-border, #dee2e6);
-    margin-bottom: 0.4rem;
+#rangoFechasPresentacionModal .mp-ppt-selection-info {
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--mp-ppt-info-text);
+    padding: 0.5rem 0.65rem;
+    background: var(--mp-ppt-info-bg);
+    border-radius: 10px;
+    border: 1px solid var(--mp-ppt-info-border);
+    margin-bottom: 0.55rem;
     flex-shrink: 0;
 }
 
-.mp-ppt-selection-info i {
-    color: var(--clr-primary, #861e34);
-    margin-right: 0.25rem;
+#rangoFechasPresentacionModal .mp-ppt-selection-info i {
+    color: var(--mp-ppt-icon-info);
+    margin-right: 0.3rem;
 }
 
-.mp-ppt-sheet-wrapper {
+#rangoFechasPresentacionModal .mp-ppt-sheet-wrapper {
     position: relative;
     flex: 1;
     min-height: 0;
     max-height: 100%;
-    background: #fff;
-    border: 1px solid var(--clr-border, #ccc);
-    border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    background: var(--mp-ppt-sheet-bg);
+    border: 1px solid var(--mp-ppt-sheet-border);
+    border-radius: 12px;
+    box-shadow: none;
     overflow: auto;
 }
 
-.mp-ppt-preview-empty {
+#rangoFechasPresentacionModal .mp-ppt-preview-empty {
     padding: 1.5rem 1rem;
     text-align: center;
-    color: var(--clr-text-muted, #6c757d);
+    color: var(--mp-ppt-empty-desc);
 }
 
-.mp-ppt-preview-empty .fa-file-powerpoint {
+#rangoFechasPresentacionModal .mp-ppt-preview-empty .fa-file-powerpoint {
     font-size: 2.5rem;
     margin-bottom: 0.5rem;
-    opacity: 0.22;
+    color: var(--mp-ppt-empty-icon);
+    opacity: 1;
 }
 
-.mp-ppt-preview-empty-title {
+#rangoFechasPresentacionModal .mp-ppt-preview-empty-title {
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.92rem;
     margin-bottom: 0.25rem;
-    color: var(--clr-text-main, #333);
+    color: var(--mp-ppt-empty-title);
 }
 
-.mp-ppt-preview-empty-desc {
-    font-size: 0.75rem;
-    opacity: 0.85;
+#rangoFechasPresentacionModal .mp-ppt-preview-empty-desc {
+    font-size: 0.78rem;
+    opacity: 0.95;
     max-width: 320px;
     margin: 0 auto;
+    color: var(--mp-ppt-empty-desc);
 }
 
-.mp-ppt-preview-loading {
+#rangoFechasPresentacionModal .mp-ppt-preview-loading {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -350,9 +497,406 @@
     padding: 1rem;
 }
 
-.mp-ppt-preview-content {
-    padding: 0.35rem;
+#rangoFechasPresentacionModal .mp-ppt-preview-spinner {
+    color: var(--mp-ppt-spinner) !important;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-loading-text {
+    color: var(--mp-ppt-loading-text) !important;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-preview-content {
+    padding: 0.45rem;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-preview-mode-tabs .btn {
+    font-size: 0.74rem;
+    border-radius: 999px;
+    padding: 0.32rem 0.75rem;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-preview-mode-tabs .btn-outline-secondary {
+    color: var(--mp-ppt-tab-inactive-fg) !important;
+    border-color: var(--mp-ppt-tab-inactive-border) !important;
+    background: transparent;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-preview-mode-tabs .btn-outline-secondary:hover {
+    background: var(--mp-ppt-tab-inactive-hover);
+    color: var(--mp-ppt-tab-inactive-fg) !important;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-preview-mode-tabs .btn.active {
+    background: var(--clr-primary, #861e34) !important;
+    border-color: var(--clr-primary, #861e34) !important;
+    color: #fff !important;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-office-embed-panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-office-iframe {
+    flex: 1 1 auto;
+    min-height: min(68vh, 880px);
+    width: 100%;
+    background: var(--mp-ppt-iframe-bg);
+    border: 1px solid var(--mp-ppt-sheet-border) !important;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-office-fallback {
+    background: var(--mp-ppt-fallback-bg) !important;
+    color: var(--mp-ppt-fallback-text) !important;
+    border: 1px solid var(--mp-ppt-fallback-border) !important;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-deck {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    overflow: auto;
+    min-height: min(68vh, 880px);
+    padding-right: 0.2rem;
+    font-family: 'Gilroy', 'Montserrat', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-slide {
+    background: #fff;
+    border: 1px solid var(--mp-ppt-sheet-border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+    font-family: inherit;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-slide-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.45rem 0.7rem;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 0.72rem;
+    color: #4b5563;
+    background: #f9fafb;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-slide-cover {
+    position: relative;
+    aspect-ratio: 16/9;
+    min-height: 280px;
+    color: #fff;
+    padding: 1.1rem 1.3rem;
+    background-color: #6d1530;
+    background-size: cover;
+    background-position: center;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-logos {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-logos img {
+    height: 36px;
+    width: auto;
+    object-fit: contain;
+    filter: brightness(1.06);
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-kicker {
+    margin: 0.35rem 0 0;
+    font-size: 1.95rem;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-sub {
+    margin: 0.45rem 0 0;
+    font-size: 1rem;
+    max-width: 62%;
+    line-height: 1.35;
+    opacity: 0.95;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-date-bottom {
+    position: absolute;
+    right: 1.1rem;
+    bottom: 0.8rem;
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-slide-body {
+    padding: 0.8rem 0.85rem;
+    background: #fff;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-slide-title {
+    margin: 0 0 0.55rem;
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #6d1530;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-subhead {
+    margin: 0 0 0.55rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-agenda h3 {
+    margin: 0 0 0.25rem;
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    color: #6d1530;
+    text-transform: uppercase;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-agenda ol {
+    margin: 0.35rem 0 0;
+    padding-left: 1.2rem;
+    color: #1f2937;
+    font-size: 0.83rem;
+    line-height: 1.7;
+    font-weight: 600;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-two-col {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-two-col h4 {
+    margin: 0 0 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #374151;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-mr-title {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 800;
+    color: #1f2937;
+    text-transform: uppercase;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 0.7rem;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 0.55rem;
+    background: #f9fafb;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-card-num {
+    font-size: 1.45rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #111827;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-card-label {
+    font-size: 0.72rem;
+    color: #6b7280;
+    margin-top: 0.2rem;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-kpis {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem 1.3rem;
+    font-size: 0.78rem;
+    color: #374151;
+    margin-bottom: 0.65rem;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-chart {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    padding: 0.45rem;
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-donut-wrap {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 0.8rem;
+    align-items: center;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-donut {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: conic-gradient(
+        #b89b6a 0 var(--a),
+        #861e3d var(--a) var(--b),
+        #d1d5db var(--b) 100%
+    );
+    display: grid;
+    place-items: center;
+    margin: 0 auto;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-donut-center {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #111827;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-donut-total {
+    font-size: 1.15rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-donut-center small {
+    font-size: 0.62rem;
+    color: #6b7280;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-donut-legend {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.38rem;
+    font-size: 0.78rem;
+    color: #1f2937;
+    font-weight: 600;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-donut-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-donut-legend .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-donut-legend .dot-asi {
+    background: #b89b6a;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-donut-legend .dot-ina {
+    background: #861e3d;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-donut-legend .dot-sin {
+    background: #d1d5db;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-chart img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-image-placeholder {
+    width: 100%;
+    min-height: 140px;
+    border: 2px dashed #c2c7d1;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(148, 163, 184, 0.08),
+        rgba(148, 163, 184, 0.08) 10px,
+        rgba(148, 163, 184, 0.03) 10px,
+        rgba(148, 163, 184, 0.03) 20px
+    );
+}
+
+@media (max-width: 860px) {
+    #rangoFechasPresentacionModal .mp-ppt-html-two-col,
+    #rangoFechasPresentacionModal .mp-ppt-html-grid-2 {
+        grid-template-columns: 1fr;
+    }
+
+    #rangoFechasPresentacionModal .mp-ppt-donut-wrap {
+        grid-template-columns: 1fr;
+    }
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.74rem;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-table th,
+#rangoFechasPresentacionModal .mp-ppt-html-table td {
+    border: 1px solid #e5e7eb;
+    padding: 0.35rem 0.45rem;
+    text-align: center;
+}
+
+#rangoFechasPresentacionModal .mp-ppt-html-table th {
+    background: #f3f4f6;
+    color: #374151;
+    font-weight: 700;
+}
+
+#rangoFechasPresentacionModal #mpPptPanelResumen {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
 }
 
 /* Réplica visual de la diapositiva 3 (sin cargar .pptx: evita descargas en el navegador) */
@@ -464,66 +1008,17 @@
     vertical-align: middle;
 }
 
-/* Calendario más pequeño dentro del modal */
-.mp-ppt-controls-side .calendar-wrapper {
-    margin-top: 0.35rem;
+/* La réplica imita papel de diapositiva; se mantiene clara también en tema oscuro */
+html.theme-dark .mp-ppt-slide-replica {
+    background-color: #fbfbfb;
+    color: #1a1a1a;
+    border-color: #ccc;
 }
 
-.mp-ppt-controls-side .flatpickr-calendar.flatpickr-premium {
-    max-width: 300px !important;
-    transform: scale(0.88);
-    transform-origin: top center;
-}
-
-.mp-ppt-controls-side .flatpickr-day {
-    max-width: 32px !important;
-    height: 32px !important;
-    line-height: 32px !important;
-}
-
-.mp-ppt-controls-side .flatpickr-current-month {
-    font-size: 1rem !important;
-}
-
-.mp-ppt-controls-side p.small {
-    font-size: 0.72rem !important;
-    margin-bottom: 0.35rem !important;
-}
-
-@media (min-width: 1100px) {
-    .mp-ppt-modal-body {
-        padding: 0.5rem 0.65rem 0.65rem !important;
-    }
-
-    .mp-ppt-preview-container {
-        flex-direction: row-reverse;
-        align-items: stretch;
-        overflow: hidden;
-        max-height: calc(88vh - 56px);
-        gap: 0.65rem;
-    }
-
-    .mp-ppt-preview-side {
-        flex: 1;
-        min-width: 0;
-        border-bottom: none;
-        border-left: 1px solid var(--clr-border, #dee2e6);
-        padding: 0.35rem 0 0.35rem 0.65rem;
-        max-height: calc(88vh - 56px);
-        overflow: hidden;
-    }
-
-    .mp-ppt-controls-side {
-        width: 300px;
-        flex-shrink: 0;
-        padding: 0.15rem 0.35rem 0.35rem 0;
-        max-height: calc(88vh - 56px);
-        overflow-y: auto;
-    }
-
-    .mp-ppt-sheet-wrapper {
-        min-height: 0;
-    }
+html.theme-dark .mp-ppt-replica-caption,
+html.theme-dark .mp-ppt-replica-meta,
+html.theme-dark .mp-ppt-slide-replica-semana {
+    color: #222;
 }
 
 @media (max-width: 640px) {
@@ -537,29 +1032,27 @@
     }
 }
 
-html.theme-dark .mp-ppt-sheet-wrapper {
-    background: var(--clr-card, #1e1e1e);
-    border-color: rgba(255, 255, 255, 0.12);
-}
+@media (min-width: 1100px) {
+    #rangoFechasPresentacionModal .mp-ppt-preview-container {
+        flex-direction: row;
+        align-items: stretch;
+        overflow: hidden;
+        max-height: calc(90vh - 64px);
+    }
 
-html.theme-dark .mp-ppt-preview-empty .fa-file-powerpoint {
-    opacity: 0.35;
-}
+    #rangoFechasPresentacionModal .mp-ppt-controls-side {
+        width: 360px;
+        flex-shrink: 0;
+        max-height: calc(90vh - 64px);
+    }
 
-html.theme-dark .mp-ppt-selection-info {
-    background: var(--clr-card, #252525);
-    border-color: rgba(255, 255, 255, 0.1);
-}
+    #rangoFechasPresentacionModal .mp-ppt-preview-side {
+        flex: 1;
+        min-width: 0;
+        max-height: calc(90vh - 64px);
+    }
 
-/* La réplica imita papel de diapositiva; se mantiene clara también en tema oscuro */
-html.theme-dark .mp-ppt-slide-replica {
-    background-color: #fbfbfb;
-    color: #1a1a1a;
-    border-color: #ccc;
-}
-
-html.theme-dark .mp-ppt-replica-caption,
-html.theme-dark .mp-ppt-replica-meta,
-html.theme-dark .mp-ppt-slide-replica-semana {
-    color: #222;
+    #rangoFechasPresentacionModal .mp-ppt-sheet-wrapper {
+        min-height: 0;
+    }
 }

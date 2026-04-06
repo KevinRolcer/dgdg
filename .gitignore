@@ -1,48 +1,20 @@
+# Directorios de dependencias y compilación
+/node_modules
+/dist
+/build
+/vendor
+
+# Logs
 *.log
-.DS_Store
+
+# Archivos de entorno (deben ser específicos para cada máquina)
 .env
 .env.*
 !.env.example
-.env.backup
-.env.production
-.envrc
-.phpactor.json
-.phpunit.result.cache
-/.fleet
-/.idea
-/.nova
-/.phpunit.cache
-/\.vs
-/.vscode
-/.zed
-/auth.json
-/oauth-*.json
-/credentials*.json
-/service-account*.json
-/secrets/
-*.pem
-*.p12
-*.pfx
-*.jks
-/node_modules
-/public/build
-/public/hot
-/public/localstorage
-/public/storage
-/storage/*.key
-/storage/logs/*
-/storage/pail
-/vendor
-Homestead.json
-Homestead.yaml
+
+# Archivos de sistema operativo
+.DS_Store
 Thumbs.db
-.env.example# Documentación local (no subir)
-/docs/
-/README.md/SECURITY.md
-/SECURE_GEMINI_AWS_PROMPT.md
-/documentacion.md
-/guia-roles-usuarios.md
-/MICRORREGIONES_REASIGNACION.md
-/CUENTAS_Y_ACCESOS_ENLACES.md
-/DocumentacionEnlaces.md
-/ENLACES_MULTI_MICRORREGION.md
+/bootstrap/cache/
+# .phpunit.result.cache is also common
+.phpunit.result.cache

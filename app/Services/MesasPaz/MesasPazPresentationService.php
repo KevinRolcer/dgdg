@@ -22,7 +22,7 @@ class MesasPazPresentationService
     private const OFFICE_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
     /**
-     * Datos para reporte y vista previa 
+     * Datos para reporte y vista previa
      * @return array{
      *     rango_formulario: string,
      *     fecha_generacion: string,
@@ -83,6 +83,7 @@ class MesasPazPresentationService
         $inicio = Carbon::parse($fechaInicio)->startOfDay();
         $fin = Carbon::parse($fechaFin)->startOfDay();
         $ctx = $this->resolverContextoPresentacion($inicio, $fin);
+        $ctxSemanaMarcada = $this->resolverContextoPresentacion($inicio->copy()->addDays(7), $fin->copy()->addDays(7));
 
         $rango = $ctx['rango'];
         $fechaActual = $ctx['fecha_actual_texto'];
@@ -93,6 +94,11 @@ class MesasPazPresentationService
         $metaMesas = $ctx['meta_mesas'];
         $mesasSinRegistroSemanal = $ctx['mesas_sin_registro_semanal'];
         $pctCumplimiento = $ctx['pct_cumplimiento'];
+        $textoSemanaMarcada = $ctxSemanaMarcada['texto_semana_anterior'];
+        $statsSemanaMarcada = $ctxSemanaMarcada['stats'];
+        $metaSemanaMarcada = $ctxSemanaMarcada['meta_mesas'];
+        $mesasSinRegistroSemanaMarcada = $ctxSemanaMarcada['mesas_sin_registro_semanal'];
+        $pctCumplimientoSemanaMarcada = $ctxSemanaMarcada['pct_cumplimiento'];
 
         Log::info('mesas_paz ppt: totales semana laboral previa al reporte', [
             'semana_contada' => $lunesAnterior->toDateString().' a '.$viernesAnterior->toDateString(),
@@ -143,6 +149,9 @@ class MesasPazPresentationService
         }
 
         $slide3 = $zip->getFromName('ppt/slides/slide3.xml');
+        $slide4 = $zip->getFromName('ppt/slides/slide4.xml');
+        $pngTemporales = [];
+
         if ($slide3 !== false) {
             $relsPath = 'ppt/slides/_rels/slide3.xml.rels';
             $relsContent = $zip->getFromName($relsPath);
@@ -160,24 +169,74 @@ class MesasPazPresentationService
                 $mesasSinRegistroSemanal,
             );
 
-            [$slide3, $relsContent, $pngTemporal] = $this->inyectarGraficaBarrasEnSlide3($zip, $slide3, $relsContent, $metaMesas, $stats);
+            [$slide3, $relsContent, $pngTemporal] = $this->inyectarGraficaCircularEnSlide(
+                $zip,
+                $slide3,
+                $relsContent,
+                $metaMesas,
+                $stats,
+                'Grafica circular semana anterior',
+                5000000,
+                3300000,
+                6400000,
+                4000000,
+            );
 
             $zip->addFromString('ppt/slides/slide3.xml', $slide3);
             if ($relsContent !== '') {
                 $zip->addFromString($relsPath, $relsContent);
             }
-
-            $zip->close();
             if (is_string($pngTemporal) && $pngTemporal !== '' && is_file($pngTemporal)) {
-                @unlink($pngTemporal);
+                $pngTemporales[] = $pngTemporal;
             }
-
-            return $rutaCompleta;
         } else {
             Log::warning('mesas_paz.pptx: no existe ppt/slides/slide3.xml; se omiten totales del reporte general.');
         }
 
+        if ($slide4 !== false) {
+            $relsPath4 = 'ppt/slides/_rels/slide4.xml.rels';
+            $relsContent4 = $zip->getFromName($relsPath4);
+            if (! is_string($relsContent4)) {
+                $relsContent4 = '';
+            }
+
+            $slide4 = $this->parchearSlide3ReporteGeneral(
+                $slide4,
+                $textoSemanaMarcada,
+                $statsSemanaMarcada['total_mesas'],
+                $statsSemanaMarcada['mesas_con_asistencia'],
+                $statsSemanaMarcada['mesas_con_inasistencia'],
+                $pctCumplimientoSemanaMarcada,
+                $mesasSinRegistroSemanaMarcada,
+            );
+
+            [$slide4, $relsContent4, $pngTemporal4] = $this->inyectarGraficaCircularEnSlide(
+                $zip,
+                $slide4,
+                $relsContent4,
+                $metaSemanaMarcada,
+                $statsSemanaMarcada,
+                'Grafica circular semana marcada',
+                5000000,
+                3300000,
+                6400000,
+                4000000,
+            );
+
+            $zip->addFromString('ppt/slides/slide4.xml', $slide4);
+            if ($relsContent4 !== '') {
+                $zip->addFromString($relsPath4, $relsContent4);
+            }
+
+            if (is_string($pngTemporal4) && $pngTemporal4 !== '' && is_file($pngTemporal4)) {
+                $pngTemporales[] = $pngTemporal4;
+            }
+        }
+
         $zip->close();
+        foreach ($pngTemporales as $pngTmp) {
+            @unlink($pngTmp);
+        }
 
         return $rutaCompleta;
     }
@@ -216,9 +275,11 @@ class MesasPazPresentationService
         $totalMunicipiosCatalogo = $this->totalMunicipiosCatalogo();
         $municipiosSinRegistroCatalogo = max(0, $totalMunicipiosCatalogo - $stats['municipios_distintos_con_registro']);
         $mesasSinRegistroSemanal = max(0, $metaMesas - $stats['total_mesas']);
-        $pctCumplimiento = $metaMesas > 0
-            ? min(100.0, round(($stats['mesas_con_asistencia'] / $metaMesas) * 100, 2))
-            : 0.0;
+        $pctCumplimiento = $this->calcularPorcentajeCumplimientoCombinado(
+            $metaMesas,
+            $stats['mesas_con_asistencia'],
+            $mesasSinRegistroSemanal,
+        );
 
         return [
             'rango' => $rango,
@@ -233,6 +294,18 @@ class MesasPazPresentationService
             'mesas_sin_registro_semanal' => $mesasSinRegistroSemanal,
             'pct_cumplimiento' => $pctCumplimiento,
         ];
+    }
+
+    private function calcularPorcentajeCumplimientoCombinado(int $metaMesas, int $asistencias, int $sinRegistro): float
+    {
+        if ($metaMesas <= 0) {
+            return 0.0;
+        }
+
+        $pctAsistencias = ($asistencias / $metaMesas) * 100;
+        $pctSinRegistro = ($sinRegistro / $metaMesas) * 100;
+
+        return round(($pctAsistencias + $pctSinRegistro) / 2, 2);
     }
 
     private function metaMesasSeguridadEsperadas(): int
@@ -303,7 +376,15 @@ class MesasPazPresentationService
         $relsContent = $this->relsAgregarRelacionImagen($relsContent, $nextRid, $mediaName);
 
         try {
-            $slide3Xml = $this->slide3InsertarPicture($slide3Xml, 'rId'.$nextRid);
+            $slide3Xml = $this->slideInsertarPicture(
+                $slide3Xml,
+                'rId'.$nextRid,
+                'Grafica barras mesas de seguridad',
+                4180000,
+                1680000,
+                4680000,
+                2320000,
+            );
         } catch (\Throwable $e) {
             Log::warning('mesas_paz ppt: no se pudo insertar p:pic en slide3. '.$e->getMessage());
         }
@@ -311,11 +392,65 @@ class MesasPazPresentationService
         return [$slide3Xml, $relsContent, $pngPath];
     }
 
+    /**
+     * @param  array{total_mesas: int, mesas_con_asistencia: int, mesas_con_inasistencia: int, por_dia: array, municipios_distintos_con_registro: int}  $stats
+     * @return array{0: string, 1: string, 2: string|null}
+     */
+    private function inyectarGraficaCircularEnSlide(
+        ZipArchive $zip,
+        string $slideXml,
+        string $relsContent,
+        int $metaMesas,
+        array $stats,
+        string $shapeName,
+        int $x,
+        int $y,
+        int $cx,
+        int $cy,
+    ): array {
+        if (! extension_loaded('gd')) {
+            Log::warning('mesas_paz ppt: extensión GD no disponible; no se inserta gráfica circular.');
+
+            return [$slideXml, $relsContent, null];
+        }
+
+        $pngPath = $this->crearArchivoPngGraficaCircular(
+            $metaMesas,
+            $stats['mesas_con_asistencia'],
+            $stats['mesas_con_inasistencia'],
+            $stats['total_mesas'],
+        );
+
+        if ($pngPath === null || ! is_file($pngPath)) {
+            return [$slideXml, $relsContent, null];
+        }
+
+        $mediaName = $this->siguienteNombreImagenPngEnZip($zip);
+        if (! $zip->addFile($pngPath, 'ppt/media/'.$mediaName)) {
+            @unlink($pngPath);
+            Log::warning('mesas_paz ppt: no se pudo añadir la imagen circular al zip.');
+
+            return [$slideXml, $relsContent, null];
+        }
+
+        $nextRid = $this->siguienteRIdEnRels($relsContent);
+        $relsContent = $this->relsAgregarRelacionImagen($relsContent, $nextRid, $mediaName);
+
+        try {
+            $slideXml = $this->slideInsertarPicture($slideXml, 'rId'.$nextRid, $shapeName, $x, $y, $cx, $cy);
+        } catch (\Throwable $e) {
+            Log::warning('mesas_paz ppt: no se pudo insertar p:pic circular. '.$e->getMessage());
+        }
+
+        return [$slideXml, $relsContent, $pngPath];
+    }
+
     private function siguienteNombreImagenPngEnZip(ZipArchive $zip): string
     {
         $max = 0;
         for ($i = 0; $i < $zip->numFiles; $i++) {
-            if ($name !== false && preg_match('#^ppt/media/image(\d+)\.png$#i', $name, $m)) {
+            $name = $zip->getNameIndex($i);
+            if (is_string($name) && preg_match('#^ppt/media/image(\d+)\.png$#i', $name, $m)) {
                 $max = max($max, (int) $m[1]);
             }
         }
@@ -365,7 +500,15 @@ class MesasPazPresentationService
         return htmlspecialchars($s, ENT_XML1 | ENT_COMPAT, 'UTF-8');
     }
 
-    private function slide3InsertarPicture(string $slideXml, string $rId): string
+    private function slideInsertarPicture(
+        string $slideXml,
+        string $rId,
+        string $shapeName,
+        int $x,
+        int $y,
+        int $cx,
+        int $cy
+    ): string
     {
         $dom = new DOMDocument;
         $dom->preserveWhiteSpace = true;
@@ -387,7 +530,7 @@ class MesasPazPresentationService
         }
 
         $nextShapeId = $this->siguienteIdFormaEnDocumento($dom);
-        $pic = $this->construirElementoPic($dom, $nextShapeId, $rId);
+        $pic = $this->construirElementoPic($dom, $nextShapeId, $rId, $shapeName, $x, $y, $cx, $cy);
 
         $elementos = [];
         foreach ($spTree->childNodes as $child) {
@@ -431,14 +574,23 @@ class MesasPazPresentationService
         return $max + 1;
     }
 
-    private function construirElementoPic(DOMDocument $dom, int $shapeId, string $rId): DOMElement
+    private function construirElementoPic(
+        DOMDocument $dom,
+        int $shapeId,
+        string $rId,
+        string $shapeName,
+        int $x,
+        int $y,
+        int $cx,
+        int $cy,
+    ): DOMElement
     {
         $pic = $dom->createElementNS(self::PRESENTATIONML_NS, 'p:pic');
 
         $nvPicPr = $dom->createElementNS(self::PRESENTATIONML_NS, 'p:nvPicPr');
         $cNvPr = $dom->createElementNS(self::PRESENTATIONML_NS, 'p:cNvPr');
         $cNvPr->setAttribute('id', (string) $shapeId);
-        $cNvPr->setAttribute('name', 'Grafica mesas de seguridad');
+        $cNvPr->setAttribute('name', $shapeName);
         $nvPicPr->appendChild($cNvPr);
 
         $cNvPicPr = $dom->createElementNS(self::PRESENTATIONML_NS, 'p:cNvPicPr');
@@ -462,11 +614,11 @@ class MesasPazPresentationService
         $spPr = $dom->createElementNS(self::PRESENTATIONML_NS, 'p:spPr');
         $xfrm = $dom->createElementNS(self::DRAWINGML_NS, 'a:xfrm');
         $off = $dom->createElementNS(self::DRAWINGML_NS, 'a:off');
-        $off->setAttribute('x', '4180000');
-        $off->setAttribute('y', '1680000');
+        $off->setAttribute('x', (string) $x);
+        $off->setAttribute('y', (string) $y);
         $ext = $dom->createElementNS(self::DRAWINGML_NS, 'a:ext');
-        $ext->setAttribute('cx', '4680000');
-        $ext->setAttribute('cy', '2320000');
+        $ext->setAttribute('cx', (string) $cx);
+        $ext->setAttribute('cy', (string) $cy);
         $xfrm->appendChild($off);
         $xfrm->appendChild($ext);
         $spPr->appendChild($xfrm);
@@ -499,7 +651,16 @@ class MesasPazPresentationService
 
         imagefilledrectangle($im, 0, 0, $w, $h, $blanco);
 
-        $font = public_path('fonts/agenda-pdf/Montserrat-Regular.ttf');
+        $font = public_path('fonts/agenda-pdf/Gilroy-ExtraBold.ttf');
+        if (! is_file($font)) {
+            $font = public_path('fonts/agenda-pdf/Gilroy-Bold.ttf');
+        }
+        if (! is_file($font)) {
+            $font = public_path('fonts/agenda-pdf/Montserrat-Bold.ttf');
+        }
+        if (! is_file($font)) {
+            $font = public_path('fonts/agenda-pdf/Montserrat-Regular.ttf');
+        }
         if (! is_file($font)) {
             $font = null;
         }
@@ -542,6 +703,145 @@ class MesasPazPresentationService
         }
 
         $tmp = tempnam(sys_get_temp_dir(), 'mppt_');
+        if ($tmp === false) {
+            imagedestroy($im);
+
+            return null;
+        }
+        $path = $tmp.'.png';
+        rename($tmp, $path);
+        imagepng($im, $path);
+        imagedestroy($im);
+
+        return $path;
+    }
+
+    /**
+     * @return string|null Ruta temporal al PNG o null si falla.
+     */
+    private function crearArchivoPngGraficaCircular(int $meta, int $asistencias, int $inasistencias, int $totalRegistrado): ?string
+    {
+        $w = 2800;
+        $h = 1500;
+        $im = imagecreatetruecolor($w, $h);
+        if ($im === false) {
+            return null;
+        }
+
+        imagealphablending($im, false);
+        imagesavealpha($im, true);
+        $transparent = imagecolorallocatealpha($im, 0, 0, 0, 127);
+        imagefilledrectangle($im, 0, 0, $w, $h, $transparent);
+        imagealphablending($im, true);
+
+        $verde = imagecolorallocate($im, 11, 78, 73);
+        $guinda = imagecolorallocate($im, 134, 30, 61);
+        $dorado = imagecolorallocate($im, 184, 155, 106);
+        $blanco = imagecolorallocate($im, 255, 255, 255);
+        $texto = imagecolorallocate($im, 58, 58, 58);
+        $textoSuave = imagecolorallocate($im, 107, 114, 128);
+
+        $sinRegistro = max(0, $meta - $totalRegistrado);
+        $total = max(1, $asistencias + $inasistencias + $sinRegistro);
+
+        $cx = 1600;
+        $cy = 560;
+        $diam = 1080;
+        $inner = 660;
+
+        $start = -90.0;
+        $segmentos = [
+            ['v' => $asistencias, 'c' => $verde],
+            ['v' => $inasistencias, 'c' => $guinda],
+            ['v' => $sinRegistro, 'c' => $dorado],
+        ];
+
+        foreach ($segmentos as $seg) {
+            if ($seg['v'] <= 0) {
+                continue;
+            }
+            $delta = 360.0 * ((float) $seg['v'] / (float) $total);
+            imagefilledarc(
+                $im,
+                $cx,
+                $cy,
+                $diam,
+                $diam,
+                (int) round($start),
+                (int) round($start + $delta),
+                $seg['c'],
+                IMG_ARC_PIE
+            );
+            $start += $delta;
+        }
+
+        imagefilledellipse($im, $cx, $cy, $inner, $inner, $blanco);
+
+        $font = public_path('fonts/agenda-pdf/Gilroy-ExtraBold.ttf');
+        if (! is_file($font)) {
+            $font = public_path('fonts/agenda-pdf/Gilroy-Bold.ttf');
+        }
+        if (! is_file($font)) {
+            $font = public_path('fonts/agenda-pdf/Montserrat-Bold.ttf');
+        }
+        if (! is_file($font)) {
+            $font = public_path('fonts/agenda-pdf/Montserrat-Regular.ttf');
+        }
+        $totalConSinRegistro = $asistencias + $inasistencias + $sinRegistro;
+        $textoCentro = (string) $totalConSinRegistro;
+        $pctAsistencia = ($total > 0) ? round(($asistencias / $total) * 100, 1) : 0.0;
+        $pctInasistencia = ($total > 0) ? round(($inasistencias / $total) * 100, 1) : 0.0;
+        $pctSinRegistro = ($total > 0) ? round(($sinRegistro / $total) * 100, 1) : 0.0;
+
+        if (is_file($font) && function_exists('imagettftext')) {
+            $bbox = imagettfbbox(148, 0, $font, $textoCentro);
+            $textW = $bbox ? abs($bbox[2] - $bbox[0]) : 0;
+            $textH = $bbox ? abs($bbox[7] - $bbox[1]) : 0;
+            $tx = (int) round($cx - ($textW / 2));
+            $ty = (int) round($cy + ($textH / 2));
+            @imagettftext($im, 148, 0, $tx, $ty, $texto, $font, $textoCentro);
+            @imagettftext($im, 148, 0, $tx + 1, $ty, $texto, $font, $textoCentro);
+
+            $totalText = 'TOTAL';
+            $bboxTotal = imagettfbbox(58, 0, $font, $totalText);
+            $totalW = $bboxTotal ? abs($bboxTotal[2] - $bboxTotal[0]) : 0;
+            $txTotal = (int) round($cx - ($totalW / 2));
+            $tyTotal = (int) round($cy + 245);
+            @imagettftext($im, 58, 0, $txTotal, $tyTotal, $texto, $font, $totalText);
+            @imagettftext($im, 58, 0, $txTotal + 1, $tyTotal, $texto, $font, $totalText);
+
+            $sizeLabel = 72;
+            $sizePct = 74;
+            $baseY = 1340;
+
+            $drawRow = function (string $label, float $pct, int $color, int $centerX) use ($im, $font, $sizeLabel, $sizePct, $baseY, $texto) {
+                $labelTxt = $label.': ';
+                $pctTxt = number_format($pct, 1).'%';
+
+                $bboxL = imagettfbbox($sizeLabel, 0, $font, $labelTxt);
+                $bboxP = imagettfbbox($sizePct, 0, $font, $pctTxt);
+                $wL = $bboxL ? abs($bboxL[2] - $bboxL[0]) : 0;
+                $wP = $bboxP ? abs($bboxP[2] - $bboxP[0]) : 0;
+                $startX = (int) round($centerX - (($wL + $wP) / 2));
+
+                @imagettftext($im, $sizeLabel, 0, $startX, $baseY, $texto, $font, $labelTxt);
+                @imagettftext($im, $sizeLabel, 0, $startX + 1, $baseY, $texto, $font, $labelTxt);
+                @imagettftext($im, $sizePct, 0, $startX + $wL, $baseY, $color, $font, $pctTxt);
+                @imagettftext($im, $sizePct, 0, $startX + $wL + 1, $baseY, $color, $font, $pctTxt);
+            };
+
+            $drawRow('Asistencias', $pctAsistencia, $verde, 430);
+            $drawRow('Inasistencias', $pctInasistencia, $guinda, 1420);
+            $drawRow('Sin registro', $pctSinRegistro, $dorado, 2360);
+        } else {
+            imagestring($im, 5, $cx - 90, $cy - 16, $textoCentro, $texto);
+            imagestring($im, 5, 120, 1390, 'Asistencias: '.number_format($pctAsistencia, 1).'%', $verde);
+            imagestring($im, 5, 980, 1390, 'Inasistencias: '.number_format($pctInasistencia, 1).'%', $guinda);
+            imagestring($im, 5, 1880, 1390, 'Sin registro: '.number_format($pctSinRegistro, 1).'%', $dorado);
+            imagestring($im, 5, $cx - 60, $cy + 80, 'TOTAL', $texto);
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'mppt_circ_');
         if ($tmp === false) {
             imagedestroy($im);
 
@@ -685,10 +985,12 @@ class MesasPazPresentationService
             if (@$dom->loadXML($xml, LIBXML_NONET)) {
                 $xp = new DOMXPath($dom);
                 $xp->registerNamespace('a', self::DRAWINGML_NS);
+                $xp->registerNamespace('p', self::PRESENTATIONML_NS);
 
                 $this->reemplazarParrafosSemanaEnSlide($xp, $textoSemanaAnterior);
                 $reemplazados = $this->reemplazarTresMetricasNumericas($xp, $totalMesas, $mesasConAsistencia, $mesasConInasistencia);
                 $this->parchearParrafoCumplimientoYSinRegistro($dom, $xp, $porcentajeCumplimiento, $mesasSinRegistroSemanal);
+                $this->moverShapeSemanaHaciaArriba($xp, 380000);
 
                 if ($reemplazados < 3) {
                     Log::warning('mesas_paz ppt slide3: solo se reemplazaron '.$reemplazados.' de 3 métricas numéricas; se aplicará respaldo en nodos sueltos.');
@@ -702,11 +1004,13 @@ class MesasPazPresentationService
         if ($domOk) {
             $out = $dom->saveXML();
             if (is_string($out) && $out !== '') {
-                return $this->reemplazarNumerosSueltosEnXml($out, $totalMesas, $mesasConAsistencia, $mesasConInasistencia);
+                $out = $this->reemplazarNumerosSueltosEnXml($out, $totalMesas, $mesasConAsistencia, $mesasConInasistencia);
+
+                return $this->forzarTextoCumplimientoEnXml($out, $porcentajeCumplimiento);
             }
         }
 
-        return $this->parchearSlide3PorTextoPlano(
+        $fallback = $this->parchearSlide3PorTextoPlano(
             $xml,
             $textoSemanaAnterior,
             $totalMesas,
@@ -715,6 +1019,70 @@ class MesasPazPresentationService
             $porcentajeCumplimiento,
             $mesasSinRegistroSemanal,
         );
+
+        return $this->forzarTextoCumplimientoEnXml($fallback, $porcentajeCumplimiento);
+    }
+
+    private function moverShapeSemanaHaciaArriba(DOMXPath $xp, int $deltaY): void
+    {
+        $spList = $xp->query('//p:sp');
+        if (! $spList) {
+            return;
+        }
+
+        for ($i = 0; $i < $spList->length; $i++) {
+            $sp = $spList->item($i);
+            if (! $sp instanceof DOMElement) {
+                continue;
+            }
+
+            $tNodes = $xp->query('.//a:t', $sp);
+            if (! $tNodes || $tNodes->length === 0) {
+                continue;
+            }
+
+            $texto = '';
+            for ($j = 0; $j < $tNodes->length; $j++) {
+                $tn = $tNodes->item($j);
+                if ($tn instanceof DOMElement) {
+                    $texto .= $tn->textContent;
+                }
+            }
+
+            if (! preg_match('/\bSemana\b/ui', $texto)) {
+                continue;
+            }
+
+            $off = $xp->query('.//a:xfrm/a:off', $sp);
+            if (! $off || $off->length === 0) {
+                continue;
+            }
+            $offNode = $off->item(0);
+            if (! $offNode instanceof DOMElement || ! $offNode->hasAttribute('y')) {
+                continue;
+            }
+
+            $yActual = (int) $offNode->getAttribute('y');
+            $offNode->setAttribute('y', (string) max(0, $yActual - $deltaY));
+
+            return;
+        }
+    }
+
+    private function forzarTextoCumplimientoEnXml(string $xml, float $porcentajeCumplimiento): string
+    {
+        $linea = sprintf('%.2f%% de cumplimiento', $porcentajeCumplimiento);
+        // Limpia residuos como "47.60% de" que puedan quedar en runs separados.
+        $xml = preg_replace('/<a:t>\s*\d+[.,]\d+\s*%?\s*de\s*<\/a:t>/iu', '<a:t></a:t>', $xml) ?? $xml;
+
+        $patron = '/<a:t>[^<]*\d+[.,]\d+\s*%?\s*de\s+cumplimiento[^<]*<\/a:t>/iu';
+        if (preg_match($patron, $xml) === 1) {
+            return preg_replace($patron, '<a:t>'.$this->xmlText($linea).'</a:t>', $xml, 1) ?? $xml;
+        }
+
+        $patron2 = '/<a:t>[^<]*cumplimiento[^<]*<\/a:t>/iu';
+
+        return preg_replace($patron2, '<a:t>'.$this->xmlText($linea).'</a:t>', $xml, 1) ?? $xml;
     }
 
     private function textoMesasSinRegistroSemanal(int $n): string
@@ -787,6 +1155,7 @@ class MesasPazPresentationService
 
     private function parchearParrafoCumplimientoYSinRegistro(DOMDocument $dom, DOMXPath $xp, float $pct, int $mesasSinRegistroSemanal): void
     {
+        unset($mesasSinRegistroSemanal);
         $pList = $xp->query('//a:p');
         if (! $pList) {
             return;
@@ -814,6 +1183,28 @@ class MesasPazPresentationService
                 continue;
             }
 
+            if ($i > 0) {
+                $prev = $pList->item($i - 1);
+                if ($prev instanceof DOMElement) {
+                    $prevText = '';
+                    $prevNodes = $xp->query('.//a:t', $prev);
+                    if ($prevNodes) {
+                        for ($k = 0; $k < $prevNodes->length; $k++) {
+                            $pn = $prevNodes->item($k);
+                            if ($pn instanceof DOMElement) {
+                                $prevText .= $pn->textContent;
+                            }
+                        }
+                    }
+                    $prevNorm = preg_replace('/\s+/u', ' ', trim($prevText)) ?? trim($prevText);
+                    if (preg_match('/^\d+[.,]\d+\s*%?\s*de\s*$/iu', $prevNorm)) {
+                        while ($prev->firstChild) {
+                            $prev->removeChild($prev->firstChild);
+                        }
+                    }
+                }
+            }
+
             $tplRpr = $this->obtenerRPrPlantillaTextoCuerpo($xp, $p);
 
             while ($p->firstChild) {
@@ -821,7 +1212,6 @@ class MesasPazPresentationService
             }
 
             $linea1 = sprintf('%.2f%% de cumplimiento', $pct);
-            $linea2 = $this->textoMesasSinRegistroSemanal($mesasSinRegistroSemanal);
 
             $r1 = $dom->createElementNS(self::DRAWINGML_NS, 'a:r');
             if ($tplRpr instanceof DOMElement) {
@@ -831,17 +1221,6 @@ class MesasPazPresentationService
             $t1->textContent = $linea1;
             $r1->appendChild($t1);
             $p->appendChild($r1);
-
-            $p->appendChild($dom->createElementNS(self::DRAWINGML_NS, 'a:br'));
-
-            $r2 = $dom->createElementNS(self::DRAWINGML_NS, 'a:r');
-            if ($tplRpr instanceof DOMElement) {
-                $r2->appendChild($dom->importNode($tplRpr->cloneNode(true), true));
-            }
-            $t2 = $dom->createElementNS(self::DRAWINGML_NS, 'a:t');
-            $t2->textContent = $linea2;
-            $r2->appendChild($t2);
-            $p->appendChild($r2);
 
             return;
         }

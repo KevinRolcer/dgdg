@@ -23,7 +23,7 @@
 <div class="mesas-paz-shell app-density-compact">
     <div class="mesas-paz-shell-main">
 
-<div id="supervisionEvidenciasPage" data-url-ppt="{{ route('ppt.generar-presentacion') }}" data-url-ppt-vista-previa="{{ route('ppt.vista-previa.preparar') }}" data-fechas-datos="{{ json_encode($fechasConDatos ?? []) }}" data-url-bruto="{{ route('mesas-paz.evidencias.registros-bruto') }}" data-url-eliminar-rango="{{ route('mesas-paz.evidencias.eliminar-rango') }}" data-csrf="{{ csrf_token() }}">
+<div id="supervisionEvidenciasPage" data-url-ppt="{{ route('ppt.generar-presentacion') }}" data-url-ppt-vista-previa="{{ route('ppt.vista-previa.preparar') }}" data-fechas-datos="{{ json_encode($fechasConDatos ?? []) }}" data-url-bruto="{{ route('mesas-paz.evidencias.registros-bruto') }}" data-url-eliminar-rango="{{ route('mesas-paz.evidencias.eliminar-rango') }}" data-csrf="{{ csrf_token() }}" data-ppt-logo-url="{{ asset('images/logo-gobierno.png') }}" data-ppt-segob-logo-url="{{ asset('images/LogoSegobHorizontal.png') }}" data-ppt-cover-bg-url="{{ asset('images/Texturas_1C-Tlaloc_rojo.png') }}">
 
 {{-- ═══ VISTA: Evidencias (vista principal) ═══ --}}
 <div id="vistaEvidencias">
@@ -644,17 +644,44 @@
             </div>
             <div class="modal-body p-0 mp-ppt-modal-body">
                 <div class="mp-ppt-preview-container">
+                    <div class="mp-ppt-controls-side">
+                        <div class="mp-ppt-controls-head">
+                            <p class="mb-1 fw-semibold mp-ppt-controls-title">Rango de fechas</p>
+                            <p class="small mb-0 mp-ppt-controls-sub">Seleccione inicio y fin para generar la presentación.</p>
+                        </div>
+                        <form id="formRangoFechasPresentation" method="POST" action="{{ route('ppt.generar-presentacion') }}">
+                            @csrf
+                            <input type="hidden" name="fecha_inicio" id="inputStart">
+                            <input type="hidden" name="fecha_fin" id="inputEnd">
+                            <div id="mpPptCalendarMonthLabel" class="mp-ppt-calendar-month-label"></div>
+                            <div class="calendar-wrapper presentation-calendar-wrap w-100 d-flex justify-content-center">
+                                <input type="text" id="fechaRangoPresentacion" name="fecha_rango" class="d-none" required>
+                            </div>
+                        </form>
+                        <div class="d-grid gap-2 mt-3">
+                            <button type="button" class="btn btn-outline-primary" id="btnVistaPreviaPresentacion">
+                                <i class="fa-solid fa-eye me-1" aria-hidden="true"></i> Actualizar vista previa
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary d-none" id="btnDescargarPresentacionPdf">
+                                <i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i> Descargar .pdf
+                            </button>
+                            <button type="button" class="btn btn-primary" id="btnDescargarPresentacion">
+                                <i class="fa-solid fa-download me-1" aria-hidden="true"></i> Descargar .pptx
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        </div>
+                    </div>
                     <div class="mp-ppt-preview-side">
                         <div class="mp-ppt-selection-info">
                             <div>
                                 <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-                                <span id="mpPptStepNote">Seleccione fechas y pulse <strong>Actualizar vista previa</strong> para ver una réplica de la diapositiva con los mismos datos que el .pptx. <strong>Descargar</strong> genera el archivo.</span>
+                                <span id="mpPptStepNote">Actualice la vista previa para cargar la presentación final.</span>
                             </div>
                         </div>
                         <div class="mp-ppt-sheet-wrapper">
                             <div id="mpPptPreviewLoading" class="mp-ppt-preview-loading d-none">
-                                <div class="spinner-border text-secondary" role="status" aria-hidden="true"></div>
-                                <p class="mt-2 mb-0 small text-muted">Generando vista previa…</p>
+                                <div class="spinner-border mp-ppt-preview-spinner" role="status" aria-hidden="true"></div>
+                                <p class="mt-2 mb-0 small mp-ppt-loading-text">Generando vista previa…</p>
                             </div>
                             <div id="mpPptPreviewEmpty" class="mp-ppt-preview-empty">
                                 <i class="fa-solid fa-file-powerpoint" aria-hidden="true"></i>
@@ -662,6 +689,11 @@
                                 <p class="mp-ppt-preview-empty-desc">Elija el rango de fechas y actualice la vista previa para ver el comparativo y los totales.</p>
                             </div>
                             <div id="mpPptPreviewContent" class="mp-ppt-preview-content d-none">
+                                <div class="mp-ppt-preview-mode-tabs d-none mb-2" id="mpPptPreviewModeTabs" role="tablist">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="mpPptTabBtnResumen" data-mp-ppt-tab="resumen" aria-selected="false">Resumen</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary active" id="mpPptTabBtnCompleto" data-mp-ppt-tab="completo" aria-selected="true">Vista PDF</button>
+                                </div>
+                                <div id="mpPptPanelResumen" class="d-none">
                                 <div id="mpPptSlideReplica" class="mp-ppt-slide-replica" aria-label="Vista previa de la diapositiva de reporte">
                                     <div class="mp-ppt-slide-replica-head">
                                         <div>
@@ -688,29 +720,25 @@
                                         </div>
                                     </div>
                                 </div>
+                                </div>
+                                <div id="mpPptPanelCompleto" class="mp-ppt-office-embed-panel d-none" aria-label="Vista previa PDF de la presentación">
+                                    <iframe
+                                        id="mpPptOfficeIframe"
+                                        title="Vista previa PDF"
+                                        class="mp-ppt-office-iframe w-100 border-0 rounded"
+                                        src="about:blank"
+                                        allowfullscreen
+                                    ></iframe>
+                                    <div id="mpPptHtmlDeck" class="mp-ppt-html-deck d-none" aria-label="Vista previa completa HTML"></div>
+                                    <div id="mpPptOfficeFallback" class="mp-ppt-office-fallback alert small mb-0 d-none" role="alert">
+                                        <p class="mb-2">No fue posible cargar el PDF del servidor. Se muestra una vista completa HTML con los datos actualizados como alternativa.</p>
+                                        <a href="#" class="btn btn-sm btn-outline-primary me-1" id="mpPptLinkVistaPagina" target="_blank" rel="noopener noreferrer">Abrir vista previa en página</a>
+                                        <a href="#" class="btn btn-sm btn-primary d-none" id="mpPptLinkSignedFile" target="_blank" rel="noopener noreferrer">Abrir archivo</a>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div id="mpPptPreviewErr" class="alert alert-danger d-none mx-3 mb-3 py-2 small" role="alert"></div>
-                    </div>
-                    <div class="mp-ppt-controls-side">
-                        <p class="small text-muted mb-2">Rango del formulario (solo días laborables). La diapositiva de totales usa la <strong>semana laboral anterior</strong> a la semana de la fecha fin.</p>
-                        <form id="formRangoFechasPresentation" method="POST" action="{{ route('ppt.generar-presentacion') }}">
-                            @csrf
-                            <input type="hidden" name="fecha_inicio" id="inputStart">
-                            <input type="hidden" name="fecha_fin" id="inputEnd">
-                            <div class="calendar-wrapper presentation-calendar-wrap w-100 d-flex justify-content-center">
-                                <input type="text" id="fechaRangoPresentacion" name="fecha_rango" class="d-none" required>
-                            </div>
-                        </form>
-                        <div class="d-grid gap-2 mt-3">
-                            <button type="button" class="btn btn-outline-primary" id="btnVistaPreviaPresentacion">
-                                <i class="fa-solid fa-eye me-1" aria-hidden="true"></i> Actualizar vista previa
-                            </button>
-                            <button type="button" class="btn btn-primary" id="btnDescargarPresentacion">
-                                <i class="fa-solid fa-download me-1" aria-hidden="true"></i> Descargar .pptx
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
-                        </div>
                     </div>
                 </div>
             </div>

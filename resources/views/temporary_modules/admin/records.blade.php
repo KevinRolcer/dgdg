@@ -17,10 +17,7 @@
 @section('content')
 <section class="tm-page tm-shell app-density-compact">
     <div class="tm-shell-main">
-        <header class="tm-shell-head tm-shell-head--no-rule">
-            <h1 class="tm-shell-title">Registros de eventos temporales</h1>
-            <p class="tm-shell-desc">Visualiza módulos con registros capturados, exportación a Excel y análisis en Word.</p>
-        </header>
+
 
         @if (session('status'))
             <div class="inline-alert inline-alert-success" role="alert">{{ session('status') }}</div>
@@ -84,7 +81,7 @@
                                     data-structure-url="{{ route('temporary-modules.admin.export-preview-structure', $module->id) }}"
                                     data-analysis-preview-url="{{ route('temporary-modules.admin.analysis-preview', $module->id) }}"
                                     data-analysis-word-url="{{ route('temporary-modules.admin.export-analysis-word', $module->id) }}"
-                                    title="Exportar a Excel"
+                                    title="Exportar (Excel, PDF, Word o informe)"
                                 >
                                     <i class="fa-solid fa-file-excel"></i>
                                 </button>
@@ -176,14 +173,12 @@
                     </div>
                     @endcan
                     @php
-                        // Load mapping of Municipio names to Microregion names to fix entries imported without microrregion_id
                         $municipiosMap = \App\Models\Municipio::with('microrregion')->get()->mapWithKeys(function ($m) {
                             $norm = \Illuminate\Support\Str::slug($m->nombre, '');
                             $mrName = $m->microrregion ? 'Microrregión ' . $m->microrregion->microrregion . ' - ' . $m->microrregion->cabecera : 'Sin microrregión asignada';
                             return [$norm => $mrName];
                         })->toArray();
 
-                        // Get the fields specifically to use inside the closure
                         $moduleFields = $module->fields;
 
                         $getMunicipioName = function ($entry) use ($moduleFields) {
@@ -371,7 +366,7 @@
         <div class="tm-modal-backdrop" data-close-export-personalize></div>
         <div class="tm-modal-dialog tm-export-personalize-dialog">
             <div class="tm-modal-head">
-                <h3>Personalizar columnas y diseño</h3>
+                <h3>Todos los registros</h3>
                 <button type="button" class="tm-modal-close" data-close-export-personalize aria-label="Cerrar">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
@@ -379,7 +374,17 @@
             <div class="tm-modal-body">
                 <div class="tm-export-personalize-loading" id="tmExportPersonalizeLoading">Cargando estructura...</div>
                 <div class="tm-export-personalize-content" id="tmExportPersonalizeContent" hidden>
-                    <div class="tm-export-personalize-form">
+                    <div class="tm-export-personalize-form tm-export-side-panel">
+                        <nav class="tm-export-side-tabs" role="tablist" aria-label="Secciones de personalización">
+                            <button type="button" role="tab" class="tm-export-side-tab is-active" data-tm-export-side-tab="tm-export-sec-title" aria-selected="true">Título</button>
+                            <button type="button" role="tab" class="tm-export-side-tab" data-tm-export-side-tab="tm-export-sec-layout">Tabla</button>
+                            <button type="button" role="tab" class="tm-export-side-tab" data-tm-export-side-tab="tm-export-sec-columns">Columnas</button>
+                            <button type="button" role="tab" class="tm-export-side-tab" data-tm-export-side-tab="tm-export-sec-export">Exportar</button>
+                        </nav>
+                        <div class="tm-export-side-scroll">
+                        <section id="tm-export-sec-title" class="tm-export-side-section">
+                            <h4 class="tm-export-side-section__title"><span class="tm-export-side-section__icon" aria-hidden="true"><i class="fa-solid fa-heading"></i></span> Título y tipografía</h4>
+                            <p class="tm-export-side-section__lead">Encabezado del documento y tamaños de fuente.</p>
                         <div class="tm-export-personalize-field">
                             <label for="tmExportPersonalizeTitle">Título del documento</label>
                             <input type="text" id="tmExportPersonalizeTitle" class="tm-input" placeholder="Nombre del módulo">
@@ -399,25 +404,30 @@
                     <div class="tm-export-personalize-field tm-export-title-align">
                         <span class="tm-export-label-inline">Alineación del título</span>
                         <div class="tm-export-align-btns" role="group" aria-label="Alineación del título">
-                            <button type="button" class="tm-export-align-btn" data-title-align="left">Izq</button>
+                            <button type="button" class="tm-export-align-btn" data-title-align="left">Izquierda</button>
                             <button type="button" class="tm-export-align-btn is-active" data-title-align="center">Centro</button>
-                            <button type="button" class="tm-export-align-btn" data-title-align="right">Der</button>
+                            <button type="button" class="tm-export-align-btn" data-title-align="right">Derecha</button>
                         </div>
                     </div>
-                    <div class="tm-export-personalize-field">
-                        <label for="tmExportTitleFontSize">Tamaño de letra del título (px)</label>
-                        <input type="number" id="tmExportTitleFontSize" class="tm-input" min="10" max="36" value="18">
+                    <div class="tm-export-field-row tm-export-field-row--fonts">
+                        <div class="tm-export-personalize-field">
+                            <label for="tmExportTitleFontSize" title="Tamaño de letra del título">Título (px)</label>
+                            <input type="number" id="tmExportTitleFontSize" class="tm-input tm-input--num-compact" min="10" max="36" value="18">
+                        </div>
+                        <div class="tm-export-personalize-field">
+                            <label for="tmExportCellFontSize" title="Tamaño de letra en celdas de datos">Celdas (px)</label>
+                            <input type="number" id="tmExportCellFontSize" class="tm-input tm-input--num-compact" min="9" max="24" value="12">
+                        </div>
+                        <div class="tm-export-personalize-field">
+                            <label for="tmExportHeaderFontSize" title="Tamaño de letra de encabezados de columnas">Encabezados (px)</label>
+                            <input type="number" id="tmExportHeaderFontSize" class="tm-input tm-input--num-compact" min="9" max="28" value="12">
+                        </div>
                     </div>
-                    <div class="tm-export-personalize-field">
-                        <label for="tmExportCellFontSize">Tamaño de letra en celdas (px)</label>
-                        <input type="number" id="tmExportCellFontSize" class="tm-input" min="9" max="24" value="12">
-                        <p class="tm-analysis-hint" style="margin-top:6px;">Solo aplica al contenido de las celdas, no al título.</p>
-                    </div>
-                    <div class="tm-export-personalize-field">
-                        <label for="tmExportHeaderFontSize">Tamaño de letra de los títulos de las columnas (px)</label>
-                        <input type="number" id="tmExportHeaderFontSize" class="tm-input" min="9" max="28" value="12">
-                        <p class="tm-analysis-hint" style="margin-top:6px;">Aplica a los encabezados de las columnas de la tabla.</p>
-                    </div>
+                    <p class="tm-analysis-hint tm-export-font-hint">Celdas: contenido de la tabla. Encabezados: fila de títulos de columnas.</p>
+                        </section>
+                        <section id="tm-export-sec-layout" class="tm-export-side-section">
+                            <h4 class="tm-export-side-section__title"><span class="tm-export-side-section__icon" aria-hidden="true"><i class="fa-solid fa-table"></i></span> Tabla principal y conteos</h4>
+                            <p class="tm-export-side-section__lead">Orden por microrregión y tabla de conteo opcional.</p>
                     <div class="tm-export-personalize-field">
                         <label for="tmExportMicrorregionSort">Orden por número de microrregión</label>
                         <select id="tmExportMicrorregionSort" class="tm-input">
@@ -453,31 +463,80 @@
                             </div>
                         </div>
                     </div>
-                        <div class="tm-export-groups-wrap" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                <span class="tm-export-label-inline">Grupos de Columnas (fila superior):</span>
-                                <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmExportAddGroupBtn" style="font-size: 0.75rem;">+ Añadir Grupo</button>
+                        </section>
+                        <section id="tm-export-sec-columns" class="tm-export-side-section">
+                            <h4 class="tm-export-side-section__title"><span class="tm-export-side-section__icon" aria-hidden="true"><i class="fa-solid fa-grip-vertical"></i></span> Grupos y columnas</h4>
+                            <p class="tm-export-side-section__lead">Misma disposición que verás en Excel, Word o PDF de datos.</p>
+                        <div class="tm-export-groups-wrap tm-export-groups-wrap--panel">
+                            <div class="tm-export-groups-wrap__head">
+                                <span class="tm-export-label-inline">Grupos de columnas (fila superior)</span>
+                                <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmExportAddGroupBtn">+ Añadir grupo</button>
                             </div>
-                            <div id="tmExportGroupsList" class="tm-export-groups-list" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;">
+                            <div id="tmExportGroupsList" class="tm-export-groups-list">
                                 <p class="tm-analysis-hint" id="tmExportNoGroupsHint">No hay grupos creados. Define grupos para agrupar campos bajo un mismo título.</p>
                             </div>
                         </div>
 
-                        <p class="tm-export-personalize-hint" style="margin-top: 15px;">Arrastra columnas para reordenar. Usa &times; para omitir. Elige un grupo de la lista arriba para cada columna.</p>
+                        <p class="tm-export-personalize-hint">Arrastra columnas para reordenar. Usa &times; para omitir. Asigna un grupo a cada columna si aplica.</p>
                         <div class="tm-export-personalize-columns" id="tmExportPersonalizeColumns" role="list"></div>
                         <p class="tm-export-restore-wrap" id="tmExportRestoreWrap" hidden>
                             <button type="button" class="tm-export-restore-btn" id="tmExportRestoreBtn">Restaurar todas las columnas</button>
                         </p>
-
+                        </section>
+                        <section id="tm-export-sec-export" class="tm-export-side-section">
+                            <h4 class="tm-export-side-section__title"><span class="tm-export-side-section__icon" aria-hidden="true"><i class="fa-solid fa-file-export"></i></span> Descargar</h4>
+                            <p class="tm-export-side-section__lead">Los formatos de esta sección usan la tabla de registros (no el informe de análisis).</p>
                         <div class="tm-export-personalize-export-block">
-                            <h4 class="tm-export-format-section__title">Exportación</h4>
-                            <p class="tm-export-format-section__hint">Excel (1 hoja o por microrregión), Word y PDF</p>
-                            <div class="tm-export-personalize-export-buttons">
-                                <button type="button" class="tm-btn tm-btn-success" id="tmExportApplyExcelSingle" title="Todos los registros en una sola hoja">Excel - 1 hoja</button>
-                                <button type="button" class="tm-btn tm-btn-success tm-export-btn-excel-mr" id="tmExportApplyExcelMr" title="Una hoja por microrregión">Excel - por MR</button>
-                                <button type="button" class="tm-btn tm-btn-primary tm-btn-word" id="tmExportApplyWordTable" title="Exportar a Word (.docx)">Word</button>
-                                <button type="button" class="tm-btn tm-btn-danger" id="tmExportApplyPdfTable" title="Exportar a PDF">PDF</button>
+                            <div class="tm-export-format-cards">
+                                <div class="tm-export-format-card tm-export-format-card--excel">
+                                    <div class="tm-export-format-card__head">
+                                        <i class="fa-solid fa-file-excel tm-export-format-card__badge" aria-hidden="true"></i>
+                                        <div>
+                                            <span class="tm-export-format-card__name">Excel</span>
+                                            <span class="tm-export-format-card__desc">Todos los registros; una o varias hojas.</span>
+                                        </div>
+                                    </div>
+                                    <div class="tm-export-format-card__actions">
+                                        <button type="button" class="tm-btn tm-btn-success tm-export-format-card__btn" id="tmExportApplyExcelSingle" title="Todos los registros en una sola hoja">Una hoja</button>
+                                        <button type="button" class="tm-btn tm-btn-success tm-export-format-card__btn tm-export-btn-excel-mr" id="tmExportApplyExcelMr" title="Una hoja por microrregión">Por microrregión</button>
+                                    </div>
+                                </div>
+                                <div class="tm-export-format-card tm-export-format-card--word">
+                                    <div class="tm-export-format-card__head">
+                                        <i class="fa-solid fa-file-word tm-export-format-card__badge" aria-hidden="true"></i>
+                                        <div>
+                                            <span class="tm-export-format-card__name">Word (.docx)</span>
+                                            <span class="tm-export-format-card__desc">Tabla de datos con el diseño de la vista previa.</span>
+                                        </div>
+                                    </div>
+                                    <div class="tm-export-format-card__actions">
+                                        <button type="button" class="tm-btn tm-btn-primary tm-btn-word tm-export-format-card__btn tm-export-format-card__btn--full" id="tmExportApplyWordTable" title="Exportar a Word">Descargar Word</button>
+                                    </div>
+                                </div>
+                                <div class="tm-export-format-card tm-export-format-card--pdf">
+                                    <div class="tm-export-format-card__head">
+                                        <i class="fa-solid fa-file-pdf tm-export-format-card__badge" aria-hidden="true"></i>
+                                        <div>
+                                            <span class="tm-export-format-card__name">PDF</span>
+                                            <span class="tm-export-format-card__desc">Misma vista que la previsualización A4.</span>
+                                        </div>
+                                    </div>
+                                    <div class="tm-export-format-card__actions">
+                                        <button type="button" class="tm-btn tm-btn-danger tm-export-format-card__btn tm-export-format-card__btn--full" id="tmExportApplyPdfTable" title="Exportar a PDF">Descargar PDF</button>
+                                    </div>
+                                </div>
                             </div>
+                            <div class="tm-export-analysis-callout">
+                                <div class="tm-export-analysis-callout__text">
+                                    <strong>Informe de análisis (Word)</strong>
+                                    <span>Resumen, tablas por microrregión y columnas dinámicas (.docx). Es otro documento, independiente de la tabla de registros.</span>
+                                </div>
+                                <button type="button" class="tm-btn tm-btn-outline tm-export-analysis-callout__btn" id="tmExportOpenAnalysisReport" title="Abrir personalización del informe">
+                                    <i class="fa-solid fa-chart-simple" aria-hidden="true"></i> Ir al informe
+                                </button>
+                            </div>
+                        </div>
+                        </section>
                         </div>
                     </div>
                     <div class="tm-export-personalize-preview-wrap">
@@ -526,19 +585,26 @@
                 </div>
             </div>
             <div class="tm-modal-body tm-analysis-word-body">
-                <aside class="tm-analysis-sidebar">
-                    <p class="tm-analysis-sidebar-title">Qué incluir</p>
-                    <label class="tm-analysis-check"><input type="checkbox" id="tmAnalysisIncludeSummary" checked> Resumen (totales)</label>
-                    <label class="tm-analysis-check"><input type="checkbox" id="tmAnalysisIncludeMrTable" checked> Tabla por microrregión / municipios</label>
-                    <hr class="tm-analysis-hr">
-                    <p class="tm-analysis-sidebar-title">Tabla vacía extra</p>
-                    <div class="tm-analysis-grid-inputs">
-                        <label>Filas <input type="number" id="tmAnalysisCustomRows" min="0" max="30" value="0" class="tm-input tm-input-sm"></label>
-                        <label>Columnas <input type="number" id="tmAnalysisCustomCols" min="0" max="12" value="0" class="tm-input tm-input-sm"></label>
+                <aside class="tm-analysis-sidebar tm-analysis-sidebar--sheets">
+                    <p class="tm-analysis-sidebar-kicker">Vista rápida</p>
+                    <div class="tm-analysis-sidebar-section">
+                        <p class="tm-analysis-sidebar-title"><i class="fa-solid fa-list-check" aria-hidden="true"></i> Qué incluir</p>
+                        <label class="tm-analysis-check"><input type="checkbox" id="tmAnalysisIncludeSummary" checked> <span>Resumen (totales)</span></label>
+                        <label class="tm-analysis-check"><input type="checkbox" id="tmAnalysisIncludeMrTable" checked> <span>Tabla por microrregión / municipios</span></label>
                     </div>
-                    <button type="button" class="tm-btn tm-btn-outline tm-analysis-build-grid" id="tmAnalysisBuildGridBtn">Crear tabla N×M en vista previa</button>
-                    <button type="button" class="tm-btn tm-btn-outline" id="tmAnalysisRefreshPreview">Actualizar vista previa</button>
-                    <p class="tm-analysis-hint">Basado en el mismo criterio que el antiguo Excel de análisis. El Excel de datos ya no incluye esa hoja.</p>
+                    <div class="tm-analysis-sidebar-section">
+                        <p class="tm-analysis-sidebar-title"><i class="fa-solid fa-table-cells" aria-hidden="true"></i> Tabla vacía extra</p>
+                        <p class="tm-analysis-sidebar-lead">Añade una cuadrícula vacía solo en la vista previa.</p>
+                        <div class="tm-analysis-grid-inputs">
+                            <label>Filas <input type="number" id="tmAnalysisCustomRows" min="0" max="30" value="0" class="tm-input tm-input-sm"></label>
+                            <label>Columnas <input type="number" id="tmAnalysisCustomCols" min="0" max="12" value="0" class="tm-input tm-input-sm"></label>
+                        </div>
+                        <button type="button" class="tm-btn tm-btn-outline tm-analysis-build-grid" id="tmAnalysisBuildGridBtn">Crear tabla N×M</button>
+                    </div>
+                    <div class="tm-analysis-sidebar-actions">
+                        <button type="button" class="tm-btn tm-btn-primary tm-analysis-sidebar-actions__primary" id="tmAnalysisRefreshPreview"><i class="fa-solid fa-rotate" aria-hidden="true"></i> Actualizar vista previa</button>
+                    </div>
+                    <p class="tm-analysis-hint tm-analysis-hint--sidebar">Mismo criterio que el antiguo Excel de análisis. Para título avanzado y tablas dinámicas usa «Editar y exportar».</p>
                 </aside>
                 <div class="tm-analysis-preview-panel">
                     <div class="tm-analysis-preview-label">Vista previa (estilo informe)</div>
@@ -566,12 +632,21 @@
         <div class="tm-modal-backdrop" data-close-analysis-word-personalize></div>
         <div class="tm-modal-dialog tm-export-personalize-dialog tm-analysis-word-personalize-dialog">
             <div class="tm-modal-head">
-                <h3>Personalizar informe Word (.docx)</h3>
+                <h3>Resumen y tablas de análisis (.docx)</h3>
                 <button type="button" class="tm-modal-close" data-close-analysis-word-personalize aria-label="Cerrar">&times;</button>
             </div>
             <div class="tm-modal-body tm-analysis-word-personalize-body">
                 <div class="tm-export-personalize-content tm-analysis-word-personalize-content">
-                    <div class="tm-export-personalize-form tm-analysis-word-personalize-form">
+                    <div class="tm-export-personalize-form tm-analysis-word-personalize-form tm-export-side-panel tm-word-side-panel">
+                        <p class="tm-export-side-panel-intro">Informe de análisis (.docx): resumen y tablas. Las pestañas agrupan opciones como en un panel lateral.</p>
+                        <nav class="tm-export-side-tabs tm-word-side-tabs" role="tablist" aria-label="Secciones del informe Word">
+                            <button type="button" role="tab" class="tm-export-side-tab is-active" data-tm-word-side-tab="tm-word-sec-doc" aria-selected="true">Documento</button>
+                            <button type="button" role="tab" class="tm-export-side-tab" data-tm-word-side-tab="tm-word-sec-tables">Tablas</button>
+                            <button type="button" role="tab" class="tm-export-side-tab" data-tm-word-side-tab="tm-word-sec-columns">Columnas</button>
+                        </nav>
+                        <div class="tm-export-side-scroll">
+                        <section id="tm-word-sec-doc" class="tm-export-side-section">
+                            <h4 class="tm-export-side-section__title"><span class="tm-export-side-section__icon" aria-hidden="true"><i class="fa-solid fa-file-lines"></i></span> Portada y orden</h4>
                         <div class="tm-export-personalize-field">
                             <label for="tmWordDocTitle">Título del documento</label>
                             <input type="text" id="tmWordDocTitle" class="tm-input" placeholder="Ej. Análisis general - nombre del módulo">
@@ -583,14 +658,14 @@
                         <div class="tm-export-personalize-field tm-export-title-align">
                             <span class="tm-export-label-inline">Alineación del título</span>
                             <div class="tm-export-align-btns" role="group">
-                                <button type="button" class="tm-export-align-btn" data-word-title-align="left">Izq</button>
+                                <button type="button" class="tm-export-align-btn" data-word-title-align="left">Izquierda</button>
                                 <button type="button" class="tm-export-align-btn is-active" data-word-title-align="center">Centro</button>
-                                <button type="button" class="tm-export-align-btn" data-word-title-align="right">Der</button>
+                                <button type="button" class="tm-export-align-btn" data-word-title-align="right">Derecha</button>
                             </div>
                         </div>
                         <div class="tm-export-personalize-field">
-                            <label for="tmWordTitleFontPx">Tamaño de letra del título (px)</label>
-                            <input type="number" id="tmWordTitleFontPx" class="tm-input" min="10" max="36" value="18">
+                            <label for="tmWordTitleFontPx" title="Tamaño de letra del título">Título (px)</label>
+                            <input type="number" id="tmWordTitleFontPx" class="tm-input tm-input--num-compact" min="10" max="36" value="18">
                         </div>
                         <div class="tm-export-personalize-field">
                             <label for="tmWordMicrorregionSort">Orden por número de microrregión</label>
@@ -599,43 +674,51 @@
                                 <option value="desc">Descendente</option>
                             </select>
                         </div>
-                        <p class="tm-analysis-sidebar-title" style="margin-top:14px;">Qué tablas incluir en el informe</p>
-                        <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeSummary" checked> Resumen (totales)</label>
-                        <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeMrTable" checked> Tabla microrregión / municipios</label>
-                        <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeDynamic" checked> Tabla por registro (columnas elegidas)</label>
-                        <p class="tm-analysis-sidebar-title" style="margin-top:12px;">Alineación / ancho de tablas</p>
-                        <div class="tm-export-align-btns tm-word-table-align-btns" role="group" aria-label="Alineación tablas" style="flex-wrap:wrap;margin-bottom:10px;">
+                        </section>
+                        <section id="tm-word-sec-tables" class="tm-export-side-section">
+                            <h4 class="tm-export-side-section__title"><span class="tm-export-side-section__icon" aria-hidden="true"><i class="fa-solid fa-table"></i></span> Tablas del informe</h4>
+                        <p class="tm-analysis-sidebar-title tm-analysis-sidebar-title--in-panel">Qué incluir</p>
+                        <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeSummary" checked> <span>Resumen (totales)</span></label>
+                        <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeMrTable" checked> <span>Tabla microrregión / municipios</span></label>
+                        <label class="tm-analysis-check"><input type="checkbox" id="tmWordIncludeDynamic" checked> <span>Tabla por registro (columnas elegidas)</span></label>
+                        <p class="tm-analysis-sidebar-title tm-analysis-sidebar-title--in-panel">Alineación y ancho</p>
+                        <div class="tm-export-align-btns tm-word-table-align-btns" role="group" aria-label="Alineación tablas">
                             <button type="button" class="tm-export-align-btn is-active" data-word-table-align="left">Izquierda</button>
                             <button type="button" class="tm-export-align-btn" data-word-table-align="center">Centrada</button>
                             <button type="button" class="tm-export-align-btn" data-word-table-align="right">Derecha</button>
                             <button type="button" class="tm-export-align-btn" data-word-table-align="stretch" title="Ocupa todo el ancho útil">Ajustar ancho</button>
                         </div>
-                        <p class="tm-analysis-sidebar-title" style="margin-top:12px;">Tablas (texto y celdas)</p>
-                        <div class="tm-word-table-opts" style="display:grid;gap:8px;margin-bottom:10px;">
-                            <label class="tm-analysis-hint" style="display:flex;align-items:center;gap:8px;margin:0;">Texto (pt)
-                                <select id="tmWordTableFontPt" class="tm-input tm-input-sm" style="max-width:80px;">
+                        <p class="tm-analysis-sidebar-title tm-analysis-sidebar-title--in-panel">Texto y celdas</p>
+                        <div class="tm-word-table-opts">
+                            <label class="tm-word-table-opts__row">Texto (pt)
+                                <select id="tmWordTableFontPt" class="tm-input tm-input-sm">
                                     @foreach ([7,8,9,10,11,12] as $pt)<option value="{{ $pt }}" {{ $pt === 9 ? 'selected' : '' }}>{{ $pt }}</option>@endforeach
                                 </select>
                             </label>
-                            <label class="tm-analysis-hint" style="display:flex;align-items:center;gap:8px;margin:0;">Relleno celdas (px)
-                                <select id="tmWordTableCellPad" class="tm-input tm-input-sm" style="max-width:80px;">
+                            <label class="tm-word-table-opts__row">Relleno celdas (px)
+                                <select id="tmWordTableCellPad" class="tm-input tm-input-sm">
                                     @foreach ([3,4,6,8,10,12] as $px)<option value="{{ $px }}" {{ $px === 6 ? 'selected' : '' }}>{{ $px }}</option>@endforeach
                                 </select>
                             </label>
-                            <label class="tm-analysis-hint" style="display:flex;align-items:center;gap:8px;margin:0;">Ancho máx. celda dinámica (px)
-                                <input type="number" id="tmWordTableCellMax" class="tm-input tm-input-sm" min="72" max="280" value="140" style="max-width:80px;">
+                            <label class="tm-word-table-opts__row">Ancho máx. celda dinámica (px)
+                                <input type="number" id="tmWordTableCellMax" class="tm-input tm-input-sm" min="72" max="280" value="140">
                             </label>
                         </div>
-                        <p class="tm-analysis-hint" style="margin:10px 0 6px;">Tabla dinámica: arrastra cada campo a una columna (máx. 12). Referencia = primer registro.</p>
+                        </section>
+                        <section id="tm-word-sec-columns" class="tm-export-side-section">
+                            <h4 class="tm-export-side-section__title"><span class="tm-export-side-section__icon" aria-hidden="true"><i class="fa-solid fa-columns"></i></span> Columnas dinámicas y KPIs</h4>
+                        <p class="tm-analysis-hint tm-analysis-hint--tight">Arrastra cada campo a una columna (máx. 12). Referencia = primer registro.</p>
                         <div class="tm-word-field-palette" id="tmWordFieldPalette" aria-label="Campos del módulo"></div>
                         <div class="tm-word-column-slots-wrap">
                             <span class="tm-export-label-inline">Columnas a exportar</span>
                             <div class="tm-word-column-slots" id="tmWordColumnSlots"></div>
                         </div>
-                        <p class="tm-analysis-sidebar-title" style="margin-top:12px;">Estándar contable (desglose)</p>
-                        <p class="tm-analysis-hint" style="margin:0 0 6px;">Arriba: KPIs en una fila. Abajo de la tabla: totales (suma números ≥0; en Sí/No solo cuenta <strong>Sí</strong>).</p>
+                        <p class="tm-analysis-sidebar-title tm-analysis-sidebar-title--in-panel">Estándar contable (desglose)</p>
+                        <p class="tm-analysis-hint tm-analysis-hint--tight">Arriba: KPIs en una fila. Abajo: totales (suma números ≥0; en Sí/No solo cuenta <strong>Sí</strong>).</p>
                         <div id="tmWordAccountingFields" class="tm-word-accounting-fields"></div>
-                        <button type="button" class="tm-btn tm-btn-outline" id="tmWordRefreshPreviewBtn" style="width:100%;margin-top:10px;">Actualizar vista previa</button>
+                        <button type="button" class="tm-btn tm-btn-primary tm-word-refresh-sticky" id="tmWordRefreshPreviewBtn"><i class="fa-solid fa-rotate" aria-hidden="true"></i> Actualizar vista previa</button>
+                        </section>
+                        </div>
                     </div>
                     <div class="tm-export-personalize-preview-wrap tm-analysis-word-preview-wrap">
                         <div class="tm-export-preview-toolbar">
@@ -1290,6 +1373,22 @@
         }
         document.getElementById('tmAnalysisOpenPersonalize') && document.getElementById('tmAnalysisOpenPersonalize').addEventListener('click', openWordPersonalizeModal);
         if (wordPersonalizeModal) {
+            wordPersonalizeModal.addEventListener('click', function (e) {
+                var wtab = e.target.closest('[data-tm-word-side-tab]');
+                if (wtab && wordPersonalizeModal.contains(wtab)) {
+                    var wid = wtab.getAttribute('data-tm-word-side-tab');
+                    var wsec = wid ? document.getElementById(wid) : null;
+                    if (wsec) {
+                        wordPersonalizeModal.querySelectorAll('.tm-word-side-tabs .tm-export-side-tab').forEach(function (t) {
+                            var on = t === wtab;
+                            t.classList.toggle('is-active', on);
+                            t.setAttribute('aria-selected', on ? 'true' : 'false');
+                        });
+                        wsec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                    return;
+                }
+            });
             wordPersonalizeModal.querySelectorAll('[data-close-analysis-word-personalize]').forEach(function (el) {
                 el.addEventListener('click', closeWordPersonalizeModal);
             });
@@ -1604,6 +1703,38 @@
 
         if (personalizeModal) {
             personalizeModal.addEventListener('click', function (e) {
+                var sideTab = e.target.closest('[data-tm-export-side-tab]');
+                if (sideTab && personalizeModal.contains(sideTab)) {
+                    var secId = sideTab.getAttribute('data-tm-export-side-tab');
+                    var secEl = secId ? document.getElementById(secId) : null;
+                    if (secEl) {
+                        personalizeModal.querySelectorAll('.tm-export-side-tabs .tm-export-side-tab').forEach(function (t) {
+                            var on = t === sideTab;
+                            t.classList.toggle('is-active', on);
+                            t.setAttribute('aria-selected', on ? 'true' : 'false');
+                        });
+                        secEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                    return;
+                }
+                var analysisJump = e.target.closest('#tmExportOpenAnalysisReport');
+                if (analysisJump) {
+                    var refBtn = personalizeModal._exportButtonRef;
+                    if (refBtn) {
+                        var previewUrl = refBtn.getAttribute('data-analysis-preview-url');
+                        var wordUrl = refBtn.getAttribute('data-analysis-word-url');
+                        if (previewUrl && wordUrl) {
+                            closePersonalizeModal();
+                            window._tmAnalysisPreviewUrl = previewUrl;
+                            window._tmAnalysisWordUrl = wordUrl;
+                            var wpf = document.getElementById('tmAnalysisWordPersonalizeForm');
+                            if (wpf) { wpf.setAttribute('action', wordUrl); }
+                            document.body.style.overflow = 'hidden';
+                            openWordPersonalizeModal();
+                        }
+                    }
+                    return;
+                }
                 var alignBtn = e.target.closest('.tm-export-align-btn');
                 if (alignBtn) {
                     var cols = personalizeModal._personalizeColumns;
@@ -1671,45 +1802,58 @@
                 item.dataset.index = String(index);
                 item.draggable = true;
 
-                var groupSelect = '<select class="tm-export-col-group-select" data-key="' + escapeHtml(col.key) + '" style="font-size: 0.75rem; padding: 2px 4px; border: 1px solid #ddd; border-radius: 4px; max-width: 120px;">' +
+                var groupSelect = '<select class="tm-input tm-export-col-group-select" data-key="' + escapeHtml(col.key) + '">' +
                     '<option value="">Sin grupo</option>' +
                     groups.map(function(g) {
                         return '<option value="' + escapeHtml(g) + '"' + (col.group === g ? ' selected' : '') + '>' + escapeHtml(g) + '</option>';
                     }).join('') +
                     '</select>';
 
-                var mid = '';
+                var secondaryRow = '';
                 if (col.is_image) {
-                    mid = '<div class="tm-export-col-image-opts">' +
-                        '<label>Ancho <input type="number" min="40" max="400" value="' + String(col.image_width || 120) + '" class="tm-export-image-width" data-key="' + escapeHtml(col.key) + '"></label>' +
-                        '<label>Alto <input type="number" min="30" max="300" value="' + String(col.image_height || 80) + '" class="tm-export-image-height" data-key="' + escapeHtml(col.key) + '"></label></div>';
+                    secondaryRow =
+                        '<div class="tm-export-col-row tm-export-col-row--secondary tm-export-col-row--image">' +
+                        '<label class="tm-export-col-field tm-export-col-field--stretch">' +
+                        '<span class="tm-export-col-field__lab">Grupo</span>' + groupSelect + '</label>' +
+                        '<label class="tm-export-col-field">' +
+                        '<span class="tm-export-col-field__lab">Ancho (px)</span>' +
+                        '<input type="number" min="40" max="400" value="' + String(col.image_width || 120) + '" class="tm-input tm-input--num-compact tm-export-image-width" data-key="' + escapeHtml(col.key) + '">' +
+                        '</label>' +
+                        '<label class="tm-export-col-field">' +
+                        '<span class="tm-export-col-field__lab">Alto (px)</span>' +
+                        '<input type="number" min="30" max="300" value="' + String(col.image_height || 80) + '" class="tm-input tm-input--num-compact tm-export-image-height" data-key="' + escapeHtml(col.key) + '">' +
+                        '</label></div>';
                 } else {
                     var approx = col.max_width_chars || 24;
                     if (!Number.isFinite(approx)) { approx = 24; }
                     approx = Math.max(2, Math.min(approx, 60));
-                    mid = '<label class="tm-export-col-width-preview" data-width-hint="' + escapeHtml(String(approx)) + '">' +
-                        '<span>Ancho (ch)</span>' +
-                        '<input type="number" class="tm-export-col-width-input" min="2" max="60" value="' + String(approx) + '" data-key="' + escapeHtml(col.key) + '">' +
-                        '</label>';
+                    secondaryRow =
+                        '<div class="tm-export-col-row tm-export-col-row--secondary">' +
+                        '<label class="tm-export-col-field tm-export-col-field--stretch">' +
+                        '<span class="tm-export-col-field__lab">Grupo</span>' + groupSelect + '</label>' +
+                        '<label class="tm-export-col-field tm-export-col-field--wch">' +
+                        '<span class="tm-export-col-field__lab">Ancho (ch)</span>' +
+                        '<input type="number" class="tm-input tm-input--num-compact tm-export-col-width-input" min="2" max="60" value="' + String(approx) + '" data-key="' + escapeHtml(col.key) + '" data-width-hint="' + escapeHtml(String(approx)) + '">' +
+                        '</label></div>';
                 }
                 var currentLabel = (col.label != null && String(col.label).trim() !== '') ? String(col.label) : String(col.key || '');
                 item.innerHTML =
-                    '<span class="tm-export-drag-handle" aria-hidden="true">&#9776;</span>' +
-                    '<div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">' +
-                        '<label style="display:flex; flex-direction:column; gap:4px;">' +
-                            '<span class="tm-export-col-label" style="font-weight: 600;">Título de columna</span>' +
-                            '<input type="text" class="tm-input tm-export-col-label-input" data-key="' + escapeHtml(col.key) + '" value="' + escapeHtml(currentLabel) + '" placeholder="Nombre de la columna">' +
+                    '<span class="tm-export-drag-handle" aria-hidden="true" title="Arrastrar para reordenar">&#9776;</span>' +
+                    '<div class="tm-export-col-main">' +
+                        '<div class="tm-export-col-row tm-export-col-row--primary">' +
+                        '<label class="tm-export-col-field tm-export-col-field--grow">' +
+                        '<span class="tm-export-col-field__lab">Columna</span>' +
+                        '<input type="text" class="tm-input tm-export-col-label-input" data-key="' + escapeHtml(col.key) + '" value="' + escapeHtml(currentLabel) + '" placeholder="Nombre en el export">' +
                         '</label>' +
-                        '<div style="display: flex; align-items: center; gap: 8px;">' +
-                            '<span style="font-size: 0.7rem; color: #666;">Grupo:</span>' + groupSelect +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="tm-export-col-color">' +
-                    '<button type="button" class="tm-export-color-trigger" data-color="' + escapeHtml(col.color || TEMPLATE_COLORS[0].value) + '" aria-haspopup="listbox" aria-expanded="false">' +
-                    '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(col.color || TEMPLATE_COLORS[0].value) + '"></span></button>' +
-                    '<div class="tm-export-color-menu" role="listbox" hidden>' + colorMenuHtml + '</div></div>' +
-                    mid +
-                    '<button type="button" class="tm-export-omit-btn" title="Omitir en el reporte" aria-label="Omitir">&times;</button>';
+                        '<div class="tm-export-col-toolbar">' +
+                        '<div class="tm-export-col-color">' +
+                        '<button type="button" class="tm-export-color-trigger" data-color="' + escapeHtml(col.color || TEMPLATE_COLORS[0].value) + '" aria-haspopup="listbox" aria-expanded="false" title="Color del encabezado">' +
+                        '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(col.color || TEMPLATE_COLORS[0].value) + '"></span></button>' +
+                        '<div class="tm-export-color-menu" role="listbox" hidden>' + colorMenuHtml + '</div></div>' +
+                        '<button type="button" class="tm-export-omit-btn" title="Omitir columna" aria-label="Omitir columna">&times;</button>' +
+                        '</div></div>' +
+                        secondaryRow +
+                    '</div>';
                 container.appendChild(item);
             });
         }
@@ -2204,12 +2348,12 @@
                 html += '</tr>';
                 html += '<tr><td style="padding-top:6px;">';
                 html += '<div class="tm-export-preview-title" style="' + titleStyle + ';font-size:' + titleFontPx + 'px;font-weight:bold;">' + escapeHtml(normalizeExportHeadingText(state.title || 'Título', titleUppercase)) + '</div>';
-                html += '<div class="tm-export-preview-subtitle" style="text-align:right;font-size:0.85rem;color:#666;margin-top:2px;">' + escapeHtml(dateStr) + '</div>';
+                html += '<div class="tm-export-preview-subtitle tm-export-preview-fecha-corte" style="text-align:right;font-size:0.85rem;margin-top:2px;">' + escapeHtml(dateStr) + '</div>';
                 html += '</td></tr>';
             } else {
                 html += '<tr><td>';
                 html += '<div class="tm-export-preview-title" style="' + titleStyle + ';font-size:' + titleFontPx + 'px;font-weight:bold;">' + escapeHtml(normalizeExportHeadingText(state.title || 'Título', titleUppercase)) + '</div>';
-                html += '<div class="tm-export-preview-subtitle" style="text-align:right;font-size:0.85rem;color:#666;margin-top:2px;">' + escapeHtml(dateStr) + '</div>';
+                html += '<div class="tm-export-preview-subtitle tm-export-preview-fecha-corte" style="text-align:right;font-size:0.85rem;margin-top:2px;">' + escapeHtml(dateStr) + '</div>';
                 html += '</td></tr>';
             }
             html += '</table>';
@@ -2900,18 +3044,24 @@
             }
             templateSwal.fire({
                 title: 'Exportación',
-                html: '<div class="tm-swal-export-options tm-swal-export-options--stacked" style="text-align:left">'
-                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.5rem;cursor:pointer;">'
-                    + '<input type="radio" name="tm-export-choice" value="single" checked style="margin-top:.2rem;"> '
-                    + '<span><strong>Excel, PDF, Word</strong><br><small style="color:#64748b">Todos los registros · diferentes formatos.</small></span>'
-                    + '</label>'
-                    + '<p class="tm-swal-export-section-title" style="margin-top:4px;">Informe</p>'
-                    + '<label style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.75rem;cursor:pointer;">'
-                    + '<input type="radio" name="tm-export-choice" value="analysis_word" style="margin-top:.2rem;"> '
-                    + '<span><strong>Informe de análisis (Word)</strong><br><small style="color:#64748b">Resumen y tablas de análisis (.docx).</small></span>'
-                    + '</label>'
-                    + '<hr style="margin:.65rem 0;border:none;border-top:1px solid #e2e8f0;">'
-                    + '<p style="margin:0;"><button type="button" class="tm-btn tm-btn-outline tm-swal-personalize-btn">Personalizar columnas y diseño</button></p>'
+                html: '<div class="tm-swal-export-options tm-swal-export-options--stacked">'
+                    + '<label class="tm-swal-export-card">'
+                    + '<input type="radio" name="tm-export-choice" value="single" checked class="tm-swal-export-card__input">'
+                    + '<span class="tm-swal-export-card__body">'
+                    + '<span class="tm-swal-export-card__icon" aria-hidden="true"><i class="fa-solid fa-table"></i></span>'
+                    + '<span class="tm-swal-export-card__text">'
+                    + '<strong class="tm-swal-export-card__title">Excel, PDF, Word</strong>'
+                    + '<small class="tm-swal-export-card__sub">Todos los registros · diferentes formatos.</small>'
+                    + '</span></span></label>'
+                    + '<label class="tm-swal-export-card">'
+                    + '<input type="radio" name="tm-export-choice" value="analysis_word" class="tm-swal-export-card__input">'
+                    + '<span class="tm-swal-export-card__body">'
+                    + '<span class="tm-swal-export-card__icon" aria-hidden="true"><i class="fa-solid fa-file-word"></i></span>'
+                    + '<span class="tm-swal-export-card__text">'
+                    + '<strong class="tm-swal-export-card__title">Informe de análisis (Word)</strong>'
+                    + '<small class="tm-swal-export-card__sub">Resumen y tablas de análisis (.docx).</small>'
+                    + '</span></span></label>'
+                    + '<p class="tm-swal-export-advanced"><button type="button" class="tm-btn tm-btn-outline tm-swal-personalize-btn">Personalizar columnas y diseño</button></p>'
                     + '</div>',
                 icon: 'question',
                 showCancelButton: true,
