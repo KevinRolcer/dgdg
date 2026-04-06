@@ -643,6 +643,13 @@ document.addEventListener('DOMContentLoaded', function () {
             closeTopbarDropdowns();
         }
 
+        if (
+            targetElement instanceof Element
+            && !targetElement.closest('#notificationsDrawer, #topbarNotifyViewAll, #notificationsDrawerRefresh')
+        ) {
+            closeNotificationsDrawer();
+        }
+
         if (targetElement instanceof Element && targetElement.closest('[data-submenu-toggle], .submenu')) {
             return;
         }

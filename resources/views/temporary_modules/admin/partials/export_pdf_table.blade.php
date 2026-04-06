@@ -2,12 +2,60 @@
     $fieldTypesByKey = $fieldTypesByKey ?? [];
     $pdfImageDataByPath = $pdfImageDataByPath ?? [];
     $fontFamily = $fontFamily ?? 'Gilroy';
+    $docMarginPreset = strtolower((string) ($docMarginPreset ?? 'compact'));
+    if (!in_array($docMarginPreset, ['normal', 'compact', 'none'], true)) {
+        $docMarginPreset = 'compact';
+    }
+    $pageMarginCss = match ($docMarginPreset) {
+        'none' => '0mm',
+        'normal' => '15mm 15mm 15mm 15mm',
+        default => '12mm 12mm 10mm 12mm',
+    };
     $cellFontSizePx = max(9, min(24, (int) ($cellFontSizePx ?? 12)));
     $titleFontSizePx = max(10, min(36, (int) ($titleFontSizePx ?? 18)));
     $varsCss = ['var(--clr-primary)' => '#861E34', 'var(--clr-secondary)' => '#2d5a27', 'var(--clr-accent)' => '#c9a227'];
     $resolveCss = function ($css) use ($varsCss) {
         return isset($varsCss[$css]) ? $varsCss[$css] : (str_starts_with($css ?? '', '#') ? $css : '#861E34');
     };
+    $countTableAlign = strtolower((string) ($countTableAlign ?? 'left'));
+    if (!in_array($countTableAlign, ['left', 'center', 'right'], true)) {
+        $countTableAlign = 'left';
+    }
+    $dataTableAlign = strtolower((string) ($tableAlign ?? 'left'));
+    if (!in_array($dataTableAlign, ['left', 'center', 'right', 'stretch'], true)) {
+        $dataTableAlign = 'left';
+    }
+
+    $preferredUnits = 0;
+    foreach (($columns ?? []) as $col) {
+        $maxChars = (int) ($col['max_width_chars'] ?? 24);
+        $maxChars = max(6, min($maxChars, 60));
+        $preferredUnits += $maxChars;
+    }
+    $forceFullWidthDataTable = count($columns ?? []) >= 6 || $preferredUnits > 110;
+
+    $stretch = !empty($stretch) || $dataTableAlign === 'stretch';
+
+    $countTableStyle = match ($countTableAlign) {
+        'center' => 'width:auto; margin: 0 auto 16px auto;',
+        'right' => 'width:auto; margin: 0 0 16px auto;',
+        default => 'width:auto; margin: 0 auto 16px 0;',
+    };
+    $countTableWrapStyle = match ($countTableAlign) {
+        'center' => 'text-align:center; margin-bottom: 16px;',
+        'right' => 'text-align:right; margin-bottom: 16px;',
+        default => 'text-align:left; margin-bottom: 16px;',
+    };
+    $countTableInlineStyle = 'display:inline-table; width:auto; table-layout:fixed; margin:0;';
+    $countTableCellWidth = max(6, min(40, (int) ($countTableCellWidth ?? 12)));
+
+    if ($forceFullWidthDataTable || $stretch || $dataTableAlign === 'left') {
+        $dataTableStyle = 'width:100%; margin-top:10px;';
+    } elseif ($dataTableAlign === 'center') {
+        $dataTableStyle = 'width:auto; display:table; margin:10px auto 0 auto;';
+    } else {
+        $dataTableStyle = 'width:auto; display:table; margin:10px 0 0 auto;';
+    }
 @endphp
 <!DOCTYPE html>
 <html lang="es">
@@ -15,11 +63,14 @@
     <meta charset="UTF-8">
     <title>{{ $title }}</title>
     <style>
+        @page {
+            margin: {{ $pageMarginCss }};
+        }
         * { box-sizing: border-box; }
         body {
             font-family: {{ $fontFamily }}, Arial, DejaVu Sans, sans-serif;
             font-size: 9px;
-            margin: 15px;
+            margin: 0;
             color: #333;
         }
         h1 {
@@ -52,7 +103,7 @@
             margin: 0;
         }
         table.data-table {
-            width: 100% !important;
+            width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
         }
@@ -92,9 +143,9 @@
         }
         /* Tabla de conteo: misma regla que antes (selector global `table` + `.count-table`) */
         .count-table {
-            width: 100% !important;
+            width: 100%;
             border-collapse: collapse;
-            table-layout: auto;
+            table-layout: fixed;
             margin-bottom: 20px;
         }
         .count-table tr {
@@ -102,6 +153,13 @@
         }
         .count-table th { background: #861E34; color: #fff; text-align: center; font-size: 8px; }
         .count-table td { text-align: center; color: #c00; font-weight: bold; font-size: 10px; }
+        .count-table th,
+        .count-table td {
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            line-height: 1.1;
+        }
     </style>
 </head>
 <body>
@@ -156,8 +214,25 @@
         if (is_string($c) && $c !== '') return $resolveCss($c);
         return $rowNum === 1 ? '#861E34' : '#2d5a27';
     };
+    $countTableResolveWidth = function ($index, $valueLabel) use ($countTableColorKeys, $countTableColors, $countTableCellWidth) {
+        $key = $countTableColorKeys[$index] ?? null;
+        if ($key === null) {
+            return $countTableCellWidth;
+        }
+        $c = $countTableColors[$key] ?? null;
+        if (!is_array($c) || !isset($c['row2Widths']) || !is_array($c['row2Widths'])) {
+            return $countTableCellWidth;
+        }
+        $raw = $c['row2Widths'][$valueLabel] ?? $c['row2Widths'][mb_strtolower((string) $valueLabel)] ?? null;
+        if ($raw === null) {
+            return $countTableCellWidth;
+        }
+        $n = (int) $raw;
+        return max(6, min(40, $n));
+    };
 @endphp
-<table class="count-table" style="margin-bottom: 16px;">
+<div style="{{ $countTableWrapStyle }}">
+<table class="count-table" style="{{ $countTableStyle }} {{ $countTableInlineStyle }}">
     <thead>
     <tr>
         @foreach ($countTable['groups'] as $gi => $group)
@@ -181,10 +256,11 @@
             @endphp
             @foreach ($group['values'] as $v)
                 @php $subLabel = $v['label'] !== '' ? $v['label'] : $group['label']; @endphp
+                @php $valueW = $countTableResolveWidth($gi, $subLabel); @endphp
                 @if($isRedundant && !$includePct)
                     @continue
                 @endif
-                <th @if($includePct) colspan="2" @endif style="background-color: {{ $countTableResolveColor($gi, 2, $subLabel) }}; color: #fff;">
+                <th @if($includePct) colspan="2" @endif style="background-color: {{ $countTableResolveColor($gi, 2, $subLabel) }}; color: #fff; width: {{ $includePct ? ($valueW * 1.7) : $valueW }}ch; min-width: {{ $valueW }}ch; white-space: normal; overflow-wrap: anywhere; word-break: break-word; line-height: 1.1;">
                     {{ $isRedundant && $includePct ? 'Cantidad' : $subLabel }}
                 </th>
             @endforeach
@@ -200,9 +276,11 @@
                 $gTotal = array_sum(array_column($group['values'], 'count'));
             @endphp
             @foreach ($group['values'] as $v)
-                <td>{{ $v['count'] }}</td>
+                @php $subLabel = $v['label'] !== '' ? $v['label'] : $group['label']; @endphp
+                @php $valueW = $countTableResolveWidth($gi, $subLabel); @endphp
+                <td style="width: {{ $valueW }}ch; min-width: {{ $valueW }}ch; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">{{ $v['count'] }}</td>
                 @if($includePct)
-                    <td style="font-size: 9px; color: #666;">
+                    <td style="width: {{ max(6, (int) floor($valueW * 0.7)) }}ch; font-size: 9px; color: #666; white-space: normal;">
                         {{ $gTotal > 0 ? round(($v['count'] / $gTotal) * 100, 2) : 0 }}%
                     </td>
                 @endif
@@ -211,6 +289,7 @@
     </tr>
     </tbody>
 </table>
+</div>
 <p style="font-weight: bold; margin: 8px 0 4px 0;">{{ $sectionLabel ?? 'Desglose' }}</p>
 @endif
 
@@ -240,7 +319,7 @@
 @if (count($tempEntries) === 0)
     <p style="margin-top: 8px;">Sin registros.</p>
 @else
-    <table class="data-table">
+    <table class="data-table" style="{{ $dataTableStyle }}">
         <thead>
         @if($hasAnyGroup)
             <tr>

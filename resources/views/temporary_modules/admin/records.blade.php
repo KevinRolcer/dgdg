@@ -385,25 +385,21 @@
                         <section id="tm-export-sec-title" class="tm-export-side-section">
                             <h4 class="tm-export-side-section__title"><span class="tm-export-side-section__icon" aria-hidden="true"><i class="fa-solid fa-heading"></i></span> Título y tipografía</h4>
                             <p class="tm-export-side-section__lead">Encabezado del documento y tamaños de fuente.</p>
-                        <div class="tm-export-personalize-field">
-                            <label for="tmExportPersonalizeTitle">Título del documento</label>
-                            <input type="text" id="tmExportPersonalizeTitle" class="tm-input" placeholder="Nombre del módulo">
+                        <div class="tm-export-personalize-field-row tm-export-title-row-group">
+                            <div class="tm-export-personalize-field tm-export-field-title-input">
+                                <label for="tmExportPersonalizeTitle">Título del documento</label>
+                                <input type="text" id="tmExportPersonalizeTitle" class="tm-input" placeholder="Nombre del módulo">
+                            </div>
+                            <div class="tm-export-case-toggle-wrap">
+                                <label class="tm-export-case-toggle" title="Convertir el título a MAYÚSCULAS">
+                                    <input type="checkbox" id="tmExportTitleUppercase" value="1">
+                                    <span class="tm-export-case-icon">Az</span>
+                                </label>
+                            </div>
                         </div>
-                    <div class="tm-export-personalize-field">
-                        <label class="tm-export-count-table-toggle">
-                            <input type="checkbox" id="tmExportTitleUppercase" value="1">
-                            Convertir el título del documento a MAYÚSCULAS
-                        </label>
-                    </div>
-                    <div class="tm-export-personalize-field">
-                        <label class="tm-export-count-table-toggle">
-                            <input type="checkbox" id="tmExportHeadersUppercase" value="1">
-                            Convertir encabezados y títulos de tabla a MAYÚSCULAS
-                        </label>
-                    </div>
                     <div class="tm-export-personalize-field tm-export-title-align">
                         <span class="tm-export-label-inline">Alineación del título</span>
-                        <div class="tm-export-align-btns" role="group" aria-label="Alineación del título">
+                        <div class="tm-export-align-btns tm-title-align-group" id="tmExportTitleAlignGroup" role="group" aria-label="Alineación del título">
                             <button type="button" class="tm-export-align-btn" data-title-align="left">Izquierda</button>
                             <button type="button" class="tm-export-align-btn is-active" data-title-align="center">Centro</button>
                             <button type="button" class="tm-export-align-btn" data-title-align="right">Derecha</button>
@@ -436,6 +432,15 @@
                         </select>
                         <p class="tm-analysis-hint" style="margin-top:6px;">La vista previa y el archivo exportado seguirán este orden por MR.</p>
                     </div>
+                    <div class="tm-export-personalize-field">
+                        <label for="tmExportDocMarginPreset">Márgenes del documento</label>
+                        <select id="tmExportDocMarginPreset" class="tm-input">
+                            <option value="normal">Normal</option>
+                            <option value="compact" selected>Compacto</option>
+                            <option value="none">Sin margen</option>
+                        </select>
+                        <p class="tm-analysis-hint" style="margin-top:6px;">Aplica a Word/PDF y a la vista previa A4.</p>
+                    </div>
                     <div class="tm-export-personalize-field tm-export-count-table-section">
                         <label class="tm-export-count-table-toggle">
                             <input type="checkbox" id="tmExportIncludeCountTable" value="1">
@@ -445,8 +450,8 @@
                             <div class="tm-export-count-table-sizes">
                                 <span class="tm-export-label-inline">Tamaños de las celdas:</span>
                                 <label class="tm-export-count-cell-width-label">
-                                    Ancho columnas (ch):
-                                    <input type="number" id="tmExportCountTableCellWidth" class="tm-export-count-cell-width-input" min="6" max="40" value="12" aria-label="Ancho de columnas de la tabla de conteo en caracteres">
+                                    Ancho (ch):
+                                    <input type="number" id="tmExportCountTableCellWidth" class="tm-export-count-cell-width-input tm-input tm-input--large" style="width: 80px;" min="6" max="40" value="12" aria-label="Ancho de columnas de la tabla de conteo en caracteres">
                                 </label>
                             </div>
                             <span class="tm-export-label-inline">Conteo por valor de:</span>
@@ -461,6 +466,14 @@
                                     <div class="tm-export-count-table-color-list" id="tmExportCountTableColorList" role="list"></div>
                                 </div>
                             </div>
+                            <div class="tm-export-personalize-field tm-export-count-table-align-group">
+                                <span class="tm-export-label-inline">Alineación de tabla de conteo</span>
+                                <div class="tm-export-align-btns tm-export-count-table-align-btns" id="tmExportCountAlignGroup" role="group" aria-label="Alineación de la tabla de conteo">
+                                    <button type="button" class="tm-export-align-btn is-active" data-count-table-align="left">Izquierda</button>
+                                    <button type="button" class="tm-export-align-btn" data-count-table-align="center">Centro</button>
+                                    <button type="button" class="tm-export-align-btn" data-count-table-align="right">Derecha</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                         </section>
@@ -471,6 +484,21 @@
                             <div class="tm-export-groups-wrap__head">
                                 <span class="tm-export-label-inline">Grupos de columnas (fila superior)</span>
                                 <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmExportAddGroupBtn">+ Añadir grupo</button>
+                            </div>
+                            <div class="tm-export-personalize-field tm-export-data-table-align-group">
+                                <span class="tm-export-label-inline">Alineación de tabla de datos</span>
+                                <div class="tm-export-align-btns tm-export-data-table-align-btns" id="tmExportDataAlignGroup" role="group" aria-label="Alineación de la tabla de datos">
+                                    <button type="button" class="tm-export-align-btn is-active" data-data-table-align="left">Izquierda</button>
+                                    <button type="button" class="tm-export-align-btn" data-data-table-align="center">Centro</button>
+                                    <button type="button" class="tm-export-align-btn" data-data-table-align="right">Derecha</button>
+                                </div>
+                            </div>
+                            <div class="tm-export-case-toggle-row-sub">
+                                <label class="tm-export-case-toggle tm-export-case-toggle--sub" title="Convertir encabezados y títulos de tabla a MAYÚSCULAS">
+                                    <input type="checkbox" id="tmExportHeadersUppercase" value="1">
+                                    <span class="tm-export-case-icon">Az</span>
+                                    <small>Convertir encabezados a MAYÚSCULAS</small>
+                                </label>
                             </div>
                             <div id="tmExportGroupsList" class="tm-export-groups-list">
                                 <p class="tm-analysis-hint" id="tmExportNoGroupsHint">No hay grupos creados. Define grupos para agrupar campos bajo un mismo título.</p>
@@ -1739,7 +1767,9 @@
                 if (alignBtn) {
                     var cols = personalizeModal._personalizeColumns;
                     if (!cols) { return; }
-                    personalizeModal.querySelectorAll('.tm-export-align-btn').forEach(function (b) { b.classList.remove('is-active'); });
+                    var alignGroup = alignBtn.closest('.tm-export-align-btns');
+                    if (!alignGroup) { return; }
+                    alignGroup.querySelectorAll('.tm-export-align-btn').forEach(function (b) { b.classList.remove('is-active'); });
                     alignBtn.classList.add('is-active');
                     var columnsEl = document.getElementById('tmExportPersonalizeColumns');
                     var previewEl = document.getElementById('tmExportPersonalizePreview');
@@ -1916,7 +1946,8 @@
                     row2: (t2 && t2.getAttribute('data-color')) ? t2.getAttribute('data-color') : 'var(--clr-secondary)',
                     showPct: !!(pctCheck && pctCheck.checked),
                     showSR: true,
-                    row2Values: {}
+                    row2Values: {},
+                    row2Widths: {}
                 };
                 var srCheck = row.querySelector('.tm-export-count-sr-check');
                 if (srCheck) { savedColors[k].showSR = !!srCheck.checked; }
@@ -1924,6 +1955,11 @@
                     var v = vrow.getAttribute('data-value');
                     var vt = vrow.querySelector('.tm-export-color-trigger');
                     if (v && vt) { savedColors[k].row2Values[v] = vt.getAttribute('data-color') || 'var(--clr-secondary)'; }
+                    var vw = vrow.querySelector('.tm-export-count-width-input');
+                    if (v && vw) {
+                        var wn = parseInt(vw.value, 10);
+                        if (!Number.isNaN(wn)) { savedColors[k].row2Widths[v] = Math.max(6, Math.min(40, wn)); }
+                    }
                 });
             });
             }
@@ -1940,6 +1976,7 @@
                 var showPct = !!(colors && colors.showPct);
                 var showSR = key === '_total' ? false : !(colors && colors.showSR === false);
                 var row2Values = (colors && colors.row2Values) ? colors.row2Values : {};
+                var row2Widths = (colors && colors.row2Widths) ? colors.row2Widths : {};
                 var srControl = key === '_total' ? '' :
                     '<label class="tm-export-count-pct-item-check" title="Incluir No aplica para este campo" style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.75rem;color:var(--clr-text-main);">' +
                     '<input type="checkbox" class="tm-export-count-sr-check"' + (showSR ? ' checked' : '') + '> No aplica' +
@@ -1965,8 +2002,13 @@
                     block += '<div class="tm-export-count-table-row2-values"><span class="tm-export-color-row-label">Fila 2 por valor:</span><div class="tm-export-count-table-value-colors">';
                     valueLabels.forEach(function (vlabel) {
                         var vc = row2Values[vlabel] || defaultRow2;
+                        var vw = row2Widths[vlabel] || 12;
                         block += '<div class="tm-export-count-table-value-color" data-value="' + escapeHtml(vlabel) + '">' +
                             '<span class="tm-export-value-label">' + escapeHtml(vlabel) + '</span>' +
+                            '<label class="tm-export-count-width-label" title="Ancho de celda para este valor">' +
+                            '<span>Ancho</span>' +
+                            '<input type="number" class="tm-export-count-width-input tm-input" min="6" max="40" value="' + escapeHtml(String(vw)) + '" aria-label="Ancho de celda para ' + escapeHtml(vlabel) + '">' +
+                            '</label>' +
                             '<button type="button" class="tm-export-color-trigger" data-color="' + escapeHtml(vc) + '" aria-haspopup="listbox" aria-expanded="false">' +
                             '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(vc) + '"></span></button>' +
                             '<div class="tm-export-color-menu" role="listbox" hidden>' + colorMenuHtml + '</div></div>';
@@ -2018,7 +2060,7 @@
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12, titleFontPx: 18, microrregionSort: 'asc' };
+                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', microrregionSort: 'asc' };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
             const titleUppercaseEl = modal ? modal.querySelector('#tmExportTitleUppercase') : document.getElementById('tmExportTitleUppercase');
@@ -2027,8 +2069,13 @@
             const titleFontEl = modal ? modal.querySelector('#tmExportTitleFontSize') : document.getElementById('tmExportTitleFontSize');
             const headerFontEl = modal ? modal.querySelector('#tmExportHeaderFontSize') : document.getElementById('tmExportHeaderFontSize');
             const microrregionSortEl = modal ? modal.querySelector('#tmExportMicrorregionSort') : document.getElementById('tmExportMicrorregionSort');
-            const alignBtn = modal ? modal.querySelector('.tm-export-title-align .tm-export-align-btn.is-active') : null;
+            const docMarginPresetEl = modal ? modal.querySelector('#tmExportDocMarginPreset') : document.getElementById('tmExportDocMarginPreset');
+            const alignBtn = modal ? modal.querySelector('#tmExportTitleAlignGroup .tm-export-align-btn.is-active') : null;
             const titleAlign = (alignBtn && alignBtn.getAttribute('data-title-align')) || 'center';
+            const countTableAlignBtn = modal ? modal.querySelector('#tmExportCountAlignGroup .tm-export-align-btn.is-active') : null;
+            const countTableAlign = (countTableAlignBtn && countTableAlignBtn.getAttribute('data-count-table-align')) || 'left';
+            const dataTableAlignBtn = modal ? modal.querySelector('#tmExportDataAlignGroup .tm-export-align-btn.is-active') : null;
+            const dataTableAlign = (dataTableAlignBtn && dataTableAlignBtn.getAttribute('data-data-table-align')) || 'left';
             const cellFontPx = cellFontEl && cellFontEl.value ? Math.max(9, Math.min(24, parseInt(cellFontEl.value, 10) || 12)) : 12;
             const titleFontPx = titleFontEl && titleFontEl.value ? Math.max(10, Math.min(36, parseInt(titleFontEl.value, 10) || 18)) : 18;
             const headerFontPx = headerFontEl && headerFontEl.value ? Math.max(9, Math.min(28, parseInt(headerFontEl.value, 10) || 12)) : 12;
@@ -2067,12 +2114,19 @@
                         row2: (t2 && t2.getAttribute('data-color')) ? t2.getAttribute('data-color') : 'var(--clr-secondary)'
                     };
                     var row2Values = {};
+                    var row2Widths = {};
                     row.querySelectorAll('.tm-export-count-table-value-color').forEach(function (vrow) {
                         var v = vrow.getAttribute('data-value');
                         var vt = vrow.querySelector('.tm-export-color-trigger');
                         if (v && vt) { row2Values[v] = vt.getAttribute('data-color') || 'var(--clr-secondary)'; }
+                        var vw = vrow.querySelector('.tm-export-count-width-input');
+                        if (v && vw) {
+                            var wn = parseInt(vw.value, 10);
+                            if (!Number.isNaN(wn)) { row2Widths[v] = Math.max(6, Math.min(40, wn)); }
+                        }
                     });
                     if (Object.keys(row2Values).length) { obj.row2Values = row2Values; }
+                    if (Object.keys(row2Widths).length) { obj.row2Widths = row2Widths; }
                     var pctCheck = row.querySelector('.tm-export-count-pct-check');
                     obj.showPct = !!(pctCheck && pctCheck.checked);
                     var srCheck = row.querySelector('.tm-export-count-sr-check');
@@ -2086,6 +2140,8 @@
             return {
                 title: titleEl ? titleEl.value : '',
                 titleAlign: titleAlign,
+                countTableAlign: countTableAlign,
+                dataTableAlign: dataTableAlign,
                 titleUppercase: !!(titleUppercaseEl && titleUppercaseEl.checked),
                 headersUppercase: !!(headersUppercaseEl && headersUppercaseEl.checked),
                 columns: columns,
@@ -2094,6 +2150,7 @@
                 cellFontPx: cellFontPx,
                 titleFontPx: titleFontPx,
                 headerFontPx: headerFontPx,
+                docMarginPreset: (docMarginPresetEl && ['normal', 'compact', 'none'].indexOf(docMarginPresetEl.value) !== -1) ? docMarginPresetEl.value : 'compact',
                 groups: groups,
                 microrregionSort: (microrregionSortEl && microrregionSortEl.value === 'desc') ? 'desc' : 'asc'
             };
@@ -2163,9 +2220,67 @@
             const cellFontPx = state.cellFontPx || 12;
             const titleFontPx = state.titleFontPx || 18;
             const titleAlign = state.titleAlign || 'center';
+            const countTableAlign = state.countTableAlign || 'left';
+            const dataTableAlign = state.dataTableAlign || 'left';
             const titleUppercase = !!state.titleUppercase;
             const headersUppercase = !!state.headersUppercase;
+            const docMarginPreset = state.docMarginPreset || 'compact';
             const titleStyle = 'text-align:' + (titleAlign === 'left' ? 'left' : titleAlign === 'right' ? 'right' : 'center');
+            var countTableMargin = countTableAlign === 'center' ? 'margin: 1.5rem auto;' : countTableAlign === 'right' ? 'margin: 1.5rem 0 1.5rem auto;' : 'margin: 1.5rem auto 1.5rem 0;';
+            var estimateColumnUnits = function (col) {
+                if (!col) { return 8; }
+                if (col.is_image) {
+                    var imageCfg = state.columns.find(function (x) { return x.key === col.key; }) || {};
+                    var imageW = imageCfg.imageWidth || 120;
+                    return Math.max(8, Math.round(imageW / 10));
+                }
+                var raw = col.max_width_chars;
+                if (raw != null && !Number.isNaN(parseInt(raw, 10))) {
+                    var custom = parseInt(raw, 10);
+                    return Math.max(2, Math.min(custom, 60));
+                }
+                var key = col.key || '';
+                if (key === 'item') { return 4; }
+                if (key === 'microrregion') { return 18; }
+                if (key === 'municipio') { return 20; }
+                if (key === 'estatus') { return 12; }
+                return 24;
+            };
+            var totalUnits = 0;
+            var colUnitsByKey = {};
+            columns.forEach(function (col) {
+                var units = estimateColumnUnits(col);
+                colUnitsByKey[col.key] = units;
+                totalUnits += units;
+            });
+            if (totalUnits <= 0) { totalUnits = 1; }
+            var colPercentByKey = {};
+            Object.keys(colUnitsByKey).forEach(function (k) {
+                colPercentByKey[k] = (colUnitsByKey[k] * 100) / totalUnits;
+            });
+
+            // Si hay muchas columnas o ancho total alto, usar todo el ancho de la hoja para evitar recortes.
+            var forceFullWidthDataTable = columns.length >= 6 || totalUnits > 110;
+            var effectiveDataTableAlign = forceFullWidthDataTable ? 'left' : dataTableAlign;
+            var dataTableMargin = effectiveDataTableAlign === 'center' ? 'margin: 1.5rem auto;' : effectiveDataTableAlign === 'right' ? 'margin: 1.5rem 0 1.5rem auto;' : 'margin: 1.5rem auto 1.5rem 0;';
+            var dataTableStyle = (forceFullWidthDataTable || effectiveDataTableAlign === 'left') ? 'width:100%;' : 'width:auto;display:table;';
+            var previewPadding = docMarginPreset === 'none' ? '0' : (docMarginPreset === 'normal' ? '18px' : '10px');
+            previewEl.style.padding = previewPadding;
+
+            var getDataColWidthStyle = function (col) {
+                if (forceFullWidthDataTable) {
+                    var units = colUnitsByKey[col.key] || 1;
+                    var pct = (units * 100) / totalUnits;
+                    return 'width:' + pct.toFixed(2) + '%;';
+                }
+                if (col.is_image) {
+                    var imageCfg = state.columns.find(function (x) { return x.key === col.key; }) || {};
+                    var imageW = (imageCfg.imageWidth || 120) + 'px';
+                    return 'width:' + imageW + ';min-width:' + imageW + ';';
+                }
+                var ch = Math.min(col.max_width_chars || 24, 60);
+                return 'width:' + ch + 'ch;';
+            };
             var countTableHtml = '';
             var root = modal || document;
             var includeCountEl = root.querySelector ? root.querySelector('#tmExportIncludeCountTable') : document.getElementById('tmExportIncludeCountTable');
@@ -2268,11 +2383,22 @@
                         }
                         return (c && c.row2) ? c.row2 : '#2d5a27';
                     };
+                    var getCountValueWidth = function (groupIndex, valueLabel) {
+                        var key = countTableKeys[groupIndex];
+                        var fallback = cellW;
+                        if (!key) { return fallback; }
+                        var c = countTableColors[key];
+                        if (!c || !c.row2Widths) { return fallback; }
+                        var direct = c.row2Widths[valueLabel];
+                        if (direct == null && valueLabel != null) { direct = c.row2Widths[String(valueLabel).toLowerCase()]; }
+                        var parsed = parseInt(direct, 10);
+                        if (Number.isNaN(parsed)) { return fallback; }
+                        return Math.max(6, Math.min(40, parsed));
+                    };
 
                     const cellW = state.countTableCellWidth || 12;
-                    const pctCellW = Math.max(6, Math.floor(cellW * 0.7));
 
-                    countTableHtml = '<table class="tm-export-preview-count-table" style="table-layout:fixed;width:auto;">';
+                    countTableHtml = '<table class="tm-export-preview-count-table" style="table-layout:fixed;width:auto;' + countTableMargin + '">';
                     countTableHtml += '<thead><tr>';
                     groups.forEach(function (g, gi) {
                         var bg = getCountColor(gi, 1);
@@ -2298,13 +2424,15 @@
                         g.values.forEach(function (v) {
                             var subLabel = v.label !== '' ? v.label : g.label;
                             var bg = getCountColor(gi, 2, subLabel);
+                            var valueW = getCountValueWidth(gi, subLabel);
+                            var valuePctW = Math.max(6, Math.floor(valueW * 0.7));
                             if (showPct && isRedundant) {
-                                countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + cellW + 'ch;">' + escapeHtml(normalizeExportHeadingText('Cantidad', headersUppercase)) + '</th>';
-                                countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + pctCellW + 'ch;font-size:0.75rem;">%</th>';
+                                countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + valueW + 'ch;white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.1;">' + escapeHtml(normalizeExportHeadingText('Cantidad', headersUppercase)) + '</th>';
+                                countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + valuePctW + 'ch;font-size:0.75rem;white-space:normal;">%</th>';
                             } else {
-                                countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + cellW + 'ch;min-width:' + cellW + 'ch;max-width:' + cellW + 'ch;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(normalizeExportHeadingText(subLabel, headersUppercase)) + '</th>';
+                                countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + valueW + 'ch;min-width:' + valueW + 'ch;max-width:' + valueW + 'ch;white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.1;">' + escapeHtml(normalizeExportHeadingText(subLabel, headersUppercase)) + '</th>';
                                 if (showPct) {
-                                    countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + pctCellW + 'ch;font-size:0.75rem;">%</th>';
+                                    countTableHtml += '<th class="tm-export-preview-count-value-header" style="background-color:' + escapeHtml(bg) + ';width:' + valuePctW + 'ch;font-size:0.75rem;white-space:normal;">%</th>';
                                 }
                             }
                         });
@@ -2318,10 +2446,13 @@
                         var gTotal = 0;
                         g.values.forEach(function(ev) { gTotal += ev.count; });
                         g.values.forEach(function (v) {
-                            countTableHtml += '<td class="tm-export-preview-count-value" style="width:' + cellW + 'ch;min-width:' + cellW + 'ch;max-width:' + cellW + 'ch;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(String(v.count)) + '</td>';
+                            var subLabel = v.label !== '' ? v.label : g.label;
+                            var valueW = getCountValueWidth(gi, subLabel);
+                            var valuePctW = Math.max(6, Math.floor(valueW * 0.7));
+                            countTableHtml += '<td class="tm-export-preview-count-value" style="width:' + valueW + 'ch;min-width:' + valueW + 'ch;max-width:' + valueW + 'ch;white-space:normal;overflow-wrap:anywhere;word-break:break-word;">' + escapeHtml(String(v.count)) + '</td>';
                             if (showPct) {
                                 var pct = gTotal > 0 ? Math.round((v.count / gTotal) * 100) : 0;
-                                countTableHtml += '<td class="tm-export-preview-count-value" style="width:' + pctCellW + 'ch;font-size:0.75rem;color:#666;">' + pct + '%</td>';
+                                countTableHtml += '<td class="tm-export-preview-count-value" style="width:' + valuePctW + 'ch;font-size:0.75rem;color:#666;white-space:normal;">' + pct + '%</td>';
                             }
                         });
                     });
@@ -2363,12 +2494,8 @@
             html += countTableHtml;
 
             // Tabla de Datos (Desglose)
-            html += '<table class="tm-export-preview-table" style="table-layout:fixed;width:auto;border-collapse:collapse;margin-top:10px;">';
-
-            // Fila de Desglose (dentro de la tabla para alineación)
-            html += '<tr class="tm-export-preview-row">';
-            html += '<td class="tm-export-preview-cell tm-export-preview-desglose-label" style="font-weight:600;padding:12px 0 6px 0;border-left:0;border-right:0;border-bottom:0;" colspan="' + totalColSpan + '">' + escapeHtml(normalizeExportHeadingText('Desglose', headersUppercase)) + '</td>';
-            html += '</tr>';
+            html += '<p class="tm-export-preview-desglose-label" style="font-weight:600;margin:10px 0 4px 0;">' + escapeHtml(normalizeExportHeadingText('Desglose', headersUppercase)) + '</p>';
+            html += '<table class="tm-export-preview-table" style="table-layout:fixed;border-collapse:collapse;' + dataTableStyle + dataTableMargin + '">';
 
             // Encabezados (con Grupos si aplica)
             var groupSpans = [];
@@ -2384,8 +2511,18 @@
             var hasAnyGroup = groupSpans.some(function (gs) { return gs.label !== ''; });
             if (hasAnyGroup) {
                 html += '<tr class="tm-export-preview-row tm-export-preview-group-header">';
+                var gColIdx = 0;
                 groupSpans.forEach(function (gs) {
                     var style = gs.label ? 'background-color:#64748b; color:white; border:1px solid #475569; font-weight:bold; border-bottom:none;' : 'border:none;';
+                    if (forceFullWidthDataTable) {
+                        var gPct = 0;
+                        for (var gi = 0; gi < gs.span; gi++) {
+                            var gcol = columns[gColIdx + gi];
+                            if (gcol && gcol.key) { gPct += (colPercentByKey[gcol.key] || 0); }
+                        }
+                        style += 'width:' + gPct.toFixed(2) + '%;';
+                    }
+                    gColIdx += gs.span;
                     html += '<th class="tm-export-preview-cell" colspan="' + gs.span + '" style="' + style + '">' + (gs.label ? escapeHtml(normalizeExportHeadingText(gs.label, headersUppercase)) : '') + '</th>';
                 });
                 html += '</tr>';
@@ -2394,14 +2531,13 @@
             html += '<tr class="tm-export-preview-row tm-export-preview-header">';
             columns.forEach(function (col) {
                 const color = colorMap[col.key] || '#861e34';
+                var widthStyle = getDataColWidthStyle(col);
                 if (col.is_image) {
                     const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
-                    const w = (c.imageWidth || 120) + 'px';
                     const h = (c.imageHeight || 80) + 'px';
-                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell tm-export-preview-image-cell" style="background-color:' + escapeHtml(color) + ';width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + '"><span class="tm-export-preview-image-placeholder">' + escapeHtml(normalizeExportHeadingText('Imagen', headersUppercase)) + '</span></th>';
+                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell tm-export-preview-image-cell" style="background-color:' + escapeHtml(color) + ';' + widthStyle + 'height:' + h + ';min-height:' + h + '"><span class="tm-export-preview-image-placeholder">' + escapeHtml(normalizeExportHeadingText('Imagen', headersUppercase)) + '</span></th>';
                 } else {
-                    const ch = Math.min(col.max_width_chars || 24, 60);
-                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(color) + ';width:' + ch + 'ch">' + escapeHtml(normalizeExportHeadingText(col.label, headersUppercase)) + '</th>';
+                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(color) + ';' + widthStyle + '">' + escapeHtml(normalizeExportHeadingText(col.label, headersUppercase)) + '</th>';
                 }
             });
             html += '</tr>';
@@ -2413,16 +2549,15 @@
                     html += '<tr class="tm-export-preview-row tm-export-preview-data">';
                     columns.forEach(function (col) {
                         const cellColor = '#f5f5f5';
+                        var widthStyle = getDataColWidthStyle(col);
                         if (col.is_image) {
                             const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
-                            const w = (c.imageWidth || 120) + 'px';
                             const h = (c.imageHeight || 80) + 'px';
-                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">-</span></td>';
+                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" style="' + widthStyle + 'height:' + h + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">-</span></td>';
                         } else {
-                            const ch = Math.min(col.max_width_chars || 24, 60);
                             var val = '';
                             if (col.key === 'item') { val = String(itemNum++); } else if (col.key === 'microrregion') { val = mrLabel; } else { val = formatPreviewCellValue(entry.data && entry.data[col.key]); }
-                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="width:' + ch + 'ch;background:' + escapeHtml(cellColor) + ';font-size:' + cellFontPx + 'px;">' + escapeHtml(val) + '</td>';
+                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + widthStyle + 'background:' + escapeHtml(cellColor) + ';font-size:' + cellFontPx + 'px;">' + escapeHtml(val) + '</td>';
                         }
                     });
                     html += '</tr>';
@@ -2431,15 +2566,14 @@
                 html += '<tr class="tm-export-preview-row tm-export-preview-data">';
                 columns.forEach(function (col) {
                     const cellColor = '#f5f5f5';
+                    var widthStyle = getDataColWidthStyle(col);
                     if (col.is_image) {
                         const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
-                        const w = (c.imageWidth || 120) + 'px';
                         const h = (c.imageHeight || 80) + 'px';
-                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" data-key="' + escapeHtml(col.key) + '" style="width:' + w + ';height:' + h + ';min-width:' + w + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">-</span></td>';
+                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" data-key="' + escapeHtml(col.key) + '" style="' + widthStyle + 'height:' + h + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">-</span></td>';
                     } else {
-                        const ch = Math.min(col.max_width_chars || 24, 60);
                         const val = (savedRow && savedRow[col.key] !== undefined) ? escapeHtml(savedRow[col.key]) : '';
-                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="width:' + ch + 'ch;background:' + escapeHtml(cellColor) + ';font-size:' + cellFontPx + 'px;" data-placeholder="Ejemplo">' + val + '</td>';
+                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="' + widthStyle + 'background:' + escapeHtml(cellColor) + ';font-size:' + cellFontPx + 'px;" data-placeholder="Ejemplo">' + val + '</td>';
                     }
                 });
                 html += '</tr>';
@@ -2635,6 +2769,7 @@
             const headersUppercaseEl = document.getElementById('tmExportHeadersUppercase');
             const cellFontEl = document.getElementById('tmExportCellFontSize');
             const titleFontEl = document.getElementById('tmExportTitleFontSize');
+                    const docMarginPresetEl = document.getElementById('tmExportDocMarginPreset');
             const applyExcelSingleBtn = document.getElementById('tmExportApplyExcelSingle');
             const applyExcelMrBtn = document.getElementById('tmExportApplyExcelMr');
             const applyWordTableBtn = document.getElementById('tmExportApplyWordTable');
@@ -2726,6 +2861,12 @@
                         personalizeModal.querySelectorAll('.tm-export-title-align .tm-export-align-btn').forEach(function (b) {
                             b.classList.toggle('is-active', (b.getAttribute('data-title-align') || '') === (draftCfg.title_align || 'center'));
                         });
+                        personalizeModal.querySelectorAll('#tmExportCountAlignGroup .tm-export-align-btn').forEach(function (b) {
+                            b.classList.toggle('is-active', (b.getAttribute('data-count-table-align') || '') === (draftCfg.count_table_align || 'left'));
+                        });
+                        personalizeModal.querySelectorAll('#tmExportDataAlignGroup .tm-export-align-btn').forEach(function (b) {
+                            b.classList.toggle('is-active', (b.getAttribute('data-data-table-align') || '') === (draftCfg.table_align || 'left'));
+                        });
                         var dOrient = draftCfg.orientation || 'portrait';
                         personalizeModal.querySelectorAll('.tm-export-orient-btn').forEach(function (b) {
                             b.classList.toggle('is-active', (b.getAttribute('data-orientation') || '') === dOrient);
@@ -2759,6 +2900,10 @@
                             var tfn = parseInt(draftCfg.title_font_size_px, 10);
                             if (!Number.isNaN(tfn)) { titleFontEl.value = String(Math.max(10, Math.min(36, tfn))); }
                         }
+                        if (docMarginPresetEl) {
+                            var dm = ['normal', 'compact', 'none'].indexOf(draftCfg.doc_margin_preset) !== -1 ? draftCfg.doc_margin_preset : 'compact';
+                            docMarginPresetEl.value = dm;
+                        }
                         var orderedMerged = [];
                         draftCfg.columns.forEach(function (sc) {
                             var b = columns.find(function (c) { return c.key === sc.key; });
@@ -2782,44 +2927,81 @@
                         if (titleEl) { titleEl.value = data.title || ''; }
                         if (titleUppercaseEl) { titleUppercaseEl.checked = false; }
                         if (headersUppercaseEl) { headersUppercaseEl.checked = false; }
+                        if (docMarginPresetEl) { docMarginPresetEl.value = 'compact'; }
                         var mrSortDefaultEl = document.getElementById('tmExportMicrorregionSort');
                         if (mrSortDefaultEl) { mrSortDefaultEl.value = data.microrregion_sort || 'asc'; }
                         buildPersonalizeColumnsList(columns, columnsEl);
                     }
                     buildCountTableColorList(countTableColorListEl, countByFieldsEl, personalizeModal._previewEntries, draftCfg ? draftCfg.count_table_colors : null);
-                    if (personalizeModal && !personalizeModal._countTableColorListenersBound) {
-                        personalizeModal._countTableColorListenersBound = true;
+                    if (personalizeModal && !personalizeModal._personalizeGeneralListenersBound) {
+                        personalizeModal._personalizeGeneralListenersBound = true;
                         personalizeModal.addEventListener('click', function (e) {
+                            var alignBtn = e.target.closest('.tm-export-align-btn');
+                            if (alignBtn) {
+                                // Limpiar solo el grupo inmediato al que pertenece el botón
+                                var parentGroup = alignBtn.parentElement;
+                                if (parentGroup) {
+                                    Array.from(parentGroup.querySelectorAll('.tm-export-align-btn')).forEach(function (b) { b.classList.remove('is-active'); });
+                                    alignBtn.classList.add('is-active');
+                                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                                }
+                            }
+
+                            var orientBtn = e.target.closest('.tm-export-orient-btn');
+                            if (orientBtn) {
+                                var group = orientBtn.closest('.tm-export-orient-btns');
+                                if (group) {
+                                    group.querySelectorAll('.tm-export-orient-btn').forEach(function (b) { b.classList.remove('is-active'); });
+                                    orientBtn.classList.add('is-active');
+                                    var orient = orientBtn.getAttribute('data-orientation') || 'portrait';
+                                    var previewPage = document.getElementById('tmExportPreviewPage');
+                                    if (previewPage) { previewPage.classList.toggle('is-landscape', orient === 'landscape'); }
+                                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                                }
+                            }
+
                             var colorList = document.getElementById('tmExportCountTableColorList');
-                            if (!colorList || !colorList.contains(e.target)) { return; }
-                            var trigger = e.target.closest('.tm-export-color-trigger');
-                            var option = e.target.closest('.tm-export-color-option');
-                            if (trigger) {
-                                var menu = trigger.nextElementSibling;
-                                if (!(menu instanceof HTMLElement)) { return; }
-                                var isOpen = !menu.hidden;
-                                Array.from(personalizeModal.querySelectorAll('.tm-export-color-menu')).forEach(function (m) { m.hidden = true; });
-                                trigger.setAttribute('aria-expanded', String(!isOpen));
-                                menu.hidden = isOpen;
-                                if (!isOpen && menu.scrollIntoView) {
-                                    setTimeout(function () { menu.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 0);
+                            if (colorList && colorList.contains(e.target)) {
+                                var trigger = e.target.closest('.tm-export-color-trigger');
+                                var option = e.target.closest('.tm-export-color-option');
+                                if (trigger) {
+                                    var menu = trigger.nextElementSibling;
+                                    if (menu instanceof HTMLElement) {
+                                        var isOpen = !menu.hidden;
+                                        Array.from(personalizeModal.querySelectorAll('.tm-export-color-menu')).forEach(function (m) { m.hidden = true; });
+                                        trigger.setAttribute('aria-expanded', String(!isOpen));
+                                        menu.hidden = isOpen;
+                                        if (!isOpen && menu.scrollIntoView) {
+                                            setTimeout(function () { menu.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 0);
+                                        }
+                                    }
+                                } else if (option) {
+                                    var color = option.getAttribute('data-color') || '';
+                                    var menu = option.closest('.tm-export-color-menu');
+                                    var colorCell = menu ? menu.closest('.tm-export-col-color') : null;
+                                    if (!colorCell) { colorCell = menu ? menu.closest('.tm-export-count-table-value-color') : null; }
+                                    var tr = colorCell ? colorCell.querySelector('.tm-export-color-trigger') : null;
+                                    if (colorCell && tr) {
+                                        colorCell.querySelectorAll('.tm-export-color-option').forEach(function (opt) { opt.classList.remove('is-active'); });
+                                        option.classList.add('is-active');
+                                        tr.setAttribute('data-color', color);
+                                        var swatch = tr.querySelector('.tm-export-color-swatch');
+                                        if (swatch instanceof HTMLElement) { swatch.style.backgroundColor = color; }
+                                    }
+                                    if (menu) { menu.hidden = true; }
+                                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                                } else if (e.target.closest('.tm-export-count-pct-check') || e.target.closest('.tm-export-count-sr-check')) {
+                                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
                                 }
-                            } else if (option) {
-                                var color = option.getAttribute('data-color') || '';
-                                var menu = option.closest('.tm-export-color-menu');
-                                var colorCell = menu ? menu.closest('.tm-export-col-color') : null;
-                                if (!colorCell) { colorCell = menu ? menu.closest('.tm-export-count-table-value-color') : null; }
-                                var tr = colorCell ? colorCell.querySelector('.tm-export-color-trigger') : null;
-                                if (colorCell && tr) {
-                                    colorCell.querySelectorAll('.tm-export-color-option').forEach(function (opt) { opt.classList.remove('is-active'); });
-                                    option.classList.add('is-active');
-                                    tr.setAttribute('data-color', color);
-                                    var swatch = tr.querySelector('.tm-export-color-swatch');
-                                    if (swatch instanceof HTMLElement) { swatch.style.backgroundColor = color; }
-                                }
-                                if (menu) { menu.hidden = true; }
+                            }
+                        });
+                        personalizeModal.addEventListener('input', function (e) {
+                            if (e.target && (e.target.closest('.tm-export-count-width-input') || e.target.id === 'tmExportCountTableCellWidth')) {
                                 buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
-                            } else if (e.target.closest('.tm-export-count-pct-check') || e.target.closest('.tm-export-count-sr-check')) {
+                            }
+                        });
+                        personalizeModal.addEventListener('change', function (e) {
+                            if (e.target && (e.target.closest('.tm-export-count-width-input') || e.target.id === 'tmExportCountTableCellWidth')) {
                                 buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
                             }
                         });
@@ -2865,6 +3047,9 @@
                     if (microrregionSortEl) {
                         microrregionSortEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
+                    if (docMarginPresetEl) {
+                        docMarginPresetEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
 
                     if (restoreBtn && restoreWrap) {
                         restoreBtn.onclick = function () {
@@ -2895,8 +3080,10 @@
                             headers_uppercase: !!state.headersUppercase,
                             cell_font_size_px: state.cellFontPx || 12,
                             title_font_size_px: state.titleFontPx || 18,
+                            doc_margin_preset: state.docMarginPreset || 'compact',
                             orientation: orientation,
-                            table_align: 'left',
+                            count_table_align: state.countTableAlign || 'left',
+                            table_align: state.dataTableAlign || 'left',
                             include_count_table: includeCountTable,
                             count_by_fields: countByFields,
                             count_table_colors: state.countTableColors || {},

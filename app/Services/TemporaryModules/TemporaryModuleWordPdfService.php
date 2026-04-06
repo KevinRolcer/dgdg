@@ -179,7 +179,19 @@ class TemporaryModuleWordPdfService
         $headersUppercase = !empty($exportConfig['headers_uppercase']);
         $title = $this->normalizeExportHeading((string) ($exportConfig['title'] ?? $fileName), $titleUppercase);
         $orientationConfig = ($exportConfig['orientation'] ?? 'portrait') === 'landscape' ? 'landscape' : 'portrait';
+        $docMarginPreset = strtolower((string) ($exportConfig['doc_margin_preset'] ?? 'compact'));
+        if (!in_array($docMarginPreset, ['normal', 'compact', 'none'], true)) {
+            $docMarginPreset = 'compact';
+        }
         $titleAlign = (string) ($exportConfig['title_align'] ?? 'center');
+        $countTableAlign = strtolower((string) ($exportConfig['count_table_align'] ?? 'left'));
+        if (!in_array($countTableAlign, ['left', 'center', 'right'], true)) {
+            $countTableAlign = 'left';
+        }
+        $dataTableAlign = strtolower((string) ($exportConfig['table_align'] ?? 'left'));
+        if (!in_array($dataTableAlign, ['left', 'center', 'right', 'stretch'], true)) {
+            $dataTableAlign = 'left';
+        }
         $cellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['cell_font_size_px'] ?? null);
         $cellFontSizePt = $this->cellPxToWordPt($cellFontSizePx);
         $titleFontSizePx = max(10, min(36, (int) ($exportConfig['title_font_size_px'] ?? 18)));
@@ -221,10 +233,10 @@ class TemporaryModuleWordPdfService
                 : \PhpOffice\PhpWord\Style\Section::ORIENTATION_PORTRAIT;
             $section = $phpWord->addSection([
                 'orientation' => $orientation,
-                'marginTop' => 1134,
-                'marginBottom' => 1134,
-                'marginLeft' => 1134,
-                'marginRight' => 1134,
+                'marginTop' => $docMarginPreset === 'none' ? 0 : ($docMarginPreset === 'normal' ? 1134 : 720),
+                'marginBottom' => $docMarginPreset === 'none' ? 0 : ($docMarginPreset === 'normal' ? 1134 : 720),
+                'marginLeft' => $docMarginPreset === 'none' ? 0 : ($docMarginPreset === 'normal' ? 1134 : 720),
+                'marginRight' => $docMarginPreset === 'none' ? 0 : ($docMarginPreset === 'normal' ? 1134 : 720),
             ]);
 
             $jc = match ($titleAlign) {
@@ -266,6 +278,8 @@ class TemporaryModuleWordPdfService
             if ($countTable !== null && isset($countTable['groups'])) {
                 $countTblStyle = ['borderSize' => 6, 'borderColor' => '444444', 'cellMargin' => 80];
                 $countTbl = $section->addTable($countTblStyle);
+                $baseCountCellWidthCh = max(6, min(40, (int) ($exportConfig['count_table_cell_width'] ?? 12)));
+                $chToTwips = static fn (int $ch): int => max(900, (int) round($ch * 120));
                 $resolveCountColor = function ($key, int $rowNum, ?string $valueLabel = null) use ($countTableColors): string {
                     $c = $countTableColors[$key] ?? null;
                     if (is_string($c) && $c !== '') {
@@ -285,6 +299,21 @@ class TemporaryModuleWordPdfService
                     }
                     return $rowNum === 1 ? '861E34' : '2d5a27';
                 };
+                $resolveCountWidth = function (string $key, ?string $valueLabel, bool $forPct = false) use ($countTableColors, $baseCountCellWidthCh, $chToTwips): int {
+                    $widthCh = $baseCountCellWidthCh;
+                    $cfg = $countTableColors[$key] ?? null;
+                    if (is_array($cfg) && $valueLabel !== null && isset($cfg['row2Widths']) && is_array($cfg['row2Widths'])) {
+                        $raw = $cfg['row2Widths'][$valueLabel] ?? $cfg['row2Widths'][mb_strtolower($valueLabel)] ?? null;
+                        if ($raw !== null) {
+                            $parsed = (int) $raw;
+                            $widthCh = max(6, min(40, $parsed));
+                        }
+                    }
+                    if ($forPct) {
+                        $widthCh = max(6, (int) floor($widthCh * 0.7));
+                    }
+                    return $chToTwips($widthCh);
+                };
                 $countTbl->addRow();
                 foreach ($countTable['groups'] as $gi => $group) {
                     $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
@@ -294,12 +323,22 @@ class TemporaryModuleWordPdfService
                     $span = $includePct ? $numValues * 2 : $numValues;
                     $isRedundant = ($gi === 0 || ($numValues === 1 && (trim((string)($group['values'][0]['label'] ?? '')) === '' || trim((string)($group['values'][0]['label'] ?? '')) === trim((string)($group['label'] ?? '')))));
 
+                    $groupTwips = 0;
+                    foreach ($group['values'] as $v) {
+                        $subLabel = $v['label'] !== '' ? $v['label'] : $group['label'];
+                        $groupTwips += $resolveCountWidth($key, $subLabel, false);
+                        if ($includePct) { $groupTwips += $resolveCountWidth($key, $subLabel, true); }
+                    }
+                    if ($groupTwips <= 0) {
+                        $groupTwips = $span * $chToTwips($baseCountCellWidthCh);
+                    }
+
                     $cellStyle = ['gridSpan' => $span, 'bgColor' => $bgHex, 'valign' => 'center'];
                     if ($isRedundant && !$includePct) {
                         $cellStyle['vMerge'] = 'restart';
                     }
 
-                    $cell = $countTbl->addCell(null, $cellStyle);
+                    $cell = $countTbl->addCell($groupTwips, $cellStyle);
                     $cell->addText((string) $group['label'], ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
                 }
                 $countTbl->addRow();
@@ -312,15 +351,17 @@ class TemporaryModuleWordPdfService
                         $bgHex = $resolveCountColor($key, 2, $subLabel);
 
                         $isRedundant = ($gi === 0 || (count($group['values']) === 1 && (trim((string)$v['label']) === '' || trim((string)$v['label']) === trim((string)$group['label']))));
+                        $cellTwips = $resolveCountWidth($key, $subLabel, false);
+                        $pctTwips = $resolveCountWidth($key, $subLabel, true);
 
                         if ($includePct) {
-                            $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText($isRedundant ? 'Cantidad' : (string) $subLabel, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
-                            $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText('%', ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                            $countTbl->addCell($cellTwips, ['bgColor' => $bgHex, 'valign' => 'center'])->addText($isRedundant ? 'Cantidad' : (string) $subLabel, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                            $countTbl->addCell($pctTwips, ['bgColor' => $bgHex, 'valign' => 'center'])->addText('%', ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
                         } else {
                             if ($isRedundant) {
-                                $countTbl->addCell(null, ['bgColor' => $bgHex, 'vMerge' => 'continue']);
+                                $countTbl->addCell($cellTwips, ['bgColor' => $bgHex, 'vMerge' => 'continue']);
                             } else {
-                                $countTbl->addCell(null, ['bgColor' => $bgHex, 'valign' => 'center'])->addText((string)$subLabel, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                                $countTbl->addCell($cellTwips, ['bgColor' => $bgHex, 'valign' => 'center'])->addText((string)$subLabel, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
                             }
                         }
                     }
@@ -332,10 +373,13 @@ class TemporaryModuleWordPdfService
                     $gTotal = array_sum(array_column($group['values'], 'count'));
 
                     foreach ($group['values'] as $v) {
-                        $countTbl->addCell()->addText((string) $v['count'], ['name' => $exportFontName, 'size' => $cellFontSizePt, 'color' => 'c00000']);
+                        $subLabel = $v['label'] !== '' ? $v['label'] : $group['label'];
+                        $cellTwips = $resolveCountWidth($key, $subLabel, false);
+                        $pctTwips = $resolveCountWidth($key, $subLabel, true);
+                        $countTbl->addCell($cellTwips)->addText((string) $v['count'], ['name' => $exportFontName, 'size' => $cellFontSizePt, 'color' => 'c00000']);
                         if ($includePct) {
                             $pct = $gTotal > 0 ? round(($v['count'] / $gTotal) * 100, 2) : 0;
-                            $countTbl->addCell()->addText($pct . '%', ['name' => $exportFontName, 'size' => $cellFontSizePt, 'color' => 'c00000']);
+                            $countTbl->addCell($pctTwips)->addText($pct . '%', ['name' => $exportFontName, 'size' => $cellFontSizePt, 'color' => 'c00000']);
                         }
                     }
                 }
@@ -484,12 +528,15 @@ class TemporaryModuleWordPdfService
             ? array_merge(['_total'], $countByFields)
             : [];
         $countTableColors = is_array($exportConfig['count_table_colors'] ?? null) ? $exportConfig['count_table_colors'] : [];
+        $countTableCellWidth = max(6, min(40, (int) ($exportConfig['count_table_cell_width'] ?? 12)));
         $columnWidthPercents = $this->fractionsToPercents($columnWidthFractions);
         $pdfImageDataByPath = $this->buildPdfImageDataByPath($entries, $columns, $fieldTypesByKey);
 
         $html = view('temporary_modules.admin.partials.export_pdf_table', [
             'title' => $title,
             'titleAlign' => $titleAlign,
+            'countTableAlign' => $countTableAlign,
+            'tableAlign' => $dataTableAlign,
             'sectionLabel' => $this->normalizeExportHeading('Desglose', $headersUppercase),
             'fontFamily' => $exportFontName,
             'cellFontSizePx' => $cellFontSizePx,
@@ -497,6 +544,7 @@ class TemporaryModuleWordPdfService
             'logoDataUri' => $this->buildLogoDataUri($logoPath),
             'fechaCorteStr' => $fechaCorteStr,
             'orientation' => $orientationConfig,
+            'docMarginPreset' => $docMarginPreset,
             'columns' => $columns,
             'columnWidthPercents' => $columnWidthPercents,
             'entries' => $entries,
@@ -505,6 +553,7 @@ class TemporaryModuleWordPdfService
             'countTable' => $countTable,
             'countTableColorKeys' => $countTableColorKeys,
             'countTableColors' => $countTableColors,
+            'countTableCellWidth' => $countTableCellWidth,
             'fieldTypesByKey' => $fieldTypesByKey,
             'pdfImageDataByPath' => $pdfImageDataByPath,
         ])->render();
