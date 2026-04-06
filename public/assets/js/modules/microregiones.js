@@ -59,6 +59,9 @@
             } catch (eDom) { /* ignore */ }
         }
         pushUniqueUrl(searchUrls, searchUrl);
+        // Final fallback: same page endpoint (usually /microregiones), known to be reachable.
+        pushUniqueUrl(searchUrls, window.location.pathname || '/microregiones');
+        pushUniqueUrl(searchUrls, '/microregiones');
         appendIndexPhpSearchVariantsIfNeeded();
     }
 
@@ -827,7 +830,7 @@
                     },
                     body: JSON.stringify({ q: query }),
                 }).then(function (r) {
-                    if (r.status === 405) {
+                    if (r.status === 404 || r.status === 405) {
                         searchPostDisabled = true;
                     }
                     if (!r.ok) throw new Error('Advanced search POST failed');
@@ -835,9 +838,9 @@
                 });
             }
 
-            function fetchSearchGetOnly(index) {
+            function fetchSearchAt(index) {
                 if (index >= searchUrls.length) {
-                    return Promise.reject(new Error('Advanced search failed'));
+                    return fetchSearchPostJson();
                 }
 
                 var baseUrl = sameOriginFetchUrl(searchUrls[index]);
@@ -849,23 +852,14 @@
                     signal: remoteSearchAbortController.signal,
                 }).then(function (r) {
                     if (r.status === 404) {
-                        return fetchSearchGetOnly(index + 1);
+                        return fetchSearchAt(index + 1);
                     }
                     if (!r.ok) throw new Error('Advanced search failed');
                     return r.json();
                 });
             }
 
-            var searchPromise;
-            if (searchPostUrl && !searchPostDisabled) {
-                searchPromise = fetchSearchPostJson();
-            } else {
-                searchPromise = Promise.reject(new Error('skip-post'));
-            }
-            searchPromise
-                .catch(function () {
-                    return fetchSearchGetOnly(0);
-                })
+            fetchSearchAt(0)
                 .then(function (payload) {
                     if (normalizeText(searchInput.value || '') !== searchKeyNorm) {
                         return;
@@ -1261,6 +1255,8 @@
                 searchUrl = payload.search_url;
                 pushUniqueUrl(searchUrls, payload.search_url);
             }
+            pushUniqueUrl(searchUrls, window.location.pathname || '/microregiones');
+            pushUniqueUrl(searchUrls, '/microregiones');
             if (payload.search_post_url) {
                 searchPostUrl = payload.search_post_url;
             }
