@@ -59,6 +59,7 @@ class MicroregionesController extends Controller
 
         $b1 = route('microregiones.boundaries', [], false);
         $b2 = route('microregiones.map-limits', [], false);
+        $s0 = route('microregiones.geo-lookup', [], false);
         $s1 = route('microregiones.map-search', [], false);
         $s2 = route('microregiones.search', [], false);
 
@@ -73,8 +74,8 @@ class MicroregionesController extends Controller
             'boundaries_url' => $b1,
             'boundaries_urls' => $b1 === $b2 ? [$b1] : [$b1, $b2],
             'boundaries_bootstrap' => $boundaries,
-            'search_url' => $s1,
-            'search_urls' => $s1 === $s2 ? [$s1] : [$s1, $s2],
+            'search_url' => $s0,
+            'search_urls' => array_values(array_unique([$s0, $s1, $s2])),
         ];
     }
 
@@ -135,6 +136,7 @@ class MicroregionesController extends Controller
     public function search(Request $request): JsonResponse
     {
         $query = trim((string) $request->query('q', ''));
+
         return response()->json([
             'results' => $this->buildSearchResults($query),
         ]);

@@ -5,9 +5,9 @@ use App\Http\Controllers\AgendaController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\GilroyFontController;
 use App\Http\Controllers\HomeController;
-use App\Http\Controllers\MicroregionesController;
 use App\Http\Controllers\MesasPazController;
 use App\Http\Controllers\MesasPazSupervisionController;
+use App\Http\Controllers\MicroregionesController;
 use App\Http\Controllers\PowerPointController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/microregiones/mapa-datos', [MicroregionesController::class, 'data'])->name('microregiones.map-datos');
     Route::get('/microregiones/lim-mun', [MicroregionesController::class, 'boundaries'])->name('microregiones.map-limits');
     Route::get('/microregiones/buscar-map', [MicroregionesController::class, 'search'])->name('microregiones.map-search');
+    Route::get('/geo/mr-lugares', [MicroregionesController::class, 'search'])->name('microregiones.geo-lookup');
 
     Route::get('/poller/export/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
         ->where('exportRequest', '[a-f0-9\-]+')

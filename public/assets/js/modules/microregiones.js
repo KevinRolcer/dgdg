@@ -17,43 +17,50 @@
         }
     }
 
-    function hydrateSearchUrls(primary, alternate) {
-        function toIndexPhpVariant(url) {
-            if (!url || typeof url !== 'string') return null;
-            try {
-                var abs = new URL(url, window.location.href);
-                if (abs.pathname.indexOf('/index.php/') === 0) {
-                    return abs.pathname + abs.search + abs.hash;
-                }
-                return '/index.php' + abs.pathname + abs.search + abs.hash;
-            } catch (e) {
-                if (url.indexOf('/index.php/') === 0) return url;
-                if (url.indexOf('/') === 0) return '/index.php' + url;
-                return '/index.php/' + url;
+    /** Solo si la página actual cargó vía /index.php/… (evita 404 al forzar index.php en hosts con URLs limpias). */
+    function toIndexPhpVariant(url) {
+        if (!url || typeof url !== 'string') return null;
+        try {
+            var abs = new URL(url, window.location.href);
+            var p = abs.pathname;
+            if (p.indexOf('/index.php/') === 0) {
+                return p + abs.search + abs.hash;
             }
+            return '/index.php' + p + abs.search + abs.hash;
+        } catch (e) {
+            if (url.indexOf('/index.php/') === 0) return url;
+            if (url.indexOf('/') === 0) return '/index.php' + url;
+            return null;
         }
-
-        var list = [];
-        pushUniqueUrl(list, primary);
-        pushUniqueUrl(list, alternate);
-        pushUniqueUrl(list, '/microregiones');
-        if (primary && primary.indexOf('/buscar-map') !== -1) {
-            pushUniqueUrl(list, primary.replace('/buscar-map', '/search'));
-        }
-        if (primary && primary.indexOf('/search') !== -1) {
-            pushUniqueUrl(list, primary.replace('/search', '/buscar-map'));
-        }
-
-        // Hosting fallback: some servers break pretty URLs but still resolve /index.php/*.
-        var currentList = list.slice();
-        currentList.forEach(function (u) {
-            pushUniqueUrl(list, toIndexPhpVariant(u));
-        });
-
-        searchUrls = list;
     }
 
-    hydrateSearchUrls(searchUrl, root.getAttribute('data-search-url-alt'));
+    function appendIndexPhpSearchVariantsIfNeeded() {
+        if (window.location.pathname.indexOf('/index.php/') === -1) {
+            return;
+        }
+        var snap = searchUrls.slice();
+        snap.forEach(function (u) {
+            var v = toIndexPhpVariant(u);
+            if (v) pushUniqueUrl(searchUrls, v);
+        });
+    }
+
+    function initSearchUrlsFromDom() {
+        searchUrls = [];
+        var multi = root.getAttribute('data-search-urls');
+        if (multi) {
+            try {
+                var parsed = JSON.parse(multi);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach(function (u) { pushUniqueUrl(searchUrls, u); });
+                }
+            } catch (eDom) { /* ignore */ }
+        }
+        pushUniqueUrl(searchUrls, searchUrl);
+        appendIndexPhpSearchVariantsIfNeeded();
+    }
+
+    initSearchUrlsFromDom();
 
     /** Evita peticiones al host de APP_URL si la página se abrió con otro origen (cookies no iban → 401). */
     function sameOriginFetchUrl(pathOrUrl) {
@@ -1206,14 +1213,17 @@
 
     loadMicroregionesPayload()
         .then(function (payload) {
+            if (payload.search_urls && Array.isArray(payload.search_urls) && payload.search_urls.length) {
+                searchUrls = [];
+                payload.search_urls.forEach(function (u) {
+                    if (u && typeof u === 'string') pushUniqueUrl(searchUrls, u);
+                });
+            }
             if (payload.search_url) {
                 searchUrl = payload.search_url;
+                pushUniqueUrl(searchUrls, payload.search_url);
             }
-            if (payload.search_urls && Array.isArray(payload.search_urls)) {
-                hydrateSearchUrls(payload.search_urls[0] || searchUrl, payload.search_urls[1] || root.getAttribute('data-search-url-alt'));
-            } else {
-                hydrateSearchUrls(searchUrl, root.getAttribute('data-search-url-alt'));
-            }
+            appendIndexPhpSearchVariantsIfNeeded();
             micros = payload.microrregiones || [];
 
             // Build fast lookup map
