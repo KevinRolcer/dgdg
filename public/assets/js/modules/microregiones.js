@@ -18,6 +18,21 @@
     }
 
     function hydrateSearchUrls(primary, alternate) {
+        function toIndexPhpVariant(url) {
+            if (!url || typeof url !== 'string') return null;
+            try {
+                var abs = new URL(url, window.location.href);
+                if (abs.pathname.indexOf('/index.php/') === 0) {
+                    return abs.pathname + abs.search + abs.hash;
+                }
+                return '/index.php' + abs.pathname + abs.search + abs.hash;
+            } catch (e) {
+                if (url.indexOf('/index.php/') === 0) return url;
+                if (url.indexOf('/') === 0) return '/index.php' + url;
+                return '/index.php/' + url;
+            }
+        }
+
         var list = [];
         pushUniqueUrl(list, primary);
         pushUniqueUrl(list, alternate);
@@ -27,6 +42,13 @@
         if (primary && primary.indexOf('/search') !== -1) {
             pushUniqueUrl(list, primary.replace('/search', '/buscar-map'));
         }
+
+        // Hosting fallback: some servers break pretty URLs but still resolve /index.php/*.
+        var currentList = list.slice();
+        currentList.forEach(function (u) {
+            pushUniqueUrl(list, toIndexPhpVariant(u));
+        });
+
         searchUrls = list;
     }
 
