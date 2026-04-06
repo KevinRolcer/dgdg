@@ -8,6 +8,17 @@
 
     const dataUrl = root.getAttribute('data-data-url');
     const searchUrl = root.getAttribute('data-search-url');
+
+    /** Evita peticiones al host de APP_URL si la página se abrió con otro origen (cookies no iban → 401). */
+    function sameOriginFetchUrl(pathOrUrl) {
+        if (!pathOrUrl) return pathOrUrl;
+        try {
+            var abs = new URL(pathOrUrl, window.location.href);
+            return window.location.origin + abs.pathname + abs.search + abs.hash;
+        } catch (e) {
+            return pathOrUrl;
+        }
+    }
     const mapEl = document.getElementById('microregionesMap');
     const accordionEl = document.getElementById('microregionesAccordion');
     const detailEl = document.getElementById('microregionesDetail');
@@ -17,8 +28,61 @@
     const searchGo = document.getElementById('microregionesSearchGo');
     const searchHint = document.getElementById('microregionesSearchHint');
     const searchResultsEl = document.getElementById('microregionesSearchResults');
-    const layoutEl = document.querySelector('.microregiones-layout');
+    const pinnedBarEl = document.getElementById('microregionesSearchPinned');
+    const pinnedBarLabelEl = document.getElementById('microregionesSearchPinnedLabel');
+    const pinnedFocusBtn = document.getElementById('microregionesSearchPinnedFocus');
+    const pinnedClearBtn = document.getElementById('microregionesSearchPinnedClear');
+    const layoutEl = document.getElementById('microregionesLayout') || document.querySelector('.microregiones-layout');
     const toggleBtn = document.getElementById('microregionesToggleSidebar');
+    const sidebarEl = document.getElementById('microregionesSidebar');
+    const mobileDrawerTab = document.getElementById('microregionesMobileDrawerTab');
+    const mobileBackdrop = document.getElementById('microregionesMobileBackdrop');
+    const sidebarMobileClose = document.getElementById('microregionesSidebarMobileClose');
+    const microMobileMq = window.matchMedia ? window.matchMedia('(max-width: 768px)') : { matches: false, addEventListener: null, addListener: null };
+
+    function isMicroMobileViewport() {
+        return microMobileMq.matches;
+    }
+
+    function openMicroMobileDrawer() {
+        if (!sidebarEl || !mobileBackdrop) {
+            return;
+        }
+        sidebarEl.classList.add('is-open');
+        mobileBackdrop.classList.add('is-visible');
+        if (mobileDrawerTab) {
+            mobileDrawerTab.classList.add('is-hidden');
+            mobileDrawerTab.setAttribute('aria-expanded', 'true');
+        }
+        if (map) {
+            setTimeout(function () {
+                map.invalidateSize();
+            }, 280);
+        }
+    }
+
+    function closeMicroMobileDrawer() {
+        if (!sidebarEl || !mobileBackdrop) {
+            return;
+        }
+        sidebarEl.classList.remove('is-open');
+        mobileBackdrop.classList.remove('is-visible');
+        if (mobileDrawerTab) {
+            mobileDrawerTab.classList.remove('is-hidden');
+            mobileDrawerTab.setAttribute('aria-expanded', 'false');
+        }
+        if (map) {
+            setTimeout(function () {
+                map.invalidateSize();
+            }, 280);
+        }
+    }
+
+    function syncMicroMobileOnViewportChange() {
+        if (!isMicroMobileViewport()) {
+            closeMicroMobileDrawer();
+        }
+    }
 
     /** @type {L.Map|null} */
     let map = null;
@@ -34,6 +98,11 @@
     let remoteSearchDebounce = null;
     let remoteSearchAbortController = null;
     let remoteSearchResults = [];
+    let lastAccordionHadMatch = false;
+    let remoteSearchLoading = false;
+    let lastRemoteSearchKey = '';
+    /** @type {object|null} copia del último resultado de búsqueda en mapa (panel fijado) */
+    let pinnedSearchResult = null;
 
     /* ── Geometry simplification ── */
     function simplifyCoords(coords, tolerance) {
@@ -270,12 +339,42 @@
         return null;
     }
 
+    function syncSearchStatus() {
+        if (!searchHint || !searchInput) {
+            return;
+        }
+        var q = normalizeText(searchInput.value || '');
+        if (!q || q.length < 3) {
+            searchHint.hidden = true;
+            return;
+        }
+        if (lastAccordionHadMatch) {
+            searchHint.hidden = true;
+            return;
+        }
+        if (remoteSearchLoading) {
+            searchHint.hidden = false;
+            searchHint.textContent = 'Buscando en el mapa…';
+            return;
+        }
+        var qNow = normalizeText(searchInput.value || '');
+        if (remoteSearchResults.length > 0 && qNow === lastRemoteSearchKey) {
+            searchHint.hidden = true;
+            return;
+        }
+        searchHint.hidden = false;
+        searchHint.textContent =
+            'Sin coincidencia en la lista de microrregiones. Use el desplegable arriba o pruebe “lugar, municipio” o “lugar (municipio)”.';
+    }
+
     function clearSearchResults() {
         remoteSearchResults = [];
+        lastRemoteSearchKey = '';
         if (searchResultsEl) {
             searchResultsEl.hidden = true;
             searchResultsEl.innerHTML = '';
         }
+        syncSearchStatus();
     }
 
     function clearSearchArea() {
@@ -285,8 +384,34 @@
         }
     }
 
+    function showAllAccordionItems() {
+        if (!accordionEl) {
+            return;
+        }
+        accordionEl.querySelectorAll('.microregiones-acc-item').forEach(function (item) {
+            item.style.display = '';
+        });
+    }
+
+    var OVERLAY_NO_HIT_PANE = 'microOverlayNoHit';
+
+    function ensureMicroMapPanes() {
+        if (!map) return;
+        if (!map.getPane('boundaryPane')) {
+            map.createPane('boundaryPane');
+            map.getPane('boundaryPane').style.zIndex = 370;
+        }
+        if (!map.getPane(OVERLAY_NO_HIT_PANE)) {
+            map.createPane(OVERLAY_NO_HIT_PANE);
+            var noHit = map.getPane(OVERLAY_NO_HIT_PANE);
+            noHit.style.zIndex = 450;
+            noHit.style.pointerEvents = 'none';
+        }
+    }
+
     /* ── Map interaction ── */
     function openMunicipioOnMap(m) {
+        showAllAccordionItems();
         clearSearchMarker();
         clearSearchArea();
         if (highlightedLayer && map) {
@@ -298,9 +423,10 @@
         var geom = geometryByMunicipioId.get(m.id);
 
         if (geom && map) {
+            ensureMicroMapPanes();
             var color = micro ? getMicroColor(micro) : '#f59e0b';
             highlightedLayer = L.geoJSON({ type: 'Feature', geometry: geom }, {
-                pane: 'boundaryPane',
+                pane: OVERLAY_NO_HIT_PANE,
                 style: {
                     color: '#ffffff',
                     weight: 2.5,
@@ -326,8 +452,13 @@
 
     function openMicroOnMap(micro) {
         if (!micro || !map) return;
+        showAllAccordionItems();
         clearSearchMarker();
         clearSearchArea();
+        if (highlightedLayer && map) {
+            map.removeLayer(highlightedLayer);
+            highlightedLayer = null;
+        }
         var mk = markerByMicroId.get(micro.id);
         if (mk) {
             map.panTo(mk.getLatLng(), { animate: true });
@@ -347,12 +478,16 @@
 
         clearSearchMarker();
 
+        ensureMicroMapPanes();
         searchMarker = L.circleMarker([lat, lng], {
             radius: 8,
             color: '#0f172a',
             weight: 2,
             fillColor: '#f97316',
-            fillOpacity: 0.95
+            fillOpacity: 0.95,
+            interactive: false,
+            bubblingMouseEvents: true,
+            pane: OVERLAY_NO_HIT_PANE,
         }).addTo(map);
     }
 
@@ -361,13 +496,10 @@
 
         clearSearchArea();
 
-        if (!map.getPane('boundaryPane')) {
-            map.createPane('boundaryPane');
-            map.getPane('boundaryPane').style.zIndex = 370;
-        }
+        ensureMicroMapPanes();
 
         searchAreaLayer = L.geoJSON({ type: 'Feature', geometry: geometry }, {
-            pane: 'boundaryPane',
+            pane: OVERLAY_NO_HIT_PANE,
             style: {
                 color: '#f97316',
                 weight: 3,
@@ -379,10 +511,54 @@
         }).addTo(map);
     }
 
-    function openAdvancedResult(result) {
-        if (!result) return;
+    function dismissSearchDropdownAfterPick() {
+        remoteSearchResults = [];
+        lastRemoteSearchKey = '';
+        if (searchResultsEl) {
+            searchResultsEl.hidden = true;
+            searchResultsEl.innerHTML = '';
+        }
+        if (searchHint) {
+            searchHint.hidden = true;
+        }
+    }
 
-        clearSearchResults();
+    function cloneSearchResultForPin(result) {
+        try {
+            return JSON.parse(JSON.stringify(result));
+        } catch (e) {
+            return result;
+        }
+    }
+
+    function syncMapResetBtnVisibility() {
+        if (!searchGo) return;
+        var hasQuery = !!(searchInput && String(searchInput.value || '').trim() !== '');
+        searchGo.hidden = !(hasQuery || !!pinnedSearchResult);
+    }
+
+    function setPinnedSearchResult(result) {
+        if (!result) return;
+        pinnedSearchResult = cloneSearchResultForPin(result);
+        if (pinnedBarEl) pinnedBarEl.hidden = false;
+        if (pinnedBarLabelEl) {
+            pinnedBarLabelEl.textContent =
+                pinnedSearchResult.label || pinnedSearchResult.display_name || 'Coincidencia en mapa';
+        }
+        syncMapResetBtnVisibility();
+    }
+
+    function clearPinnedSearchResult() {
+        pinnedSearchResult = null;
+        clearSearchMarker();
+        clearSearchArea();
+        if (pinnedBarEl) pinnedBarEl.hidden = true;
+        if (pinnedBarLabelEl) pinnedBarLabelEl.textContent = '';
+        syncMapResetBtnVisibility();
+    }
+
+    function applyAdvancedResultToMapAndDetail(result) {
+        if (!result) return;
 
         var municipio = result.municipio && result.municipio.id
             ? findMunicipioById(result.municipio.id)
@@ -408,6 +584,19 @@
                 map.setView([result.lat, result.lng], Math.max(map.getZoom(), 14), { animate: true });
             }
         }
+    }
+
+    function refocusPinnedSearch() {
+        if (!pinnedSearchResult || !map) return;
+        applyAdvancedResultToMapAndDetail(pinnedSearchResult);
+    }
+
+    function openAdvancedResult(result) {
+        if (!result) return;
+
+        dismissSearchDropdownAfterPick();
+        applyAdvancedResultToMapAndDetail(result);
+        setPinnedSearchResult(result);
     }
 
     function placeholderMrSvg(num) {
@@ -456,7 +645,6 @@
             sum.appendChild(title);
 
             sum.addEventListener('click', function (e) {
-                // Focus map on this microregion
                 openMicroOnMap(micro);
             });
 
@@ -500,15 +688,11 @@
 
         if (!remoteSearchResults.length) {
             searchResultsEl.hidden = true;
+            syncSearchStatus();
             return;
         }
 
         searchResultsEl.hidden = false;
-
-
-        if (searchHint) {
-            searchHint.hidden = true;
-        }
 
         var fragment = document.createDocumentFragment();
 
@@ -531,6 +715,7 @@
 
         searchResultsEl.appendChild(fragment);
         searchResultsEl.hidden = false;
+        syncSearchStatus();
     }
 
     function queueAdvancedSearch() {
@@ -550,13 +735,25 @@
         }
 
         if (query.length < 3) {
+            remoteSearchLoading = false;
             clearSearchResults();
             return;
         }
 
+        var searchKeyNorm = normalizeText(query);
+
         remoteSearchDebounce = setTimeout(function () {
             remoteSearchAbortController = new AbortController();
-            fetch(searchUrl + '?q=' + encodeURIComponent(query), {
+            remoteSearchLoading = true;
+            remoteSearchResults = [];
+            lastRemoteSearchKey = '';
+            if (searchResultsEl) {
+                searchResultsEl.hidden = true;
+                searchResultsEl.innerHTML = '';
+            }
+            syncSearchStatus();
+
+            fetch(sameOriginFetchUrl(searchUrl) + '?q=' + encodeURIComponent(query), {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
                 signal: remoteSearchAbortController.signal,
@@ -566,25 +763,31 @@
                     return r.json();
                 })
                 .then(function (payload) {
+                    if (normalizeText(searchInput.value || '') !== searchKeyNorm) {
+                        return;
+                    }
                     var results = payload && Array.isArray(payload.results) ? payload.results : [];
+                    lastRemoteSearchKey = searchKeyNorm;
                     renderRemoteSearchResults(results);
                 })
                 .catch(function (err) {
                     if (err && err.name === 'AbortError') return;
+                    lastRemoteSearchKey = '';
                     clearSearchResults();
                 })
                 .finally(function () {
                     remoteSearchAbortController = null;
+                    remoteSearchLoading = false;
+                    syncSearchStatus();
                 });
-        }, 320);
+        }, 260);
     }
 
     function runSearch() {
         var q = normalizeText(searchInput && searchInput.value ? searchInput.value : '');
-        searchHint.hidden = true;
 
         if (!q) {
-            clearSearch();
+            clearSearchFilteringOnly();
             return;
         }
 
@@ -618,18 +821,33 @@
             }
         });
 
-        if (!anyFound) {
-            searchHint.hidden = false;
-            searchHint.textContent = 'No se encontraron resultados.';
-        }
+        lastAccordionHadMatch = anyFound;
+        syncSearchStatus();
     }
 
-    function clearSearch() {
+    /** Solo quita filtro de búsqueda y capas de resultado Nominatim; no aleja el mapa ni cierra el detalle. */
+    function clearSearchFilteringOnly() {
+        if (searchHint) searchHint.hidden = true;
+        lastAccordionHadMatch = false;
+        remoteSearchLoading = false;
+        clearSearchResults();
+        if (!pinnedSearchResult) {
+            clearSearchMarker();
+            clearSearchArea();
+        }
+        showAllAccordionItems();
+        syncSearchStatus();
+        syncMapResetBtnVisibility();
+    }
+
+    /** Vista completa del estado: limpia input, resaltado, detalle y encuadre a Puebla. */
+    function resetMapToPueblaView() {
         if (searchInput) searchInput.value = '';
         if (searchHint) searchHint.hidden = true;
+        lastAccordionHadMatch = false;
+        remoteSearchLoading = false;
         clearSearchResults();
-        clearSearchMarker();
-        clearSearchArea();
+        clearPinnedSearchResult();
 
         var accItems = accordionEl.querySelectorAll('.microregiones-acc-item');
         accItems.forEach(function (item) {
@@ -637,28 +855,26 @@
             item.open = false;
         });
 
-        // Hide detail card
         if (detailEl) detailEl.classList.add('microregiones-floating-detail--hidden');
 
-        // Clear map highlight
         if (highlightedLayer && map) {
             map.removeLayer(highlightedLayer);
             highlightedLayer = null;
         }
 
-        // Reset map view to Puebla
         if (map) {
-            var b = getPueblaLatLngBounds(null); // Passing null to get defaults or check if needs payload
+            var b = getPueblaLatLngBounds(null);
             map.fitBounds(b, { padding: [28, 28], maxZoom: 9, animate: true });
         }
+        syncSearchStatus();
+        syncMapResetBtnVisibility();
     }
 
     /* ── Boundary rendering (chunked via rAF to avoid freezing) ── */
     function applyBoundaries(payload) {
         if (!map || !payload || !payload.municipios) return;
 
-        map.createPane('boundaryPane');
-        map.getPane('boundaryPane').style.zIndex = 370;
+        ensureMicroMapPanes();
 
         var turfLib = typeof window !== 'undefined' ? window.turf : null;
 
@@ -845,6 +1061,8 @@
             preferCanvas: true
         }).setView([19.05, -97.95], 8);
 
+        ensureMicroMapPanes();
+
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -882,8 +1100,9 @@
 
                 var marker = L.marker([avgLat, avgLng], { icon: customIcon }).addTo(map);
 
-                marker.on('click', function () {
-                    renderDetail(micro, null);
+                marker.on('click', function (e) {
+                    L.DomEvent.stopPropagation(e);
+                    openMicroOnMap(micro);
                 });
 
                 markerByMicroId.set(micro.id, marker);
@@ -900,7 +1119,7 @@
     }
 
     /* ── Bootstrap ── */
-    fetch(dataUrl, {
+    fetch(sameOriginFetchUrl(dataUrl), {
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin',
     })
@@ -923,7 +1142,7 @@
             // Load municipality boundaries (chunked rendering)
             var bUrl = payload.boundaries_url;
             if (bUrl) {
-                fetch(bUrl, {
+                fetch(sameOriginFetchUrl(bUrl), {
                     headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     credentials: 'same-origin',
                 })
@@ -943,21 +1162,40 @@
     }
 
     if (searchGo) {
-        searchGo.addEventListener('click', clearSearch);
+        searchGo.addEventListener('click', resetMapToPueblaView);
+    }
+
+    if (pinnedClearBtn) {
+        pinnedClearBtn.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+        });
+        pinnedClearBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            clearPinnedSearchResult();
+        });
+    }
+    if (pinnedFocusBtn) {
+        pinnedFocusBtn.addEventListener('click', function () {
+            refocusPinnedSearch();
+        });
     }
     if (searchInput) {
         var searchLabel = document.querySelector('.microregiones-search-label[for="microregionesSearchInput"]');
         if (searchLabel) {
             searchLabel.textContent = 'Buscar municipio, calle, colonia, junta auxiliar o microrregion';
         }
-        searchInput.placeholder = 'Ej. Cholula, Av. Juarez, La Paz...';
+        searchInput.placeholder = 'Ej. Los Encinos, Huejotzingo · Av. Juárez, Puebla · MR3';
+        if (searchResultsEl) {
+            searchResultsEl.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+            });
+        }
         searchInput.addEventListener('input', function () {
-            if (searchGo) {
-                searchGo.hidden = !searchInput.value;
-            }
             runSearch();
             queueAdvancedSearch();
+            syncMapResetBtnVisibility();
         });
+        syncMapResetBtnVisibility();
 
         searchInput.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
@@ -972,7 +1210,7 @@
                 if (searchResultsEl) {
                     searchResultsEl.hidden = true;
                 }
-            }, 180);
+            }, 380);
         });
         searchInput.addEventListener('focus', function () {
             if (searchResultsEl && remoteSearchResults.length > 0) {
@@ -984,15 +1222,60 @@
     if (toggleBtn && layoutEl) {
         var toggleText = toggleBtn.querySelector('.microregiones-sidebar-toggle-text');
         toggleBtn.addEventListener('click', function () {
+            if (isMicroMobileViewport()) {
+                return;
+            }
             var collapsed = layoutEl.classList.toggle('sidebar-collapsed');
             toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
             if (toggleText) {
                 toggleText.textContent = collapsed ? 'Mostrar panel' : 'Ocultar panel';
             }
             if (map) {
-                setTimeout(function () { map.invalidateSize(); }, 280);
+                setTimeout(function () {
+                    map.invalidateSize();
+                }, 280);
             }
         });
     }
+
+    if (mobileDrawerTab && sidebarEl) {
+        mobileDrawerTab.addEventListener('click', function () {
+            if (!isMicroMobileViewport()) {
+                return;
+            }
+            if (sidebarEl.classList.contains('is-open')) {
+                closeMicroMobileDrawer();
+            } else {
+                openMicroMobileDrawer();
+            }
+        });
+    }
+
+    if (mobileBackdrop) {
+        mobileBackdrop.addEventListener('click', function () {
+            closeMicroMobileDrawer();
+        });
+    }
+
+    if (sidebarMobileClose) {
+        sidebarMobileClose.addEventListener('click', function () {
+            closeMicroMobileDrawer();
+        });
+    }
+
+    if (microMobileMq.addEventListener) {
+        microMobileMq.addEventListener('change', syncMicroMobileOnViewportChange);
+    } else if (microMobileMq.addListener) {
+        microMobileMq.addListener(syncMicroMobileOnViewportChange);
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape' || !isMicroMobileViewport()) {
+            return;
+        }
+        if (sidebarEl && sidebarEl.classList.contains('is-open')) {
+            closeMicroMobileDrawer();
+        }
+    });
 
 })();

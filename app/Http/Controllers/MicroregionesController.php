@@ -45,8 +45,8 @@ class MicroregionesController extends Controller
                 'attribution' => 'Â© OpenStreetMap',
                 'puebla_bounds' => PueblaStateBounds::asArray(),
             ],
-            'boundaries_url' => route('microregiones.boundaries'),
-            'search_url' => route('microregiones.search'),
+            'boundaries_url' => route('microregiones.boundaries', [], false),
+            'search_url' => route('microregiones.search', [], false),
         ]);
     }
 

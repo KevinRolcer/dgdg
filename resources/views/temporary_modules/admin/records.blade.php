@@ -874,9 +874,14 @@
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (analysisLoading) { analysisLoading.hidden = true; analysisLoading.style.display = 'none'; }
+                    var now = new Date();
+                    var dateStr = now.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+                                 now.getHours().toString().padStart(2, '0') + ':' +
+                                 now.getMinutes().toString().padStart(2, '0');
                     var html = '<div class="tm-analysis-doc-inner">';
                     html += '<h4 class="tm-analysis-doc-title">' + escapeHtml(data.module_name || 'Módulo') + '</h4>';
-                    html += '<p class="tm-analysis-doc-sub">Análisis general</p>';
+                    html += '<p class="tm-analysis-doc-sub" style="text-align:right">Fecha y hora de corte: ' + escapeHtml(dateStr) + '</p>';
+                    html += '<p class="tm-analysis-doc-sub">Análisis general (Preliminar)</p>';
                     if (data.summary) {
                         html += '<table class="tm-analysis-mini-table">';
                         Object.keys(data.summary).forEach(function (k) {
@@ -1024,9 +1029,15 @@
             var mrColW = [112, 56, 56, maxPx, 48, maxPx];
             var wrapCls = 'tm-word-table-block tm-word-table-block--' + tblAlign;
             var inner = '';
+            var now = new Date();
+            var dateStrFixed = now.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+                               now.getHours().toString().padStart(2, '0') + ':' +
+                               now.getMinutes().toString().padStart(2, '0');
+
             inner += '<div class="tm-word-preview-sheet tm-word-preview-sheet--' + orient + '">';
             inner += '<div class="tm-analysis-doc-inner tm-word-overlay-inner tm-word-tables-fixed tm-word-tables-align-' + tblAlign + '" style="text-align:' + align + ';--tw-table-font:' + fontPt + 'pt;--tw-cell-pad:' + padPx + 'px;--tw-cell-max:' + maxPx + 'px">';
             inner += '<h4 class="tm-analysis-doc-title" style="text-align:' + align + '">' + escapeHtml(data.doc_title || data.module_name || 'Módulo') + '</h4>';
+            inner += '<p class="tm-analysis-doc-sub" style="text-align:right">Fecha y hora de corte: ' + escapeHtml(dateStrFixed) + '</p>';
             if (data.subtitle) inner += '<p class="tm-analysis-doc-sub" style="text-align:' + align + '">' + escapeHtml(data.subtitle) + '</p>';
             inner += '<p class="tm-analysis-doc-sub">Vista previa · ' + (orient === 'landscape' ? 'Horizontal' : 'Vertical') + '</p>';
             inner += '<div class="tm-word-preview-body-inner" style="margin-top:8px">';
@@ -2174,7 +2185,11 @@
                 }
             }
             const totalColSpan = columns.length;
-            const dateStr = 'Fecha y hora de corte: ' + new Date().toLocaleString();
+            var now = new Date();
+            var dateStrFormatted = now.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+                                   now.getHours().toString().padStart(2, '0') + ':' +
+                                   now.getMinutes().toString().padStart(2, '0');
+            const dateStr = 'Fecha y hora de corte: ' + dateStrFormatted;
 
             let html = '';
 
@@ -2183,19 +2198,19 @@
             html += '<table style="width:100%;border-collapse:collapse;table-layout:fixed;">';
             if (TM_EXPORT_PREVIEW_LOGO_URL) {
                 html += '<tr>';
-                html += '<td style="width:60%;vertical-align:bottom;padding-bottom:2px;">'
+                html += '<td style="width:100%;vertical-align:bottom;padding-bottom:2px;">'
                     + '<img src="' + escapeHtml(TM_EXPORT_PREVIEW_LOGO_URL) + '" alt="Gobierno de Puebla" style="height:52px;width:auto;display:block;">'
                     + '</td>';
-                html += '<td style="width:40%;text-align:right;vertical-align:bottom;font-size:0.8rem;color:#666;padding-bottom:2px;">' + escapeHtml(dateStr) + '</td>';
                 html += '</tr>';
-                html += '<tr><td colspan="2" style="padding-top:6px;">';
+                html += '<tr><td style="padding-top:6px;">';
                 html += '<div class="tm-export-preview-title" style="' + titleStyle + ';font-size:' + titleFontPx + 'px;font-weight:bold;">' + escapeHtml(normalizeExportHeadingText(state.title || 'Título', titleUppercase)) + '</div>';
+                html += '<div class="tm-export-preview-subtitle" style="text-align:right;font-size:0.85rem;color:#666;margin-top:2px;">' + escapeHtml(dateStr) + '</div>';
                 html += '</td></tr>';
             } else {
                 html += '<tr><td>';
                 html += '<div class="tm-export-preview-title" style="' + titleStyle + ';font-size:' + titleFontPx + 'px;font-weight:bold;">' + escapeHtml(normalizeExportHeadingText(state.title || 'Título', titleUppercase)) + '</div>';
+                html += '<div class="tm-export-preview-subtitle" style="text-align:right;font-size:0.85rem;color:#666;margin-top:2px;">' + escapeHtml(dateStr) + '</div>';
                 html += '</td></tr>';
-                html += '<tr><td style="text-align:right;font-size:0.8rem;color:#666;padding-top:6px;">' + escapeHtml(dateStr) + '</td></tr>';
             }
             html += '</table>';
             html += '</div>';

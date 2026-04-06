@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class NominatimPlaceSearchService
 {
-    private const CACHE_PREFIX = 'microregiones_place_search_v1_';
+    private const CACHE_PREFIX = 'microregiones_place_search_v4_';
     private const MUNICIPIOS_CACHE_KEY = 'microregiones_municipios_puebla_v1';
     private const PUEBLA_VIEWBOX = '-98.765,20.895,-96.708,17.862';
 
@@ -26,7 +26,18 @@ class NominatimPlaceSearchService
         $cacheKey = self::CACHE_PREFIX.md5(mb_strtolower($query, 'UTF-8').'|'.$limit);
 
         return Cache::remember($cacheKey, now()->addHours(12), function () use ($query, $limit) {
-            $rows = $this->requestPlaces($query, max($limit * 2, 8));
+            [$placeQuery, $municipioHint] = $this->extractSearchContext($query);
+            $placeQuery = trim($placeQuery);
+            if ($placeQuery === '') {
+                return [];
+            }
+
+            $commaHint = $this->parseMunicipioHintFromQuery($placeQuery);
+            if ($commaHint !== null && ($municipioHint === null || mb_strlen($commaHint, 'UTF-8') > mb_strlen($municipioHint, 'UTF-8'))) {
+                $municipioHint = $commaHint;
+            }
+
+            $rows = $this->requestPlaces($placeQuery, max($limit * 10, 45));
             if ($rows === []) {
                 return [];
             }
@@ -36,7 +47,7 @@ class NominatimPlaceSearchService
             $seen = [];
 
             foreach ($rows as $row) {
-                $resolved = $this->resolveMunicipio($row, $municipios);
+                $resolved = $this->resolveMunicipio($row, $municipios, $municipioHint);
                 if ($resolved === null) {
                     continue;
                 }
@@ -60,7 +71,7 @@ class NominatimPlaceSearchService
                     'lng' => $lng,
                     'type' => (string) ($row['type'] ?? ''),
                     'osm_type' => (string) ($row['osm_type'] ?? ''),
-                    'geometry' => $this->resolveResultGeometry($row),
+                    'geometry' => $this->extractResultGeometry($row),
                     'municipio_id' => $resolved['municipio_id'],
                     'municipio_nombre' => $resolved['municipio_nombre'],
                     'resolution_source' => $resolved['source'],
@@ -76,66 +87,162 @@ class NominatimPlaceSearchService
     }
 
     /**
+     * Nominatim exige ~1 solicitud por segundo; ráfagas grandes devuelven 429 o cuerpo HTML y la búsqueda queda vacía.
+     *
      * @return array<int, array<string, mixed>>
      */
-    private function requestPlaces(string $query, int $limit): array
+    private function requestPlaces(string $query, int $rawTarget): array
     {
-        $queries = array_slice($this->buildSearchQueries($query), 0, 4);
-        $results = [];
+        $variants = array_values(array_unique(array_slice($this->buildSearchQueries($query), 0, 3)));
+        if ($variants === []) {
+            return [];
+        }
+
+        $limit = min(50, max(25, $rawTarget));
+        $merged = [];
         $seen = [];
 
-        foreach ($queries as $variant) {
-            try {
-                $response = Http::connectTimeout(3)
-                    ->timeout(8)
-                    ->retry(1, 250)
-                    ->withHeaders([
-                        'User-Agent' => 'SegobMicroregiones/1.0 (busqueda territorial interna)',
-                        'Accept-Language' => 'es',
-                    ])
-                    ->get('https://nominatim.openstreetmap.org/search', [
-                        'q' => $variant.', Puebla, México',
-                        'format' => 'jsonv2',
-                        'limit' => $limit,
-                        'countrycodes' => 'mx',
-                        'addressdetails' => 1,
-                        'polygon_geojson' => 1,
-                        'viewbox' => self::PUEBLA_VIEWBOX,
-                        'bounded' => 1,
-                    ]);
+        $steps = [
+            ['q' => $variants[0], 'viewbox' => self::PUEBLA_VIEWBOX, 'bounded' => false],
+            ['q' => $variants[0], 'viewbox' => null, 'bounded' => false],
+        ];
 
-                if (! $response->successful()) {
+        if (isset($variants[1]) && $variants[1] !== $variants[0]) {
+            $steps[] = ['q' => $variants[1], 'viewbox' => self::PUEBLA_VIEWBOX, 'bounded' => false];
+        }
+
+        foreach ($steps as $idx => $step) {
+            if (count($merged) >= $rawTarget) {
+                break;
+            }
+            if ($idx > 0) {
+                usleep(1_100_000);
+            }
+
+            $rows = $this->nominatimSearchOnce($step['q'], $limit, $step['viewbox'], $step['bounded']);
+            foreach ($rows as $row) {
+                if (! is_array($row) || ! $this->looksLikePuebla($row)) {
                     continue;
                 }
 
-                $rows = $response->json();
-                if (! is_array($rows)) {
+                $uniqueKey = (string) ($row['place_id'] ?? $row['osm_id'] ?? md5((string) ($row['display_name'] ?? '')));
+                if (isset($seen[$uniqueKey])) {
                     continue;
                 }
 
-                foreach ($rows as $row) {
-                    if (! is_array($row) || ! $this->looksLikePuebla($row)) {
-                        continue;
-                    }
+                $seen[$uniqueKey] = true;
+                $merged[] = $row;
 
-                    $uniqueKey = (string) ($row['place_id'] ?? $row['osm_id'] ?? md5((string) ($row['display_name'] ?? '')));
-                    if (isset($seen[$uniqueKey])) {
-                        continue;
-                    }
-
-                    $seen[$uniqueKey] = true;
-                    $results[] = $row;
-
-                    if (count($results) >= $limit) {
-                        return $results;
-                    }
+                if (count($merged) >= $rawTarget) {
+                    return $merged;
                 }
-            } catch (\Throwable $e) {
-                Log::warning('Nominatim place search: '.$e->getMessage());
             }
         }
 
-        return $results;
+        if ($merged === [] || count($merged) < 8) {
+            usleep(1_100_000);
+            $rows = $this->nominatimSearchOnce($variants[0], $limit, self::PUEBLA_VIEWBOX, true);
+            foreach ($rows as $row) {
+                if (! is_array($row) || ! $this->looksLikePuebla($row)) {
+                    continue;
+                }
+
+                $uniqueKey = (string) ($row['place_id'] ?? $row['osm_id'] ?? md5((string) ($row['display_name'] ?? '')));
+                if (isset($seen[$uniqueKey])) {
+                    continue;
+                }
+
+                $seen[$uniqueKey] = true;
+                $merged[] = $row;
+
+                if (count($merged) >= $rawTarget) {
+                    break;
+                }
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Una sola petición de búsqueda a Nominatim.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function nominatimSearchOnce(string $variant, int $limit, ?string $viewbox, bool $bounded): array
+    {
+        $params = [
+            'q' => $variant.', Puebla, México',
+            'format' => 'jsonv2',
+            'limit' => $limit,
+            'countrycodes' => 'mx',
+            'addressdetails' => 1,
+            'polygon_geojson' => 1,
+        ];
+        if ($viewbox !== null) {
+            $params['viewbox'] = $viewbox;
+        }
+        if ($bounded) {
+            $params['bounded'] = 1;
+        }
+
+        $headers = [
+            'User-Agent' => 'SegobMicroregiones/1.0 (busqueda territorial interna)',
+            'Accept-Language' => 'es',
+        ];
+
+        try {
+            $response = Http::connectTimeout(5)
+                ->timeout(20)
+                ->withHeaders($headers)
+                ->get('https://nominatim.openstreetmap.org/search', $params);
+
+            if ($response->status() === 429) {
+                Log::warning('Nominatim 429 (límite de uso); reintento tras pausa.');
+                sleep(2);
+                $response = Http::connectTimeout(5)
+                    ->timeout(20)
+                    ->withHeaders($headers)
+                    ->get('https://nominatim.openstreetmap.org/search', $params);
+            }
+
+            if (! $response->successful()) {
+                Log::warning('Nominatim HTTP '.$response->status().' en búsqueda microregiones');
+
+                return [];
+            }
+
+            $rows = $response->json();
+            if (! is_array($rows)) {
+                Log::warning('Nominatim devolvió cuerpo no JSON (bloqueo, captcha o error).');
+
+                return [];
+            }
+
+            return $rows;
+        } catch (\Throwable $e) {
+            Log::warning('Nominatim place search: '.$e->getMessage());
+
+            return [];
+        }
+    }
+
+    /**
+     * Quita pista entre paréntesis al final, p. ej. "Los Encinos (Huejotzingo)".
+     *
+     * @return array{0: string, 1: string|null}
+     */
+    private function extractSearchContext(string $query): array
+    {
+        $query = trim($query);
+        $hint = null;
+
+        if (preg_match('/\(\s*([^)]+)\s*\)\s*$/u', $query, $m)) {
+            $hint = trim($m[1]);
+            $query = trim(preg_replace('/\s*\(\s*[^)]+\s*\)\s*$/u', '', $query) ?? '');
+        }
+
+        return [$query, $hint !== '' ? $hint : null];
     }
 
     /**
@@ -171,7 +278,7 @@ class NominatimPlaceSearchService
      * @param  array<int, array<string, mixed>>  $municipios
      * @return array{municipio_id:int, municipio_nombre:string, source:string}|null
      */
-    private function resolveMunicipio(array $row, array $municipios): ?array
+    private function resolveMunicipio(array $row, array $municipios, ?string $municipioHint = null): ?array
     {
         $lat = isset($row['lat']) ? (float) $row['lat'] : null;
         $lng = isset($row['lon']) ? (float) $row['lon'] : null;
@@ -195,7 +302,7 @@ class NominatimPlaceSearchService
         $address = $row['address'] ?? [];
         $candidates = [];
 
-        foreach (['municipality', 'county', 'city', 'town', 'village', 'state_district'] as $key) {
+        foreach (['municipality', 'county', 'city', 'town', 'village', 'locality', 'state_district', 'city_district', 'region'] as $key) {
             $value = is_array($address) ? ($address[$key] ?? null) : null;
             if (is_string($value) && trim($value) !== '') {
                 $candidates[] = $value;
@@ -208,20 +315,169 @@ class NominatimPlaceSearchService
         }
 
         foreach ($candidates as $candidate) {
-            $normalizedCandidate = $this->normalizeMunicipioName($candidate);
-            foreach ($municipios as $municipio) {
-                $normalizedMunicipio = (string) $municipio['normalized'];
-                if ($normalizedCandidate === $normalizedMunicipio || str_contains($normalizedCandidate, $normalizedMunicipio)) {
-                    return [
-                        'municipio_id' => (int) $municipio['id'],
-                        'municipio_nombre' => (string) $municipio['municipio'],
-                        'source' => 'address',
-                    ];
-                }
+            $match = $this->bestMunicipioMatchInText($this->normalizeMunicipioName($candidate), $municipios);
+            if ($match !== null) {
+                return $match + ['source' => 'address'];
+            }
+        }
+
+        if (is_string($municipioHint) && trim($municipioHint) !== '') {
+            $hintNorm = $this->normalizeMunicipioName($municipioHint);
+            $fromHint = $this->bestMunicipioMatchInText($hintNorm, $municipios, true);
+            if ($fromHint !== null) {
+                return $fromHint + ['source' => 'query_hint'];
             }
         }
 
         return null;
+    }
+
+    /**
+     * Prefiere igualdad exacta; si no, la coincidencia por subcadena más larga (evita asignar "CHOLULA" antes que "SAN PEDRO CHOLULA").
+     *
+     * @param  array<int, array<string, mixed>>  $municipios
+     * @return array{municipio_id:int, municipio_nombre:string}|null
+     */
+    private function bestMunicipioMatchInText(string $normalizedHaystack, array $municipios, bool $allowFuzzyHint = false): ?array
+    {
+        if ($normalizedHaystack === '') {
+            return null;
+        }
+
+        foreach ($municipios as $municipio) {
+            $normalizedMunicipio = (string) $municipio['normalized'];
+            if ($normalizedMunicipio !== '' && $normalizedHaystack === $normalizedMunicipio) {
+                return [
+                    'municipio_id' => (int) $municipio['id'],
+                    'municipio_nombre' => (string) $municipio['municipio'],
+                ];
+            }
+        }
+
+        $best = null;
+        $bestLen = 0;
+        $minLen = $allowFuzzyHint ? 4 : 5;
+
+        foreach ($municipios as $municipio) {
+            $normalizedMunicipio = (string) $municipio['normalized'];
+            $len = mb_strlen($normalizedMunicipio, 'UTF-8');
+            if ($len < $minLen) {
+                continue;
+            }
+
+            if (! str_contains($normalizedHaystack, $normalizedMunicipio)) {
+                continue;
+            }
+
+            if ($len > $bestLen) {
+                $bestLen = $len;
+                $best = $municipio;
+            }
+        }
+
+        if ($best !== null) {
+            return [
+                'municipio_id' => (int) $best['id'],
+                'municipio_nombre' => (string) $best['municipio'],
+            ];
+        }
+
+        if ($allowFuzzyHint && mb_strlen($normalizedHaystack, 'UTF-8') >= 4) {
+            $bestContain = null;
+            $bestContainLen = 0;
+            foreach ($municipios as $municipio) {
+                $n = (string) $municipio['normalized'];
+                if ($n === '' || ! str_contains($n, $normalizedHaystack)) {
+                    continue;
+                }
+                $len = mb_strlen($n, 'UTF-8');
+                if ($len > $bestContainLen) {
+                    $bestContainLen = $len;
+                    $bestContain = $municipio;
+                }
+            }
+            if ($bestContain !== null) {
+                return [
+                    'municipio_id' => (int) $bestContain['id'],
+                    'municipio_nombre' => (string) $bestContain['municipio'],
+                ];
+            }
+
+            return $this->fuzzyMunicipioMatch($normalizedHaystack, $municipios);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $municipios
+     * @return array{municipio_id:int, municipio_nombre:string}|null
+     */
+    private function fuzzyMunicipioMatch(string $normalizedHint, array $municipios): ?array
+    {
+        if (mb_strlen($normalizedHint, 'UTF-8') < 4) {
+            return null;
+        }
+
+        $best = null;
+        $bestPct = 0.0;
+
+        foreach ($municipios as $municipio) {
+            $n = (string) $municipio['normalized'];
+            if ($n === '' || mb_strlen($n, 'UTF-8') < 4) {
+                continue;
+            }
+
+            similar_text($normalizedHint, $n, $pct);
+            if ($pct < 70.0) {
+                continue;
+            }
+
+            if ($pct > $bestPct) {
+                $bestPct = $pct;
+                $best = $municipio;
+            } elseif ($pct === $bestPct && $best !== null && mb_strlen($n, 'UTF-8') > mb_strlen((string) $best['normalized'], 'UTF-8')) {
+                $best = $municipio;
+            }
+        }
+
+        if ($best === null) {
+            return null;
+        }
+
+        return [
+            'municipio_id' => (int) $best['id'],
+            'municipio_nombre' => (string) $best['municipio'],
+        ];
+    }
+
+    /**
+     * Si el usuario escribe "calle X, Atlixco" o "colonia Y — Tehuacán", usa el último segmento como pista de municipio.
+     */
+    private function parseMunicipioHintFromQuery(string $query): ?string
+    {
+        $query = trim($query);
+        if ($query === '' || ! preg_match('/[,;|]/u', $query)) {
+            return null;
+        }
+
+        $parts = preg_split('/\s*[,;|]\s*/u', $query) ?: [];
+        $parts = array_values(array_filter(array_map('trim', $parts), fn ($p) => $p !== ''));
+        if (count($parts) < 2) {
+            return null;
+        }
+
+        $hint = $parts[count($parts) - 1];
+        if (mb_strlen($hint, 'UTF-8') < 3) {
+            return null;
+        }
+
+        $hintLower = mb_strtolower($hint, 'UTF-8');
+        if (preg_match('/^(puebla|mexico|méxico|mx)$/u', $hintLower)) {
+            return null;
+        }
+
+        return $hint;
     }
 
     /**
@@ -244,11 +500,14 @@ class NominatimPlaceSearchService
     /**
      * @param  array<string, mixed>  $row
      */
-    private function buildPlaceLabel(array $row, string $municipio): string
+    private function buildPlaceLabel(array $row, string $municipioNombreResuelto): string
     {
         $address = is_array($row['address'] ?? null) ? $row['address'] : [];
 
         $main = $address['road']
+            ?? $address['pedestrian']
+            ?? $address['path']
+            ?? $address['footway']
             ?? $address['suburb']
             ?? $address['neighbourhood']
             ?? $address['village']
@@ -266,6 +525,11 @@ class NominatimPlaceSearchService
         $parts = [trim((string) $main)];
         if (is_string($secondary) && trim($secondary) !== '' && mb_strtolower($secondary, 'UTF-8') !== mb_strtolower((string) $main, 'UTF-8')) {
             $parts[] = trim($secondary);
+        }
+
+        $mun = trim($municipioNombreResuelto);
+        if ($mun !== '' && ! in_array(mb_strtolower($mun, 'UTF-8'), array_map(fn ($p) => mb_strtolower($p, 'UTF-8'), $parts), true)) {
+            $parts[] = $mun;
         }
 
         return implode(' · ', array_filter($parts));
@@ -395,6 +659,22 @@ class NominatimPlaceSearchService
             }
         }
 
+        $commaParts = preg_split('/\s*,\s*/u', $query, 2);
+        if (count($commaParts) === 2) {
+            $left = trim($commaParts[0]);
+            $right = trim($commaParts[1]);
+            if ($left !== '' && $right !== '' && mb_strlen($right, 'UTF-8') >= 3) {
+                $structured = $left.', '.$right;
+                if (! in_array($structured, $variants, true)) {
+                    $variants[] = $structured;
+                }
+                $structuredSwapped = $right.' '.$left;
+                if (mb_strlen($left, 'UTF-8') >= 8 && ! in_array($structuredSwapped, $variants, true)) {
+                    $variants[] = $structuredSwapped;
+                }
+            }
+        }
+
         $withoutPunctuation = preg_replace('/[.,;:#\-]+/u', ' ', $expanded) ?? $expanded;
         $withoutPunctuation = preg_replace('/\s+/u', ' ', trim($withoutPunctuation)) ?? trim($withoutPunctuation);
         if ($withoutPunctuation !== '' && ! in_array($withoutPunctuation, $variants, true)) {
@@ -434,6 +714,12 @@ class NominatimPlaceSearchService
             '/\bEXHDA\.?\b/ui' => 'ex hacienda',
             '/\bEX[-\s]?HAC\.?\b/ui' => 'ex hacienda',
             '/\bU\.?\s*H\.?\b/ui' => 'unidad habitacional',
+            '/\bCARR\.?\b/ui' => 'carretera',
+            '/\bCTRA\.?\b/ui' => 'carretera',
+            '/\bCTTE\.?\b/ui' => 'carretera',
+            '/\bCARRET\.?\b/ui' => 'carretera',
+            '/\bLIBR\.?\b/ui' => 'libramiento',
+            '/\bKM\.?\b/ui' => 'kilometro',
         ];
 
         $expanded = $query;
@@ -449,7 +735,7 @@ class NominatimPlaceSearchService
     private function stripLeadingPlaceType(string $query): string
     {
         $stripped = preg_replace(
-            '/^\b(calle|colonia|avenida|privada|prolongacion|fraccionamiento|barrio|junta auxiliar|unidad habitacional|referencia|lugar|parque|mercado)\b\s+/ui',
+            '/^\b(calle|colonia|avenida|privada|prolongacion|fraccionamiento|barrio|junta auxiliar|unidad habitacional|carretera|libramiento|referencia|lugar|parque|mercado)\b\s+/ui',
             '',
             $query
         ) ?? $query;
@@ -484,27 +770,13 @@ class NominatimPlaceSearchService
         return $geometry;
     }
 
-    /**
-     * @param  array<string, mixed>  $row
-     * @return array<string, mixed>|null
-     */
-    private function resolveResultGeometry(array $row): ?array
-    {
-        $geometry = $this->extractResultGeometry($row);
-        if ($geometry !== null) {
-            return $geometry;
-        }
-
-        return $this->searchFallbackGeometry($row);
-    }
-
     private function looksLikeJuntaAuxiliarSearch(string $query): bool
     {
         $normalized = mb_strtolower($query, 'UTF-8');
 
         return str_contains($normalized, 'junta auxiliar')
-            || preg_match('/\b(auxiliar|jta|j a)\b/u', $normalized) === 1
-            || preg_match('/\b(san|santa|santo)\b/u', $normalized) === 1;
+            || preg_match('/\bjta\.?\b/u', $normalized) === 1
+            || preg_match('/\bj\.?\s*a\.?\b/u', $normalized) === 1;
     }
 
     private function ensureJuntaAuxiliarPrefix(string $query): string
@@ -514,154 +786,5 @@ class NominatimPlaceSearchService
         }
 
         return 'junta auxiliar '.trim($query);
-    }
-
-    /**
-     * @param  array<string, mixed>  $row
-     * @return array<string, mixed>|null
-     */
-    private function searchFallbackGeometry(array $row): ?array
-    {
-        $address = is_array($row['address'] ?? null) ? $row['address'] : [];
-        $name = trim((string) (
-            $address['suburb']
-            ?? $address['neighbourhood']
-            ?? $address['quarter']
-            ?? $address['city_district']
-            ?? $address['hamlet']
-            ?? $address['village']
-            ?? $row['name']
-            ?? ''
-        ));
-
-        if ($name === '') {
-            return null;
-        }
-
-        $municipio = trim((string) (
-            $address['city']
-            ?? $address['town']
-            ?? $address['municipality']
-            ?? $address['county']
-            ?? 'Puebla'
-        ));
-
-        $queries = [
-            $name.', '.$municipio,
-            'colonia '.$name.', '.$municipio,
-            'barrio '.$name.', '.$municipio,
-            'fraccionamiento '.$name.', '.$municipio,
-            'junta auxiliar '.$name.', '.$municipio,
-        ];
-
-        $seen = [];
-
-        foreach ($queries as $query) {
-            $query = trim($query);
-            if ($query === '' || isset($seen[$query])) {
-                continue;
-            }
-
-            $seen[$query] = true;
-
-            try {
-                $response = Http::timeout(20)
-                    ->withHeaders([
-                        'User-Agent' => 'SegobMicroregiones/1.0 (busqueda territorial interna)',
-                        'Accept-Language' => 'es',
-                    ])
-                    ->get('https://nominatim.openstreetmap.org/search', [
-                        'q' => $query.', Puebla, México',
-                        'format' => 'jsonv2',
-                        'limit' => 6,
-                        'countrycodes' => 'mx',
-                        'addressdetails' => 1,
-                        'polygon_geojson' => 1,
-                        'viewbox' => self::PUEBLA_VIEWBOX,
-                        'bounded' => 1,
-                    ]);
-
-                if (! $response->successful()) {
-                    continue;
-                }
-
-                $rows = $response->json();
-                if (! is_array($rows)) {
-                    continue;
-                }
-
-                foreach ($rows as $candidate) {
-                    if (! is_array($candidate) || ! $this->looksLikePuebla($candidate)) {
-                        continue;
-                    }
-
-                    $candidateGeometry = $this->extractResultGeometry($candidate);
-                    if ($candidateGeometry === null) {
-                        continue;
-                    }
-
-                    if (! $this->candidateMatchesPlaceName($candidate, $name)) {
-                        continue;
-                    }
-
-                    return $candidateGeometry;
-                }
-            } catch (\Throwable $e) {
-                Log::warning('Nominatim fallback geometry: '.$e->getMessage());
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $candidate
-     */
-    private function candidateMatchesPlaceName(array $candidate, string $expectedName): bool
-    {
-        $normalizedExpected = $this->normalizeLooseText($expectedName);
-        if ($normalizedExpected === '') {
-            return false;
-        }
-
-        $address = is_array($candidate['address'] ?? null) ? $candidate['address'] : [];
-        $names = array_filter([
-            $candidate['name'] ?? null,
-            $candidate['display_name'] ?? null,
-            $address['suburb'] ?? null,
-            $address['neighbourhood'] ?? null,
-            $address['quarter'] ?? null,
-            $address['city_district'] ?? null,
-            $address['hamlet'] ?? null,
-            $address['village'] ?? null,
-        ], fn ($value) => is_string($value) && trim($value) !== '');
-
-        foreach ($names as $name) {
-            $normalizedCandidate = $this->normalizeLooseText((string) $name);
-            if ($normalizedCandidate === $normalizedExpected || str_contains($normalizedCandidate, $normalizedExpected) || str_contains($normalizedExpected, $normalizedCandidate)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function normalizeLooseText(string $value): string
-    {
-        $value = mb_strtolower(trim($value), 'UTF-8');
-        $value = strtr($value, [
-            'á' => 'a',
-            'é' => 'e',
-            'í' => 'i',
-            'ó' => 'o',
-            'ú' => 'u',
-            'ü' => 'u',
-            'ñ' => 'n',
-        ]);
-        $value = preg_replace('/[^a-z0-9 ]+/u', ' ', $value) ?? $value;
-        $value = preg_replace('/\b(colonia|barrio|fraccionamiento|junta auxiliar|unidad habitacional)\b/u', ' ', $value) ?? $value;
-        $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
-
-        return trim($value);
     }
 }

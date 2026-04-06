@@ -329,15 +329,20 @@ document.addEventListener('DOMContentLoaded', function () {
             requestUrl = pageUrl + (pageUrl.indexOf('?') === -1 ? '?' : '&') + '_nc=' + Date.now();
         }
 
+        // Sin X-Requested-With: si la sesión expiró, Laravel redirige al login (302) en lugar de 401 JSON;
+        // la cookie de sesión sigue yendo en same-origin igual que una navegación normal.
         fetch(requestUrl, {
             method: 'GET',
             credentials: 'same-origin',
             cache: 'no-store',
             headers: {
-                'X-Requested-With': 'XMLHttpRequest'
+                Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8'
             }
         })
             .then(function (response) {
+                if (response.status === 401 || response.status === 403) {
+                    return Promise.reject(new Error('unauthorized'));
+                }
                 return response.text();
             })
             .then(function (html) {

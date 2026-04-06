@@ -108,27 +108,29 @@
 <table class="doc-head-table" role="presentation">
     @if (!empty($logoDataUri))
     <tr>
-        <td style="text-align: left; vertical-align: bottom; padding-bottom: 2px; width: 60%;">
+        <td colspan="2" style="text-align: left; vertical-align: bottom; padding-bottom: 2px;">
             <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobierno de Puebla">
-        </td>
-        <td style="text-align: right; vertical-align: bottom; font-size: 10px; padding-bottom: 2px; width: 40%;">
-            @if(isset($fechaCorteStr))Fecha y hora de corte: {{ $fechaCorteStr }}@endif
         </td>
     </tr>
     <tr>
-        <td colspan="2" style="padding-top: 6px;">
-            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 2px;">{{ $title }}</h1>
+        <td colspan="2" style="padding-top: 10px; padding-bottom: 4px;">
+            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 0;">{{ $title }}</h1>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" style="text-align: right; font-size: 10px; padding-bottom: 10px;">
+            @if(isset($fechaCorteStr))Fecha y hora de corte: {{ $fechaCorteStr }}@endif
         </td>
     </tr>
     @else
     <tr>
-        <td class="doc-head-title-cell">
-            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 2px;">{{ $title }}</h1>
+        <td class="doc-head-title-cell" style="padding-bottom: 4px;">
+            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 0;">{{ $title }}</h1>
         </td>
     </tr>
     @if(isset($fechaCorteStr))
     <tr>
-        <td style="text-align: right; font-size: 10px; padding-top: 4px;">Fecha y hora de corte: {{ $fechaCorteStr }}</td>
+        <td style="text-align: right; font-size: 10px; padding-bottom: 10px;">Fecha y hora de corte: {{ $fechaCorteStr }}</td>
     </tr>
     @endif
     @endif

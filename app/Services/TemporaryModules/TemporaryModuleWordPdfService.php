@@ -237,7 +237,7 @@ class TemporaryModuleWordPdfService
             }
 
             $fechaCorteStr = now()->format('d/m/Y H:i');
-            // Header table: logo (left) + date (right) in row 1; title full-width in row 2
+            // Header table: logo (full width) in row 1; title (full width, align center) in row 2; date (full width, align right) in row 3
             $hdrTbl = $section->addTable([
                 'borderSize' => 0,
                 'borderColor' => 'FFFFFF',
@@ -246,19 +246,20 @@ class TemporaryModuleWordPdfService
                 'cellMarginLeft' => 0,
                 'cellMarginRight' => 0,
             ]);
-            $hdrLogoW = (int) round($usableTableTwips * 0.60);
-            $hdrDateW = $usableTableTwips - $hdrLogoW;
-            $hdrTbl->addRow(800);
-            $hdrLogoCell = $hdrTbl->addCell($hdrLogoW, ['valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
             if ($hasLogo) {
+                $hdrLogoRow = $hdrTbl->addRow(800);
+                $hdrLogoCell = $hdrLogoRow->addCell($usableTableTwips, ['gridSpan' => 2, 'valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
                 $hdrLogoRun = $hdrLogoCell->addTextRun(['alignment' => Jc::START]);
                 $hdrLogoRun->addImage($logoPath, ['height' => 52]);
             }
-            $hdrDateCell = $hdrTbl->addCell($hdrDateW, ['valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
-            $hdrDateCell->addText('Fecha y hora de corte: '.$fechaCorteStr, ['name' => $exportFontName, 'size' => 9], ['alignment' => Jc::END, 'spaceAfter' => 0]);
+
             $hdrTbl->addRow();
             $hdrTitleCell = $hdrTbl->addCell($usableTableTwips, ['gridSpan' => 2, 'borderSize' => 0, 'borderColor' => 'FFFFFF', 'cellMarginTop' => 80]);
-            $hdrTitleCell->addText($title, ['name' => $exportFontName, 'bold' => true, 'size' => $titleFontSizePt, 'color' => '861E34'], ['alignment' => $jc, 'spaceAfter' => 80]);
+            $hdrTitleCell->addText($title, ['name' => $exportFontName, 'bold' => true, 'size' => $titleFontSizePt, 'color' => '861E34'], ['alignment' => $jc, 'spaceAfter' => 40]);
+
+            $hdrTbl->addRow();
+            $hdrDateCell = $hdrTbl->addCell($usableTableTwips, ['gridSpan' => 2, 'valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
+            $hdrDateCell->addText('Fecha y hora de corte: '.$fechaCorteStr, ['name' => $exportFontName, 'size' => 9], ['alignment' => Jc::END, 'spaceAfter' => 120]);
 
             $section->addTextBreak(1);
 

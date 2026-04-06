@@ -202,7 +202,6 @@ class TemporaryModuleAnalysisWordService
 
         $fechaCorteStr = now()->format('d/m/Y H:i');
         $subtitle = trim((string) ($config['subtitle'] ?? ''));
-        // Header table: logo (left) + date (right) in row 1; title (+ subtitle) full-width in row 2
         $hdrWidth = $orientation === SectionStyle::ORIENTATION_LANDSCAPE ? 14570 : 9638;
         $hdrTbl = $section->addTable([
             'borderSize' => 0,
@@ -212,22 +211,23 @@ class TemporaryModuleAnalysisWordService
             'cellMarginLeft' => 0,
             'cellMarginRight' => 0,
         ]);
-        $hdrLogoW = (int) round($hdrWidth * 0.60);
-        $hdrDateW = $hdrWidth - $hdrLogoW;
-        $hdrTbl->addRow(800);
-        $hdrLogoCell = $hdrTbl->addCell($hdrLogoW, ['valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
         if ($hasLogo) {
+            $hdrLogoRow = $hdrTbl->addRow(800);
+            $hdrLogoCell = $hdrLogoRow->addCell($hdrWidth, ['gridSpan' => 2, 'valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
             $hdrLogoRun = $hdrLogoCell->addTextRun(['alignment' => Jc::START]);
             $hdrLogoRun->addImage($logoPath, ['height' => 52]);
         }
-        $hdrDateCell = $hdrTbl->addCell($hdrDateW, ['valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
-        $hdrDateCell->addText('Fecha y hora de corte: '.$fechaCorteStr, ['name' => $exportFontName, 'size' => 9], ['alignment' => Jc::END, 'spaceAfter' => 0]);
+
         $hdrTbl->addRow();
         $hdrTitleCell = $hdrTbl->addCell($hdrWidth, ['gridSpan' => 2, 'borderSize' => 0, 'borderColor' => 'FFFFFF', 'cellMarginTop' => 80]);
-        $hdrTitleCell->addText($docTitle, ['name' => $exportFontName, 'bold' => true, 'size' => $titleFontSizePt, 'color' => '861E34'], ['alignment' => $titleJc, 'spaceAfter' => $subtitle !== '' ? 80 : 160]);
+        $hdrTitleCell->addText($docTitle, ['name' => $exportFontName, 'bold' => true, 'size' => $titleFontSizePt, 'color' => '861E34'], ['alignment' => $titleJc, 'spaceAfter' => $subtitle !== '' ? 40 : 80]);
         if ($subtitle !== '') {
-            $hdrTitleCell->addText($subtitle, ['name' => $exportFontName, 'size' => 10], ['alignment' => $titleJc, 'spaceAfter' => 100]);
+            $hdrTitleCell->addText($subtitle, ['name' => $exportFontName, 'size' => 10], ['alignment' => $titleJc, 'spaceAfter' => 80]);
         }
+
+        $hdrTbl->addRow();
+        $hdrDateCell = $hdrTbl->addCell($hdrWidth, ['gridSpan' => 2, 'valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
+        $hdrDateCell->addText('Fecha y hora de corte: '.$fechaCorteStr, ['name' => $exportFontName, 'size' => 9], ['alignment' => Jc::END, 'spaceAfter' => 120]);
         $section->addTextBreak(1);
 
         if ($includeSummary || $includeMrTable) {
@@ -708,7 +708,7 @@ class TemporaryModuleAnalysisWordService
             $municipiosCapturados = 0;
 
             if ($municipioFieldKey) {
-                foreach ($mr->getRelation('municipios') as $muni) {
+                foreach ($mr->municipios as $muni) {
                     $muniIdStr = (string) $muni->id;
                     $muniNombreStr = mb_strtolower(trim($muni->municipio));
                     if (in_array($muniIdStr, $municipiosCapturadosGlobalVals, true) || in_array($muniNombreStr, $municipiosCapturadosGlobalVals, true)) {

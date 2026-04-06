@@ -7,9 +7,9 @@
 
 @section('content')
 @php $hidePageHeader = true; @endphp
-<div class="microregiones-page" id="microregionesRoot" data-data-url="{{ route('microregiones.data') }}" data-search-url="{{ route('microregiones.search') }}">
+<div class="microregiones-page" id="microregionesRoot" data-data-url="{{ route('microregiones.data', [], false) }}" data-search-url="{{ route('microregiones.search', [], false) }}">
 
-    <div class="microregiones-layout">
+    <div class="microregiones-layout" id="microregionesLayout">
         <div class="microregiones-map-wrap">
             <div id="microregionesMap" class="microregiones-map" role="application" aria-label="Mapa de microrregiones"></div>
             <button type="button" class="microregiones-sidebar-toggle" id="microregionesToggleSidebar" aria-expanded="true" aria-controls="microregionesSidebar">
@@ -25,20 +25,41 @@
             </div>
         </div>
 
-        <aside class="microregiones-sidebar" id="microregionesSidebar">
+        <aside class="microregiones-sidebar" id="microregionesSidebar" aria-label="Panel de búsqueda y microrregiones">
+            <div class="microregiones-sidebar-mobile-bar">
+                <span class="microregiones-sidebar-mobile-title">Microrregiones</span>
+                <button type="button" class="microregiones-sidebar-mobile-close" id="microregionesSidebarMobileClose" title="Cerrar panel" aria-label="Cerrar panel">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
             <div class="microregiones-search">
                 <label class="microregiones-search-label" for="microregionesSearchInput">Buscar municipio o microrregión</label>
                 <div class="microregiones-search-row">
                     <input type="search" id="microregionesSearchInput" class="microregiones-search-input" placeholder="Municipio de Puebla o MR3, MR 14..." autocomplete="off">
-                    <button type="button" class="microregiones-search-btn" id="microregionesSearchGo" title="Limpiar búsqueda"><i class="fa-solid fa-xmark"></i></button>
+                    <button type="button" class="microregiones-search-btn" id="microregionesSearchGo" hidden title="Vista del estado de Puebla (alejar mapa)" aria-label="Vista del estado de Puebla"><i class="fa-solid fa-map" aria-hidden="true"></i></button>
                 </div>
-                <p class="microregiones-search-hint" id="microregionesSearchHint" hidden></p>
                 <div class="microregiones-search-results" id="microregionesSearchResults" hidden></div>
+                <div class="microregiones-search-pinned" id="microregionesSearchPinned" hidden>
+                    <button type="button" class="microregiones-search-pinned-focus" id="microregionesSearchPinnedFocus" title="Volver a mostrar en el mapa" aria-label="Volver a enfocar en el mapa el resultado de búsqueda fijado">
+                        <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                        <span class="microregiones-search-pinned-label" id="microregionesSearchPinnedLabel"></span>
+                    </button>
+                    <button type="button" class="microregiones-search-pinned-clear" id="microregionesSearchPinnedClear" title="Quitar resultado fijado" aria-label="Quitar resultado fijado del panel">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <p class="microregiones-search-hint microregiones-search-hint--status" id="microregionesSearchHint" hidden></p>
             </div>
 
             <div class="microregiones-accordion" id="microregionesAccordion"></div>
         </aside>
     </div>
+
+    <button type="button" class="microregiones-mobile-drawer-tab" id="microregionesMobileDrawerTab" aria-expanded="false" aria-controls="microregionesSidebar" aria-label="Abrir panel de microrregiones y búsqueda">
+        <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i>
+        <span class="microregiones-mobile-drawer-tab-label">Panel</span>
+    </button>
+    <button type="button" class="microregiones-mobile-drawer-backdrop" id="microregionesMobileBackdrop" aria-label="Cerrar panel" tabindex="-1"></button>
 </div>
 @endsection
 
