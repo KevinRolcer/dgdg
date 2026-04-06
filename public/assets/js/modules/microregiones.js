@@ -96,7 +96,8 @@
     const mobileDrawerTab = document.getElementById('microregionesMobileDrawerTab');
     const mobileBackdrop = document.getElementById('microregionesMobileBackdrop');
     const sidebarMobileClose = document.getElementById('microregionesSidebarMobileClose');
-    const microMobileMq = window.matchMedia ? window.matchMedia('(max-width: 768px)') : { matches: false, addEventListener: null, addListener: null };
+    /** Móvil + tablet: panel tipo cajón (mismo breakpoint que CSS). */
+    const microMobileMq = window.matchMedia ? window.matchMedia('(max-width: 1024px)') : { matches: false, addEventListener: null, addListener: null };
 
     function isMicroMobileViewport() {
         return microMobileMq.matches;
@@ -1415,6 +1416,23 @@
             closeMicroMobileDrawer();
         });
     }
+
+    document.addEventListener(
+        'pointerdown',
+        function (e) {
+            if (!isMicroMobileViewport() || !sidebarEl || !sidebarEl.classList.contains('is-open')) {
+                return;
+            }
+            if (sidebarEl.contains(e.target)) {
+                return;
+            }
+            if (mobileDrawerTab && mobileDrawerTab.contains(e.target)) {
+                return;
+            }
+            closeMicroMobileDrawer();
+        },
+        true
+    );
 
     if (sidebarMobileClose) {
         sidebarMobileClose.addEventListener('click', function () {
