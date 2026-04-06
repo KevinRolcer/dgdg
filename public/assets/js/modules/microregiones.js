@@ -1161,15 +1161,33 @@
             // Load Puebla state outline (cached in localStorage)
             loadPueblaBoundary();
 
-            // Load municipality boundaries (chunked rendering)
-            var bUrl = payload.boundaries_url;
-            if (bUrl) {
-                fetch(sameOriginFetchUrl(bUrl), {
+            // Límites municipales (varias URLs por si el hosting bloquea una ruta)
+            var boundaryUrls = [];
+            if (payload.boundaries_urls && payload.boundaries_urls.length) {
+                payload.boundaries_urls.forEach(function (u) {
+                    if (u && boundaryUrls.indexOf(u) === -1) boundaryUrls.push(u);
+                });
+            } else if (payload.boundaries_url) {
+                boundaryUrls.push(payload.boundaries_url);
+            }
+
+            function fetchBoundariesAt(index) {
+                if (index >= boundaryUrls.length) {
+                    return Promise.resolve(null);
+                }
+                return fetch(sameOriginFetchUrl(boundaryUrls[index]), {
                     headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     credentials: 'same-origin',
-                })
-                    .then(function (r) { return r.ok ? r.json() : null; })
-                    .then(function (bp) { if (bp) applyBoundaries(bp); });
+                }).then(function (r) {
+                    if (r.ok) return r.json();
+                    return fetchBoundariesAt(index + 1);
+                });
+            }
+
+            if (boundaryUrls.length) {
+                fetchBoundariesAt(0).then(function (bp) {
+                    if (bp) applyBoundaries(bp);
+                });
             }
         })
         .catch(function () {

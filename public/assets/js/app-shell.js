@@ -248,20 +248,54 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function buildExportStatusUrl(template, exportId) {
+        return template.replace(/\/0$/, '/' + exportId);
+    }
+
+    /**
+     * Prueba varias plantillas de URL (poller corto + ruta larga) por si el hosting devuelve 404 en una.
+     */
+    function fetchExportStatusWithFallback(templates, exportId, templateIndex) {
+        templateIndex = templateIndex || 0;
+        if (templateIndex >= templates.length) {
+            return Promise.reject(new Error('no-templates'));
+        }
+        var url = buildExportStatusUrl(templates[templateIndex], exportId);
+        return fetch(url, {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function (res) {
+            if (res.status === 404 && templateIndex + 1 < templates.length) {
+                return fetchExportStatusWithFallback(templates, exportId, templateIndex + 1);
+            }
+            return res;
+        });
+    }
+
     function startExportStatusPolling() {
         stopAllExportPolling();
-        var urlTemplate = document.body.getAttribute('data-export-status-url');
-        if (!urlTemplate) return;
+        var multiRaw = document.body.getAttribute('data-export-status-urls');
+        var urlTemplates = [];
+        if (multiRaw) {
+            try {
+                var parsed = JSON.parse(multiRaw);
+                if (Array.isArray(parsed)) {
+                    urlTemplates = parsed.filter(function (t) { return t && typeof t === 'string'; });
+                }
+            } catch (eMulti) { /* ignore */ }
+        }
+        if (!urlTemplates.length) {
+            var single = document.body.getAttribute('data-export-status-url');
+            if (single) urlTemplates = [single];
+        }
+        if (!urlTemplates.length) return;
+
         document.querySelectorAll('[data-export-request-id]').forEach(function (el) {
             var id = el.getAttribute('data-export-request-id');
             if (!id || exportPollIntervals[id]) return;
-            var url = urlTemplate.replace(/\/0$/, '/' + id);
             var failCount = 0;
             var intervalId = setInterval(function () {
-                fetch(url, {
-                    credentials: 'same-origin',
-                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                })
+                fetchExportStatusWithFallback(urlTemplates, id, 0)
                     .then(function (res) {
                         if (res.status === 401 || res.status === 403) {
                             clearInterval(exportPollIntervals[id]);

@@ -34,6 +34,13 @@
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
             </div>
+            @if(($municipioBoundaryCount ?? 1) === 0)
+            <div class="microregiones-boundaries-missing" role="status">
+                <strong>Sin límites municipales en el servidor.</strong>
+                Los pins se muestran, pero los polígonos requieren geometrías en BD. Ejecute en el servidor:
+                <code class="microregiones-boundaries-missing-code">php artisan microregiones:fetch-boundaries</code>
+            </div>
+            @endif
             <div class="microregiones-search">
                 <label class="microregiones-search-label" for="microregionesSearchInput">Buscar municipio o microrregión</label>
                 <div class="microregiones-search-row">

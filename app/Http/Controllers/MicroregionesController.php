@@ -20,14 +20,24 @@ class MicroregionesController extends Controller
         private readonly MunicipioGeocodeService $geocode,
         private readonly PueblaMunicipioBoundaryService $boundary,
         private readonly NominatimPlaceSearchService $placeSearch,
-    ) {
-    }
+    ) {}
 
     public function index(): View
     {
+        $municipioBoundaryCount = Municipio::query()
+            ->whereNotNull('microrregion_id')
+            ->where(function ($q) {
+                $q->whereIn('cve_edo', ['21', '021', 21])
+                    ->orWhereRaw('CAST(cve_edo AS UNSIGNED) = ?', [21]);
+            })
+            ->whereNotNull('geojson_boundary')
+            ->where('geojson_boundary', '!=', '')
+            ->count();
+
         return view('microregiones.index', [
             'pageTitle' => 'Microrregiones',
             'microregionesBootstrap' => $this->buildMapDataResponse(),
+            'municipioBoundaryCount' => $municipioBoundaryCount,
         ]);
     }
 
@@ -38,6 +48,9 @@ class MicroregionesController extends Controller
     {
         $out = $this->buildMicrorregionesPayload();
 
+        $b1 = route('microregiones.boundaries', [], false);
+        $b2 = route('microregiones.map-limits', [], false);
+
         return [
             'microrregiones' => $out,
             'map' => [
@@ -46,7 +59,8 @@ class MicroregionesController extends Controller
                 'attribution' => '© OpenStreetMap',
                 'puebla_bounds' => PueblaStateBounds::asArray(),
             ],
-            'boundaries_url' => route('microregiones.map-limits', [], false),
+            'boundaries_url' => $b1,
+            'boundaries_urls' => $b1 === $b2 ? [$b1] : [$b1, $b2],
             'search_url' => route('microregiones.map-search', [], false),
         ];
     }
@@ -157,6 +171,12 @@ class MicroregionesController extends Controller
 
         return response()->json([
             'municipios' => $rows,
+            'meta' => [
+                'geometry_count' => count($rows),
+                'hint' => count($rows) === 0
+                    ? 'No hay polígonos de municipios en la base de datos. En el servidor ejecute: php artisan microregiones:fetch-boundaries'
+                    : null,
+            ],
         ]);
     }
 
