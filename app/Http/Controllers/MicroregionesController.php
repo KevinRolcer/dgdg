@@ -11,6 +11,7 @@ use App\Services\Microregiones\PueblaMunicipioBoundaryService;
 use App\Services\Microregiones\PueblaStateBounds;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -22,8 +23,15 @@ class MicroregionesController extends Controller
         private readonly NominatimPlaceSearchService $placeSearch,
     ) {}
 
-    public function index(): View
+    public function index(Request $request): View|JsonResponse|Response
     {
+        $query = trim((string) $request->query('q', ''));
+        if ($query !== '' && ($request->expectsJson() || $request->ajax())) {
+            return response()->json([
+                'results' => $this->buildSearchResults($query),
+            ]);
+        }
+
         $municipioBoundaryCount = Municipio::query()
             ->whereNotNull('microrregion_id')
             ->where(function ($q) {
@@ -127,17 +135,23 @@ class MicroregionesController extends Controller
     public function search(Request $request): JsonResponse
     {
         $query = trim((string) $request->query('q', ''));
+        return response()->json([
+            'results' => $this->buildSearchResults($query),
+        ]);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function buildSearchResults(string $query): array
+    {
         if (mb_strlen($query) < 3) {
-            return response()->json([
-                'results' => [],
-            ]);
+            return [];
         }
 
         $placeResults = $this->placeSearch->searchInPuebla($query, 5);
         if ($placeResults === []) {
-            return response()->json([
-                'results' => [],
-            ]);
+            return [];
         }
 
         $micros = collect($this->buildMicrorregionesPayload())->keyBy('id');
@@ -185,9 +199,7 @@ class MicroregionesController extends Controller
             ];
         }
 
-        return response()->json([
-            'results' => $results,
-        ]);
+        return $results;
     }
 
     /**

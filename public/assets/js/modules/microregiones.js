@@ -36,6 +36,7 @@
         var list = [];
         pushUniqueUrl(list, primary);
         pushUniqueUrl(list, alternate);
+        pushUniqueUrl(list, '/microregiones');
         if (primary && primary.indexOf('/buscar-map') !== -1) {
             pushUniqueUrl(list, primary.replace('/buscar-map', '/search'));
         }
