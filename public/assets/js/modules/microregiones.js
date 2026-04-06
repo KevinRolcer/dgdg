@@ -9,6 +9,7 @@
     const dataUrl = root.getAttribute('data-data-url');
     var searchUrl = root.getAttribute('data-search-url');
     var searchUrls = [];
+    var searchPostUrl = root.getAttribute('data-search-post-url');
 
     function pushUniqueUrl(list, url) {
         if (!url || typeof url !== 'string') return;
@@ -806,9 +807,33 @@
             }
             syncSearchStatus();
 
+            function fetchSearchPostJson() {
+                var postUrl = searchPostUrl;
+                if (!postUrl) {
+                    return Promise.reject(new Error('no search post url'));
+                }
+                var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                var csrf = csrfMeta ? csrfMeta.getAttribute('content') : '';
+                return fetch(sameOriginFetchUrl(postUrl), {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    signal: remoteSearchAbortController.signal,
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrf,
+                    },
+                    body: JSON.stringify({ q: query }),
+                }).then(function (r) {
+                    if (!r.ok) throw new Error('Advanced search POST failed');
+                    return r.json();
+                });
+            }
+
             function fetchSearchAt(index) {
-                if (!searchUrls.length || index >= searchUrls.length) {
-                    return Promise.reject(new Error('Advanced search failed'));
+                if (index >= searchUrls.length) {
+                    return fetchSearchPostJson();
                 }
 
                 var baseUrl = sameOriginFetchUrl(searchUrls[index]);
@@ -1222,6 +1247,9 @@
             if (payload.search_url) {
                 searchUrl = payload.search_url;
                 pushUniqueUrl(searchUrls, payload.search_url);
+            }
+            if (payload.search_post_url) {
+                searchPostUrl = payload.search_post_url;
             }
             appendIndexPhpSearchVariantsIfNeeded();
             micros = payload.microrregiones || [];

@@ -76,6 +76,7 @@ class MicroregionesController extends Controller
             'boundaries_bootstrap' => $boundaries,
             'search_url' => $s0,
             'search_urls' => array_values(array_unique([$s0, $s1, $s2])),
+            'search_post_url' => route('microregiones.search-post', [], false),
         ];
     }
 
@@ -136,6 +137,19 @@ class MicroregionesController extends Controller
     public function search(Request $request): JsonResponse
     {
         $query = trim((string) $request->query('q', ''));
+
+        return response()->json([
+            'results' => $this->buildSearchResults($query),
+        ]);
+    }
+
+    /**
+     * Misma lógica que {@see search} vía POST + JSON (cuerpo o formulario).
+     * Útil cuando el hosting/WAF devuelve 404 a todos los GET con ?q= en rutas de microrregiones.
+     */
+    public function searchPost(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->input('q', ''));
 
         return response()->json([
             'results' => $this->buildSearchResults($query),

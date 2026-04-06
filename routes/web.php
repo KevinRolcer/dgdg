@@ -47,6 +47,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/microregiones/lim-mun', [MicroregionesController::class, 'boundaries'])->name('microregiones.map-limits');
     Route::get('/microregiones/buscar-map', [MicroregionesController::class, 'search'])->name('microregiones.map-search');
     Route::get('/geo/mr-lugares', [MicroregionesController::class, 'search'])->name('microregiones.geo-lookup');
+    Route::post('/mr/q', [MicroregionesController::class, 'searchPost'])
+        ->middleware('throttle:120,1')
+        ->name('microregiones.search-post');
 
     Route::get('/poller/export/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
         ->where('exportRequest', '[a-f0-9\-]+')
