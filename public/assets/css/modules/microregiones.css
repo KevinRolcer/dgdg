@@ -123,28 +123,6 @@
     min-width: 0;
 }
 
-.microregiones-boundaries-missing {
-    margin: 0 0 0.75rem;
-    padding: 0.65rem 0.75rem;
-    border-radius: var(--ui-radius);
-    border: 1px solid var(--clr-accent);
-    background: color-mix(in srgb, var(--clr-accent) 14%, var(--clr-bg));
-    font-size: var(--fs-caption);
-    line-height: 1.45;
-    color: var(--clr-text-main);
-}
-
-.microregiones-boundaries-missing-code {
-    display: block;
-    margin-top: 0.35rem;
-    padding: 0.35rem 0.45rem;
-    border-radius: 4px;
-    background: var(--clr-bg);
-    border: 1px solid var(--clr-border);
-    font-size: 0.75rem;
-    word-break: break-all;
-}
-
 /* ── Search ── */
 .microregiones-search-label {
     display: block;

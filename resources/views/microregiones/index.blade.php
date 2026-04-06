@@ -8,15 +8,11 @@
 @section('content')
 @php
     $hidePageHeader = true;
-    $microSearchUrls = array_values(array_unique([
-        route('microregiones.geo-lookup', [], false),
-        route('microregiones.map-search', [], false),
-        route('microregiones.search', [], false),
-    ]));
+    $microSearchUrls = [route('microregiones.index', [], false)];
 @endphp
 {{-- JSON incrustado: el mapa carga aunque /microregiones/data falle por proxy/WAF --}}
 <script type="application/json" id="microregionesMapBootstrap">@json($microregionesBootstrap ?? ['microrregiones' => []])</script>
-<div class="microregiones-page" id="microregionesRoot" data-data-url="{{ route('microregiones.map-datos', [], false) }}" data-search-url="{{ $microSearchUrls[0] ?? '' }}" data-search-urls="{{ e(json_encode($microSearchUrls)) }}" data-search-post-url="{{ route('microregiones.search-post', [], false) }}">
+<div class="microregiones-page" id="microregionesRoot" data-data-url="{{ route('microregiones.map-datos', [], false) }}" data-search-url="{{ $microSearchUrls[0] ?? '' }}" data-search-urls="{{ e(json_encode($microSearchUrls)) }}" data-search-post-url="">
 
     <div class="microregiones-layout" id="microregionesLayout">
         <div class="microregiones-map-wrap">
@@ -41,13 +37,6 @@
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
             </div>
-            @if(($municipioBoundaryCount ?? 1) === 0)
-            <div class="microregiones-boundaries-missing" role="status">
-                <strong>Sin límites municipales en el servidor.</strong>
-                Los pins se muestran, pero los polígonos requieren geometrías en BD. Ejecute en el servidor:
-                <code class="microregiones-boundaries-missing-code">php artisan microregiones:fetch-boundaries</code>
-            </div>
-            @endif
             <div class="microregiones-search">
                 <label class="microregiones-search-label" for="microregionesSearchInput">Buscar municipio o microrregión</label>
                 <div class="microregiones-search-row">

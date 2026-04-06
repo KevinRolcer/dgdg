@@ -32,20 +32,9 @@ class MicroregionesController extends Controller
             ]);
         }
 
-        $municipioBoundaryCount = Municipio::query()
-            ->whereNotNull('microrregion_id')
-            ->where(function ($q) {
-                $q->whereIn('cve_edo', ['21', '021', 21])
-                    ->orWhereRaw('CAST(cve_edo AS UNSIGNED) = ?', [21]);
-            })
-            ->whereNotNull('geojson_boundary')
-            ->where('geojson_boundary', '!=', '')
-            ->count();
-
         return view('microregiones.index', [
             'pageTitle' => 'Microrregiones',
             'microregionesBootstrap' => $this->buildMapDataResponse(),
-            'municipioBoundaryCount' => $municipioBoundaryCount,
         ]);
     }
 
@@ -59,9 +48,7 @@ class MicroregionesController extends Controller
 
         $b1 = route('microregiones.boundaries', [], false);
         $b2 = route('microregiones.map-limits', [], false);
-        $s0 = route('microregiones.geo-lookup', [], false);
-        $s1 = route('microregiones.map-search', [], false);
-        $s2 = route('microregiones.search', [], false);
+        $searchStable = route('microregiones.index', [], false);
 
         return [
             'microrregiones' => $out,
@@ -74,14 +61,14 @@ class MicroregionesController extends Controller
             'boundaries_url' => $b1,
             'boundaries_urls' => $b1 === $b2 ? [$b1] : [$b1, $b2],
             'boundaries_bootstrap' => $boundaries,
-            'search_url' => $s0,
-            'search_urls' => array_values(array_unique([$s0, $s1, $s2])),
-            'search_post_url' => route('microregiones.search-post', [], false),
+            'search_url' => $searchStable,
+            'search_urls' => [$searchStable],
+            'search_post_url' => null,
         ];
     }
 
     /**
-     * @return array{municipios: array<int, array{id: int, micro_id: int, nombre: string, geometry: array<string, mixed>}>, meta: array{geometry_count: int, hint: ?string}}
+     * @return array{municipios: array<int, array{id: int, micro_id: int, nombre: string, geometry: array<string, mixed>}>, meta: array{geometry_count: int}}
      */
     protected function buildBoundariesPayload(): array
     {
@@ -119,9 +106,6 @@ class MicroregionesController extends Controller
             'municipios' => $rows,
             'meta' => [
                 'geometry_count' => count($rows),
-                'hint' => count($rows) === 0
-                    ? 'No hay polígonos de municipios en la base de datos. En el servidor ejecute: php artisan microregiones:fetch-boundaries'
-                    : null,
             ],
         ];
     }
