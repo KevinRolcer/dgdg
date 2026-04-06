@@ -52,6 +52,7 @@
                     'time' => $noty->created_at->locale('es')->diffForHumans(),
                     'url' => $d['url'] ?? null,
                     'export_request_id' => $d['export_request_id'] ?? null,
+                    'is_export_pending' => $noty->type === \App\Notifications\ExcelExportPending::class,
                     'whatsapp_archive_id' => $waArchiveId,
                     'whatsapp_import_progress' => $waProgress,
                     'whatsapp_import_phase' => $waPhase,
@@ -113,7 +114,7 @@
                                         }
                                     @endphp
                                     <li class="{{ $loop->first ? 'is-active' : '' }} wa-notify-item" style="position:relative; padding-right:42px;"
-                                        @if(!empty($notification['export_request_id'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif
+                                        @if(!empty($notification['export_request_id']) && !empty($notification['is_export_pending'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif
                                         @if(!empty($notification['whatsapp_archive_id']) && ($notification['whatsapp_import_status'] ?? '') === 'processing') data-whatsapp-import-archive-id="{{ $notification['whatsapp_archive_id'] }}" @endif
                                     >
                                         <span class="topbar-notify-icon">
@@ -360,7 +361,7 @@
                             }
                         @endphp
                         <li class="wa-notify-item" style="position:relative; padding-right:42px;"
-                            @if(!empty($notification['export_request_id'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif
+                            @if(!empty($notification['export_request_id']) && !empty($notification['is_export_pending'])) data-export-request-id="{{ $notification['export_request_id'] }}" @endif
                             @if(!empty($notification['whatsapp_archive_id']) && ($notification['whatsapp_import_status'] ?? '') === 'processing') data-whatsapp-import-archive-id="{{ $notification['whatsapp_archive_id'] }}" @endif
                         >
                             <span class="topbar-notify-icon">

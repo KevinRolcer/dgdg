@@ -302,12 +302,12 @@ document.addEventListener('DOMContentLoaded', function () {
                             delete exportPollIntervals[id];
                             return Promise.reject(new Error('unauthorized'));
                         }
+                        if (res.status === 404) {
+                            clearInterval(exportPollIntervals[id]);
+                            delete exportPollIntervals[id];
+                            return { status: 'gone' };
+                        }
                         if (!res.ok) {
-                            failCount++;
-                            if (failCount >= 3) {
-                                clearInterval(exportPollIntervals[id]);
-                                delete exportPollIntervals[id];
-                            }
                             return Promise.reject(new Error('http'));
                         }
                         failCount = 0;
@@ -327,7 +327,10 @@ document.addEventListener('DOMContentLoaded', function () {
                             refreshNotifications();
                         }
                     })
-                    .catch(function () {
+                    .catch(function (err) {
+                        if (err && err.message === 'unauthorized') {
+                            return;
+                        }
                         failCount++;
                         if (failCount >= 3) {
                             clearInterval(exportPollIntervals[id]);
