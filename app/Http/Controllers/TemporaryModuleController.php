@@ -2043,8 +2043,23 @@ class TemporaryModuleController extends Controller
             ->where('data->export_request_id', $exportRequest)
             ->first();
 
+        // Fallback: en algunos MySQL/MariaDB la condición JSON no coincide; leer data ya casteado.
         if (! $notification) {
-            abort(404);
+            $notification = $request->user()->notifications()
+                ->orderByDesc('created_at')
+                ->limit(400)
+                ->get()
+                ->first(function ($n) use ($exportRequest) {
+                    $d = $n->data;
+
+                    return is_array($d)
+                        && (string) ($d['export_request_id'] ?? '') === (string) $exportRequest;
+                });
+        }
+
+        // Sin 404: el front hace polling; UUIDs viejos o notificaciones borradas no deben llenar la consola.
+        if (! $notification) {
+            return response()->json(['status' => 'gone']);
         }
 
         $isPending = $notification->type === \App\Notifications\ExcelExportPending::class;

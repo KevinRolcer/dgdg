@@ -281,6 +281,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     })
                     .then(function (data) {
                         if (!data) return;
+                        if (data.status === 'gone') {
+                            clearInterval(exportPollIntervals[id]);
+                            delete exportPollIntervals[id];
+                            refreshNotifications();
+                            return;
+                        }
                         if (data.status === 'completed' || data.status === 'failed') {
                             clearInterval(exportPollIntervals[id]);
                             delete exportPollIntervals[id];
