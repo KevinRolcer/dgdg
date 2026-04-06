@@ -51,6 +51,8 @@ class MicroregionesController extends Controller
 
         $b1 = route('microregiones.boundaries', [], false);
         $b2 = route('microregiones.map-limits', [], false);
+        $s1 = route('microregiones.map-search', [], false);
+        $s2 = route('microregiones.search', [], false);
 
         return [
             'microrregiones' => $out,
@@ -63,7 +65,8 @@ class MicroregionesController extends Controller
             'boundaries_url' => $b1,
             'boundaries_urls' => $b1 === $b2 ? [$b1] : [$b1, $b2],
             'boundaries_bootstrap' => $boundaries,
-            'search_url' => route('microregiones.map-search', [], false),
+            'search_url' => $s1,
+            'search_urls' => $s1 === $s2 ? [$s1] : [$s1, $s2],
         ];
     }
 

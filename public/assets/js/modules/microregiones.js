@@ -8,6 +8,29 @@
 
     const dataUrl = root.getAttribute('data-data-url');
     var searchUrl = root.getAttribute('data-search-url');
+    var searchUrls = [];
+
+    function pushUniqueUrl(list, url) {
+        if (!url || typeof url !== 'string') return;
+        if (list.indexOf(url) === -1) {
+            list.push(url);
+        }
+    }
+
+    function hydrateSearchUrls(primary, alternate) {
+        var list = [];
+        pushUniqueUrl(list, primary);
+        pushUniqueUrl(list, alternate);
+        if (primary && primary.indexOf('/buscar-map') !== -1) {
+            pushUniqueUrl(list, primary.replace('/buscar-map', '/search'));
+        }
+        if (primary && primary.indexOf('/search') !== -1) {
+            pushUniqueUrl(list, primary.replace('/search', '/buscar-map'));
+        }
+        searchUrls = list;
+    }
+
+    hydrateSearchUrls(searchUrl, root.getAttribute('data-search-url-alt'));
 
     /** Evita peticiones al host de APP_URL si la página se abrió con otro origen (cookies no iban → 401). */
     function sameOriginFetchUrl(pathOrUrl) {
@@ -719,7 +742,7 @@
     }
 
     function queueAdvancedSearch() {
-        if (!searchUrl || !searchInput) return;
+        if (!searchInput) return;
 
         var rawQuery = searchInput.value || '';
         var query = rawQuery.trim();
@@ -753,15 +776,28 @@
             }
             syncSearchStatus();
 
-            fetch(sameOriginFetchUrl(searchUrl) + '?q=' + encodeURIComponent(query), {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                credentials: 'same-origin',
-                signal: remoteSearchAbortController.signal,
-            })
-                .then(function (r) {
+            function fetchSearchAt(index) {
+                if (!searchUrls.length || index >= searchUrls.length) {
+                    return Promise.reject(new Error('Advanced search failed'));
+                }
+
+                var baseUrl = sameOriginFetchUrl(searchUrls[index]);
+                var queryJoiner = baseUrl.indexOf('?') === -1 ? '?' : '&';
+
+                return fetch(baseUrl + queryJoiner + 'q=' + encodeURIComponent(query), {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                    signal: remoteSearchAbortController.signal,
+                }).then(function (r) {
+                    if (r.status === 404) {
+                        return fetchSearchAt(index + 1);
+                    }
                     if (!r.ok) throw new Error('Advanced search failed');
                     return r.json();
-                })
+                });
+            }
+
+            fetchSearchAt(0)
                 .then(function (payload) {
                     if (normalizeText(searchInput.value || '') !== searchKeyNorm) {
                         return;
@@ -1149,6 +1185,11 @@
         .then(function (payload) {
             if (payload.search_url) {
                 searchUrl = payload.search_url;
+            }
+            if (payload.search_urls && Array.isArray(payload.search_urls)) {
+                hydrateSearchUrls(payload.search_urls[0] || searchUrl, payload.search_urls[1] || root.getAttribute('data-search-url-alt'));
+            } else {
+                hydrateSearchUrls(searchUrl, root.getAttribute('data-search-url-alt'));
             }
             micros = payload.microrregiones || [];
 

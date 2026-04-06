@@ -9,7 +9,7 @@
 @php $hidePageHeader = true; @endphp
 {{-- JSON incrustado: el mapa carga aunque /microregiones/data falle por proxy/WAF --}}
 <script type="application/json" id="microregionesMapBootstrap">@json($microregionesBootstrap ?? ['microrregiones' => []])</script>
-<div class="microregiones-page" id="microregionesRoot" data-data-url="{{ route('microregiones.map-datos', [], false) }}" data-search-url="{{ route('microregiones.map-search', [], false) }}">
+<div class="microregiones-page" id="microregionesRoot" data-data-url="{{ route('microregiones.map-datos', [], false) }}" data-search-url="{{ route('microregiones.map-search', [], false) }}" data-search-url-alt="{{ route('microregiones.search', [], false) }}">
 
     <div class="microregiones-layout" id="microregionesLayout">
         <div class="microregiones-map-wrap">
