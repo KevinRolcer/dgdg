@@ -47,6 +47,7 @@ class MicroregionesController extends Controller
     protected function buildMapDataResponse(): array
     {
         $out = $this->buildMicrorregionesPayload();
+        $boundaries = $this->buildBoundariesPayload();
 
         $b1 = route('microregiones.boundaries', [], false);
         $b2 = route('microregiones.map-limits', [], false);
@@ -61,7 +62,54 @@ class MicroregionesController extends Controller
             ],
             'boundaries_url' => $b1,
             'boundaries_urls' => $b1 === $b2 ? [$b1] : [$b1, $b2],
+            'boundaries_bootstrap' => $boundaries,
             'search_url' => route('microregiones.map-search', [], false),
+        ];
+    }
+
+    /**
+     * @return array{municipios: array<int, array{id: int, micro_id: int, nombre: string, geometry: array<string, mixed>}>, meta: array{geometry_count: int, hint: ?string}}
+     */
+    protected function buildBoundariesPayload(): array
+    {
+        $rows = [];
+
+        $ids = Municipio::query()
+            ->whereNotNull('microrregion_id')
+            ->where(function ($q) {
+                $q->whereIn('cve_edo', ['21', '021', 21])
+                    ->orWhereRaw('CAST(cve_edo AS UNSIGNED) = ?', [21]);
+            })
+            ->orderBy('id')
+            ->pluck('id');
+
+        foreach ($ids as $id) {
+            $mun = Municipio::query()->find($id);
+            if (! $mun) {
+                continue;
+            }
+
+            $geom = $this->boundary->getCachedPolygonGeometry($mun);
+            if ($geom === null) {
+                continue;
+            }
+
+            $rows[] = [
+                'id' => (int) $mun->id,
+                'micro_id' => (int) $mun->microrregion_id,
+                'nombre' => (string) $mun->municipio,
+                'geometry' => $geom,
+            ];
+        }
+
+        return [
+            'municipios' => $rows,
+            'meta' => [
+                'geometry_count' => count($rows),
+                'hint' => count($rows) === 0
+                    ? 'No hay polígonos de municipios en la base de datos. En el servidor ejecute: php artisan microregiones:fetch-boundaries'
+                    : null,
+            ],
         ];
     }
 
@@ -144,40 +192,7 @@ class MicroregionesController extends Controller
      */
     public function boundaries(): JsonResponse
     {
-        $rows = [];
-
-        $municipios = Municipio::query()
-            ->whereNotNull('microrregion_id')
-            ->where(function ($q) {
-                $q->whereIn('cve_edo', ['21', '021', 21])
-                    ->orWhereRaw('CAST(cve_edo AS UNSIGNED) = ?', [21]);
-            })
-            ->orderBy('id')
-            ->get(['id', 'microrregion_id', 'municipio']);
-
-        foreach ($municipios as $mun) {
-            $geom = $this->boundary->getCachedPolygonGeometry($mun);
-            if ($geom === null) {
-                continue;
-            }
-
-            $rows[] = [
-                'id' => (int) $mun->id,
-                'micro_id' => (int) $mun->microrregion_id,
-                'nombre' => (string) $mun->municipio,
-                'geometry' => $geom,
-            ];
-        }
-
-        return response()->json([
-            'municipios' => $rows,
-            'meta' => [
-                'geometry_count' => count($rows),
-                'hint' => count($rows) === 0
-                    ? 'No hay polígonos de municipios en la base de datos. En el servidor ejecute: php artisan microregiones:fetch-boundaries'
-                    : null,
-            ],
-        ]);
+        return response()->json($this->buildBoundariesPayload());
     }
 
     private function resolveSeccionPngUrl(string $num): ?string

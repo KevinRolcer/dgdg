@@ -1161,6 +1161,14 @@
             // Load Puebla state outline (cached in localStorage)
             loadPueblaBoundary();
 
+            // Prefer embedded boundaries from bootstrap to avoid failures when endpoints are blocked.
+            if (payload.boundaries_bootstrap && Array.isArray(payload.boundaries_bootstrap.municipios)) {
+                if (payload.boundaries_bootstrap.municipios.length > 0) {
+                    applyBoundaries(payload.boundaries_bootstrap);
+                    return;
+                }
+            }
+
             // Límites municipales (varias URLs por si el hosting bloquea una ruta)
             var boundaryUrls = [];
             if (payload.boundaries_urls && payload.boundaries_urls.length) {
