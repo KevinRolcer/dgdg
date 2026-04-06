@@ -10,6 +10,7 @@
     var searchUrl = root.getAttribute('data-search-url');
     var searchUrls = [];
     var searchPostUrl = root.getAttribute('data-search-post-url');
+    var searchPostDisabled = false;
 
     function pushUniqueUrl(list, url) {
         if (!url || typeof url !== 'string') return;
@@ -58,6 +59,9 @@
             } catch (eDom) { /* ignore */ }
         }
         pushUniqueUrl(searchUrls, searchUrl);
+        // Final fallback: same page endpoint (usually /microregiones), known to be reachable.
+        pushUniqueUrl(searchUrls, window.location.pathname || '/microregiones');
+        pushUniqueUrl(searchUrls, '/microregiones');
         appendIndexPhpSearchVariantsIfNeeded();
     }
 
@@ -809,7 +813,7 @@
 
             function fetchSearchPostJson() {
                 var postUrl = searchPostUrl;
-                if (!postUrl) {
+                if (!postUrl || searchPostDisabled) {
                     return Promise.reject(new Error('no search post url'));
                 }
                 var csrfMeta = document.querySelector('meta[name="csrf-token"]');
@@ -826,6 +830,9 @@
                     },
                     body: JSON.stringify({ q: query }),
                 }).then(function (r) {
+                    if (r.status === 404 || r.status === 405) {
+                        searchPostDisabled = true;
+                    }
                     if (!r.ok) throw new Error('Advanced search POST failed');
                     return r.json();
                 });
@@ -1248,6 +1255,8 @@
                 searchUrl = payload.search_url;
                 pushUniqueUrl(searchUrls, payload.search_url);
             }
+            pushUniqueUrl(searchUrls, window.location.pathname || '/microregiones');
+            pushUniqueUrl(searchUrls, '/microregiones');
             if (payload.search_post_url) {
                 searchPostUrl = payload.search_post_url;
             }
