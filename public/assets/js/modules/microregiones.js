@@ -7,7 +7,7 @@
     }
 
     const dataUrl = root.getAttribute('data-data-url');
-    const searchUrl = root.getAttribute('data-search-url');
+    var searchUrl = root.getAttribute('data-search-url');
 
     /** Evita peticiones al host de APP_URL si la página se abrió con otro origen (cookies no iban → 401). */
     function sameOriginFetchUrl(pathOrUrl) {
@@ -1118,16 +1118,38 @@
         } catch (e) { /* ignore */ }
     }
 
-    /* ── Bootstrap ── */
-    fetch(sameOriginFetchUrl(dataUrl), {
-        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'same-origin',
-    })
-        .then(function (r) {
+    /* ── Bootstrap (prioridad: JSON en la página; respaldo: fetch) ── */
+    function tryReadMicroregionesBootstrap() {
+        var el = document.getElementById('microregionesMapBootstrap');
+        if (!el || !el.textContent) return null;
+        try {
+            var p = JSON.parse(el.textContent);
+            if (p && Array.isArray(p.microrregiones)) {
+                return p;
+            }
+        } catch (e) { /* ignore */ }
+        return null;
+    }
+
+    function loadMicroregionesPayload() {
+        var fromPage = tryReadMicroregionesBootstrap();
+        if (fromPage) {
+            return Promise.resolve(fromPage);
+        }
+        return fetch(sameOriginFetchUrl(dataUrl), {
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        }).then(function (r) {
             if (!r.ok) throw new Error('No se pudieron cargar los datos.');
             return r.json();
-        })
+        });
+    }
+
+    loadMicroregionesPayload()
         .then(function (payload) {
+            if (payload.search_url) {
+                searchUrl = payload.search_url;
+            }
             micros = payload.microrregiones || [];
 
             // Build fast lookup map

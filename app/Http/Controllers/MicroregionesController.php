@@ -27,7 +27,28 @@ class MicroregionesController extends Controller
     {
         return view('microregiones.index', [
             'pageTitle' => 'Microrregiones',
+            'microregionesBootstrap' => $this->buildMapDataResponse(),
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function buildMapDataResponse(): array
+    {
+        $out = $this->buildMicrorregionesPayload();
+
+        return [
+            'microrregiones' => $out,
+            'map' => [
+                'center' => [19.0, -97.75],
+                'zoom' => 8,
+                'attribution' => '© OpenStreetMap',
+                'puebla_bounds' => PueblaStateBounds::asArray(),
+            ],
+            'boundaries_url' => route('microregiones.map-limits', [], false),
+            'search_url' => route('microregiones.map-search', [], false),
+        ];
     }
 
     /**
@@ -35,19 +56,7 @@ class MicroregionesController extends Controller
      */
     public function data(): JsonResponse
     {
-        $out = $this->buildMicrorregionesPayload();
-
-        return response()->json([
-            'microrregiones' => $out,
-            'map' => [
-                'center' => [19.0, -97.75],
-                'zoom' => 8,
-                'attribution' => 'Â© OpenStreetMap',
-                'puebla_bounds' => PueblaStateBounds::asArray(),
-            ],
-            'boundaries_url' => route('microregiones.boundaries', [], false),
-            'search_url' => route('microregiones.search', [], false),
-        ]);
+        return response()->json($this->buildMapDataResponse());
     }
 
     public function search(Request $request): JsonResponse

@@ -42,6 +42,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/microregiones/data', [MicroregionesController::class, 'data'])->name('microregiones.data');
     Route::get('/microregiones/boundaries', [MicroregionesController::class, 'boundaries'])->name('microregiones.boundaries');
     Route::get('/microregiones/search', [MicroregionesController::class, 'search'])->name('microregiones.search');
+    // Rutas alias (menos probables de bloqueo WAF / reglas “/data” en hosting)
+    Route::get('/microregiones/mapa-datos', [MicroregionesController::class, 'data'])->name('microregiones.map-datos');
+    Route::get('/microregiones/lim-mun', [MicroregionesController::class, 'boundaries'])->name('microregiones.map-limits');
+    Route::get('/microregiones/buscar-map', [MicroregionesController::class, 'search'])->name('microregiones.map-search');
+
+    Route::get('/poller/export/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
+        ->where('exportRequest', '[a-f0-9\-]+')
+        ->middleware('can:Modulos-Temporales-Admin')
+        ->name('temporary-modules.export-poll');
     Route::get('/mi-perfil', [ProfileController::class, 'show'])->name('profile.show');
     Route::get('/ajustes', [SettingsController::class, 'index'])->name('settings.index');
     Route::get('/ajustes/apariencia', [SettingsController::class, 'apariencia'])->name('settings.apariencia');

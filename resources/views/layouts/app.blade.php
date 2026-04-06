@@ -20,7 +20,7 @@
     <script src="{{ asset('assets/js/vendor/simple-expand.min.js') }}"></script>
 </head>
 <body
-    @can('Modulos-Temporales-Admin') data-export-status-url="{{ route('temporary-modules.admin.export-status', ['exportRequest' => 0], false) }}" @endcan
+    @can('Modulos-Temporales-Admin') data-export-status-url="{{ route('temporary-modules.export-poll', ['exportRequest' => '0'], false) }}" @endcan
     @can('Chats-WhatsApp-Sensible') data-whatsapp-import-status-base="{{ url('/admin/whatsapp-chats') }}" @endcan
 >
     @php
