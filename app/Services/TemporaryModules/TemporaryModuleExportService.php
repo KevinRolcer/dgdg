@@ -48,11 +48,12 @@ class TemporaryModuleExportService
         $direction = strtoupper($this->resolveMicrorregionSortDirection());
 
         return $query
+            ->reorder()
             ->leftJoin('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
             ->orderByRaw(
                 'CASE WHEN temporary_module_entries.microrregion_id IS NULL THEN 1 ELSE 0 END, '.
                 'CAST(COALESCE(microrregiones.microrregion, 0) AS UNSIGNED) '.$direction.', '.
-                'LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(temporary_module_entries.data, "$.\\\"_municipio_reporte\\\"")), ""))) ASC, '.
+                "LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(temporary_module_entries.data, '$._municipio_reporte')), ''))) ASC, ".
                 'temporary_module_entries.submitted_at DESC'
             )
             ->select('temporary_module_entries.*');
