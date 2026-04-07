@@ -149,11 +149,14 @@ class TemporaryModuleExportService
             $groups = $temporaryModule->entries()
                 ->withoutGlobalScopes()
                 ->reorder() // evitamos ordenar por submitted_at en una consulta DISTINCT
-                ->select('microrregion_id')
+                ->select([
+                    'temporary_module_entries.microrregion_id',
+                    'microrregiones.microrregion as microrregion_sort',
+                ])
                 ->join('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
+                ->groupBy('temporary_module_entries.microrregion_id', 'microrregiones.microrregion')
                 ->orderByRaw('CAST(microrregiones.microrregion AS UNSIGNED) '.$groupDirection)
-                ->distinct()
-                ->pluck('microrregion_id')
+                ->pluck('temporary_module_entries.microrregion_id')
                 ->values();
 
             if ($groups->isEmpty()) {
