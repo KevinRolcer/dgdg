@@ -130,7 +130,12 @@ html.theme-dark .topbar-menu-link.is-active {
 
 html.theme-dark .notifications-drawer {
     background: var(--clr-card);
-    box-shadow: -12px 0 32px rgba(0, 0, 0, 0.5);
+    box-shadow: none;
+    border-left: 0;
+}
+
+html.theme-dark .notifications-drawer-backdrop {
+    background: rgba(2, 6, 23, 0.26);
 }
 
 html.theme-dark .notifications-drawer-clear,

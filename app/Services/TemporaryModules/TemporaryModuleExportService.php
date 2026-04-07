@@ -244,18 +244,93 @@ class TemporaryModuleExportService
         ];
     }
 
-    public function generateTemplate(TemporaryModule $module): array
+    public function generateTemplate(TemporaryModule $module, ?array $options = null): array
     {
+        $options = $options ?? [];
+        $withData = (bool) ($options['with_data'] ?? false);
+        $microrregionId = isset($options['microrregion_id']) ? (int) $options['microrregion_id'] : null;
+        $suffix = trim((string) ($options['suffix'] ?? ''));
+
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Plantilla');
 
+        $fields = $this->templateFields($module);
+        $this->fillTemplateHeader($sheet, $fields);
+
+        if ($withData) {
+            $entriesQuery = $module->entries()
+                ->withoutGlobalScopes()
+                ->reorder()
+                ->orderBy('submitted_at');
+
+            if (($microrregionId ?? 0) > 0) {
+                $entriesQuery->where('microrregion_id', $microrregionId);
+            }
+
+            $entries = $entriesQuery->get(['data']);
+            $this->fillTemplateDataRows($sheet, $fields, $entries, 3);
+        }
+
+        $eventToken = preg_replace('/[^A-Za-z0-9]+/', '_', Str::ascii((string) $module->name));
+        $eventToken = trim((string) $eventToken, '_');
+        if ($eventToken === '') {
+            $eventToken = 'Modulo_'.$module->id;
+        }
+
+        if ($withData && ($microrregionId ?? 0) > 0) {
+            $microrregionNo = (string) DB::table('microrregiones')
+                ->where('id', (int) $microrregionId)
+                ->value('microrregion');
+            $microrregionNo = trim($microrregionNo);
+            if ($microrregionNo === '') {
+                $microrregionNo = str_pad((string) $microrregionId, 2, '0', STR_PAD_LEFT);
+            } else {
+                $microrregionNo = str_pad($microrregionNo, 2, '0', STR_PAD_LEFT);
+            }
+
+            $fileName = $microrregionNo.'.'.$eventToken.'_'.now()->format('Ymd_His').'.xlsx';
+        } else {
+            $fileName = $eventToken.'_Plantilla.xlsx';
+        }
+        $exportDir = storage_path('app/public/temporary-exports');
+        $tempFilePath = $exportDir.'/'.$fileName;
+
+        if (! is_dir($exportDir)) {
+            mkdir($exportDir, 0755, true);
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($tempFilePath);
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet);
+
+        return [
+            'name' => $fileName,
+            'path' => $tempFilePath,
+            'url' => route('temporary-modules.plantilla.download', ['file' => $fileName], false),
+        ];
+    }
+
+    private function templateFields(TemporaryModule $module): Collection
+    {
         $importableTypes = TemporaryModuleExcelImportService::IMPORTABLE_TYPES;
-        $fields = $module->fields()
+
+        if ($module->relationLoaded('fields') && $module->fields instanceof Collection) {
+            return $module->fields
+                ->whereIn('type', $importableTypes)
+                ->sortBy('sort_order')
+                ->values();
+        }
+
+        return $module->fields()
             ->whereIn('type', $importableTypes)
             ->orderBy('sort_order')
             ->get();
+    }
 
+    private function fillTemplateHeader(Worksheet $sheet, Collection $fields): void
+    {
         $col = 1;
         foreach ($fields as $field) {
             $letter = Coordinate::stringFromColumnIndex($col);
@@ -265,7 +340,6 @@ class TemporaryModuleExportService
             $style->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
             $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::HEADER_FILL_COLOR);
 
-            // Placeholder content in first data row
             $placeholder = '';
             $type = (string) $field->type;
             if ($type === 'select') {
@@ -294,28 +368,34 @@ class TemporaryModuleExportService
             $sheet->getColumnDimension($letter)->setAutoSize(true);
             $col++;
         }
+    }
 
-        $baseName = Str::slug((string) $module->name, '_');
-        if ($baseName === '') {
-            $baseName = 'plantilla_modulo_'.$module->id;
+    private function fillTemplateDataRows(Worksheet $sheet, Collection $fields, Collection $entries, int $startRow): void
+    {
+        $row = max(3, $startRow);
+
+        foreach ($entries as $entry) {
+            $data = is_array($entry->data ?? null) ? $entry->data : [];
+            $col = 1;
+
+            foreach ($fields as $field) {
+                $letter = Coordinate::stringFromColumnIndex($col);
+                $value = $data[$field->key] ?? '';
+
+                if (is_array($value)) {
+                    $value = implode(', ', array_filter(array_map('strval', $value), fn ($v) => trim($v) !== ''));
+                } elseif (is_bool($value)) {
+                    $value = $value ? 'Sí' : 'No';
+                } elseif (! is_scalar($value) && $value !== null) {
+                    $value = '';
+                }
+
+                $sheet->setCellValue($letter.$row, (string) ($value ?? ''));
+                $col++;
+            }
+
+            $row++;
         }
-        $fileName = 'plantilla_'.$baseName.'.xlsx';
-        $exportDir = storage_path('app/public/temporary-exports');
-        $tempFilePath = $exportDir.'/'.$fileName;
-
-        if (!is_dir($exportDir)) {
-            mkdir($exportDir, 0755, true);
-        }
-
-        $writer = new Xlsx($spreadsheet);
-        $writer->save($tempFilePath);
-        $spreadsheet->disconnectWorksheets();
-        unset($spreadsheet);
-
-        return [
-            'name' => $fileName,
-            'url' => route('temporary-modules.plantilla.download', ['file' => $fileName]),
-        ];
     }
 
     private function fillAnalysisSheet(Worksheet $sheet, TemporaryModule $temporaryModule): void

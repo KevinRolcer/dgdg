@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var notificationsDrawerBackdrop = document.getElementById('notificationsDrawerBackdrop');
     var topbarNotifyRefresh = document.getElementById('topbarNotifyRefresh');
     var notificationsDrawerRefresh = document.getElementById('notificationsDrawerRefresh');
+    var suppressNextDrawerAutoClose = false;
     var collapseStorageKey = 'segob_sidebar_collapsed';
     var mobileBreakpoint = 768;
 
@@ -113,6 +114,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         notificationsDrawer.classList.add('is-open');
         notificationsDrawerBackdrop.classList.add('is-visible');
+        document.body.classList.add('notifications-modal-open');
         notificationsDrawer.setAttribute('aria-hidden', 'false');
         if (topbarNotifyViewAll) {
             topbarNotifyViewAll.setAttribute('aria-expanded', 'true');
@@ -126,6 +128,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         notificationsDrawer.classList.remove('is-open');
         notificationsDrawerBackdrop.classList.remove('is-visible');
+        document.body.classList.remove('notifications-modal-open');
         notificationsDrawer.setAttribute('aria-hidden', 'true');
         if (topbarNotifyViewAll) {
             topbarNotifyViewAll.setAttribute('aria-expanded', 'false');
@@ -567,6 +570,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (deleteBtn) {
             event.preventDefault();
             event.stopPropagation();
+            suppressNextDrawerAutoClose = true;
 
             var form = deleteBtn.closest('form');
             if (!form) return;
@@ -591,6 +595,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (typeof window.swal === 'function') {
                         window.swal('Error', 'No se pudo eliminar la notificación.', 'error');
                     }
+                })
+                .finally(function () {
+                    setTimeout(function () {
+                        suppressNextDrawerAutoClose = false;
+                    }, 0);
                 });
         }
     });
@@ -635,6 +644,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.addEventListener('click', function (event) {
         var targetElement = event.target;
+
+        if (suppressNextDrawerAutoClose) {
+            return;
+        }
 
         if (
             targetElement instanceof Element

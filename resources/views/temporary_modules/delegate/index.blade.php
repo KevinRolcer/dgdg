@@ -135,6 +135,8 @@
             $tmImportable = $module->fields->filter(function ($f) {
                 return in_array($f->type, \App\Services\TemporaryModules\TemporaryModuleExcelImportService::IMPORTABLE_TYPES, true);
             });
+            $templateModalId = 'tmTemplateDownloadModal-'.$module->id;
+            $hasTemplateData = (int) ($module->my_entries_count ?? 0) > 0;
         @endphp
         <div class="tm-modal" id="delegate-preview-{{ $module->id }}" aria-hidden="true" role="dialog" aria-modal="true">
             <div class="tm-modal-backdrop" data-close-module-preview></div>
@@ -146,11 +148,20 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:10px;">
                         @if ($tmImportable->isNotEmpty())
-                            <a href="{{ route('temporary-modules.download-template', $module->id) }}"
-                               class="tm-btn tm-btn-outline"
-                               aria-label="Descargar plantilla Excel">
-                                <i class="fa-solid fa-download" aria-hidden="true"></i> Plantilla
-                            </a>
+                            @if ($hasTemplateData)
+                                <button type="button"
+                                   class="tm-btn tm-btn-outline"
+                                   data-open-template-download="{{ $templateModalId }}"
+                                   aria-label="Descargar plantilla Excel">
+                                    <i class="fa-solid fa-download" aria-hidden="true"></i> Plantilla
+                                </button>
+                            @else
+                                <a href="{{ route('temporary-modules.download-template', ['module' => $module->id, 'scope' => 'blank']) }}"
+                                   class="tm-btn tm-btn-outline"
+                                   aria-label="Descargar plantilla Excel">
+                                    <i class="fa-solid fa-download" aria-hidden="true"></i> Plantilla
+                                </a>
+                            @endif
                             <button type="button"
                                     class="tm-btn tm-btn-outline"
                                     data-open-excel-import="tmImportarExcelModal-{{ $module->id }}"
@@ -455,6 +466,70 @@
                 </div>
             </div>
         </div>
+
+        @if ($tmImportable->isNotEmpty() && $hasTemplateData)
+            @php
+                $allTemplateUrls = $microsAsignadas->map(function ($micro) use ($module) {
+                    return route('temporary-modules.download-template', [
+                        'module' => $module->id,
+                        'scope' => 'microrregion',
+                        'selected_microrregion_id' => $micro->id,
+                        'with_data' => 1,
+                    ]);
+                })->values()->all();
+            @endphp
+            <div class="tm-modal tm-template-download-modal" id="{{ $templateModalId }}" aria-hidden="true" role="dialog" aria-modal="true">
+                <div class="tm-modal-backdrop" data-close-module-preview></div>
+                <div class="tm-modal-dialog tm-modal-dialog-entry tm-template-download-dialog">
+                    <div class="tm-modal-head">
+                        <div class="tm-modal-head-stack">
+                            <h3>Descargar plantilla</h3>
+                            <p class="tm-modal-subtitle">{{ $module->name }}</p>
+                        </div>
+                        <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <div class="tm-modal-body">
+                        <div class="tm-template-download-grid">
+                            <a class="tm-template-download-card tm-template-download-card--blank"
+                               href="{{ route('temporary-modules.download-template', ['module' => $module->id, 'scope' => 'blank']) }}">
+                                <span class="tm-template-download-icon" aria-hidden="true"><i class="fa-solid fa-file-arrow-down"></i></span>
+                                <span class="tm-template-download-copy">
+                                    <span class="tm-template-download-title">Plantilla sin datos</span>
+                                    <span class="tm-template-download-desc">Con ejemplo de llenado</span>
+                                </span>
+                                <span class="tm-template-download-action">Descargar</span>
+                            </a>
+
+                            @foreach ($microsAsignadas as $micro)
+                                <a class="tm-template-download-card"
+                                   href="{{ route('temporary-modules.download-template', ['module' => $module->id, 'scope' => 'microrregion', 'selected_microrregion_id' => $micro->id, 'with_data' => 1]) }}">
+                                    <span class="tm-template-download-icon" aria-hidden="true"><i class="fa-solid fa-file-arrow-down"></i></span>
+                                    <span class="tm-template-download-copy">
+                                        <span class="tm-template-download-title">MR {{ $micro->microrregion }} - {{ $micro->cabecera }}</span>
+                                        <span class="tm-template-download-desc">Plantilla con datos.</span>
+                                    </span>
+                                    <span class="tm-template-download-action">Descargar</span>
+                                </a>
+                            @endforeach
+
+                            <button type="button"
+                               class="tm-template-download-card tm-template-download-card--all"
+                               data-download-all-templates
+                               data-template-urls='@json($allTemplateUrls)'>
+                                <span class="tm-template-download-icon" aria-hidden="true"><i class="fa-solid fa-file-zipper"></i></span>
+                                <span class="tm-template-download-copy">
+                                    <span class="tm-template-download-title">Todas las microregiones</span>
+                                    <span class="tm-template-download-desc">1 archivo por MR</span>
+                                </span>
+                                <span class="tm-template-download-action">Descargar</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
 
         @if ($tmImportable->isNotEmpty())
             <div class="tm-modal tm-excel-import-modal" id="tmImportarExcelModal-{{ $module->id }}" aria-hidden="true" role="dialog" aria-modal="true"
@@ -2168,7 +2243,11 @@
                         throw result.data;
                     }
 
-                    notify('Exito', result.data.message || 'Registro guardado correctamente.', 'success');
+                    if (typeof window.segobToast === 'function') {
+                        window.segobToast('success', result.data.message || 'Registro guardado correctamente.');
+                    } else {
+                        notify('Exito', result.data.message || 'Registro guardado correctamente.', 'success');
+                    }
 
                     const selectedMr = microrregionSelector ? String(microrregionSelector.value || '') : '';
                     form.reset();
@@ -2196,14 +2275,18 @@
                         ? ownerModalId.replace('delegate-preview-', '')
                         : '';
 
-                    if (recordsUrl) {
-                        const url = new URL(recordsUrl, window.location.origin);
-                        if (/^\d+$/.test(moduleId)) {
-                            url.searchParams.set('module', moduleId);
+                    if (/^\d+$/.test(moduleId)) {
+                        // Actualiza contador "Mis registros" sin cerrar modal.
+                        const refreshBtn = document.querySelector('[data-refresh-module="' + moduleId + '"]');
+                        if (refreshBtn) {
+                            refreshBtn.click();
                         }
 
-                        window.location.href = url.toString();
-                        return;
+                        // Actualiza historial de "Ver mis registros" en segundo plano.
+                        const recordsPanel = document.getElementById('module-records-' + moduleId);
+                        if (recordsPanel && typeof window.__tmReloadRecordsPanel === 'function') {
+                            window.__tmReloadRecordsPanel(recordsPanel, { requireActive: false });
+                        }
                     }
                 })
                 .catch(function (errorData) {
@@ -3727,6 +3810,68 @@
             });
         });
 
+
+        document.addEventListener('click', function (event) {
+            const btn = event.target.closest('[data-open-template-download]');
+            if (!btn) return;
+
+            const modalId = btn.getAttribute('data-open-template-download');
+            const modal = modalId ? document.getElementById(modalId) : null;
+            if (!modal) return;
+
+            event.preventDefault();
+            openModal(modal, btn);
+        });
+
+        document.addEventListener('click', function (event) {
+            const btn = event.target.closest('[data-download-all-templates]');
+            if (!btn) {
+                return;
+            }
+
+            event.preventDefault();
+
+            let urls = [];
+            try {
+                const raw = btn.getAttribute('data-template-urls') || '[]';
+                const parsed = JSON.parse(raw);
+                urls = Array.isArray(parsed) ? parsed.filter(function (u) { return typeof u === 'string' && u.trim() !== ''; }) : [];
+            } catch (_) {
+                urls = [];
+            }
+
+            if (!urls.length) {
+                if (typeof window.segobToast === 'function') {
+                    window.segobToast('warning', 'No hay microrregiones asignadas para descargar.');
+                }
+                return;
+            }
+
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="tm-template-download-badge">Descargando...</span><h4>Todas las microregiones</h4><p>Preparando archivos individuales...</p>';
+
+            let iframe = document.getElementById('tmTemplateDownloadFrame');
+            if (!(iframe instanceof HTMLIFrameElement)) {
+                iframe = document.createElement('iframe');
+                iframe.id = 'tmTemplateDownloadFrame';
+                iframe.style.display = 'none';
+                iframe.setAttribute('aria-hidden', 'true');
+                document.body.appendChild(iframe);
+            }
+
+            urls.forEach(function (url, index) {
+                window.setTimeout(function () {
+                    const sep = url.indexOf('?') >= 0 ? '&' : '?';
+                    iframe.src = url + sep + 'batch=' + Date.now() + '_' + index;
+                }, index * 900);
+            });
+
+            window.setTimeout(function () {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }, (urls.length * 900) + 350);
+        });
 
         document.addEventListener('click', function (event) {
             const btn = event.target.closest('[data-open-excel-import]');

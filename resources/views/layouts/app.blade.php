@@ -287,6 +287,15 @@
             if (Toast) {
                 const mappedIcon = resolveSegobToastIcon(icon, message);
                 let options = { icon: mappedIcon, title: message };
+
+                // Para evitar desfases de geometría en toasts de éxito/error,
+                // usamos un símbolo simple centrado dentro del círculo.
+                if (mappedIcon === 'success') {
+                    options.iconHtml = '&#10003;';
+                } else if (mappedIcon === 'error') {
+                    options.iconHtml = '&#10005;';
+                }
+
                 // En modo oscuro, usar color accent para el texto de todos los avisos
                 if (document.documentElement.classList.contains('theme-dark')) {
                     options.color = '#ffffff';

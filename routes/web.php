@@ -221,7 +221,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{module}/registros/{entry}', [TemporaryModuleController::class, 'destroyEntry'])->middleware('can:Modulos-Temporales')->whereNumber('module')->whereNumber('entry')->name('temporary-modules.entry.destroy');
         Route::delete('/{module}/registros-masivo', [TemporaryModuleController::class, 'bulkDestroyEntries'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.entries.bulk-destroy');
         Route::get('/{module}/plantilla', [TemporaryModuleController::class, 'downloadTemplate'])->middleware('can:modulos-temporales-ver')->whereNumber('module')->name('temporary-modules.download-template');
-        Route::get('/plantillas/{file}', [TemporaryModuleController::class, 'downloadTemplateFile'])->where('file', 'plantilla_[A-Za-z0-9_\-]+\.xlsx')->middleware('can:modulos-temporales-ver')->name('temporary-modules.plantilla.download');
+        Route::get('/plantillas/{file}', [TemporaryModuleController::class, 'downloadTemplateFile'])->where('file', '[A-Za-z0-9._\-]+\.xlsx')->middleware('can:modulos-temporales-ver')->name('temporary-modules.plantilla.download');
         Route::get('/{module}/registros/{entry}/archivo/{fieldKey}', [TemporaryModuleController::class, 'previewEntryFile'])->middleware('can:modulos-temporales-ver')->whereNumber('entry')->where('fieldKey', '[A-Za-z0-9_\-]+')->name('temporary-modules.entry-file.preview');
     });
 

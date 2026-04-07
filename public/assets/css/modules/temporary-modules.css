@@ -2409,6 +2409,179 @@ a.tm-paginator-btn:hover {
     max-height: 85vh;
 }
 
+.tm-template-download-dialog {
+    max-width: min(760px, calc(100vw - 24px));
+}
+
+.tm-template-download-intro {
+    margin: 0 0 2px;
+    color: var(--clr-text-light);
+    font-size: var(--fs-small);
+}
+
+.tm-template-download-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    max-height: min(56vh, 520px);
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.tm-template-download-grid::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+}
+
+.tm-template-download-modal .tm-modal-body {
+    overflow: hidden;
+}
+
+.tm-template-download-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 84px;
+    height: auto;
+    text-decoration: none;
+    border: 1px solid var(--clr-border);
+    border-radius: 10px;
+    padding: 10px;
+    background: var(--clr-card);
+    color: var(--clr-text-main);
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.tm-template-download-card:hover,
+.tm-template-download-card:focus-visible {
+    border-color: rgba(199, 155, 102, 0.65);
+    background: color-mix(in srgb, var(--clr-card) 84%, var(--clr-bg) 16%);
+    outline: none;
+}
+
+.tm-template-download-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--clr-border);
+    background: color-mix(in srgb, var(--clr-card) 80%, var(--clr-bg) 20%);
+    color: var(--clr-text-light);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+.tm-template-download-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.tm-template-download-title {
+    margin: 0;
+    font-size: var(--fs-body);
+    line-height: 1.25;
+    color: var(--clr-text-main);
+    font-weight: 700;
+}
+
+.tm-template-download-desc {
+    margin: 0;
+    font-size: 0.76rem;
+    line-height: 1.4;
+    color: var(--clr-text-light);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tm-template-download-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 96px;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--clr-border);
+    background: color-mix(in srgb, var(--clr-card) 86%, var(--clr-bg) 14%);
+    color: var(--clr-text-main);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.tm-template-download-card--blank {
+    border-color: color-mix(in srgb, var(--clr-secondary) 30%, var(--clr-border) 70%);
+}
+
+.tm-template-download-card--all {
+    border-color: color-mix(in srgb, var(--clr-primary) 35%, var(--clr-border) 65%);
+}
+
+.tm-template-download-card--blank .tm-template-download-icon {
+    color: #2f7b59;
+    border-color: rgba(47, 123, 89, 0.35);
+    background: rgba(47, 123, 89, 0.1);
+}
+
+.tm-template-download-card--blank .tm-template-download-action {
+    border-color: rgba(47, 123, 89, 0.35);
+    color: #2f7b59;
+}
+
+.tm-template-download-card--all .tm-template-download-icon {
+    color: #b4233c;
+    border-color: rgba(180, 35, 60, 0.35);
+    background: rgba(180, 35, 60, 0.1);
+}
+
+.tm-template-download-card--all .tm-template-download-action {
+    border-color: rgba(180, 35, 60, 0.35);
+    color: #b4233c;
+}
+
+html.theme-dark .tm-template-download-icon {
+    background: color-mix(in srgb, var(--clr-card) 82%, #000 18%);
+}
+
+html.theme-dark .tm-template-download-card:hover,
+html.theme-dark .tm-template-download-card:focus-visible {
+    background: color-mix(in srgb, var(--clr-card) 88%, #ffffff 12%);
+}
+
+html.theme-dark .tm-template-download-card--blank .tm-template-download-action,
+html.theme-dark .tm-template-download-card--blank .tm-template-download-icon {
+    color: #7bc9a5;
+    border-color: rgba(123, 201, 165, 0.45);
+}
+
+html.theme-dark .tm-template-download-card--all .tm-template-download-action,
+html.theme-dark .tm-template-download-card--all .tm-template-download-icon {
+    color: #ff8b9e;
+    border-color: rgba(255, 139, 158, 0.45);
+}
+
+@media (min-width: 992px) {
+    .tm-template-download-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .tm-template-download-card {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .tm-template-download-action {
+        margin-left: 44px;
+    }
+}
+
 .tm-modal-dialog-entry:not(.tm-excel-modal-dialog) .tm-modal-body {
     display: flex;
     flex-direction: column;

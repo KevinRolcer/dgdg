@@ -166,18 +166,65 @@ class TemporaryModuleController extends Controller
         ]);
     }
 
-    public function downloadTemplate(int $module): RedirectResponse
+    public function downloadTemplate(Request $request, int $module): RedirectResponse
     {
         $temporaryModule = TemporaryModule::query()->findOrFail($module);
-        $result = $this->exportService->generateTemplate($temporaryModule);
+        $user = $request->user();
+        $isAdmin = Gate::forUser($user)->allows('modulos-temporales-admin-ver');
 
-        return redirect($result['url']);
+        abort_unless(
+            $isAdmin || $this->accessService->userCanAccessModule($temporaryModule, (int) $user->id),
+            403
+        );
+
+        $scope = (string) $request->query('scope', 'blank');
+        if (! in_array($scope, ['blank', 'microrregion', 'all'], true)) {
+            $scope = 'blank';
+        }
+
+        if ($scope === 'blank') {
+            $result = $this->exportService->generateTemplate($temporaryModule);
+
+            return redirect($result['url']);
+        }
+
+        $allowedMicrorregionIds = $isAdmin
+            ? []
+            : $this->accessService->microrregionIdsPorUsuario((int) $user->id);
+
+        if ($scope === 'microrregion') {
+            $requestedMicrorregionId = $request->filled('selected_microrregion_id')
+                ? (int) $request->query('selected_microrregion_id')
+                : 0;
+
+            if ($requestedMicrorregionId < 1 && ! $isAdmin && count($allowedMicrorregionIds) === 1) {
+                $requestedMicrorregionId = (int) $allowedMicrorregionIds[0];
+            }
+
+            abort_unless($requestedMicrorregionId > 0, 422, 'Selecciona una microrregión válida.');
+
+            if (! $isAdmin) {
+                abort_unless(in_array($requestedMicrorregionId, $allowedMicrorregionIds, true), 403);
+            }
+
+            $result = $this->exportService->generateTemplate($temporaryModule, [
+                'with_data' => true,
+                'microrregion_id' => $requestedMicrorregionId,
+            ]);
+
+            return redirect($result['url']);
+        }
+
+        return redirect()->route('temporary-modules.download-template', [
+            'module' => $temporaryModule->id,
+            'scope' => 'blank',
+        ]);
     }
 
     public function downloadTemplateFile(Request $request, string $file): BinaryFileResponse
     {
         $file = trim($file);
-        abort_unless(preg_match('/\Aplantilla_[A-Za-z0-9_\-]+\.xlsx\z/', $file) === 1, 404);
+        abort_unless(preg_match('/\A[A-Za-z0-9._\-]+\.xlsx\z/', $file) === 1, 404);
 
         $path = storage_path('app/public/temporary-exports/'.$file);
         abort_unless(is_file($path), 404);
