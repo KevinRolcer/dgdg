@@ -333,6 +333,7 @@ class TemporaryModuleController extends Controller
         $payload = [
             'success' => true,
             'headers' => $preview['headers'],
+            'preview_rows' => $preview['preview_rows'] ?? [],
             'header_row' => $headerRow,
             'data_start_row' => $headerRow + 1,
             'sheet_names' => $preview['sheet_names'] ?? [],
@@ -364,6 +365,8 @@ class TemporaryModuleController extends Controller
             'col_microrregion' => ['nullable', 'integer', 'min:-1'],
             'col_municipio' => ['nullable', 'integer', 'min:-1'],
             'field_columns' => ['required', 'string'],
+            'field_types' => ['nullable', 'string'],
+            'field_options' => ['nullable', 'string'],
             'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
         ]);
 
@@ -380,6 +383,30 @@ class TemporaryModuleController extends Controller
             throw ValidationException::withMessages(['field_columns' => 'Elige al menos una columna como campo del módulo.']);
         }
         $fieldColumns = array_map('intval', $fieldColumns);
+
+        $fieldTypes = json_decode((string) $request->input('field_types', '{}'), true);
+        if (! is_array($fieldTypes)) {
+            $fieldTypes = [];
+        }
+        $allowedFieldTypes = ['text', 'textarea', 'number', 'date', 'datetime', 'select', 'multiselect', 'municipio', 'boolean', 'semaforo'];
+        $fieldTypes = collect($fieldTypes)
+            ->mapWithKeys(function ($type, $idx) use ($allowedFieldTypes) {
+                $i = (int) $idx;
+                $t = strtolower(trim((string) $type));
+
+                return [$i => in_array($t, $allowedFieldTypes, true) ? $t : 'text'];
+            })
+            ->all();
+
+        $fieldOptions = json_decode((string) $request->input('field_options', '{}'), true);
+        if (! is_array($fieldOptions)) {
+            $fieldOptions = [];
+        }
+        $fieldOptions = collect($fieldOptions)
+            ->mapWithKeys(function ($value, $idx) {
+                return [(int) $idx => is_scalar($value) ? trim((string) $value) : ''];
+            })
+            ->all();
 
         $isIndefinite = (bool) $request->boolean('is_indefinite');
         $expiresAt = null;
@@ -402,6 +429,8 @@ class TemporaryModuleController extends Controller
                 $colMr,
                 $colMun,
                 $fieldColumns,
+                $fieldTypes,
+                $fieldOptions,
                 $stats,
                 (int) ($request->input('sheet_index') ?: 0),
             );
@@ -2002,6 +2031,58 @@ class TemporaryModuleController extends Controller
             'message' => 'Registro creado correctamente.',
             'entry_id' => $result['entry']->id,
             'seed_discard_log' => $result['seed_discard_log'],
+        ]);
+    }
+
+    public function searchSeedDiscardMunicipios(Request $request, int $module): JsonResponse
+    {
+        abort_unless(auth()->user()?->can('Modulos-Temporales-Admin'), 403);
+        TemporaryModule::query()->findOrFail($module);
+
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $q = trim((string) ($validated['q'] ?? ''));
+        $query = DB::table('municipios as mu')
+            ->join('microrregiones as mr', 'mr.id', '=', 'mu.microrregion_id')
+            ->select([
+                'mu.id',
+                'mu.municipio',
+                'mu.microrregion_id',
+                'mr.microrregion',
+                'mr.cabecera',
+            ]);
+
+        if ($q !== '') {
+            $like = '%'.addcslashes($q, '%_\\').'%';
+            $query->where(function ($w) use ($like): void {
+                $w->where('mu.municipio', 'like', $like)
+                    ->orWhere('mr.cabecera', 'like', $like)
+                    ->orWhere('mr.microrregion', 'like', $like);
+            });
+        }
+
+        $items = $query
+            ->orderBy('mu.municipio')
+            ->limit(30)
+            ->get()
+            ->map(function ($row) {
+                $mr = str_pad(trim((string) $row->microrregion), 2, '0', STR_PAD_LEFT);
+
+                return [
+                    'id' => (int) $row->id,
+                    'municipio' => (string) $row->municipio,
+                    'microrregion_id' => (int) $row->microrregion_id,
+                    'label' => 'MR '.$mr.' '.trim((string) ($row->cabecera ?? '')),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return response()->json([
+            'ok' => true,
+            'items' => $items,
         ]);
     }
 

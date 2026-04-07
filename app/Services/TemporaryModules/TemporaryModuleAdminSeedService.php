@@ -26,7 +26,69 @@ class TemporaryModuleAdminSeedService
 
     public function previewHeaders(UploadedFile $file, int $headerRow, int $sheetIndex = 0): array
     {
-        return $this->excelReader->preview($file, $headerRow, false, $sheetIndex);
+        $preview = $this->excelReader->preview($file, $headerRow, false, $sheetIndex);
+        $preview['preview_rows'] = $this->buildPreviewRows(
+            $file,
+            (int) ($preview['header_row'] ?? $headerRow),
+            (int) ($preview['sheet_index'] ?? $sheetIndex),
+            24
+        );
+
+        return $preview;
+    }
+
+    /**
+     * @return list<array{row:int,cells:list<string>}>
+     */
+    private function buildPreviewRows(UploadedFile $file, int $headerRow, int $sheetIndex, int $maxRows = 24): array
+    {
+        $headerRow = max(1, $headerRow);
+        $endRow = $headerRow + max(8, $maxRows);
+
+        $reader = IOFactory::createReaderForFile($file->getRealPath());
+        if (method_exists($reader, 'setReadDataOnly')) {
+            $reader->setReadDataOnly(true);
+        }
+        if (method_exists($reader, 'setReadFilter')) {
+            $reader->setReadFilter(new class($endRow) implements IReadFilter {
+                public function __construct(private int $maxRow) {}
+                public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool
+                {
+                    return $row <= $this->maxRow;
+                }
+            });
+        }
+
+        $spreadsheet = $reader->load($file->getRealPath());
+        $sheetNames = $spreadsheet->getSheetNames();
+        $sheetIndex = max(0, min($sheetIndex, count($sheetNames) - 1));
+        $sheet = $spreadsheet->getSheet($sheetIndex);
+
+        $maxCol = Coordinate::columnIndexFromString($sheet->getHighestDataColumn($headerRow));
+        $maxCol = max(1, min($maxCol, 30));
+
+        $rows = [];
+        for ($r = $headerRow; $r <= $endRow; $r++) {
+            $cells = [];
+            $nonEmpty = 0;
+            for ($c = 1; $c <= $maxCol; $c++) {
+                $letter = Coordinate::stringFromColumnIndex($c);
+                $cell = trim((string) ($sheet->getCell($letter.$r)->getFormattedValue() ?? ''));
+                $cells[] = $cell;
+                if ($cell !== '') {
+                    $nonEmpty++;
+                }
+            }
+            if ($nonEmpty === 0) {
+                continue;
+            }
+            $rows[] = ['row' => $r, 'cells' => $cells];
+            if (count($rows) >= $maxRows) {
+                break;
+            }
+        }
+
+        return $rows;
     }
 
     /**
@@ -193,6 +255,8 @@ class TemporaryModuleAdminSeedService
         int $colMicrorregion,
         int $colMunicipio,
         array $fieldColumnIndices,
+        array $fieldTypesByColumn,
+        array $fieldOptionsByColumn,
         array &$stats,
         int $sheetIndex = 0,
     ): TemporaryModule {
@@ -266,13 +330,18 @@ class TemporaryModuleAdminSeedService
                 $n++;
             }
             $usedKeys[] = $key;
+            $fieldType = strtolower(trim((string) ($fieldTypesByColumn[$idx] ?? 'text')));
+            if (! in_array($fieldType, ['text', 'textarea', 'number', 'date', 'datetime', 'select', 'multiselect', 'municipio', 'boolean', 'semaforo'], true)) {
+                $fieldType = 'text';
+            }
+            $rawOptions = trim((string) ($fieldOptionsByColumn[$idx] ?? ''));
             $preparedFields[] = [
                 'label' => $label,
                 'comment' => null,
                 'key' => $key,
-                'type' => 'text',
+                'type' => $fieldType,
                 'is_required' => false,
-                'options' => null,
+                'options' => $this->normalizeSeedFieldOptions($fieldType, $rawOptions),
                 'sort_order' => $sort,
                 'subsection_index' => null,
             ];
@@ -287,7 +356,11 @@ class TemporaryModuleAdminSeedService
         $fieldCols = array_values($fieldColumnIndices);
         foreach ($fieldCols as $i => $colIdx) {
             if (isset($preparedFields[$i])) {
-                $indexToKey[(int) $colIdx] = $preparedFields[$i]['key'];
+                $indexToKey[(int) $colIdx] = [
+                    'key' => $preparedFields[$i]['key'],
+                    'type' => (string) ($preparedFields[$i]['type'] ?? 'text'),
+                    'options' => $preparedFields[$i]['options'] ?? null,
+                ];
             }
         }
 
@@ -484,7 +557,15 @@ class TemporaryModuleAdminSeedService
                         if (count($stats['unmatched']) < 150) {
                             $stats['unmatched'][] = ['row' => $row, 'reason' => 'Municipio: '.$municipioSearch];
                         }
-                        $entryPayload = $this->buildSeedRowFieldPayload($sheet, $row, $fieldColumnIndices, $indexToKey, $lastFieldCarry);
+                        $entryPayload = $this->buildSeedRowFieldPayload(
+                            $sheet,
+                            $row,
+                            $fieldColumnIndices,
+                            $indexToKey,
+                            $lastFieldCarry,
+                            $municipiosGlobalNorm,
+                            $municipiosByMicro
+                        );
                         $suggestions = $this->suggestMunicipiosForDiscard($municipioSearch, $microId, $municipiosGlobalNorm, $microLabels);
                         $this->pushDiscarded(
                             $stats,
@@ -529,15 +610,45 @@ class TemporaryModuleAdminSeedService
 
                 foreach ($fieldColumnIndices as $colIdx) {
                     $colIdx = (int) $colIdx;
-                    $key = $indexToKey[$colIdx] ?? null;
-                    if (! $key) {
+                    $descriptor = $indexToKey[$colIdx] ?? null;
+                    if (! is_array($descriptor) || ! isset($descriptor['key'])) {
                         continue;
                     }
+                    $key = (string) $descriptor['key'];
                     $raw = $this->cellStrMerged($sheet, $colIdx, $row);
                     if ($raw !== '') {
                         $lastFieldCarry[$colIdx] = $raw;
                     }
-                    $data[$key] = $raw !== '' ? $raw : ($lastFieldCarry[$colIdx] ?? '');
+                    $resolved = $raw !== '' ? $raw : ($lastFieldCarry[$colIdx] ?? '');
+                    $data[$key] = $this->normalizeSeedFieldValue(
+                        $resolved,
+                        (string) ($descriptor['type'] ?? 'text'),
+                        $descriptor['options'] ?? null,
+                        $municipiosGlobalNorm,
+                        $municipiosByMicro
+                    );
+                }
+
+                // Ignora filas de totales/resumen (ej. =SUM(...)) cuando no representan un ítem real.
+                $fieldRawValues = [];
+                foreach ($fieldColumnIndices as $colIdx) {
+                    $fieldRawValues[] = $this->cellStrMerged($sheet, (int) $colIdx, $row);
+                }
+                $hasAggregateFormula = false;
+                $hasNonFormulaValue = false;
+                foreach ($fieldRawValues as $v) {
+                    $txt = trim((string) $v);
+                    if ($txt === '') {
+                        continue;
+                    }
+                    if ($this->isAggregateFormulaValue($txt)) {
+                        $hasAggregateFormula = true;
+                        continue;
+                    }
+                    $hasNonFormulaValue = true;
+                }
+                if (! $looksLikeItemRow && $hasAggregateFormula && ! $hasNonFormulaValue) {
+                    continue;
                 }
 
                 $data['_fila_excel'] = (string) $row;
@@ -643,20 +754,30 @@ class TemporaryModuleAdminSeedService
         array $fieldColumnIndices,
         array $indexToKey,
         array $lastFieldCarrySnapshot,
+        array $municipiosGlobalNorm,
+        array $municipiosByMicro,
     ): array {
         $carry = $lastFieldCarrySnapshot;
         $data = [];
         foreach ($fieldColumnIndices as $colIdx) {
             $colIdx = (int) $colIdx;
-            $key = $indexToKey[$colIdx] ?? null;
-            if (! $key) {
+            $descriptor = $indexToKey[$colIdx] ?? null;
+            if (! is_array($descriptor) || ! isset($descriptor['key'])) {
                 continue;
             }
+            $key = (string) $descriptor['key'];
             $raw = $this->cellStrMerged($sheet, $colIdx, $row);
             if ($raw !== '') {
                 $carry[$colIdx] = $raw;
             }
-            $data[$key] = $raw !== '' ? $raw : ($carry[$colIdx] ?? '');
+            $resolved = $raw !== '' ? $raw : ($carry[$colIdx] ?? '');
+            $data[$key] = $this->normalizeSeedFieldValue(
+                $resolved,
+                (string) ($descriptor['type'] ?? 'text'),
+                $descriptor['options'] ?? null,
+                $municipiosGlobalNorm,
+                $municipiosByMicro
+            );
         }
         $data['_fila_excel'] = (string) $row;
 
@@ -915,6 +1036,115 @@ class TemporaryModuleAdminSeedService
         $s = mb_strtoupper(preg_replace('/\s+/', ' ', trim($s)), 'UTF-8');
 
         return strtr($s, ['Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ñ' => 'N']);
+    }
+
+    private function isAggregateFormulaValue(string $value): bool
+    {
+        $value = trim($value);
+        if ($value === '' || ! str_starts_with($value, '=')) {
+            return false;
+        }
+
+        return (bool) preg_match('/^=\s*(SUM|SUBTOTAL|PROMEDIO|AVERAGE|COUNT|COUNTA|MAX|MIN)\s*\(/i', $value);
+    }
+
+    private function normalizeSeedFieldOptions(string $type, string $rawOptions): ?array
+    {
+        if (! in_array($type, ['select', 'multiselect'], true)) {
+            return null;
+        }
+        if ($rawOptions === '') {
+            return [];
+        }
+        $parts = preg_split('/[\r\n,;|]+/u', $rawOptions) ?: [];
+        $options = [];
+        foreach ($parts as $part) {
+            $v = trim((string) $part);
+            if ($v !== '' && ! in_array($v, $options, true)) {
+                $options[] = $v;
+            }
+        }
+
+        return $options;
+    }
+
+    private function normalizeSeedFieldValue(
+        string $value,
+        string $type,
+        mixed $options = null,
+        array $municipiosGlobalNorm = [],
+        array $municipiosByMicro = [],
+    ): mixed
+    {
+                if ($type === 'municipio') {
+                    if ($municipiosGlobalNorm !== [] && $municipiosByMicro !== []) {
+                        $municipioDB = $this->resolveMunicipioGlobal($value, null, $municipiosGlobalNorm, $municipiosByMicro);
+                        if ($municipioDB) {
+                            return (string) $municipioDB->municipio;
+                        }
+                    }
+                    return $value;
+                }
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        if ($type === 'number') {
+            $compact = str_replace([',', ' '], ['', ''], $value);
+            if (is_numeric($compact)) {
+                return str_contains($compact, '.') ? (float) $compact : (int) $compact;
+            }
+
+            return $value;
+        }
+
+        if ($type === 'boolean') {
+            $n = $this->normalize($value);
+            if (in_array($n, ['SI', 'S', 'TRUE', 'VERDADERO', '1', 'X'], true)) {
+                return true;
+            }
+            if (in_array($n, ['NO', 'N', 'FALSE', 'FALSO', '0'], true)) {
+                return false;
+            }
+
+            return $value;
+        }
+
+        if ($type === 'multiselect') {
+            $parts = preg_split('/[\r\n,;|]+/u', $value) ?: [];
+            $vals = [];
+            foreach ($parts as $part) {
+                $v = trim((string) $part);
+                if ($v !== '' && ! in_array($v, $vals, true)) {
+                    $vals[] = $v;
+                }
+            }
+            if ($vals === []) {
+                return [];
+            }
+            if (is_array($options) && $options !== []) {
+                $normOpts = array_map(fn ($x) => $this->normalize((string) $x), $options);
+                $vals = array_values(array_filter($vals, fn ($v) => in_array($this->normalize($v), $normOpts, true)));
+            }
+
+            return $vals === [] ? [] : $vals;
+        }
+
+        if ($type === 'semaforo') {
+            $n = $this->normalize($value);
+            if (str_contains($n, 'VERDE')) {
+                return 'Verde';
+            }
+            if (str_contains($n, 'AMARILLO')) {
+                return 'Amarillo';
+            }
+            if (str_contains($n, 'ROJO')) {
+                return 'Rojo';
+            }
+        }
+
+        return $value;
     }
 
     /**
@@ -1251,15 +1481,19 @@ class TemporaryModuleAdminSeedService
 
     private function resolveUserIdForMicrorregion(int $microrregionId): ?int
     {
-        $delegado = DB::table('delegados')->where('microrregion_id', $microrregionId)->value('user_id');
+        $delegado = DB::table('delegados as d')
+            ->join('users as u', 'u.id', '=', 'd.user_id')
+            ->where('d.microrregion_id', $microrregionId)
+            ->value('d.user_id');
         if ($delegado) {
             return (int) $delegado;
         }
 
-        $uid = DB::table('user_microrregion')
-            ->where('microrregion_id', $microrregionId)
+        $uid = DB::table('user_microrregion as um')
+            ->join('users as u', 'u.id', '=', 'um.user_id')
+            ->where('um.microrregion_id', $microrregionId)
             ->orderBy('user_id')
-            ->value('user_id');
+            ->value('um.user_id');
 
         return $uid ? (int) $uid : null;
     }

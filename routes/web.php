@@ -187,6 +187,10 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('module')
                 ->middleware(['can:Modulos-Temporales-Admin', 'throttle:60,1'])
                 ->name('temporary-modules.admin.seed-discard-register');
+            Route::get('/{module}/buscar-municipios-log-semilla', [TemporaryModuleController::class, 'searchSeedDiscardMunicipios'])
+                ->whereNumber('module')
+                ->middleware(['can:Modulos-Temporales-Admin', 'throttle:120,1'])
+                ->name('temporary-modules.admin.seed-discard-search-municipios');
             Route::get('/{module}/analisis-preview', [TemporaryModuleController::class, 'analysisPreviewJson'])
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')

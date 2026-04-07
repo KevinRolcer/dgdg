@@ -94,6 +94,7 @@
                                         data-module-name="{{ e($module->name) }}"
                                         data-json-id="tm-seed-discard-{{ $module->id }}"
                                         data-register-url="{{ route('temporary-modules.admin.seed-discard-register', $module->id) }}"
+                                        data-search-url="{{ route('temporary-modules.admin.seed-discard-search-municipios', $module->id) }}"
                                         title="Log de descartados"
                                     >
                                         <i class="fa-solid fa-clipboard-list"></i>
@@ -875,7 +876,7 @@
         const seedLogTableWrap = document.getElementById('tmSeedDiscardLogTableWrap');
         const TM_EXPORT_PREVIEW_LOGO_URL = @json(asset('images/LogoSegobHorizontal.png'));
 
-        function openSeedDiscardLog(moduleName, jsonId, registerUrl) {
+        function openSeedDiscardLog(moduleName, jsonId, registerUrl, searchUrl) {
             if (!seedLogModal || !seedLogTbody) return;
             var el = document.getElementById(jsonId);
             var list = [];
@@ -897,6 +898,7 @@
                 if (window.tmSeedDiscardLog && registerUrl) {
                     window.tmSeedDiscardLog.renderRows(seedLogTbody, list, {
                         registerUrl: registerUrl,
+                        searchUrl: searchUrl || '',
                         csrfToken: csrf,
                         jsonScriptEl: el,
                         onUpdateList: function () {},
@@ -941,7 +943,8 @@
                 openSeedDiscardLog(
                     btn.getAttribute('data-module-name'),
                     btn.getAttribute('data-json-id'),
-                    btn.getAttribute('data-register-url') || ''
+                    btn.getAttribute('data-register-url') || '',
+                    btn.getAttribute('data-search-url') || ''
                 );
             });
         });

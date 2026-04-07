@@ -116,14 +116,18 @@ class TemporaryModuleAccessService
         if ($microrregionIds === []) {
             return [];
         }
-        $fromDelegados = DB::table('delegados')
-            ->whereIn('microrregion_id', $microrregionIds)
-            ->whereNotNull('user_id')
-            ->pluck('user_id')
+        $fromDelegados = DB::table('delegados as d')
+            ->join('users as u', 'u.id', '=', 'd.user_id')
+            ->whereIn('d.microrregion_id', $microrregionIds)
+            ->whereNotNull('d.user_id')
+            ->pluck('d.user_id')
             ->all();
-        $fromEnlaces = DB::table('user_microrregion')
-            ->whereIn('microrregion_id', $microrregionIds)
-            ->pluck('user_id')
+
+        $fromEnlaces = DB::table('user_microrregion as um')
+            ->join('users as u', 'u.id', '=', 'um.user_id')
+            ->whereIn('um.microrregion_id', $microrregionIds)
+            ->whereNotNull('um.user_id')
+            ->pluck('um.user_id')
             ->all();
 
         return array_values(array_unique(array_map('intval', array_merge($fromDelegados, $fromEnlaces))));

@@ -53,6 +53,12 @@
                     <div id="tmSeedDetectNote" class="tm-seed-note tm-seed-note--ok tm-hidden" role="status"></div>
                     <div id="tmSeedPreviewErr" class="tm-seed-note tm-seed-note--err tm-hidden"></div>
                     <div id="tmSeedSheetTabs" class="tm-seed-sheet-tabs tm-hidden"></div>
+                    <div id="tmSeedPreviewWrap" class="tm-seed-preview-wrap tm-hidden">
+                        <div class="tm-seed-preview-title"><i class="fa-regular fa-eye"></i> Vista previa del documento</div>
+                        <div class="tm-seed-preview-table-wrap" id="tmSeedPreviewTableWrap">
+                            <div class="tm-seed-preview-empty">Carga un archivo y pulsa "Leer encabezados" para ver la tabla.</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -91,22 +97,38 @@
                     <hr class="tm-seed-divider">
 
                     <h4 class="tm-seed-subtitle">Mapeo de columnas</h4>
-                    <label class="tm-inline-check tm-seed-check tm-seed-check--block">
-                        <input type="checkbox" id="tmSeedMrOnly"> Sin columna <strong>Municipio</strong> (solo microregión)
-                    </label>
-                    <div class="tm-excel-grid">
-                        <label class="tm-seed-label" id="tmSeedWrapMun">Municipio <span class="tm-seed-hint">(principal)</span>
-                            <select name="col_municipio" id="tmSeedColMun" class="tm-input"></select>
-                        </label>
-                        <label class="tm-seed-label" id="tmSeedWrapMr">Microregión <span class="tm-seed-hint" id="tmSeedMrHint">(opcional)</span>
-                            <select name="col_microrregion" id="tmSeedColMr" class="tm-input"></select>
-                        </label>
-                    </div>
-                    <input type="hidden" name="col_municipio" id="tmSeedMunSentinel" value="-1" disabled>
+                    <div class="tm-seed-importer-layout">
+                        <div class="tm-seed-importer-main">
+                            <label class="tm-inline-check tm-seed-check tm-seed-check--block">
+                                <input type="checkbox" id="tmSeedMrOnly"> Sin columna <strong>Municipio</strong> (solo microregión)
+                            </label>
+                            <div class="tm-excel-grid">
+                                <label class="tm-seed-label" id="tmSeedWrapMun">Municipio <span class="tm-seed-hint">(principal)</span>
+                                    <select name="col_municipio" id="tmSeedColMun" class="tm-input"></select>
+                                </label>
+                                <label class="tm-seed-label" id="tmSeedWrapMr">Microregión <span class="tm-seed-hint" id="tmSeedMrHint">(opcional)</span>
+                                    <select name="col_microrregion" id="tmSeedColMr" class="tm-input"></select>
+                                </label>
+                            </div>
+                            <input type="hidden" name="col_municipio" id="tmSeedMunSentinel" value="-1" disabled>
 
-                    <p class="tm-seed-hint-block">Campos del módulo (Acción, estatus, etc.):</p>
-                    <div id="tmSeedFieldChecks" class="tm-seed-field-checks"></div>
-                    <input type="hidden" name="field_columns" id="tmSeedFieldColumns" value="">
+                            <p class="tm-seed-hint-block">Selecciona columnas para crear campos y define su tipo:</p>
+                            <div id="tmSeedFieldMapRows" class="tm-seed-map-rows"></div>
+                            <input type="hidden" name="field_columns" id="tmSeedFieldColumns" value="">
+                            <input type="hidden" name="field_types" id="tmSeedFieldTypes" value="{}">
+                            <input type="hidden" name="field_options" id="tmSeedFieldOptions" value="{}">
+                        </div>
+                        <aside class="tm-seed-importer-side">
+                            <h5 class="tm-seed-importer-side-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Recomendaciones</h5>
+                            <ul class="tm-seed-importer-tips">
+                                <li>Usa <strong>Texto</strong> para valores libres y descripciones.</li>
+                                <li>Usa <strong>Número</strong> para metas, montos o cantidades.</li>
+                                <li>Usa <strong>Lista</strong> cuando tengas valores repetidos (estatus, avance).</li>
+                                <li>Si una columna tiene varios valores por celda, usa <strong>Selección múltiple</strong>.</li>
+                                <li>Con <strong>Municipio</strong> se normaliza contra el catálogo global (incluye municipios de todas las microrregiones).</li>
+                            </ul>
+                        </aside>
+                    </div>
 
                     <div class="tm-seed-actions">
                         <button type="submit" class="tm-btn tm-btn-primary tm-seed-submit" id="tmSeedSubmit" disabled>
@@ -167,8 +189,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const mappingEl = document.getElementById('tmSeedMapping');
     const colMr = document.getElementById('tmSeedColMr');
     const colMun = document.getElementById('tmSeedColMun');
-    const fieldChecks = document.getElementById('tmSeedFieldChecks');
+    const fieldMapRows = document.getElementById('tmSeedFieldMapRows');
     const fieldColumnsInput = document.getElementById('tmSeedFieldColumns');
+    const fieldTypesInput = document.getElementById('tmSeedFieldTypes');
+    const fieldOptionsInput = document.getElementById('tmSeedFieldOptions');
+    const previewWrap = document.getElementById('tmSeedPreviewWrap');
+    const previewTableWrap = document.getElementById('tmSeedPreviewTableWrap');
     const submitBtn = document.getElementById('tmSeedSubmit');
     const indef = document.getElementById('tmSeedIndef');
     const expires = document.getElementById('tmSeedExpires');
@@ -181,6 +207,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const sheetIndexInput = document.getElementById('tmSeedSheetIndex');
     const detectNoteEl = document.getElementById('tmSeedDetectNote');
     const autoDetectChk = document.getElementById('tmSeedAutoDetect');
+    const fieldTypesCatalog = {
+        text: 'Texto',
+        textarea: 'Texto largo',
+        number: 'Número',
+        date: 'Fecha',
+        datetime: 'Fecha y hora',
+        select: 'Lista',
+        multiselect: 'Selección múltiple',
+        municipio: 'Municipio (catálogo)',
+        boolean: 'Sí / No',
+        semaforo: 'Semáforo'
+    };
 
     let currentSheetIndex = 0;
 
@@ -194,9 +232,30 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     mrOnlyChk.addEventListener('change', syncMrMunMode);
 
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function inferFieldType(label) {
+        const n = String(label || '').toUpperCase();
+        if (/MUNICIPIO|LOCALIDAD|COMUNIDAD/.test(n)) return 'municipio';
+        if (/FECHA|DIA|MES|AÑO/.test(n)) return 'date';
+        if (/HORA|F\.\s*HORA|TIMESTAMP/.test(n)) return 'datetime';
+        if (/TOTAL|CANTIDAD|META|NUMERO|NÚMERO|PORCENTAJE|MONTO|IMPORTE/.test(n)) return 'number';
+        if (/ESTATUS|ESTADO|SEM[ÁA]FORO|NIVEL/.test(n)) return 'select';
+        if (/OBSERVACION|DESCRIPCION|DETALLE|COMENTARIO/.test(n)) return 'textarea';
+
+        return 'text';
+    }
+
     function fillSelects(headers) {
         const opts = headers.map(function (h) {
-            return '<option value="' + h.index + '">' + h.letter + ' — ' + String(h.label || '(vacío)').replace(/</g, '&lt;') + '</option>';
+            return '<option value="' + h.index + '">' + h.letter + ' — ' + escapeHtml(h.label || '(vacío)') + '</option>';
         }).join('');
         colMr.innerHTML = '<option value="-1">— Ninguna —</option>' + opts;
         colMun.innerHTML = opts;
@@ -210,26 +269,135 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!colMr.dataset.set) colMr.value = '-1';
         if (!colMun.dataset.set && colMun.options.length) colMun.selectedIndex = 0;
         syncMrMunMode();
-        fieldChecks.innerHTML = '';
+
+        const typeOptions = Object.keys(fieldTypesCatalog).map(function (key) {
+            return '<option value="' + key + '">' + fieldTypesCatalog[key] + '</option>';
+        }).join('');
+
+        fieldMapRows.innerHTML = '';
         headers.forEach(function (h) {
-            const id = 'fc_' + h.index;
+            const norm = String(h.label || '').toUpperCase();
+            const isGeoColumn = /MICRORREGION|MICRORREGI|\bMR\b|MUNICIPIO|MUNICIP/.test(norm);
+            const isFolioColumn = /^N\s*[°#.]?$|^NO\.?$|^NUMERO$|^NÚMERO$/.test(norm.replace(/\s+/g, ''));
+            const shouldCheck = !isGeoColumn && !isFolioColumn;
+            const type = inferFieldType(h.label || '');
             const row = document.createElement('label');
-            row.className = 'tm-seed-fc-label';
-            row.innerHTML = '<input type="checkbox" class="tm-seed-fc" value="' + h.index + '" id="' + id + '"> <span>' + h.letter + ' — ' + String(h.label || '').replace(/</g, '&lt;') + '</span>';
-            fieldChecks.appendChild(row);
+            row.className = 'tm-seed-map-row';
+            row.innerHTML = ''
+                + '<div class="tm-seed-map-col tm-seed-map-col--pick">'
+                + '  <input type="checkbox" class="tm-seed-fc" value="' + h.index + '" ' + (shouldCheck ? 'checked' : '') + '>'
+                + '  <span class="tm-seed-map-col-label">' + h.letter + ' — ' + escapeHtml(h.label || '(vacío)') + '</span>'
+                + '</div>'
+                + '<div class="tm-seed-map-col tm-seed-map-col--type">'
+                + '  <select class="tm-input tm-seed-field-type" data-col-idx="' + h.index + '">' + typeOptions + '</select>'
+                + '</div>'
+                + '<div class="tm-seed-map-col tm-seed-map-col--options">'
+                + '  <input type="text" class="tm-input tm-seed-field-options" data-col-idx="' + h.index + '" placeholder="Opciones separadas por coma">'
+                + '</div>';
+            fieldMapRows.appendChild(row);
+            const typeSel = row.querySelector('.tm-seed-field-type');
+            if (typeSel) typeSel.value = type;
         });
+
         mappingEl.classList.remove('tm-hidden');
         mappingEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         syncFieldColumns();
+        updateOptionsVisibility();
+    }
+
+    function updateOptionsVisibility() {
+        fieldMapRows.querySelectorAll('.tm-seed-map-row').forEach(function (row) {
+            const checkbox = row.querySelector('.tm-seed-fc');
+            const typeSel = row.querySelector('.tm-seed-field-type');
+            const optionsInput = row.querySelector('.tm-seed-field-options');
+            if (!checkbox || !typeSel || !optionsInput) return;
+            const allowOptions = ['select', 'multiselect'].indexOf(typeSel.value) !== -1;
+            optionsInput.disabled = !checkbox.checked || !allowOptions;
+            if (!allowOptions && optionsInput.value.trim() !== '') {
+                optionsInput.value = '';
+            }
+            if (typeSel.value === 'municipio') {
+                optionsInput.placeholder = 'Normalización automática por catálogo';
+            } else {
+                optionsInput.placeholder = 'Opciones separadas por coma';
+            }
+            row.classList.toggle('is-active', checkbox.checked);
+        });
+    }
+
+    function renderPreviewTable(headers, rows, headerRow, dataStartRow) {
+        if (!Array.isArray(rows) || rows.length === 0) {
+            previewTableWrap.innerHTML = '<div class="tm-seed-preview-empty">No se encontraron filas para vista previa.</div>';
+            previewWrap.classList.remove('tm-hidden');
+            return;
+        }
+        const visibleCols = Math.min(24, headers.length || 12);
+        let html = '<table class="tm-excel-preview-table"><thead><tr><th class="row-num">Fila</th>';
+        for (let c = 0; c < visibleCols; c++) {
+            const head = headers[c];
+            const title = head ? (head.letter + ' — ' + (head.label || '(vacío)')) : ('Col ' + (c + 1));
+            const colIdx = head ? head.index : c;
+            html += '<th data-col-idx="' + colIdx + '">' + escapeHtml(title) + '</th>';
+        }
+        html += '</tr></thead><tbody>';
+        rows.forEach(function (r) {
+            const isHeader = Number(r.row) === Number(headerRow);
+            const isData = Number(r.row) >= Number(dataStartRow);
+            const trClass = isHeader ? 'is-header-row' : (isData ? 'is-data-row' : '');
+            html += '<tr class="' + trClass + '"><td class="row-num">' + escapeHtml(r.row) + '</td>';
+            for (let c = 0; c < visibleCols; c++) {
+                const cell = Array.isArray(r.cells) ? (r.cells[c] || '') : '';
+                const head = headers[c];
+                const colIdx = head ? head.index : c;
+                html += '<td data-col-idx="' + colIdx + '">' + escapeHtml(cell) + '</td>';
+            }
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        previewTableWrap.innerHTML = html;
+        previewWrap.classList.remove('tm-hidden');
+        paintMappedColumns();
+    }
+
+    function paintMappedColumns() {
+        const mapped = Array.from(fieldMapRows.querySelectorAll('.tm-seed-fc:checked')).map(function (el) { return parseInt(el.value, 10); });
+        previewTableWrap.querySelectorAll('[data-col-idx]').forEach(function (cell) {
+            const idx = parseInt(cell.getAttribute('data-col-idx'), 10);
+            cell.classList.toggle('is-mapped-column', mapped.indexOf(idx) !== -1);
+        });
     }
 
     function syncFieldColumns() {
-        const checked = Array.from(document.querySelectorAll('.tm-seed-fc:checked')).map(function (c) { return parseInt(c.value, 10); });
+        const checked = Array.from(fieldMapRows.querySelectorAll('.tm-seed-fc:checked')).map(function (c) { return parseInt(c.value, 10); });
+        const types = {};
+        const options = {};
+        fieldMapRows.querySelectorAll('.tm-seed-map-row').forEach(function (row) {
+            const checkbox = row.querySelector('.tm-seed-fc');
+            const typeSel = row.querySelector('.tm-seed-field-type');
+            const optionsInput = row.querySelector('.tm-seed-field-options');
+            if (!checkbox || !typeSel || !optionsInput || !checkbox.checked) return;
+            const idx = parseInt(checkbox.value, 10);
+            types[idx] = typeSel.value || 'text';
+            options[idx] = optionsInput.value || '';
+        });
         fieldColumnsInput.value = JSON.stringify(checked);
+        fieldTypesInput.value = JSON.stringify(types);
+        fieldOptionsInput.value = JSON.stringify(options);
         submitBtn.disabled = checked.length === 0;
+        paintMappedColumns();
     }
 
-    fieldChecks.addEventListener('change', syncFieldColumns);
+    fieldMapRows.addEventListener('change', function (event) {
+        if (event.target.classList.contains('tm-seed-field-type') || event.target.classList.contains('tm-seed-fc')) {
+            updateOptionsVisibility();
+        }
+        syncFieldColumns();
+    });
+    fieldMapRows.addEventListener('input', function (event) {
+        if (event.target.classList.contains('tm-seed-field-options')) {
+            syncFieldColumns();
+        }
+    });
 
     function renderSheetTabs(sheetNames, activeIndex) {
         if (!sheetNames || sheetNames.length <= 1) {
@@ -298,6 +466,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 colMr.dataset.set = '';
                 colMun.dataset.set = '';
                 fillSelects(j.headers || []);
+                renderPreviewTable(j.headers || [], j.preview_rows || [], j.header_row || 1, j.data_start_row || ((j.header_row || 1) + 1));
             }).catch(function (e) {
                 errEl.textContent = e.message || 'Error al procesar el archivo.';
                 errEl.classList.remove('tm-hidden');
@@ -307,9 +476,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.getElementById('tmSeedReadHeaders').addEventListener('click', function () {
-        currentSheetIndex = 0;
-        sheetIndexInput.value = '0';
-        readHeaders(0);
+        currentSheetIndex = parseInt(sheetIndexInput.value || '0', 10);
+        readHeaders(currentSheetIndex);
     });
 
     indef.addEventListener('change', function () {

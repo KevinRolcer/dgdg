@@ -37,6 +37,7 @@
             role="dialog"
             aria-modal="true"
             data-register-url="{{ route('temporary-modules.admin.seed-discard-register', $temporaryModule->id) }}"
+            data-search-url="{{ route('temporary-modules.admin.seed-discard-search-municipios', $temporaryModule->id) }}"
             data-csrf-token="{{ csrf_token() }}"
         >
             <div class="tm-modal-backdrop" data-tm-seed-log-close-edit></div>
@@ -321,7 +322,7 @@
         {{-- linked: two sub-field definitions --}}
         <div class="tm-linked-container" data-linked-wrap hidden>
             <div class="tm-linked-wrap tm-grid tm-grid-2" style="border:1px solid var(--clr-divider,#ddd);border-radius:6px;padding:12px 16px;gap:24px;margin-top:8px;background:var(--tm-muted-bg, rgba(0,0,0,0.02));">
-                
+
                 {{-- Principal --}}
                 <div style="display:flex;flex-direction:column;gap:8px;border-right:1px solid var(--clr-divider,#ddd);padding-right:16px;">
                     <h6 style="margin:0;font-size:.85rem;font-weight:700;color:var(--clr-primary,#861e34);">1. Campo principal</h6>
@@ -984,6 +985,7 @@
                     wrap.hidden = false;
                     window.tmSeedDiscardLog.renderRows(tbody, currentList, {
                         registerUrl: modal.getAttribute('data-register-url') || '',
+                        searchUrl: modal.getAttribute('data-search-url') || '',
                         csrfToken: modal.getAttribute('data-csrf-token') || '',
                         jsonScriptEl: jsonEl,
                         onUpdateList: function (newLog) {
