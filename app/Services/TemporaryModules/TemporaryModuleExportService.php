@@ -52,6 +52,7 @@ class TemporaryModuleExportService
             ->orderByRaw(
                 'CASE WHEN temporary_module_entries.microrregion_id IS NULL THEN 1 ELSE 0 END, '.
                 'CAST(COALESCE(microrregiones.microrregion, 0) AS UNSIGNED) '.$direction.', '.
+                'LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(temporary_module_entries.data, "$.\\\"_municipio_reporte\\\"")), ""))) ASC, '.
                 'temporary_module_entries.submitted_at DESC'
             )
             ->select('temporary_module_entries.*');
@@ -1312,15 +1313,15 @@ class TemporaryModuleExportService
                     $rowIndex++;
                     $itemNumber++;
                 }
-
-                // Merge last remaining group after all iterations
-                if ($mergingStartRow !== null && $mergingStartRow < ($rowIndex - 1)) {
-                    $sheet->mergeCells('B'.$mergingStartRow.':B'.($rowIndex - 1));
-                    $sheet->getStyle('B'.$mergingStartRow.':B'.($rowIndex - 1))->getAlignment()
-                        ->setVertical(Alignment::VERTICAL_CENTER)
-                        ->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                }
             });
+
+            // Merge final microrregión group once, after processing all chunks.
+            if ($mergingStartRow !== null && $mergingStartRow < ($rowIndex - 1)) {
+                $sheet->mergeCells('B'.$mergingStartRow.':B'.($rowIndex - 1));
+                $sheet->getStyle('B'.$mergingStartRow.':B'.($rowIndex - 1))->getAlignment()
+                    ->setVertical(Alignment::VERTICAL_CENTER)
+                    ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            }
         }
 
         $lastDataRow = $rowIndex > $dataStartRow ? $rowIndex - 1 : $dataStartRow;
