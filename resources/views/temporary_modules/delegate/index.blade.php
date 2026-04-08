@@ -2920,6 +2920,7 @@
             let workbookData = null;
             let currentWorkbook = null;
             let currentSheetIdx = 0;
+            let currentSheetStartRow = 1;
             let excelFields = [];
 
             const switchToSheet = function(idx) {
@@ -2928,7 +2929,17 @@
                 if (idx < 0 || idx >= names.length) return;
                 currentSheetIdx = idx;
                 const worksheet = currentWorkbook.Sheets[names[idx]];
-                workbookData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                let startRow = 1;
+                if (worksheet && worksheet['!ref']) {
+                    try {
+                        const range = XLSX.utils.decode_range(String(worksheet['!ref']));
+                        if (range && range.s && Number.isFinite(range.s.r)) {
+                            startRow = range.s.r + 1;
+                        }
+                    } catch (_) {}
+                }
+                currentSheetStartRow = Math.max(1, startRow);
+                workbookData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: true, defval: '' });
                 renderExcelPreview(workbookData);
             };
 
@@ -3039,6 +3050,7 @@
                 workbookData = null;
                 currentWorkbook = null;
                 currentSheetIdx = 0;
+                currentSheetStartRow = 1;
                 const sheetTabsWrap = modal.querySelector('.tm-excel-sheet-tabs-wrap-el');
                 if (sheetTabsWrap) sheetTabsWrap.style.display = 'none';
                 const sheetTabsEl = modal.querySelector('.tm-excel-sheet-tabs-el');
@@ -3137,7 +3149,7 @@
                 html += '</tr></thead><tbody>';
 
                 data.slice(0, 1000).forEach((row, rowIndex) => {
-                    const displayRowIndex = rowIndex + 1;
+                    const displayRowIndex = currentSheetStartRow + rowIndex;
                     html += '<tr data-row-index="' + displayRowIndex + '"><td class="row-num">' + displayRowIndex + '</td>';
                     for (let i = 0; i < maxCols; i++) {
                         const cell = row[i] !== undefined && row[i] !== null ? row[i] : '';
@@ -3452,10 +3464,11 @@
 
             modal.querySelector('.tm-excel-auto-detect')?.addEventListener('click', () => {
                 if (!workbookData) return;
-                let found = 1;
+                let found = currentSheetStartRow;
                 for (let i = 0; i < workbookData.length; i++) {
                     if ((workbookData[i] || []).filter(c => c !== null && c !== '').length >= 3) {
-                        found = i + 1; break;
+                        found = currentSheetStartRow + i;
+                        break;
                     }
                 }
                 headerRowInput.value = found;

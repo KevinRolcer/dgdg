@@ -70,9 +70,12 @@ class TemporaryModuleEntryDataService
             ->all();
 
         foreach ($fileFieldKeys as $fieldKey) {
-            $path = $entry->data[$fieldKey] ?? null;
-            if (is_string($path) && trim($path) !== '' && !filter_var($path, FILTER_VALIDATE_URL)) {
-                $this->deleteStoredPath($path);
+            $value = $entry->data[$fieldKey] ?? null;
+            $paths = is_array($value) ? $value : ($value ? [(string)$value] : []);
+            foreach ($paths as $path) {
+                if (is_string($path) && trim($path) !== '' && !filter_var($path, FILTER_VALIDATE_URL)) {
+                    $this->deleteStoredPath($path);
+                }
             }
         }
 
@@ -90,12 +93,13 @@ class TemporaryModuleEntryDataService
         if (!empty($fileFieldKeys)) {
             foreach ($temporaryModule->entries()->select(['id', 'data'])->cursor() as $entry) {
                 foreach ($fileFieldKeys as $fieldKey) {
-                    $path = $entry->data[$fieldKey] ?? null;
-                    if (!is_string($path) || trim($path) === '' || filter_var($path, FILTER_VALIDATE_URL)) {
-                        continue;
+                    $value = $entry->data[$fieldKey] ?? null;
+                    $paths = is_array($value) ? $value : ($value ? [(string)$value] : []);
+                    foreach ($paths as $path) {
+                        if (is_string($path) && trim((string)$path) !== '' && !filter_var($path, FILTER_VALIDATE_URL)) {
+                            $filesToDelete[] = ltrim(str_replace('\\', '/', (string)$path), '/');
+                        }
                     }
-
-                    $filesToDelete[] = ltrim(str_replace('\\', '/', $path), '/');
                 }
             }
         }
@@ -136,8 +140,13 @@ class TemporaryModuleEntryDataService
                 }
 
                 $value = $data[$fieldKey];
-                if (in_array($fieldKey, $imageKeys, true) && is_string($value) && trim($value) !== '' && !filter_var($value, FILTER_VALIDATE_URL)) {
-                    $filesToDelete[] = ltrim(str_replace('\\', '/', $value), '/');
+                $paths = is_array($value) ? $value : ($value ? [(string)$value] : []);
+                if (in_array($fieldKey, $imageKeys, true)) {
+                    foreach ($paths as $path) {
+                        if (is_string($path) && trim((string)$path) !== '' && !filter_var($path, FILTER_VALIDATE_URL)) {
+                            $filesToDelete[] = ltrim(str_replace('\\', '/', (string)$path), '/');
+                        }
+                    }
                 }
 
                 unset($data[$fieldKey]);

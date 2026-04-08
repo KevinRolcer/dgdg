@@ -21,6 +21,10 @@
     if (!in_array($countTableAlign, ['left', 'center', 'right'], true)) {
         $countTableAlign = 'left';
     }
+    $sumTableAlign = strtolower((string) ($sumTableAlign ?? $countTableAlign));
+    if (!in_array($sumTableAlign, ['left', 'center', 'right'], true)) {
+        $sumTableAlign = $countTableAlign;
+    }
     $dataTableAlign = strtolower((string) ($tableAlign ?? 'left'));
     if (!in_array($dataTableAlign, ['left', 'center', 'right', 'stretch'], true)) {
         $dataTableAlign = 'left';
@@ -48,6 +52,17 @@
     };
     $countTableInlineStyle = 'display:inline-table; width:auto; table-layout:fixed; margin:0;';
     $countTableCellWidth = max(6, min(40, (int) ($countTableCellWidth ?? 12)));
+    $sumTableWrapStyle = match ($sumTableAlign) {
+        'center' => 'text-align:center; margin-bottom: 16px;',
+        'right' => 'text-align:right; margin-bottom: 16px;',
+        default => 'text-align:left; margin-bottom: 16px;',
+    };
+    $sumTableStyle = match ($sumTableAlign) {
+        'center' => 'width:auto; margin: 0 auto 16px auto;',
+        'right' => 'width:auto; margin: 0 0 16px auto;',
+        default => 'width:auto; margin: 0 auto 16px 0;',
+    };
+    $sumGroupColor = trim((string) ($sumGroupColor ?? 'var(--clr-primary)'));
 
     if ($forceFullWidthDataTable || $stretch || $dataTableAlign === 'left') {
         $dataTableStyle = 'width:100%; margin-top:10px;';
@@ -159,6 +174,25 @@
             overflow-wrap: anywhere;
             word-break: break-word;
             line-height: 1.1;
+        }
+        .sum-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            margin-bottom: 16px;
+        }
+        .sum-table th {
+            background: #475569;
+            color: #fff;
+            text-align: center;
+            font-size: 9px;
+        }
+        .sum-table td {
+            text-align: center;
+            font-size: 10px;
+        }
+        .sum-table td:first-child {
+            text-align: left;
         }
     </style>
 </head>
@@ -290,6 +324,130 @@
     </tbody>
 </table>
 </div>
+@endif
+
+@if(!empty($sumTable) && !empty($sumTable['rows']) && is_array($sumTable['rows']))
+@php
+    $sumTitle = trim((string) ($sumTitle ?? 'Sumatoria'));
+    if ($sumTitle === '') { $sumTitle = 'Sumatoria'; }
+    $sumTitleCase = strtolower((string) ($sumTitleCase ?? 'normal'));
+    if (!in_array($sumTitleCase, ['normal', 'upper', 'lower'], true)) { $sumTitleCase = 'normal'; }
+    $sumTitleAlign = strtolower((string) ($sumTitleAlign ?? 'center'));
+    if (!in_array($sumTitleAlign, ['left', 'center', 'right'], true)) { $sumTitleAlign = 'center'; }
+    $sumTitleFontSizePx = max(10, min(36, (int) ($sumTitleFontSizePx ?? 14)));
+    $sumHeadingText = $sumTitle.' por '.($sumTable['group_label'] ?? 'Grupo');
+    if (!empty($headersUppercase)) {
+        $sumHeadingText = mb_strtoupper($sumHeadingText);
+    }
+    if ($sumTitleCase === 'upper') {
+        $sumHeadingText = mb_strtoupper($sumHeadingText);
+    } elseif ($sumTitleCase === 'lower') {
+        $sumHeadingText = mb_strtolower($sumHeadingText);
+        $sumHeadingText = mb_strtoupper(mb_substr($sumHeadingText, 0, 1, 'UTF-8'), 'UTF-8').mb_substr($sumHeadingText, 1, null, 'UTF-8');
+    }
+@endphp
+<p style="font-weight: bold; margin: 6px 0 6px 0; text-align: {{ $sumTitleAlign }}; font-size: {{ $sumTitleFontSizePx }}px;">{{ $sumHeadingText }}</p>
+<div style="{{ $sumTableWrapStyle }}">
+@php
+    $sumMetricColumns = is_array($sumTable['metric_columns'] ?? null) ? $sumTable['metric_columns'] : [];
+    $sumFormulaColumns = is_array($sumTable['formula_columns'] ?? null) ? $sumTable['formula_columns'] : [];
+    $sumCombinedColumns = [];
+    foreach ($sumMetricColumns as $col) {
+        $sumCombinedColumns[] = [
+            'id' => (string) ($col['id'] ?? ''),
+            'label' => (string) ($col['label'] ?? ''),
+            'group' => trim((string) ($col['group'] ?? '')),
+            'op' => 'metric',
+            'sort_order' => (int) ($col['sort_order'] ?? 0),
+        ];
+    }
+    if ($sumCombinedColumns === [] && is_array($sumTable['metric_labels'] ?? null)) {
+        foreach (($sumTable['metric_labels'] ?? []) as $id => $label) {
+            $sumCombinedColumns[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'metric', 'sort_order' => 0];
+        }
+    }
+    foreach ($sumFormulaColumns as $col) {
+        $sumCombinedColumns[] = [
+            'id' => (string) ($col['id'] ?? ''),
+            'label' => (string) ($col['label'] ?? ''),
+            'group' => trim((string) ($col['group'] ?? '')),
+            'op' => (string) ($col['op'] ?? 'add'),
+            'sort_order' => (int) ($col['sort_order'] ?? 0),
+        ];
+    }
+    if ($sumFormulaColumns === [] && is_array($sumTable['formula_labels'] ?? null)) {
+        foreach (($sumTable['formula_labels'] ?? []) as $id => $label) {
+            $sumCombinedColumns[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'add', 'sort_order' => 0];
+        }
+    }
+    if ($sumCombinedColumns !== []) {
+        usort($sumCombinedColumns, static function (array $a, array $b): int {
+            $sa = (int) ($a['sort_order'] ?? 0);
+            $sb = (int) ($b['sort_order'] ?? 0);
+            if ($sa !== $sb) {
+                if ($sa === 0) return 1;
+                if ($sb === 0) return -1;
+                return $sa <=> $sb;
+            }
+            return 0;
+        });
+    }
+    $sumHasGroups = collect($sumCombinedColumns)->contains(fn ($c) => ((string) ($c['group'] ?? '')) !== '');
+    $sumGroupSpans = [];
+    if ($sumHasGroups) {
+        foreach ($sumCombinedColumns as $col) {
+            $g = (string) ($col['group'] ?? '');
+            if (!empty($sumGroupSpans) && $sumGroupSpans[count($sumGroupSpans) - 1]['label'] === $g) {
+                $sumGroupSpans[count($sumGroupSpans) - 1]['span']++;
+            } else {
+                $sumGroupSpans[] = ['label' => $g, 'span' => 1];
+            }
+        }
+    }
+@endphp
+<table class="sum-table" style="{{ $sumTableStyle }} {{ $countTableInlineStyle }}">
+    <thead>
+    @if($sumHasGroups)
+    <tr>
+        <th style="background:{{ $sumGroupColor }};color:#fff;"></th>
+        @foreach($sumGroupSpans as $gs)
+            <th colspan="{{ $gs['span'] }}" style="background:#334155;color:#fff;">{{ $gs['label'] }}</th>
+        @endforeach
+    </tr>
+    @endif
+    <tr>
+        <th style="background:{{ $sumGroupColor }};color:#fff;">{{ $sumTable['group_label'] ?? 'Grupo' }}</th>
+        @foreach ($sumCombinedColumns as $col)
+            <th>{{ $col['label'] }}</th>
+        @endforeach
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (($sumTable['rows'] ?? []) as $row)
+        <tr>
+            <td>{{ $row['group'] ?? '' }}</td>
+            @foreach ($sumCombinedColumns as $col)
+                @php
+                    $id = (string) ($col['id'] ?? '');
+                    $isMetric = (string) ($col['op'] ?? 'metric') === 'metric';
+                    $val = $isMetric
+                        ? (float) (($row['metrics'][$id] ?? 0.0))
+                        : (float) (($row['formulas'][$id] ?? 0.0));
+                    $txt = round($val, 2);
+                    if (!$isMetric && (string) ($col['op'] ?? '') === 'percent') {
+                        $txt = $txt.'%';
+                    }
+                @endphp
+                <td>{{ $txt }}</td>
+            @endforeach
+        </tr>
+    @endforeach
+    </tbody>
+</table>
+</div>
+@endif
+
+@if((!empty($countTable) && isset($countTable['groups'])) || (!empty($sumTable) && !empty($sumTable['rows']) && is_array($sumTable['rows'])))
 <p style="font-weight: bold; margin: 8px 0 4px 0;">{{ $sectionLabel ?? 'Desglose' }}</p>
 @endif
 

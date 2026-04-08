@@ -49,39 +49,52 @@ class TemporaryModuleExcelImportService
         $sheetIndex = max(0, min($sheetIndex, count($sheetNames) - 1));
         $sheet = $spreadsheet->getSheet($sheetIndex);
 
-        // Fallback: scan up to 5 rows starting from headerRow, pick the one with most non-empty cells
-        $bestHeaderRow = $headerRow;
-        $bestNonEmpty = 0;
-        $bestColCount = 0;
-        $bestLabels = [];
-        for ($tryRow = $headerRow; $tryRow < $headerRow + 5; $tryRow++) {
-            $highestCol = $sheet->getHighestDataColumn($tryRow);
+        $buildHeadersFromRow = function (int $rowNum) use ($sheet): array {
+            $highestCol = $sheet->getHighestDataColumn($rowNum);
             $maxColIndex = Coordinate::columnIndexFromString($highestCol);
             $labels = [];
-            $nonEmpty = 0;
             for ($col = 1; $col <= $maxColIndex; $col++) {
                 $letter = Coordinate::stringFromColumnIndex($col);
-                $raw = $sheet->getCell($letter.$tryRow)->getValue();
-                $label = $this->stringifyCell($raw);
+                $raw = $sheet->getCell($letter.$rowNum)->getValue();
                 $labels[] = [
                     'index' => $col - 1,
                     'letter' => $letter,
-                    'label' => $label,
+                    'label' => $this->stringifyCell($raw),
                 ];
-                if (trim($label) !== '') {
-                    $nonEmpty++;
+            }
+
+            return $labels;
+        };
+
+        // Si el usuario ya eligió fila (>1), respetarla estrictamente.
+        // Solo aplicamos fallback automático cuando la fila es 1 (valor por defecto inicial).
+        if ($headerRow > 1) {
+            $headers = $buildHeadersFromRow($headerRow);
+        } else {
+            $bestHeaderRow = $headerRow;
+            $bestNonEmpty = 0;
+            $bestColCount = 0;
+            $bestLabels = [];
+            for ($tryRow = $headerRow; $tryRow < $headerRow + 5; $tryRow++) {
+                $labels = $buildHeadersFromRow($tryRow);
+                $nonEmpty = 0;
+                foreach ($labels as $labelMeta) {
+                    if (trim((string) ($labelMeta['label'] ?? '')) !== '') {
+                        $nonEmpty++;
+                    }
+                }
+                $colCount = count($labels);
+                if ($nonEmpty > $bestNonEmpty || ($nonEmpty === $bestNonEmpty && $colCount > $bestColCount)) {
+                    $bestHeaderRow = $tryRow;
+                    $bestNonEmpty = $nonEmpty;
+                    $bestColCount = $colCount;
+                    $bestLabels = $labels;
                 }
             }
-            if ($nonEmpty > $bestNonEmpty || ($nonEmpty === $bestNonEmpty && $maxColIndex > $bestColCount)) {
-                $bestHeaderRow = $tryRow;
-                $bestNonEmpty = $nonEmpty;
-                $bestColCount = $maxColIndex;
-                $bestLabels = $labels;
-            }
-        }
 
-        $headers = $bestLabels;
-        $headerRow = $bestHeaderRow;
+            $headers = $bestLabels;
+            $headerRow = $bestHeaderRow;
+        }
 
         $result = [
             'success' => true,

@@ -610,15 +610,19 @@ class TemporaryModuleAnalysisWordService
             return $value ? 'Sí' : 'No';
         }
         if (in_array($t, ['image', 'file'], true)) {
-            if (! is_string($value) || trim($value) === '') {
+            $files = is_array($value) ? array_filter($value) : ($value ? [(string) $value] : []);
+            if (empty($files)) {
                 return '—';
             }
-            if (filter_var($value, FILTER_VALIDATE_URL)) {
+            if (count($files) > 1) {
+                return '['.count($files).' '.(($t === 'image' || $t === 'foto') ? 'Imágenes' : 'Archivos').' adjuntos]';
+            }
+            $val = (string) reset($files);
+            if (filter_var($val, FILTER_VALIDATE_URL)) {
                 return '[Enlace adjunto]';
             }
-            $base = basename(str_replace('\\', '/', $value));
-
-            return $base !== '' && $base !== '.' ? $base : '[Archivo adjunto]';
+            $base = basename(str_replace('\\', '/', $val));
+            return ($base !== '' && $base !== '.') ? $base : (($t === 'image' || $t === 'foto') ? '[Imagen adjunta]' : '[Archivo adjunto]');
         }
         if ($t === 'categoria' && is_array($value)) {
             $parts = [];

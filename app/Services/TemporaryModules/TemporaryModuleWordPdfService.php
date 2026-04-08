@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PhpOffice\PhpWord\SimpleType\Jc;
+use PhpOffice\PhpWord\SimpleType\JcTable;
 use PhpOffice\PhpWord\Style\Section as SectionStyle;
 use Dompdf\Dompdf;
 use Illuminate\Support\Facades\Storage;
@@ -188,6 +189,25 @@ class TemporaryModuleWordPdfService
         if (!in_array($countTableAlign, ['left', 'center', 'right'], true)) {
             $countTableAlign = 'left';
         }
+        $sumTableAlign = strtolower((string) ($exportConfig['sum_table_align'] ?? 'left'));
+        if (!in_array($sumTableAlign, ['left', 'center', 'right'], true)) {
+            $sumTableAlign = 'left';
+        }
+        $sumTitle = trim((string) ($exportConfig['sum_title'] ?? 'Sumatoria'));
+        if ($sumTitle === '') {
+            $sumTitle = 'Sumatoria';
+        }
+        $sumTitleCase = strtolower((string) ($exportConfig['sum_title_case'] ?? 'normal'));
+        if (!in_array($sumTitleCase, ['normal', 'upper', 'lower'], true)) {
+            $sumTitleCase = 'normal';
+        }
+        $sumTitleAlign = strtolower((string) ($exportConfig['sum_title_align'] ?? 'center'));
+        if (!in_array($sumTitleAlign, ['left', 'center', 'right'], true)) {
+            $sumTitleAlign = 'center';
+        }
+        $sumTitleFontSizePx = max(10, min(36, (int) ($exportConfig['sum_title_font_size_px'] ?? 14)));
+        $sumTitleFontSizePt = max(8, min(27, (int) round($sumTitleFontSizePx * 0.75)));
+        $sumGroupColorHex = $this->cssColorToHex((string) ($exportConfig['sum_group_color'] ?? 'var(--clr-primary)'));
         $dataTableAlign = strtolower((string) ($exportConfig['table_align'] ?? 'left'));
         if (!in_array($dataTableAlign, ['left', 'center', 'right', 'stretch'], true)) {
             $dataTableAlign = 'left';
@@ -207,18 +227,67 @@ class TemporaryModuleWordPdfService
         $columnTwips = $this->distributeTwipsFromFractions($columnWidthFractions, $usableTableTwips);
 
         $includeCountTable = !empty($exportConfig['include_count_table']);
+        $includeSumTable = !empty($exportConfig['include_sum_table']);
         $countByFields = $includeCountTable && is_array($exportConfig['count_by_fields'] ?? null)
             ? array_values(array_filter(array_map('strval', $exportConfig['count_by_fields'])))
             : [];
         $countTableColors = is_array($exportConfig['count_table_colors'] ?? null) ? $exportConfig['count_table_colors'] : [];
+        $sumGroupBy = (string) ($exportConfig['sum_group_by'] ?? 'microrregion');
+        $sumMetrics = $includeSumTable && is_array($exportConfig['sum_metrics'] ?? null)
+            ? array_values($exportConfig['sum_metrics'])
+            : [];
+        $sumFormulas = $includeSumTable && is_array($exportConfig['sum_formulas'] ?? null)
+            ? array_values($exportConfig['sum_formulas'])
+            : [];
         $countTable = null;
+        $sumTable = null;
+        $fieldLabels = [];
+        foreach ($columns as $column) {
+            $fieldLabels[(string) ($column['key'] ?? '')] = (string) ($column['label'] ?? '');
+        }
         if ($includeCountTable) {
-            $fieldLabels = [];
-            foreach ($columns as $column) {
-                $fieldLabels[(string) ($column['key'] ?? '')] = (string) ($column['label'] ?? '');
-            }
             $countTable = $this->buildCountTableData($entries, $countByFields, $fieldLabels, $countTableColors);
             $countTable = $this->transformCountTableLabels($countTable, $headersUppercase);
+        }
+        if ($includeSumTable && $sumMetrics !== []) {
+            $sumTable = $this->buildSumTableData(
+                $entries,
+                $sumMetrics,
+                $sumFormulas,
+                $sumGroupBy,
+                $fieldLabels,
+                $microrregionMeta,
+            );
+            if ($headersUppercase) {
+                $sumTable['group_label'] = $this->normalizeExportHeading((string) ($sumTable['group_label'] ?? ''), true);
+                if (is_array($sumTable['metric_labels'] ?? null)) {
+                    foreach ($sumTable['metric_labels'] as $id => $label) {
+                        $sumTable['metric_labels'][$id] = $this->normalizeExportHeading((string) $label, true);
+                    }
+                }
+                if (is_array($sumTable['metric_columns'] ?? null)) {
+                    foreach ($sumTable['metric_columns'] as $idx => $col) {
+                        $sumTable['metric_columns'][$idx]['label'] = $this->normalizeExportHeading((string) ($col['label'] ?? ''), true);
+                        $sumTable['metric_columns'][$idx]['group'] = $this->normalizeExportHeading((string) ($col['group'] ?? ''), true);
+                    }
+                }
+                if (is_array($sumTable['formula_labels'] ?? null)) {
+                    foreach ($sumTable['formula_labels'] as $id => $label) {
+                        $sumTable['formula_labels'][$id] = $this->normalizeExportHeading((string) $label, true);
+                    }
+                }
+                if (is_array($sumTable['formula_columns'] ?? null)) {
+                    foreach ($sumTable['formula_columns'] as $idx => $col) {
+                        $sumTable['formula_columns'][$idx]['label'] = $this->normalizeExportHeading((string) ($col['label'] ?? ''), true);
+                        $sumTable['formula_columns'][$idx]['group'] = $this->normalizeExportHeading((string) ($col['group'] ?? ''), true);
+                    }
+                }
+                if (is_array($sumTable['rows'] ?? null)) {
+                    foreach ($sumTable['rows'] as $idx => $row) {
+                        $sumTable['rows'][$idx]['group'] = $this->normalizeExportHeading((string) ($row['group'] ?? ''), true);
+                    }
+                }
+            }
         }
 
         if ($format === 'word') {
@@ -275,8 +344,15 @@ class TemporaryModuleWordPdfService
 
             $section->addTextBreak(1);
 
+            $hasSummarySections = false;
+
             if ($countTable !== null && isset($countTable['groups'])) {
-                $countTblStyle = ['borderSize' => 6, 'borderColor' => '444444', 'cellMargin' => 80];
+                $countTblStyle = [
+                    'borderSize' => 6,
+                    'borderColor' => '444444',
+                    'cellMargin' => 80,
+                    'alignment' => $this->resolveWordTableAlignment($countTableAlign),
+                ];
                 $countTbl = $section->addTable($countTblStyle);
                 $baseCountCellWidthCh = max(6, min(40, (int) ($exportConfig['count_table_cell_width'] ?? 12)));
                 $chToTwips = static fn (int $ch): int => max(900, (int) round($ch * 120));
@@ -384,6 +460,156 @@ class TemporaryModuleWordPdfService
                     }
                 }
                 $section->addTextBreak(1);
+                $hasSummarySections = true;
+            }
+
+            if ($sumTable !== null && !empty($sumTable['rows']) && is_array($sumTable['rows'])) {
+                $sumGroupLabel = (string) ($sumTable['group_label'] ?? 'Grupo');
+                $sumMetricColumns = is_array($sumTable['metric_columns'] ?? null) ? $sumTable['metric_columns'] : [];
+                $sumFormulaColumns = is_array($sumTable['formula_columns'] ?? null) ? $sumTable['formula_columns'] : [];
+                $sumMetricLabels = [];
+                foreach ($sumMetricColumns as $col) {
+                    $sumMetricLabels[(string) ($col['id'] ?? '')] = (string) ($col['label'] ?? '');
+                }
+                if ($sumMetricLabels === []) {
+                    $sumMetricLabels = is_array($sumTable['metric_labels'] ?? null) ? $sumTable['metric_labels'] : [];
+                }
+                $sumFormulaLabels = [];
+                foreach ($sumFormulaColumns as $col) {
+                    $sumFormulaLabels[(string) ($col['id'] ?? '')] = (string) ($col['label'] ?? '');
+                }
+                if ($sumFormulaLabels === []) {
+                    $sumFormulaLabels = is_array($sumTable['formula_labels'] ?? null) ? $sumTable['formula_labels'] : [];
+                }
+                $sumCombinedCols = [];
+                foreach ($sumMetricColumns as $col) {
+                    $sumCombinedCols[] = [
+                        'id' => (string) ($col['id'] ?? ''),
+                        'label' => (string) ($col['label'] ?? ''),
+                        'group' => trim((string) ($col['group'] ?? '')),
+                        'op' => 'metric',
+                        'sort_order' => (int) ($col['sort_order'] ?? 0),
+                    ];
+                }
+                if ($sumCombinedCols === [] && $sumMetricLabels !== []) {
+                    foreach ($sumMetricLabels as $id => $label) {
+                        $sumCombinedCols[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'metric', 'sort_order' => 0];
+                    }
+                }
+                foreach ($sumFormulaColumns as $col) {
+                    $sumCombinedCols[] = [
+                        'id' => (string) ($col['id'] ?? ''),
+                        'label' => (string) ($col['label'] ?? ''),
+                        'group' => trim((string) ($col['group'] ?? '')),
+                        'op' => (string) ($col['op'] ?? 'add'),
+                        'sort_order' => (int) ($col['sort_order'] ?? 0),
+                    ];
+                }
+                if (empty($sumFormulaColumns) && $sumFormulaLabels !== []) {
+                    foreach ($sumFormulaLabels as $id => $label) {
+                        $sumCombinedCols[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'add', 'sort_order' => 0];
+                    }
+                }
+                if ($sumCombinedCols !== []) {
+                    usort($sumCombinedCols, static function (array $a, array $b): int {
+                        $sa = (int) ($a['sort_order'] ?? 0);
+                        $sb = (int) ($b['sort_order'] ?? 0);
+                        if ($sa !== $sb) {
+                            if ($sa === 0) return 1;
+                            if ($sb === 0) return -1;
+                            return $sa <=> $sb;
+                        }
+                        return 0;
+                    });
+                }
+                $hasSumGroupHeaders = collect($sumCombinedCols)->contains(fn ($col) => ((string) ($col['group'] ?? '')) !== '');
+                $sumRows = $sumTable['rows'];
+
+                $sumTitleText = $this->normalizeExportHeading($sumTitle, $headersUppercase);
+                if ($sumTitleCase === 'upper') {
+                    $sumTitleText = mb_strtoupper($sumTitleText);
+                } elseif ($sumTitleCase === 'lower') {
+                    $sumTitleText = mb_strtolower($sumTitleText);
+                    $first = mb_substr($sumTitleText, 0, 1, 'UTF-8');
+                    $rest = mb_substr($sumTitleText, 1, null, 'UTF-8');
+                    $sumTitleText = mb_strtoupper($first, 'UTF-8').$rest;
+                }
+                $sumTitleJc = match ($sumTitleAlign) {
+                    'left' => Jc::START,
+                    'right' => Jc::END,
+                    default => Jc::CENTER,
+                };
+
+                $section->addText(
+                    $sumTitleText.' '.$this->normalizeExportHeading('por '.$sumGroupLabel, $headersUppercase),
+                    ['name' => $exportFontName, 'bold' => true, 'size' => $sumTitleFontSizePt],
+                    ['spaceAfter' => 120, 'alignment' => $sumTitleJc]
+                );
+
+                $sumTbl = $section->addTable([
+                    'borderSize' => 6,
+                    'borderColor' => '444444',
+                    'cellMargin' => 80,
+                    'alignment' => $this->resolveWordTableAlignment($sumTableAlign),
+                ]);
+                if ($hasSumGroupHeaders) {
+                    $sumTbl->addRow();
+                    $sumTbl->addCell(2200, ['bgColor' => $sumGroupColorHex, 'valign' => 'center']);
+                    $spanCount = 0;
+                    $spanGroup = null;
+                    foreach ($sumCombinedCols as $idx => $col) {
+                        $grp = (string) ($col['group'] ?? '');
+                        if ($spanGroup === null) {
+                            $spanGroup = $grp;
+                            $spanCount = 1;
+                        } elseif ($grp === $spanGroup) {
+                            $spanCount++;
+                        } else {
+                            $sumTbl->addCell(1600 * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => '334155', 'valign' => 'center'])
+                                ->addText(trim($spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                            $spanGroup = $grp;
+                            $spanCount = 1;
+                        }
+                        if ($idx === count($sumCombinedCols) - 1) {
+                            $sumTbl->addCell(1600 * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => '334155', 'valign' => 'center'])
+                                ->addText(trim((string) $spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                        }
+                    }
+                }
+
+                $sumTbl->addRow();
+                $sumTbl->addCell(2200, ['bgColor' => $sumGroupColorHex, 'valign' => 'center'])
+                    ->addText((string) $sumGroupLabel, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                foreach ($sumCombinedCols as $col) {
+                    $sumTbl->addCell(1600, ['bgColor' => '475569', 'valign' => 'center'])
+                        ->addText((string) ($col['label'] ?? ''), ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                }
+
+                foreach ($sumRows as $row) {
+                    $sumTbl->addRow();
+                    $sumTbl->addCell(2200)->addText((string) ($row['group'] ?? ''), ['name' => $exportFontName, 'size' => $cellFontSizePt]);
+
+                    foreach ($sumCombinedCols as $col) {
+                        $id = (string) ($col['id'] ?? '');
+                        if ((string) ($col['op'] ?? 'metric') === 'metric') {
+                            $v = (float) (($row['metrics'][$id] ?? 0.0));
+                            $sumTbl->addCell(1600)->addText((string) round($v, 2), ['name' => $exportFontName, 'size' => $cellFontSizePt], ['alignment' => Jc::CENTER]);
+                        } else {
+                            $v = (float) (($row['formulas'][$id] ?? 0.0));
+                            $text = (string) round($v, 2);
+                            if ((string) ($col['op'] ?? '') === 'percent') {
+                                $text .= '%';
+                            }
+                            $sumTbl->addCell(1600)->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt], ['alignment' => Jc::CENTER]);
+                        }
+                    }
+                }
+
+                $section->addTextBreak(1);
+                $hasSummarySections = true;
+            }
+
+            if ($hasSummarySections) {
                 $section->addText($this->normalizeExportHeading('Desglose', $headersUppercase), ['name' => $exportFontName, 'bold' => true, 'size' => 11], ['spaceAfter' => 120]);
             }
 
@@ -459,7 +685,7 @@ class TemporaryModuleWordPdfService
                     }
                     $v = $entry->data[$k] ?? null;
                     $t = (string) ($fieldTypesByKey[$k] ?? '');
-                    if ($this->resolveImageAbsolutePath($v, $t) !== null) {
+                    if (count($this->resolveImageAbsolutePaths($v, $t)) > 0) {
                         $hasImageInRow = true;
                         break;
                     }
@@ -486,14 +712,16 @@ class TemporaryModuleWordPdfService
                     }
 
                     $val = $entry->data[$key] ?? null;
-                    $imagePath = $this->resolveImageAbsolutePath($val, $fieldType);
-                    if ($imagePath !== null) {
+                    $imagePaths = $this->resolveImageAbsolutePaths($val, $fieldType);
+                    if ($imagePaths !== []) {
                         $w = $columnTwips[$idx] ?? null;
                         $imgCell = $table->addCell($w, ['valign' => 'center']);
-                        $imgCell->addImage($imagePath, [
-                            'height' => 72,
-                            'alignment' => Jc::CENTER,
-                        ]);
+                        foreach ($imagePaths as $imagePath) {
+                            $imgCell->addImage($imagePath, [
+                                'height' => 72,
+                                'alignment' => Jc::CENTER,
+                            ]);
+                        }
                     } else {
                         if (is_bool($val)) {
                             $text = $val ? 'Sí' : 'No';
@@ -535,7 +763,14 @@ class TemporaryModuleWordPdfService
         $html = view('temporary_modules.admin.partials.export_pdf_table', [
             'title' => $title,
             'titleAlign' => $titleAlign,
+            'headersUppercase' => $headersUppercase,
             'countTableAlign' => $countTableAlign,
+            'sumTableAlign' => $sumTableAlign,
+            'sumTitle' => $sumTitle,
+            'sumTitleCase' => $sumTitleCase,
+            'sumTitleAlign' => $sumTitleAlign,
+            'sumTitleFontSizePx' => $sumTitleFontSizePx,
+            'sumGroupColor' => '#'.$sumGroupColorHex,
             'tableAlign' => $dataTableAlign,
             'sectionLabel' => $this->normalizeExportHeading('Desglose', $headersUppercase),
             'fontFamily' => $exportFontName,
@@ -551,6 +786,7 @@ class TemporaryModuleWordPdfService
             'microrregionMeta' => $microrregionMeta,
             'stretch' => $stretch,
             'countTable' => $countTable,
+            'sumTable' => $sumTable,
             'countTableColorKeys' => $countTableColorKeys,
             'countTableColors' => $countTableColors,
             'countTableCellWidth' => $countTableCellWidth,
@@ -658,6 +894,305 @@ class TemporaryModuleWordPdfService
         $text = trim($text);
 
         return $uppercase && $text !== '' ? mb_strtoupper($text, 'UTF-8') : $text;
+    }
+
+    private function resolveWordTableAlignment(string $align): string
+    {
+        return match (strtolower(trim($align))) {
+            'center' => JcTable::CENTER,
+            'right' => JcTable::END,
+            default => JcTable::START,
+        };
+    }
+
+    private function normalizeSummaryText(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        $txt = trim((string) $value);
+
+        return mb_strtolower($txt, 'UTF-8');
+    }
+
+    private function parseSummaryNumber(mixed $value): ?float
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (is_int($value) || is_float($value)) {
+            return is_finite((float) $value) ? (float) $value : null;
+        }
+
+        $raw = preg_replace('/\s+/', '', trim((string) $value)) ?: '';
+        if ($raw === '') {
+            return null;
+        }
+
+        $commaPos = strrpos($raw, ',');
+        $dotPos = strrpos($raw, '.');
+        if ($commaPos !== false && $dotPos !== false) {
+            if ($commaPos > $dotPos) {
+                $raw = str_replace('.', '', $raw);
+                $raw = str_replace(',', '.', $raw);
+            } else {
+                $raw = str_replace(',', '', $raw);
+            }
+        } elseif ($commaPos !== false && $dotPos === false) {
+            $raw = str_replace(',', '.', $raw);
+        }
+
+        if (!is_numeric($raw)) {
+            return null;
+        }
+
+        return (float) $raw;
+    }
+
+    private function resolveMunicipioGroupLabel(array $entryData, array $fieldLabels): string
+    {
+        $raw = trim((string) ($entryData['_municipio_reporte'] ?? ''));
+        if ($raw !== '') {
+            return $raw;
+        }
+
+        foreach ($fieldLabels as $key => $label) {
+            $cmp = mb_strtolower((string) $key, 'UTF-8').' '.mb_strtolower((string) $label, 'UTF-8');
+            if (str_contains($cmp, 'municipio')) {
+                $v = trim((string) ($entryData[$key] ?? ''));
+                if ($v !== '') {
+                    return $v;
+                }
+            }
+        }
+
+        return 'Sin municipio';
+    }
+
+    /**
+     * @param  array<int,array{id:string,label:string,group?:string,field_key:string,agg:string,match_value?:string}>  $sumMetrics
+     * @param  array<int,array{id:string,label:string,group?:string,op:string,metric_ids:array<int,string>,base_metric_id?:string}>  $sumFormulas
+     * @param  array<string,string>  $fieldLabels
+     * @return array{group_label:string,metric_columns:array<int,array{id:string,label:string,group:string}>,formula_columns:array<int,array{id:string,label:string,group:string,op:string,base_metric_id:string}>,metric_labels:array<string,string>,formula_labels:array<string,string>,rows:array<int,array{group:string,metrics:array<string,float>,formulas:array<string,float>}>}
+     */
+    private function buildSumTableData(
+        Collection $entries,
+        array $sumMetrics,
+        array $sumFormulas,
+        string $groupBy,
+        array $fieldLabels,
+        Collection $microrregionMeta,
+    ): array {
+        $groupBy = $groupBy === 'municipio' ? 'municipio' : 'microrregion';
+        $metricLabels = [];
+        $formulaLabels = [];
+        $metricColumns = [];
+        $formulaColumns = [];
+        foreach ($sumMetrics as $metric) {
+            $id = (string) ($metric['id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+            $label = (string) ($metric['label'] ?? $id);
+            $group = trim((string) ($metric['group'] ?? ''));
+            $sortOrder = (int) ($metric['sort_order'] ?? 0);
+            $metricLabels[$id] = $label;
+            $metricColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'sort_order' => $sortOrder];
+        }
+        foreach ($sumFormulas as $formula) {
+            $id = (string) ($formula['id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+            $label = (string) ($formula['label'] ?? $id);
+            $group = trim((string) ($formula['group'] ?? ''));
+            $op = (string) ($formula['op'] ?? 'add');
+            $baseMetricId = (string) ($formula['base_metric_id'] ?? '');
+            $sortOrder = (int) ($formula['sort_order'] ?? 0);
+            $formulaLabels[$id] = $label;
+            $formulaColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'op' => $op, 'base_metric_id' => $baseMetricId, 'sort_order' => $sortOrder];
+        }
+
+        $rowsByKey = [];
+        $orderedKeys = [];
+        foreach ($entries as $entry) {
+            $entryData = (array) ($entry->data ?? []);
+            if ($groupBy === 'municipio') {
+                $groupLabel = $this->resolveMunicipioGroupLabel($entryData, $fieldLabels);
+            } else {
+                $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+                $groupLabel = (string) (($meta['label'] ?? null) ?: 'Sin microrregión');
+            }
+            $groupKey = $groupBy.':'.$groupLabel;
+            if (!isset($rowsByKey[$groupKey])) {
+                $orderedKeys[] = $groupKey;
+                $rowsByKey[$groupKey] = ['group' => $groupLabel, 'metrics' => [], 'formulas' => []];
+                foreach ($sumMetrics as $metric) {
+                    $rowsByKey[$groupKey]['metrics'][(string) $metric['id']] = 0.0;
+                }
+            }
+
+            foreach ($sumMetrics as $metric) {
+                $metricId = (string) ($metric['id'] ?? '');
+                $fieldKey = (string) ($metric['field_key'] ?? '');
+                $agg = (string) ($metric['agg'] ?? 'sum');
+                if ($metricId === '' || $fieldKey === '') {
+                    continue;
+                }
+                $raw = $entryData[$fieldKey] ?? null;
+                if ($agg === 'sum') {
+                    $acc = 0.0;
+                    if (is_array($raw)) {
+                        foreach ($raw as $part) {
+                            $n = $this->parseSummaryNumber($part);
+                            if ($n !== null) {
+                                $acc += $n;
+                            }
+                        }
+                    } else {
+                        $n = $this->parseSummaryNumber($raw);
+                        if ($n !== null) {
+                            $acc += $n;
+                        }
+                    }
+                    $rowsByKey[$groupKey]['metrics'][$metricId] += $acc;
+                } elseif ($agg === 'count_non_empty') {
+                    $hasValue = false;
+                    if (is_array($raw) && !isset($raw['primary'])) {
+                        $hasValue = collect($raw)->contains(fn ($item) => trim((string) $item) !== '');
+                    } elseif (is_array($raw) && isset($raw['primary'])) {
+                        $hasValue = trim((string) ($raw['primary'] ?? '')) !== '';
+                    } else {
+                        $hasValue = trim((string) ($raw ?? '')) !== '';
+                    }
+                    if ($hasValue) {
+                        $rowsByKey[$groupKey]['metrics'][$metricId] += 1;
+                    }
+                } elseif ($agg === 'count_unique' || $agg === 'count_equals') {
+                    $target = $this->normalizeSummaryText((string) ($metric['match_value'] ?? ''));
+                    if ($agg === 'count_equals' && $target !== '') {
+                        $matched = false;
+                        if (is_array($raw) && !isset($raw['primary'])) {
+                            foreach ($raw as $part) {
+                                if ($this->normalizeSummaryText($part) === $target) {
+                                    $matched = true;
+                                    break;
+                                }
+                            }
+                        } else {
+                            $matched = $this->normalizeSummaryText($raw) === $target;
+                        }
+                        if ($matched) {
+                            $rowsByKey[$groupKey]['metrics'][$metricId] += 1;
+                        }
+                    } else {
+                        if (!isset($rowsByKey[$groupKey]['_unique_sets'])) {
+                            $rowsByKey[$groupKey]['_unique_sets'] = [];
+                        }
+                        if (!isset($rowsByKey[$groupKey]['_unique_sets'][$metricId])) {
+                            $rowsByKey[$groupKey]['_unique_sets'][$metricId] = [];
+                        }
+                        $pushUnique = function (mixed $value) use (&$rowsByKey, $groupKey, $metricId): void {
+                            $key = $this->normalizeSummaryText($value);
+                            if ($key !== '') {
+                                $rowsByKey[$groupKey]['_unique_sets'][$metricId][$key] = true;
+                            }
+                        };
+                        if (is_array($raw) && !isset($raw['primary'])) {
+                            foreach ($raw as $part) {
+                                $pushUnique($part);
+                            }
+                        } elseif (is_array($raw) && isset($raw['primary'])) {
+                            $pushUnique($raw['primary'] ?? null);
+                        } else {
+                            $pushUnique($raw);
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($groupBy === 'municipio') {
+            usort($orderedKeys, function ($a, $b) use ($rowsByKey) {
+                return strcasecmp((string) ($rowsByKey[$a]['group'] ?? ''), (string) ($rowsByKey[$b]['group'] ?? ''));
+            });
+        }
+
+        foreach ($orderedKeys as $groupKey) {
+            foreach ($sumMetrics as $metric) {
+                $metricId = (string) ($metric['id'] ?? '');
+                $agg = (string) ($metric['agg'] ?? 'sum');
+                $target = $this->normalizeSummaryText((string) ($metric['match_value'] ?? ''));
+                if ($metricId === '') {
+                    continue;
+                }
+                if ($agg === 'count_unique' || ($agg === 'count_equals' && $target === '')) {
+                    $set = $rowsByKey[$groupKey]['_unique_sets'][$metricId] ?? [];
+                    $rowsByKey[$groupKey]['metrics'][$metricId] = (float) count($set);
+                }
+            }
+            unset($rowsByKey[$groupKey]['_unique_sets']);
+        }
+
+        foreach ($orderedKeys as $groupKey) {
+            foreach ($sumFormulas as $formula) {
+                $formulaId = (string) ($formula['id'] ?? '');
+                $op = (string) ($formula['op'] ?? 'add');
+                $metricIds = array_values(array_filter(array_map('strval', (array) ($formula['metric_ids'] ?? []))));
+                $baseMetricId = (string) ($formula['base_metric_id'] ?? '');
+                if ($formulaId === '' || $metricIds === []) {
+                    continue;
+                }
+                $vals = array_map(function ($metricId) use ($rowsByKey, $groupKey) {
+                    return (float) ($rowsByKey[$groupKey]['metrics'][$metricId] ?? 0.0);
+                }, $metricIds);
+
+                $result = 0.0;
+                if ($op === 'subtract') {
+                    $result = array_shift($vals) ?? 0.0;
+                    foreach ($vals as $v) {
+                        $result -= $v;
+                    }
+                } elseif ($op === 'multiply') {
+                    $result = 1.0;
+                    foreach ($vals as $v) {
+                        $result *= $v;
+                    }
+                } elseif ($op === 'divide') {
+                    $result = array_shift($vals) ?? 0.0;
+                    foreach ($vals as $v) {
+                        if ($v == 0.0) {
+                            $result = 0.0;
+                            break;
+                        }
+                        $result /= $v;
+                    }
+                } elseif ($op === 'percent') {
+                    $numerator = (float) (($vals[0] ?? 0.0));
+                    $base = (float) ($rowsByKey[$groupKey]['metrics'][$baseMetricId] ?? 0.0);
+                    $result = ($base !== 0.0) ? (($numerator / $base) * 100.0) : 0.0;
+                } else {
+                    foreach ($vals as $v) {
+                        $result += $v;
+                    }
+                }
+                $rowsByKey[$groupKey]['formulas'][$formulaId] = $result;
+            }
+        }
+
+        $rows = [];
+        foreach ($orderedKeys as $key) {
+            $rows[] = $rowsByKey[$key];
+        }
+
+        return [
+            'group_label' => $groupBy === 'municipio' ? 'Municipio' : 'Microrregión',
+            'metric_columns' => $metricColumns,
+            'formula_columns' => $formulaColumns,
+            'metric_labels' => $metricLabels,
+            'formula_labels' => $formulaLabels,
+            'rows' => $rows,
+        ];
     }
 
     private function transformExportColumns(array $columns, bool $uppercase = false): array
@@ -837,6 +1372,11 @@ class TemporaryModuleWordPdfService
         return max(7, min(18, (int) round($px * 0.75)));
     }
 
+    private function pxToTwips(int $px): int
+    {
+        return max(0, (int) round($px * 15));
+    }
+
     private function resolveExportFontName(): string
     {
         $hasGilroy = false;
@@ -863,64 +1403,52 @@ class TemporaryModuleWordPdfService
         return $hasGilroy ? 'Gilroy' : 'Arial';
     }
 
-    private function resolveImageAbsolutePath(mixed $value, string $fieldType): ?string
+    private function resolveImageAbsolutePaths(mixed $value, string $fieldType): array
     {
-        if (!is_scalar($value)) {
-            return null;
-        }
+        $rawPaths = is_array($value) ? array_filter($value) : ($value ? [(string) $value] : []);
+        $resolved = [];
 
-        $raw = trim((string) $value);
-        if ($raw === '') {
-            return null;
-        }
+        foreach ($rawPaths as $path) {
+            if (!is_string($path) || trim($path) === '') continue;
+            $path = trim($path);
 
-        if (!$this->isImageTypeOrValue($fieldType, $raw)) {
-            return null;
-        }
+            if (!$this->isImageTypeOrValue($fieldType, $path)) continue;
 
-        // Si viene como URL (p.ej. /storage/... o https://dominio/storage/...), intentamos resolver a ruta local
-        // para poder incrustar (PhpWord requiere path local).
-        if (filter_var($raw, FILTER_VALIDATE_URL)) {
-            $localFromUrl = $this->tryResolveLocalPathFromUrl($raw);
-            if ($localFromUrl !== null) {
-                return $localFromUrl;
+            if (filter_var($path, FILTER_VALIDATE_URL)) {
+                $localFromUrl = $this->tryResolveLocalPathFromUrl($path);
+                if ($localFromUrl !== null) {
+                    $resolved[] = $localFromUrl;
+                }
+                $downloaded = $this->tryDownloadImageFromSameHostUrl($path);
+                if ($downloaded !== null) {
+                    $resolved[] = $downloaded;
+                }
+                continue;
             }
-            // Evitar SSRF: solo descargamos si es del mismo host que la app
-            $downloaded = $this->tryDownloadImageFromSameHostUrl($raw);
-            if ($downloaded !== null) {
-                return $downloaded;
+
+            $fullPath = $this->entryDataService->resolveStoredFilePath($path);
+            if (is_string($fullPath) && is_file($fullPath)) {
+                $resolved[] = $fullPath;
             }
-            return null;
         }
 
-        $fullPath = $this->entryDataService->resolveStoredFilePath($raw);
-        if (!is_string($fullPath) || !is_file($fullPath)) {
-            return null;
-        }
-
-        return $fullPath;
-    }
-
-    private function pxToTwips(int $px): int
-    {
-        // Aproximación: 96dpi → 1px ≈ 15 twips (1440 twips / 96 px).
-        return max(0, (int) round($px * 15));
+        return $resolved;
     }
 
     private function isImageTypeOrValue(string $fieldType, string $value): bool
     {
-        $ft = strtolower(trim($fieldType));
-        if ($ft === 'image' || $ft === 'foto' || $ft === 'photo') {
+        $type = strtolower(trim($fieldType));
+        if ($type !== '' && in_array($type, ['image', 'file_image', 'image_upload'], true)) {
             return true;
         }
 
-        $extension = strtolower((string) pathinfo(parse_url($value, PHP_URL_PATH) ?? $value, PATHINFO_EXTENSION));
-        if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'], true)) {
+        $path = strtolower((string) parse_url($value, PHP_URL_PATH));
+        if ($path !== '' && preg_match('/\.(png|jpe?g|gif|webp|bmp|svg)$/i', $path) === 1) {
             return true;
         }
 
-        if (filter_var($value, FILTER_VALIDATE_URL)) {
-            return false;
+        if (str_starts_with(strtolower($value), 'data:image/')) {
+            return true;
         }
 
         $fullPath = $this->entryDataService->resolveStoredFilePath($value);
@@ -991,62 +1519,50 @@ class TemporaryModuleWordPdfService
                 }
 
                 $value = $entry->data[$key] ?? null;
-                if (!is_scalar($value)) {
-                    continue;
-                }
-
-                $original = (string) $value;
-                $raw = trim($original);
-                if ($raw === '') {
-                    continue;
-                }
-
+                $rawPaths = is_array($value) ? array_filter($value) : ($value ? [(string) $value] : []);
                 $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
 
-                if (filter_var($raw, FILTER_VALIDATE_URL)) {
-                    if (!$this->isImageTypeOrValue($fieldType, $raw)) {
+                foreach ($rawPaths as $original) {
+                    $original = (string)$original;
+                    $raw = trim($original);
+                    if ($raw === '') continue;
+
+                    if (filter_var($raw, FILTER_VALIDATE_URL)) {
+                        if (!$this->isImageTypeOrValue($fieldType, $raw)) continue;
+
+                        $localFromUrl = $this->tryResolveLocalPathFromUrl($raw);
+                        if ($localFromUrl !== null) {
+                            $binary = @file_get_contents($localFromUrl);
+                            if ($binary !== false && $binary !== '') {
+                                $mime = @mime_content_type($localFromUrl) ?: 'image/jpeg';
+                                $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
+                                foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
+                                    $map[$lookupKey] = $dataUri;
+                                }
+                                continue;
+                            }
+                        }
+
+                        foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
+                            $map[$lookupKey] = $raw;
+                        }
                         continue;
                     }
 
-                    // Preferir inline base64 si la URL mapea a archivo local.
-                    $localFromUrl = $this->tryResolveLocalPathFromUrl($raw);
-                    if ($localFromUrl !== null) {
-                        $binary = @file_get_contents($localFromUrl);
-                        if ($binary !== false && $binary !== '') {
-                            $mime = @mime_content_type($localFromUrl) ?: 'image/jpeg';
-                            $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
-                            foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
-                                $map[$lookupKey] = $dataUri;
-                            }
-                            continue;
-                        }
-                    }
+                    if (!$this->isImageTypeOrValue($fieldType, $raw)) continue;
+
+                    $fullPath = $this->entryDataService->resolveStoredFilePath($raw);
+                    if (!is_string($fullPath) || !is_file($fullPath)) continue;
+
+                    $binary = @file_get_contents($fullPath);
+                    if ($binary === false || $binary === '') continue;
+
+                    $mime = @mime_content_type($fullPath) ?: 'image/jpeg';
+                    $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
 
                     foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
-                        $map[$lookupKey] = $raw;
+                        $map[$lookupKey] = $dataUri;
                     }
-                    continue;
-                }
-
-                if (!$this->isImageTypeOrValue($fieldType, $raw)) {
-                    continue;
-                }
-
-                $fullPath = $this->entryDataService->resolveStoredFilePath($raw);
-                if (!is_string($fullPath) || !is_file($fullPath)) {
-                    continue;
-                }
-
-                $binary = @file_get_contents($fullPath);
-                if ($binary === false || $binary === '') {
-                    continue;
-                }
-
-                $mime = @mime_content_type($fullPath) ?: 'image/jpeg';
-                $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
-
-                foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
-                    $map[$lookupKey] = $dataUri;
                 }
             }
         }

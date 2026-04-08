@@ -27,6 +27,14 @@ class TemporaryModuleAdminSeedService
     public function previewHeaders(UploadedFile $file, int $headerRow, int $sheetIndex = 0): array
     {
         $preview = $this->excelReader->preview($file, $headerRow, false, $sheetIndex);
+        $preview['column_suggestions'] = $this->buildColumnSuggestions(
+            $file,
+            (int) ($preview['header_row'] ?? $headerRow),
+            (int) ($preview['sheet_index'] ?? $sheetIndex),
+            (array) ($preview['headers'] ?? []),
+            2000,
+            80
+        );
         $preview['preview_rows'] = $this->buildPreviewRows(
             $file,
             (int) ($preview['header_row'] ?? $headerRow),
@@ -89,6 +97,171 @@ class TemporaryModuleAdminSeedService
         }
 
         return $rows;
+    }
+
+    /**
+     * @param  list<array{index:int,letter:string,label:string}>  $headers
+     * @return array<int, array{select:list<string>,multiselect:list<string>}>
+     */
+    private function buildColumnSuggestions(
+        UploadedFile $file,
+        int $headerRow,
+        int $sheetIndex,
+        array $headers,
+        int $maxScanRows = 2000,
+        int $maxOptionsPerColumn = 80,
+    ): array {
+        $headerRow = max(1, $headerRow);
+        $endRow = $headerRow + max(50, $maxScanRows);
+
+        $reader = IOFactory::createReaderForFile($file->getRealPath());
+        if (method_exists($reader, 'setReadDataOnly')) {
+            $reader->setReadDataOnly(true);
+        }
+        if (method_exists($reader, 'setReadFilter')) {
+            $reader->setReadFilter(new class($endRow) implements IReadFilter {
+                public function __construct(private int $maxRow) {}
+                public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool
+                {
+                    return $row <= $this->maxRow;
+                }
+            });
+        }
+
+        $spreadsheet = $reader->load($file->getRealPath());
+        $sheetNames = $spreadsheet->getSheetNames();
+        $sheetIndex = max(0, min($sheetIndex, count($sheetNames) - 1));
+        $sheet = $spreadsheet->getSheet($sheetIndex);
+
+        $maxColFromHeaders = 0;
+        foreach ($headers as $h) {
+            $maxColFromHeaders = max($maxColFromHeaders, ((int) ($h['index'] ?? 0)) + 1);
+        }
+        $maxCol = $maxColFromHeaders > 0
+            ? $maxColFromHeaders
+            : Coordinate::columnIndexFromString($sheet->getHighestDataColumn($headerRow));
+        $maxCol = max(1, min($maxCol, 40));
+
+        $startRow = $headerRow + 1;
+        $highest = min((int) $sheet->getHighestDataRow(), $endRow);
+        $selectBuckets = [];
+        $multiBuckets = [];
+
+        for ($r = $startRow; $r <= $highest; $r++) {
+            for ($c = 1; $c <= $maxCol; $c++) {
+                $letter = Coordinate::stringFromColumnIndex($c);
+                $idx = $c - 1;
+                $raw = trim((string) ($sheet->getCell($letter.$r)->getFormattedValue() ?? ''));
+                if ($raw === '' || str_starts_with($raw, '=')) {
+                    continue;
+                }
+
+                $this->pushSuggestionValue($selectBuckets[$idx], $raw, $maxOptionsPerColumn);
+
+                $parts = preg_split('/[\r\n,;|]+/u', $raw) ?: [];
+                foreach ($parts as $part) {
+                    $token = trim((string) $part);
+                    if ($token === '') {
+                        continue;
+                    }
+                    $this->pushSuggestionValue($multiBuckets[$idx], $token, $maxOptionsPerColumn);
+                }
+            }
+        }
+
+        $result = [];
+        foreach (range(0, $maxCol - 1) as $idx) {
+            $selectVals = isset($selectBuckets[$idx]) && is_array($selectBuckets[$idx])
+                ? array_values($selectBuckets[$idx])
+                : [];
+            $multiVals = isset($multiBuckets[$idx]) && is_array($multiBuckets[$idx])
+                ? array_values($multiBuckets[$idx])
+                : [];
+            if ($multiVals === [] && $selectVals !== []) {
+                $multiVals = $selectVals;
+            }
+            $result[$idx] = [
+                'select' => $selectVals,
+                'multiselect' => $multiVals,
+            ];
+        }
+
+        return $result;
+    }
+
+    private function pushSuggestionValue(?array &$bucket, string $rawValue, int $maxOptions): void
+    {
+        if (! is_array($bucket)) {
+            $bucket = [];
+        }
+        if (count($bucket) >= $maxOptions) {
+            return;
+        }
+
+        $key = $this->normalizeSuggestionCompareKey($rawValue);
+        if ($key === '' || isset($bucket[$key])) {
+            return;
+        }
+
+        $bucket[$key] = $this->formatSuggestionDisplay($rawValue);
+    }
+
+    private function normalizeSuggestionCompareKey(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        $value = mb_strtolower($value, 'UTF-8');
+        $value = strtr($value, [
+            'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n',
+            'à' => 'a', 'è' => 'e', 'ì' => 'i', 'ò' => 'o', 'ù' => 'u',
+        ]);
+        $value = preg_replace('/\s+/', ' ', $value) ?: $value;
+        $tokens = preg_split('/\s+/u', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ($tokens !== []) {
+            $tokens = array_map(fn ($t) => $this->singularizeSuggestionToken((string) $t), $tokens);
+            $value = implode(' ', $tokens);
+        }
+
+        // Colapsa espacios entre letras y números (ej: "A 1" => "A1").
+        $value = preg_replace('/(?<=\p{L})\s+(?=\d)|(?<=\d)\s+(?=\p{L})/u', '', $value) ?: $value;
+
+        return trim($value);
+    }
+
+    private function singularizeSuggestionToken(string $token): string
+    {
+        $token = trim($token);
+        $len = mb_strlen($token, 'UTF-8');
+        if ($len <= 3) {
+            return $token;
+        }
+
+        if (preg_match('/ces$/u', $token) === 1 && $len > 4) {
+            return mb_substr($token, 0, -3, 'UTF-8').'z';
+        }
+
+        if (preg_match('/[aeiou]s$/u', $token) === 1 && $len > 4) {
+            return mb_substr($token, 0, -1, 'UTF-8');
+        }
+
+        if (preg_match('/[bcdfghjklmnñpqrstvwxyz]es$/u', $token) === 1 && $len > 5) {
+            return mb_substr($token, 0, -2, 'UTF-8');
+        }
+
+        return $token;
+    }
+
+    private function formatSuggestionDisplay(string $value): string
+    {
+        $value = trim(preg_replace('/\s+/', ' ', $value) ?: $value);
+        if ($value === '') {
+            return '';
+        }
+
+        return mb_convert_case(mb_strtolower($value, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
     }
 
     /**
@@ -257,6 +430,7 @@ class TemporaryModuleAdminSeedService
         array $fieldColumnIndices,
         array $fieldTypesByColumn,
         array $fieldOptionsByColumn,
+        array $fieldUnificationsByColumn,
         array &$stats,
         int $sheetIndex = 0,
     ): TemporaryModule {
@@ -335,13 +509,16 @@ class TemporaryModuleAdminSeedService
                 $fieldType = 'text';
             }
             $rawOptions = trim((string) ($fieldOptionsByColumn[$idx] ?? ''));
+            $rawUnifications = trim((string) ($fieldUnificationsByColumn[$idx] ?? ''));
+            $unificationMap = $this->parseSeedUnificationRules($fieldType, $rawUnifications);
             $preparedFields[] = [
                 'label' => $label,
                 'comment' => null,
                 'key' => $key,
                 'type' => $fieldType,
                 'is_required' => false,
-                'options' => $this->normalizeSeedFieldOptions($fieldType, $rawOptions),
+                'options' => $this->normalizeSeedFieldOptions($fieldType, $rawOptions, $unificationMap),
+                'unifications' => $unificationMap,
                 'sort_order' => $sort,
                 'subsection_index' => null,
             ];
@@ -360,6 +537,7 @@ class TemporaryModuleAdminSeedService
                     'key' => $preparedFields[$i]['key'],
                     'type' => (string) ($preparedFields[$i]['type'] ?? 'text'),
                     'options' => $preparedFields[$i]['options'] ?? null,
+                    'unifications' => $preparedFields[$i]['unifications'] ?? [],
                 ];
             }
         }
@@ -625,7 +803,8 @@ class TemporaryModuleAdminSeedService
                         (string) ($descriptor['type'] ?? 'text'),
                         $descriptor['options'] ?? null,
                         $municipiosGlobalNorm,
-                        $municipiosByMicro
+                        $municipiosByMicro,
+                        is_array($descriptor['unifications'] ?? null) ? $descriptor['unifications'] : []
                     );
                 }
 
@@ -776,7 +955,8 @@ class TemporaryModuleAdminSeedService
                 (string) ($descriptor['type'] ?? 'text'),
                 $descriptor['options'] ?? null,
                 $municipiosGlobalNorm,
-                $municipiosByMicro
+                $municipiosByMicro,
+                is_array($descriptor['unifications'] ?? null) ? $descriptor['unifications'] : []
             );
         }
         $data['_fila_excel'] = (string) $row;
@@ -1048,7 +1228,7 @@ class TemporaryModuleAdminSeedService
         return (bool) preg_match('/^=\s*(SUM|SUBTOTAL|PROMEDIO|AVERAGE|COUNT|COUNTA|MAX|MIN)\s*\(/i', $value);
     }
 
-    private function normalizeSeedFieldOptions(string $type, string $rawOptions): ?array
+    private function normalizeSeedFieldOptions(string $type, string $rawOptions, array $unificationMap = []): ?array
     {
         if (! in_array($type, ['select', 'multiselect'], true)) {
             return null;
@@ -1058,14 +1238,77 @@ class TemporaryModuleAdminSeedService
         }
         $parts = preg_split('/[\r\n,;|]+/u', $rawOptions) ?: [];
         $options = [];
+        $seen = [];
         foreach ($parts as $part) {
             $v = trim((string) $part);
-            if ($v !== '' && ! in_array($v, $options, true)) {
-                $options[] = $v;
+            if ($v === '') {
+                continue;
             }
+            $v = $this->applySeedUnificationValue($v, $unificationMap);
+            $compareKey = $this->normalizeSuggestionCompareKey($v);
+            if ($compareKey === '' || isset($seen[$compareKey])) {
+                continue;
+            }
+            $seen[$compareKey] = true;
+            $options[] = $v;
         }
 
         return $options;
+    }
+
+    /**
+     * @return array<string, string> clave normalizada origen => destino
+     */
+    private function parseSeedUnificationRules(string $type, string $rawRules): array
+    {
+        if (! in_array($type, ['select', 'multiselect'], true)) {
+            return [];
+        }
+        $rawRules = trim($rawRules);
+        if ($rawRules === '') {
+            return [];
+        }
+
+        $lines = preg_split('/[\r\n;|]+/u', $rawRules) ?: [];
+        $map = [];
+        foreach ($lines as $line) {
+            $line = trim((string) $line);
+            if ($line === '') {
+                continue;
+            }
+            $parts = preg_split('/\s*(?:=>|->|=)\s*/u', $line, 2) ?: [];
+            if (count($parts) !== 2) {
+                continue;
+            }
+            $from = trim((string) ($parts[0] ?? ''));
+            $to = trim((string) ($parts[1] ?? ''));
+            if ($from === '' || $to === '') {
+                continue;
+            }
+            $fromKey = $this->normalizeSuggestionCompareKey($from);
+            if ($fromKey === '') {
+                continue;
+            }
+            $map[$fromKey] = preg_replace('/\s+/', ' ', $to) ?: $to;
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param  array<string, string>  $unificationMap
+     */
+    private function applySeedUnificationValue(string $value, array $unificationMap): string
+    {
+        if ($unificationMap === []) {
+            return $value;
+        }
+        $key = $this->normalizeSuggestionCompareKey($value);
+        if ($key === '') {
+            return $value;
+        }
+
+        return (string) ($unificationMap[$key] ?? $value);
     }
 
     private function normalizeSeedFieldValue(
@@ -1074,20 +1317,27 @@ class TemporaryModuleAdminSeedService
         mixed $options = null,
         array $municipiosGlobalNorm = [],
         array $municipiosByMicro = [],
+        array $unificationMap = [],
     ): mixed
     {
-                if ($type === 'municipio') {
-                    if ($municipiosGlobalNorm !== [] && $municipiosByMicro !== []) {
-                        $municipioDB = $this->resolveMunicipioGlobal($value, null, $municipiosGlobalNorm, $municipiosByMicro);
-                        if ($municipioDB) {
-                            return (string) $municipioDB->municipio;
-                        }
-                    }
-                    return $value;
-                }
         $value = trim($value);
         if ($value === '') {
             return '';
+        }
+
+        if ($type === 'municipio') {
+            if ($municipiosGlobalNorm !== [] && $municipiosByMicro !== []) {
+                $municipioDB = $this->resolveMunicipioGlobal($value, null, $municipiosGlobalNorm, $municipiosByMicro);
+                if ($municipioDB) {
+                    return (string) $municipioDB->municipio;
+                }
+            }
+
+            return $value;
+        }
+
+        if ($type === 'select') {
+            return $this->applySeedUnificationValue($value, $unificationMap);
         }
 
         if ($type === 'number') {
@@ -1115,7 +1365,7 @@ class TemporaryModuleAdminSeedService
             $parts = preg_split('/[\r\n,;|]+/u', $value) ?: [];
             $vals = [];
             foreach ($parts as $part) {
-                $v = trim((string) $part);
+                $v = $this->applySeedUnificationValue(trim((string) $part), $unificationMap);
                 if ($v !== '' && ! in_array($v, $vals, true)) {
                     $vals[] = $v;
                 }
@@ -1125,6 +1375,12 @@ class TemporaryModuleAdminSeedService
             }
             if (is_array($options) && $options !== []) {
                 $normOpts = array_map(fn ($x) => $this->normalize((string) $x), $options);
+                foreach ($unificationMap as $target) {
+                    $normTarget = $this->normalize((string) $target);
+                    if (! in_array($normTarget, $normOpts, true)) {
+                        $normOpts[] = $normTarget;
+                    }
+                }
                 $vals = array_values(array_filter($vals, fn ($v) => in_array($this->normalize($v), $normOpts, true)));
             }
 

@@ -334,6 +334,7 @@ class TemporaryModuleController extends Controller
             'success' => true,
             'headers' => $preview['headers'],
             'preview_rows' => $preview['preview_rows'] ?? [],
+            'column_suggestions' => $preview['column_suggestions'] ?? [],
             'header_row' => $headerRow,
             'data_start_row' => $headerRow + 1,
             'sheet_names' => $preview['sheet_names'] ?? [],
@@ -367,6 +368,7 @@ class TemporaryModuleController extends Controller
             'field_columns' => ['required', 'string'],
             'field_types' => ['nullable', 'string'],
             'field_options' => ['nullable', 'string'],
+            'field_unifications' => ['nullable', 'string'],
             'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
         ]);
 
@@ -408,6 +410,16 @@ class TemporaryModuleController extends Controller
             })
             ->all();
 
+        $fieldUnifications = json_decode((string) $request->input('field_unifications', '{}'), true);
+        if (! is_array($fieldUnifications)) {
+            $fieldUnifications = [];
+        }
+        $fieldUnifications = collect($fieldUnifications)
+            ->mapWithKeys(function ($value, $idx) {
+                return [(int) $idx => is_scalar($value) ? trim((string) $value) : ''];
+            })
+            ->all();
+
         $isIndefinite = (bool) $request->boolean('is_indefinite');
         $expiresAt = null;
         if (! $isIndefinite) {
@@ -431,6 +443,7 @@ class TemporaryModuleController extends Controller
                 $fieldColumns,
                 $fieldTypes,
                 $fieldOptions,
+                $fieldUnifications,
                 $stats,
                 (int) ($request->input('sheet_index') ?: 0),
             );
@@ -1326,13 +1339,16 @@ class TemporaryModuleController extends Controller
 
             if (in_array($field->type, ['file', 'image'], true)) {
                 $existingValue = $existingEntry?->data[$field->key] ?? null;
-                $hasExistingImage = is_string($existingValue) && trim($existingValue) !== '';
+                $hasExistingImage = (is_string($existingValue) && trim((string)$existingValue) !== '') || (is_array($existingValue) && count($existingValue) > 0);
                 $removeRequested = filter_var($request->input('remove_images.'.$field->key), FILTER_VALIDATE_BOOLEAN);
                 $isRequiredNow = (bool) $field->is_required && (! $hasExistingImage || $removeRequested);
 
-                $rules[$key] = $isRequiredNow
-                    ? ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:20480']
-                    : ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:20480'];
+                $rules[$key] = $isRequiredNow ? ['required'] : ['nullable'];
+                if ($request->hasFile($key)) {
+                    $rules[$key][] = 'array';
+                    $rules[$key][] = 'max:2';
+                    $rules[$key.'.*'] = ['file', $field->type === 'image' ? 'image' : 'nullable', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,txt,csv', 'max:20480'];
+                }
                 $rules['remove_images.'.$field->key] = ['nullable', 'boolean'];
             } elseif ($field->type === 'multiselect') {
                 $opts = is_array($field->options) ? $field->options : [];
@@ -1375,29 +1391,29 @@ class TemporaryModuleController extends Controller
             $existingValue = $existingEntry?->data[$field->key] ?? null;
             $removeRequested = filter_var(Arr::get($validated, 'remove_images.'.$field->key), FILTER_VALIDATE_BOOLEAN);
 
-            if (in_array($field->type, ['file', 'image'], true) && $request->hasFile('values.'.$field->key)) {
-                $uploadedFile = $request->file('values.'.$field->key);
-                $directory = 'temporary-modules/'.$temporaryModule->id.'/'.$request->user()->id;
-
-                if ($field->type === 'image' && in_array($uploadedFile->getMimeType(), ['image/jpeg', 'image/png', 'image/webp'])) {
-                    $storedPath = $this->compressAndStoreImage($uploadedFile, $directory);
-                } else {
-                    $storedPath = $uploadedFile->store($directory, 'secure_shared');
-                }
-
-                if (is_string($existingValue) && trim($existingValue) !== '' && $existingValue !== $storedPath) {
-                    $this->entryDataService->deleteStoredPath($existingValue);
-                }
-
-                $value = $storedPath;
-            } elseif (in_array($field->type, ['file', 'image'], true)) {
-                if ($existingEntry && ! $removeRequested && is_string($existingValue) && trim($existingValue) !== '') {
-                    $value = $existingValue;
-                } else {
-                    if ($existingEntry && $removeRequested && is_string($existingValue) && trim($existingValue) !== '') {
-                        $this->entryDataService->deleteStoredPath($existingValue);
+            if (in_array($field->type, ['file', 'image'], true)) {
+                $uploadedFiles = $request->file('values.'.$field->key);
+                if ($uploadedFiles) {
+                    if (!is_array($uploadedFiles)) { $uploadedFiles = [$uploadedFiles]; }
+                    $directory = 'temporary-modules/'.$temporaryModule->id.'/'.$request->user()->id;
+                    $storedPaths = [];
+                    foreach ($uploadedFiles as $uploadedFile) {
+                        if ($field->type === 'image' && in_array($uploadedFile->getMimeType(), ['image/jpeg', 'image/png', 'image/webp'])) {
+                            $storedPaths[] = $this->compressAndStoreImage($uploadedFile, $directory);
+                        } else { $storedPaths[] = $uploadedFile->store($directory, 'secure_shared'); }
                     }
+                    // Limpieza opcional de previos no incluidos (reemplace total)
+                    $oldPaths = is_array($existingValue) ? $existingValue : ($existingValue ? [(string)$existingValue] : []);
+                    foreach ($oldPaths as $oldPath) {
+                        if (!in_array($oldPath, $storedPaths, true)) { $this->entryDataService->deleteStoredPath($oldPath); }
+                    }
+                    $value = $storedPaths;
+                } elseif ($removeRequested) {
+                    $oldPaths = is_array($existingValue) ? $existingValue : ($existingValue ? [(string)$existingValue] : []);
+                    foreach ($oldPaths as $oldPath) { $this->entryDataService->deleteStoredPath($oldPath); }
                     $value = null;
+                } else {
+                    $value = $existingValue;
                 }
             }
 
@@ -2419,7 +2435,10 @@ class TemporaryModuleController extends Controller
             );
         }
 
-        $path = $entryModel->data[$fieldKey] ?? null;
+        $dataValue = $entryModel->data[$fieldKey] ?? null;
+        $index = (int) $request->query('i', 0);
+        $path = is_array($dataValue) ? ($dataValue[$index] ?? null) : $dataValue;
+
         abort_unless(is_string($path) && trim($path) !== '', 404);
 
         $fullPath = $this->entryDataService->resolveStoredFilePath($path);

@@ -97,6 +97,7 @@
                     <hr class="tm-seed-divider">
 
                     <h4 class="tm-seed-subtitle">Mapeo de columnas</h4>
+                    <p class="tm-seed-hint-block tm-seed-hint-block--intro">Selecciona las columnas que serán campos del módulo, define su tipo y, para listas, se propondrán opciones automáticamente desde los datos del Excel.</p>
                     <div class="tm-seed-importer-layout">
                         <div class="tm-seed-importer-main">
                             <label class="tm-inline-check tm-seed-check tm-seed-check--block">
@@ -112,22 +113,17 @@
                             </div>
                             <input type="hidden" name="col_municipio" id="tmSeedMunSentinel" value="-1" disabled>
 
-                            <p class="tm-seed-hint-block">Selecciona columnas para crear campos y define su tipo:</p>
+                            <div class="tm-seed-map-head" aria-hidden="true">
+                                <span>Columna</span>
+                                <span>Tipo</span>
+                                <span>Opciones</span>
+                            </div>
                             <div id="tmSeedFieldMapRows" class="tm-seed-map-rows"></div>
                             <input type="hidden" name="field_columns" id="tmSeedFieldColumns" value="">
                             <input type="hidden" name="field_types" id="tmSeedFieldTypes" value="{}">
                             <input type="hidden" name="field_options" id="tmSeedFieldOptions" value="{}">
+                            <input type="hidden" name="field_unifications" id="tmSeedFieldUnifications" value="{}">
                         </div>
-                        <aside class="tm-seed-importer-side">
-                            <h5 class="tm-seed-importer-side-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Recomendaciones</h5>
-                            <ul class="tm-seed-importer-tips">
-                                <li>Usa <strong>Texto</strong> para valores libres y descripciones.</li>
-                                <li>Usa <strong>Número</strong> para metas, montos o cantidades.</li>
-                                <li>Usa <strong>Lista</strong> cuando tengas valores repetidos (estatus, avance).</li>
-                                <li>Si una columna tiene varios valores por celda, usa <strong>Selección múltiple</strong>.</li>
-                                <li>Con <strong>Municipio</strong> se normaliza contra el catálogo global (incluye municipios de todas las microrregiones).</li>
-                            </ul>
-                        </aside>
                     </div>
 
                     <div class="tm-seed-actions">
@@ -138,6 +134,36 @@
                 </div>
             </div>
         </form>
+
+        <div class="tm-modal tm-seed-unif-modal" id="tmSeedUnifModal" aria-hidden="true">
+            <div class="tm-modal-backdrop" data-close="1"></div>
+            <div class="tm-modal-dialog tm-seed-unif-dialog" role="dialog" aria-modal="true" aria-labelledby="tmSeedUnifTitle">
+                <div class="tm-modal-head">
+                    <div>
+                        <h3 id="tmSeedUnifTitle">Unificar respuestas</h3>
+                        <p class="tm-modal-subtitle" id="tmSeedUnifSubtitle">Elige valores de origen y su valor unificado.</p>
+                    </div>
+                    <button type="button" class="tm-modal-close" id="tmSeedUnifClose" aria-label="Cerrar modal"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="tm-modal-body">
+                    <div class="tm-seed-unif-grid">
+                        <label class="tm-seed-label">Origen
+                            <select id="tmSeedUnifFrom" class="tm-input"></select>
+                        </label>
+                        <label class="tm-seed-label">Unificar como
+                            <select id="tmSeedUnifTo" class="tm-input"></select>
+                        </label>
+                    </div>
+                    <div class="tm-seed-unif-actions">
+                        <button type="button" class="tm-btn tm-btn-primary" id="tmSeedUnifAddRule">
+                            <i class="fa-solid fa-plus"></i> Agregar regla
+                        </button>
+                    </div>
+                    <div id="tmSeedUnifRulesEmpty" class="tm-seed-preview-empty">No hay reglas configuradas para esta columna.</div>
+                    <div id="tmSeedUnifRulesList" class="tm-seed-unif-rules tm-hidden"></div>
+                </div>
+            </div>
+        </div>
     </article>
 </section>
 @endsection
@@ -193,6 +219,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const fieldColumnsInput = document.getElementById('tmSeedFieldColumns');
     const fieldTypesInput = document.getElementById('tmSeedFieldTypes');
     const fieldOptionsInput = document.getElementById('tmSeedFieldOptions');
+    const fieldUnificationsInput = document.getElementById('tmSeedFieldUnifications');
     const previewWrap = document.getElementById('tmSeedPreviewWrap');
     const previewTableWrap = document.getElementById('tmSeedPreviewTableWrap');
     const submitBtn = document.getElementById('tmSeedSubmit');
@@ -207,6 +234,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const sheetIndexInput = document.getElementById('tmSeedSheetIndex');
     const detectNoteEl = document.getElementById('tmSeedDetectNote');
     const autoDetectChk = document.getElementById('tmSeedAutoDetect');
+    const unifModal = document.getElementById('tmSeedUnifModal');
+    const unifFrom = document.getElementById('tmSeedUnifFrom');
+    const unifTo = document.getElementById('tmSeedUnifTo');
+    const unifAddRule = document.getElementById('tmSeedUnifAddRule');
+    const unifRulesList = document.getElementById('tmSeedUnifRulesList');
+    const unifRulesEmpty = document.getElementById('tmSeedUnifRulesEmpty');
+    const unifSubtitle = document.getElementById('tmSeedUnifSubtitle');
+    const unifClose = document.getElementById('tmSeedUnifClose');
     const fieldTypesCatalog = {
         text: 'Texto',
         textarea: 'Texto largo',
@@ -221,6 +256,123 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     let currentSheetIndex = 0;
+    let currentColumnSuggestions = {};
+    let activeUnifRow = null;
+
+    function parseUnificationRules(raw) {
+        const text = String(raw || '').trim();
+        if (!text) return [];
+        const lines = text.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean);
+        const rules = [];
+        lines.forEach(function (line) {
+            const parts = line.split(/\s*(?:=>|->|=)\s*/);
+            if (parts.length < 2) return;
+            const from = String(parts[0] || '').trim();
+            const to = String(parts.slice(1).join('=') || '').trim();
+            if (!from || !to) return;
+            rules.push({ from: from, to: to });
+        });
+        return rules;
+    }
+
+    function serializeUnificationRules(rules) {
+        return rules.map(function (r) { return String(r.from).trim() + ' => ' + String(r.to).trim(); }).join('\n');
+    }
+
+    function getUnifHiddenInput(row) {
+        return row ? row.querySelector('.tm-seed-field-unifications') : null;
+    }
+
+    function getUnifButton(row) {
+        return row ? row.querySelector('.tm-seed-field-unif-open') : null;
+    }
+
+    function updateUnifButtonLabel(row) {
+        const hidden = getUnifHiddenInput(row);
+        const btn = getUnifButton(row);
+        if (!hidden || !btn) return;
+        const count = parseUnificationRules(hidden.value).length;
+        btn.innerHTML = '<i class="fa-solid fa-shuffle"></i> Unificar respuestas' + (count > 0 ? ' (' + count + ')' : '');
+    }
+
+    function collectRowOptionValues(row) {
+        const checkbox = row.querySelector('.tm-seed-fc');
+        const typeSel = row.querySelector('.tm-seed-field-type');
+        const optionsInput = row.querySelector('.tm-seed-field-options');
+        if (!checkbox || !typeSel || !optionsInput) return [];
+        const colIdx = parseInt(checkbox.value || '-1', 10);
+        const suggested = getSuggestedOptionsForColumn(colIdx, typeSel.value || 'select');
+        const typed = String(optionsInput.value || '')
+            .split(/[\r\n,;|]+/)
+            .map(function (v) { return normalizeOptionLabel(v); })
+            .filter(Boolean);
+        const union = [];
+        const seen = new Set();
+        suggested.concat(typed).forEach(function (value) {
+            const label = normalizeOptionLabel(value);
+            const key = normalizeOptionCompareKey(label);
+            if (!label || !key || seen.has(key)) return;
+            seen.add(key);
+            union.push(label);
+        });
+        return union;
+    }
+
+    function fillUnifSelects(options, selectedFrom, selectedTo) {
+        const build = function (selected) {
+            let html = '<option value="">Selecciona opción…</option>';
+            options.forEach(function (opt) {
+                const isSel = selected && normalizeOptionCompareKey(selected) === normalizeOptionCompareKey(opt);
+                html += '<option value="' + escapeHtml(opt) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHtml(opt) + '</option>';
+            });
+            return html;
+        };
+        unifFrom.innerHTML = build(selectedFrom || '');
+        unifTo.innerHTML = build(selectedTo || '');
+    }
+
+    function renderUnifRulesInModal(row) {
+        const hidden = getUnifHiddenInput(row);
+        if (!hidden) return;
+        const rules = parseUnificationRules(hidden.value);
+        if (rules.length === 0) {
+            unifRulesList.classList.add('tm-hidden');
+            unifRulesList.innerHTML = '';
+            unifRulesEmpty.classList.remove('tm-hidden');
+        } else {
+            unifRulesEmpty.classList.add('tm-hidden');
+            unifRulesList.classList.remove('tm-hidden');
+            unifRulesList.innerHTML = rules.map(function (rule, idx) {
+                return ''
+                    + '<div class="tm-seed-unif-rule" data-rule-idx="' + idx + '">'
+                    + '  <span class="tm-seed-unif-rule-from">' + escapeHtml(rule.from) + '</span>'
+                    + '  <i class="fa-solid fa-arrow-right"></i>'
+                    + '  <span class="tm-seed-unif-rule-to">' + escapeHtml(rule.to) + '</span>'
+                    + '  <button type="button" class="tm-btn tm-btn-danger tm-seed-unif-remove" data-rule-idx="' + idx + '">Quitar</button>'
+                    + '</div>';
+            }).join('');
+        }
+        updateUnifButtonLabel(row);
+    }
+
+    function openUnifModalForRow(row) {
+        const typeSel = row.querySelector('.tm-seed-field-type');
+        if (!typeSel || (typeSel.value !== 'select' && typeSel.value !== 'multiselect')) return;
+        activeUnifRow = row;
+        const label = row.querySelector('.tm-seed-map-col-label')?.textContent?.trim() || 'Columna seleccionada';
+        unifSubtitle.textContent = 'Reglas para: ' + label;
+        const opts = collectRowOptionValues(row);
+        fillUnifSelects(opts, '', '');
+        renderUnifRulesInModal(row);
+        unifModal.classList.add('is-open');
+        unifModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeUnifModal() {
+        activeUnifRow = null;
+        unifModal.classList.remove('is-open');
+        unifModal.setAttribute('aria-hidden', 'true');
+    }
 
     function syncMrMunMode() {
         const mrOnly = mrOnlyChk.checked;
@@ -253,6 +405,79 @@ document.addEventListener('DOMContentLoaded', function () {
         return 'text';
     }
 
+    function normalizeOptionCompareKey(value) {
+        let base = String(value || '')
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, ' ');
+
+        const singularize = function (token) {
+            const t = String(token || '');
+            if (t.length <= 3) return t;
+            if (/ces$/.test(t) && t.length > 4) return t.slice(0, -3) + 'z';
+            if (/[aeiou]s$/.test(t) && t.length > 4) return t.slice(0, -1);
+            if (/[bcdfghjklmnñpqrstvwxyz]es$/.test(t) && t.length > 5) return t.slice(0, -2);
+            return t;
+        };
+
+        base = base
+            .split(' ')
+            .filter(Boolean)
+            .map(singularize)
+            .join(' ');
+
+        return base.replace(/(?<=\p{L})\s+(?=\d)|(?<=\d)\s+(?=\p{L})/gu, '');
+    }
+
+    function normalizeOptionLabel(value) {
+        const cleaned = String(value || '').trim().replace(/\s+/g, ' ');
+        if (!cleaned) return '';
+        return cleaned
+            .toLowerCase()
+            .replace(/(^|\s)([a-záéíóúñü])/g, function (_, prefix, chr) {
+                return prefix + chr.toUpperCase();
+            });
+    }
+
+    function getSuggestedOptionsForColumn(colIdx, type) {
+        const data = currentColumnSuggestions[String(colIdx)] || currentColumnSuggestions[colIdx] || null;
+        if (!data || typeof data !== 'object') return [];
+        const key = type === 'multiselect' ? 'multiselect' : 'select';
+        const source = Array.isArray(data[key]) ? data[key] : [];
+        const unique = [];
+        const seen = new Set();
+        source.forEach(function (raw) {
+            const label = normalizeOptionLabel(raw);
+            if (!label) return;
+            const norm = normalizeOptionCompareKey(label);
+            if (!norm || seen.has(norm)) return;
+            seen.add(norm);
+            unique.push(label);
+        });
+        return unique;
+    }
+
+    function fillAutoOptionsIfNeeded(row, force) {
+        const checkbox = row.querySelector('.tm-seed-fc');
+        const typeSel = row.querySelector('.tm-seed-field-type');
+        const optionsInput = row.querySelector('.tm-seed-field-options');
+        if (!checkbox || !typeSel || !optionsInput || !checkbox.checked) return;
+        const type = typeSel.value;
+        if (type !== 'select' && type !== 'multiselect') return;
+        const hasManualText = optionsInput.dataset.manual === '1';
+        if (!force && hasManualText) return;
+        if (!force && optionsInput.value.trim() !== '') return;
+        const colIdx = parseInt(typeSel.getAttribute('data-col-idx') || checkbox.value || '-1', 10);
+        if (colIdx < 0) return;
+        const suggestions = getSuggestedOptionsForColumn(colIdx, type);
+        if (suggestions.length === 0) return;
+        optionsInput.value = suggestions.join(', ');
+        optionsInput.dataset.auto = '1';
+        optionsInput.dataset.manual = '0';
+    }
+
     function fillSelects(headers) {
         const opts = headers.map(function (h) {
             return '<option value="' + h.index + '">' + h.letter + ' — ' + escapeHtml(h.label || '(vacío)') + '</option>';
@@ -281,22 +506,29 @@ document.addEventListener('DOMContentLoaded', function () {
             const isFolioColumn = /^N\s*[°#.]?$|^NO\.?$|^NUMERO$|^NÚMERO$/.test(norm.replace(/\s+/g, ''));
             const shouldCheck = !isGeoColumn && !isFolioColumn;
             const type = inferFieldType(h.label || '');
-            const row = document.createElement('label');
+            const row = document.createElement('div');
             row.className = 'tm-seed-map-row';
             row.innerHTML = ''
                 + '<div class="tm-seed-map-col tm-seed-map-col--pick">'
                 + '  <input type="checkbox" class="tm-seed-fc" value="' + h.index + '" ' + (shouldCheck ? 'checked' : '') + '>'
                 + '  <span class="tm-seed-map-col-label">' + h.letter + ' — ' + escapeHtml(h.label || '(vacío)') + '</span>'
+                + '  <span class="tm-seed-map-sort-actions">'
+                + '    <button type="button" class="tm-btn tm-seed-map-move" data-move-up title="Subir campo">↑</button>'
+                + '    <button type="button" class="tm-btn tm-seed-map-move" data-move-down title="Bajar campo">↓</button>'
+                + '  </span>'
                 + '</div>'
                 + '<div class="tm-seed-map-col tm-seed-map-col--type">'
                 + '  <select class="tm-input tm-seed-field-type" data-col-idx="' + h.index + '">' + typeOptions + '</select>'
                 + '</div>'
                 + '<div class="tm-seed-map-col tm-seed-map-col--options">'
                 + '  <input type="text" class="tm-input tm-seed-field-options" data-col-idx="' + h.index + '" placeholder="Opciones separadas por coma">'
+                + '  <button type="button" class="tm-btn tm-seed-field-unif-open"><i class="fa-solid fa-shuffle"></i> Unificar respuestas</button>'
+                + '  <input type="hidden" class="tm-seed-field-unifications" value="">'
                 + '</div>';
             fieldMapRows.appendChild(row);
             const typeSel = row.querySelector('.tm-seed-field-type');
             if (typeSel) typeSel.value = type;
+            updateUnifButtonLabel(row);
         });
 
         mappingEl.classList.remove('tm-hidden');
@@ -310,14 +542,30 @@ document.addEventListener('DOMContentLoaded', function () {
             const checkbox = row.querySelector('.tm-seed-fc');
             const typeSel = row.querySelector('.tm-seed-field-type');
             const optionsInput = row.querySelector('.tm-seed-field-options');
-            if (!checkbox || !typeSel || !optionsInput) return;
+            const unifInput = row.querySelector('.tm-seed-field-unifications');
+            const unifBtn = row.querySelector('.tm-seed-field-unif-open');
+            if (!checkbox || !typeSel || !optionsInput || !unifInput || !unifBtn) return;
             const allowOptions = ['select', 'multiselect'].indexOf(typeSel.value) !== -1;
-            optionsInput.disabled = !checkbox.checked || !allowOptions;
+            const showConfig = checkbox.checked && allowOptions;
+            optionsInput.disabled = !showConfig;
+            unifInput.disabled = !showConfig;
+            unifBtn.disabled = !showConfig;
+            optionsInput.classList.toggle('tm-hidden', !showConfig);
+            unifBtn.classList.toggle('tm-hidden', !showConfig);
             if (!allowOptions && optionsInput.value.trim() !== '') {
                 optionsInput.value = '';
+                optionsInput.dataset.auto = '0';
+                optionsInput.dataset.manual = '0';
+            }
+            if (!allowOptions && unifInput.value.trim() !== '') {
+                unifInput.value = '';
+                updateUnifButtonLabel(row);
             }
             if (typeSel.value === 'municipio') {
                 optionsInput.placeholder = 'Normalización automática por catálogo';
+            } else if (typeSel.value === 'select' || typeSel.value === 'multiselect') {
+                optionsInput.placeholder = 'Autogenerado desde columna (editable)';
+                fillAutoOptionsIfNeeded(row, true);
             } else {
                 optionsInput.placeholder = 'Opciones separadas por coma';
             }
@@ -371,18 +619,22 @@ document.addEventListener('DOMContentLoaded', function () {
         const checked = Array.from(fieldMapRows.querySelectorAll('.tm-seed-fc:checked')).map(function (c) { return parseInt(c.value, 10); });
         const types = {};
         const options = {};
+        const unifications = {};
         fieldMapRows.querySelectorAll('.tm-seed-map-row').forEach(function (row) {
             const checkbox = row.querySelector('.tm-seed-fc');
             const typeSel = row.querySelector('.tm-seed-field-type');
             const optionsInput = row.querySelector('.tm-seed-field-options');
-            if (!checkbox || !typeSel || !optionsInput || !checkbox.checked) return;
+            const unifInput = row.querySelector('.tm-seed-field-unifications');
+            if (!checkbox || !typeSel || !optionsInput || !unifInput || !checkbox.checked) return;
             const idx = parseInt(checkbox.value, 10);
             types[idx] = typeSel.value || 'text';
             options[idx] = optionsInput.value || '';
+            unifications[idx] = unifInput.value || '';
         });
         fieldColumnsInput.value = JSON.stringify(checked);
         fieldTypesInput.value = JSON.stringify(types);
         fieldOptionsInput.value = JSON.stringify(options);
+        fieldUnificationsInput.value = JSON.stringify(unifications);
         submitBtn.disabled = checked.length === 0;
         paintMappedColumns();
     }
@@ -395,7 +647,80 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     fieldMapRows.addEventListener('input', function (event) {
         if (event.target.classList.contains('tm-seed-field-options')) {
+            event.target.dataset.manual = '1';
+            event.target.dataset.auto = '0';
             syncFieldColumns();
+        }
+    });
+
+    fieldMapRows.addEventListener('click', function (event) {
+        const moveBtn = event.target.closest('[data-move-up], [data-move-down]');
+        if (moveBtn) {
+            const row = moveBtn.closest('.tm-seed-map-row');
+            if (!row) return;
+            if (moveBtn.hasAttribute('data-move-up')) {
+                const prev = row.previousElementSibling;
+                if (prev) fieldMapRows.insertBefore(row, prev);
+            } else {
+                const next = row.nextElementSibling;
+                if (next) fieldMapRows.insertBefore(next, row);
+            }
+            syncFieldColumns();
+            updateOptionsVisibility();
+            return;
+        }
+
+        const btn = event.target.closest('.tm-seed-field-unif-open');
+        if (!btn) return;
+        const row = btn.closest('.tm-seed-map-row');
+        if (!row) return;
+        openUnifModalForRow(row);
+    });
+
+    unifAddRule.addEventListener('click', function () {
+        if (!activeUnifRow) return;
+        const from = normalizeOptionLabel(unifFrom.value || '');
+        const to = normalizeOptionLabel(unifTo.value || '');
+        if (!from || !to) {
+            return;
+        }
+        const hidden = getUnifHiddenInput(activeUnifRow);
+        if (!hidden) return;
+        const rules = parseUnificationRules(hidden.value);
+        const key = normalizeOptionCompareKey(from);
+        const filtered = rules.filter(function (r) { return normalizeOptionCompareKey(r.from) !== key; });
+        filtered.push({ from: from, to: to });
+        hidden.value = serializeUnificationRules(filtered);
+        renderUnifRulesInModal(activeUnifRow);
+        syncFieldColumns();
+        unifFrom.value = '';
+        unifTo.value = '';
+        unifFrom.focus();
+    });
+
+    unifRulesList.addEventListener('click', function (event) {
+        const btn = event.target.closest('.tm-seed-unif-remove');
+        if (!btn || !activeUnifRow) return;
+        const idx = parseInt(btn.getAttribute('data-rule-idx') || '-1', 10);
+        if (idx < 0) return;
+        const hidden = getUnifHiddenInput(activeUnifRow);
+        if (!hidden) return;
+        const rules = parseUnificationRules(hidden.value);
+        rules.splice(idx, 1);
+        hidden.value = serializeUnificationRules(rules);
+        renderUnifRulesInModal(activeUnifRow);
+        syncFieldColumns();
+    });
+
+    unifModal.addEventListener('click', function (event) {
+        if (event.target.matches('[data-close="1"]')) {
+            closeUnifModal();
+        }
+    });
+    unifClose.addEventListener('click', closeUnifModal);
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && unifModal.classList.contains('is-open')) {
+            closeUnifModal();
         }
     });
 
@@ -463,6 +788,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (j.sheet_names) {
                     renderSheetTabs(j.sheet_names, typeof j.sheet_index === 'number' ? j.sheet_index : sheetIdx);
                 }
+                currentColumnSuggestions = (j.column_suggestions && typeof j.column_suggestions === 'object') ? j.column_suggestions : {};
                 colMr.dataset.set = '';
                 colMun.dataset.set = '';
                 fillSelects(j.headers || []);

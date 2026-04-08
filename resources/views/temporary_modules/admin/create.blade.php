@@ -127,6 +127,11 @@
 
         <button type="button" class="tm-btn" data-toggle-comment>Agregar observación</button>
 
+        <div class="tm-row-sort-actions" data-sort-actions>
+            <button type="button" class="tm-btn" data-move-up title="Subir campo">↑</button>
+            <button type="button" class="tm-btn" data-move-down title="Bajar campo">↓</button>
+        </div>
+
         <label class="tm-comment-field" data-comment-wrap hidden>
             Comentario de ayuda (opcional)
             <input type="text" data-name="comment" placeholder="Ejemplo: registra calle y número exterior">
@@ -174,7 +179,7 @@
         {{-- linked: two sub-field definitions --}}
         <div class="tm-linked-container" data-linked-wrap hidden>
             <div class="tm-linked-wrap tm-grid tm-grid-2" style="border:1px solid var(--clr-divider,#ddd);border-radius:6px;padding:12px 16px;gap:24px;margin-top:8px;background:var(--tm-muted-bg, rgba(0,0,0,0.02));">
-                
+
                 {{-- Principal --}}
                 <div style="display:flex;flex-direction:column;gap:8px;border-right:1px solid var(--clr-divider,#ddd);padding-right:16px;">
                     <h6 style="margin:0;font-size:.85rem;font-weight:700;color:var(--clr-primary,#861e34);">1. Campo principal</h6>
@@ -307,6 +312,8 @@
             const removeButton = row.querySelector('[data-remove-field]');
             const commentWrap = row.querySelector('[data-comment-wrap]');
             const toggleCommentButton = row.querySelector('[data-toggle-comment]');
+            const moveUpButton = row.querySelector('[data-move-up]');
+            const moveDownButton = row.querySelector('[data-move-down]');
 
             if (labelInput && keyInput) {
                 labelInput.addEventListener('input', function () {
@@ -393,6 +400,24 @@
             if (removeButton) {
                 removeButton.addEventListener('click', function () {
                     row.remove();
+                    refreshIndices();
+                });
+            }
+
+            if (moveUpButton) {
+                moveUpButton.addEventListener('click', function () {
+                    const prev = row.previousElementSibling;
+                    if (!prev) return;
+                    container.insertBefore(row, prev);
+                    refreshIndices();
+                });
+            }
+
+            if (moveDownButton) {
+                moveDownButton.addEventListener('click', function () {
+                    const next = row.nextElementSibling;
+                    if (!next) return;
+                    container.insertBefore(next, row);
                     refreshIndices();
                 });
             }

@@ -197,18 +197,26 @@
                                         <i class="fa-solid fa-paste" aria-hidden="true"></i> Pegar
                                     </button>
                                 </div>
-                                <small class="tm-upload-evidence-hint">Arrastra aquí o usa los botones.</small>
-                                <div class="tm-upload-evidence-dropzone" data-paste-upload-wrap>
-                                    <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" class="d-none" {{ $field->is_required ? 'required' : '' }}>
+                                <small class="tm-upload-evidence-hint">Arrastra aquí o usa los botones.</smal                                 <div class="tm-upload-evidence-dropzone" data-paste-upload-wrap>
+                                    <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}[]" class="d-none" {{ $field->is_required ? 'required' : '' }} multiple data-max-files="2">
                                     <div class="tm-upload-evidence-placeholder">
                                         <i class="fa-solid fa-images" aria-hidden="true"></i>
-                                        <p>Suelta la imagen aquí</p>
+                                        <p>Suelta las imágenes aquí (Máx. 2)</p>
                                     </div>
-                                    <div class="tm-inline-image-preview tm-image-preview" data-inline-image-preview data-image-preview hidden>
-                                        <img src="" alt="Vista previa" data-inline-image-preview-img data-image-preview-img>
-                                        <button type="button" class="tm-image-clear" data-inline-image-remove aria-label="Quitar imagen">&times;</button>
+                                    <div class="tm-inline-image-preview-container" data-inline-image-preview-container style="display:flex; flex-wrap:wrap; gap:8px; width:100%; justify-content:center;">
+                                        {{-- El JS insertara las previsualizaciones aqui --}}
                                     </div>
+                                    @if (!empty($value))
+                                        <div class="tm-existing-images-note" style="margin-top:8px; font-size:12px; color:var(--clr-text-light); text-align:center;">
+                                            <p><i class="fa-solid fa-circle-info"></i> Ya existen imágenes. Si subes nuevas, las anteriores se borrarán.</p>
+                                            <label style="display:inline-flex; align-items:center; gap:6px; color:var(--clr-primary); cursor:pointer;">
+                                                <input type="checkbox" name="remove_images[{{ $field->key }}]" value="1">
+                                                <span>Eliminar imágenes actuales</span>
+                                            </label>
+                                        </div>
+                                    @endif
                                 </div>
+iv>
                                 <small class="tm-paste-status" id="paste_status_{{ $id }}" aria-live="polite"></small>
                             </div>
                         @else
@@ -382,19 +390,27 @@
                             @foreach ($fields as $field)
                                 @php
                                     $cell = $entry->data[$field->key] ?? null;
-                                @endphp
-                                <td>
-                                    @if (in_array($field->type, ['file', 'image'], true) && is_string($cell) && $cell !== '')
-                                        <button
-                                            type="button"
-                                            class="tm-thumb-link"
-                                            data-open-image-preview
-                                            data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $temporaryModule->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) }}"
-                                            data-image-title="{{ $field->label }}"
-                                            title="Ver imagen"
-                                        >
-                                            <i class="fa fa-image" aria-hidden="true"></i> Ver imagen
-                                        </button>
+                                                          <td>
+                                    @php
+                                        $isImageField = in_array($field->type, ['file', 'image'], true);
+                                        $images = is_array($cell) ? $cell : ($cell ? [(string)$cell] : []);
+                                    @endphp
+
+                                    @if ($isImageField && count($images) > 0)
+                                        <div style="display:flex; flex-direction:column; gap:4px;">
+                                            @foreach ($images as $index => $img)
+                                                <button
+                                                    type="button"
+                                                    class="tm-thumb-link"
+                                                    data-open-image-preview
+                                                    data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $temporaryModule->id, 'entry' => $entry->id, 'fieldKey' => $field->key, 'i' => $index]) }}"
+                                                    data-image-title="{{ $field->label }} ({{ $index + 1 }})"
+                                                    title="Ver imagen {{ $index + 1 }}"
+                                                >
+                                                    <i class="fa fa-image" aria-hidden="true"></i> Imagen {{ $index + 1 }}
+                                                </button>
+                                            @endforeach
+                                        </div>
                                     @elseif (is_bool($cell))
                                         {{ $cell ? 'Si' : 'No' }}
                                     @elseif ($field->type === 'semaforo' && is_string($cell) && $cell !== '')
@@ -404,6 +420,7 @@
                                         {{ $cell ?? '-' }}
                                     @endif
                                 </td>
+         </td>
                             @endforeach
                         </tr>
                     @empty
@@ -633,42 +650,91 @@
             statusElement.classList.toggle('is-success', !hasError && message !== '');
         };
 
-        const setFileInInput = function (input, file) {
+        const setFileInInput = function (input, file, append = false) {
             if (!input || !file || typeof DataTransfer === 'undefined') {
                 return false;
             }
 
+            const maxFiles = parseInt(input.dataset.maxFiles || '1');
             const transfer = new DataTransfer();
-            transfer.items.add(file);
+
+            if (append) {
+                // Keep existing files
+                Array.from(input.files).forEach(f => {
+                    if (transfer.items.length < maxFiles) transfer.items.add(f);
+                });
+            }
+
+            if (transfer.items.length < maxFiles) {
+                transfer.items.add(file);
+            } else {
+                // If we reached max, we might want to replace the last one or just ignore
+                // For now, let's just not add if we are at max and append is true
+                if (!append) {
+                    transfer.items.add(file);
+                } else {
+                    return false;
+                }
+            }
+
             input.files = transfer.files;
             input.dispatchEvent(new Event('change', { bubbles: true }));
             return true;
         };
 
-        const setPreview = function (input, file) {
+        const setPreview = function (input) {
             const wrap = input.closest('[data-paste-upload-wrap]');
-            if (!wrap) {
-                return;
-            }
+            if (!wrap) return;
 
-            const preview = wrap.querySelector('[data-inline-image-preview]');
-            const previewImg = wrap.querySelector('[data-inline-image-preview-img]');
-            if (!(preview instanceof HTMLElement) || !(previewImg instanceof HTMLImageElement)) {
-                return;
-            }
+            const container = wrap.querySelector('[data-inline-image-preview-container]');
+            if (!container) return;
 
-            if (!file) {
-                preview.hidden = true;
-                previewImg.removeAttribute('src');
-                return;
-            }
+            // Clear previous previews
+            container.innerHTML = '';
 
-            const reader = new FileReader();
-            reader.onload = function (event) {
-                previewImg.src = String(event.target && event.target.result ? event.target.result : '');
-                preview.hidden = false;
-            };
-            reader.readAsDataURL(file);
+            const files = Array.from(input.files || []);
+            if (files.length === 0) return;
+
+            files.forEach((file, index) => {
+                if (!file.type.startsWith('image/')) return;
+
+                const previewDiv = document.createElement('div');
+                previewDiv.className = 'tm-inline-image-preview tm-image-preview';
+                previewDiv.style.position = 'relative';
+
+                const img = document.createElement('img');
+                img.style.maxWidth = '120px';
+                img.style.maxHeight = '120px';
+                img.style.borderRadius = '8px';
+                img.style.objectFit = 'cover';
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'tm-image-clear';
+                removeBtn.innerHTML = '&times;';
+                removeBtn.style.position = 'absolute';
+                removeBtn.style.top = '-8px';
+                removeBtn.style.right = '-8px';
+
+                removeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const dt = new DataTransfer();
+                    Array.from(input.files).forEach((f, i) => {
+                        if (i !== index) dt.items.add(f);
+                    });
+                    input.files = dt.files;
+                    setPreview(input);
+                });
+
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    img.src = e.target.result;
+                    previewDiv.appendChild(img);
+                    previewDiv.appendChild(removeBtn);
+                    container.appendChild(previewDiv);
+                };
+                reader.readAsDataURL(file);
+            });
         };
 
         const getImageFileFromFileList = function (files) {
@@ -683,7 +749,7 @@
             return null;
         };
 
-        const assignClipboardFile = function (input, blob) {
+        const assignClipboardFile = function (input, blob, append = false) {
             if (!input || !blob) {
                 return false;
             }
@@ -696,7 +762,7 @@
                 lastModified: Date.now(),
             });
 
-            return setFileInInput(input, file);
+            return setFileInInput(input, file, append);
         };
 
         const handlePasteEvent = function (event, input) {
@@ -708,18 +774,24 @@
             });
 
             if (!imageItem) {
-                setStatus(statusElement, 'No se detecto una imagen en el portapapeles.', true);
+                setStatus(statusElement, 'No se detectó una imagen en el portapapeles.', true);
+                return;
+            }
+
+            const maxFiles = parseInt(input.dataset.maxFiles || '1');
+            if (input.files.length >= maxFiles) {
+                setStatus(statusElement, `Límite de ${maxFiles} imágenes alcanzado.`, true);
                 return;
             }
 
             const imageFile = imageItem.getAsFile();
-            const wasAssigned = assignClipboardFile(input, imageFile);
+            const wasAssigned = assignClipboardFile(input, imageFile, true);
             if (!wasAssigned) {
-                setStatus(statusElement, 'No se pudo cargar la imagen pegada. Usa seleccionar archivo.', true);
+                setStatus(statusElement, 'No se pudo cargar la imagen pegada.', true);
                 return;
             }
 
-            setStatus(statusElement, 'Imagen pegada correctamente.', false);
+            setStatus(statusElement, 'Imagen agregada correctamente.', false);
             event.preventDefault();
         };
 
@@ -746,7 +818,7 @@
                     }
 
                     const blob = await clipboardItem.getType(imageType);
-                    assigned = assignClipboardFile(input, blob);
+                    assigned = assignClipboardFile(input, blob, true);
                     if (assigned) {
                         break;
                     }
@@ -773,8 +845,7 @@
             });
 
             input.addEventListener('change', function () {
-                const file = input.files && input.files[0] ? input.files[0] : null;
-                setPreview(input, file);
+                setPreview(input);
             });
 
             const wrap = input.closest('[data-paste-upload-wrap]');
@@ -782,13 +853,7 @@
                 return;
             }
 
-            const removeButton = wrap.querySelector('[data-inline-image-remove]');
-            if (removeButton instanceof HTMLButtonElement) {
-                removeButton.addEventListener('click', function () {
-                    input.value = '';
-                    setPreview(input, null);
-                });
-            }
+            // removeButton ya no se usa aqui, se maneja individualmente en setPreview
         });
 
         pasteButtons.forEach(function (button) {
@@ -839,17 +904,20 @@
                 event.preventDefault();
                 area.classList.remove('is-dragover');
 
-                const imageFile = getImageFileFromFileList(event.dataTransfer ? event.dataTransfer.files : []);
-                if (!imageFile) {
-                    setStatus(getStatusElement(input), 'Solo imagenes.', true);
+                const files = event.dataTransfer ? Array.from(event.dataTransfer.files) : [];
+                const imageFiles = files.filter(f => f.type.startsWith('image/')).slice(0, parseInt(input.dataset.maxFiles || '1'));
+
+                if (imageFiles.length === 0) {
+                    setStatus(getStatusElement(input), 'Solo imágenes.', true);
                     return;
                 }
 
-                const wasAssigned = setFileInInput(input, imageFile);
-                setStatus(getStatusElement(input), wasAssigned ? 'Imagen cargada.' : 'No se pudo adjuntar.', !wasAssigned);
-                if (wasAssigned) {
-                    setPreview(input, imageFile);
-                }
+                const dt = new DataTransfer();
+                imageFiles.forEach(f => dt.items.add(f));
+                input.files = dt.files;
+
+                setStatus(getStatusElement(input), 'Imágenes cargadas.', false);
+                setPreview(input);
             });
         });
 
@@ -1322,7 +1390,7 @@
         html += '</tr></thead><tbody>';
 
         data.slice(0, 100).forEach((row, rowIndex) => {
-            const displayRowIndex = rowIndex + 1;
+            const displayRowIndex = currentSheetStartRow + rowIndex;
             html += '<tr data-row-index="' + displayRowIndex + '"><td class="row-num">' + displayRowIndex + '</td>';
             for (let i = 0; i < maxCols; i++) {
                 const cell = row[i] !== undefined && row[i] !== null ? row[i] : '';
@@ -1481,6 +1549,7 @@
             // PDF: no se puede leer con SheetJS, usar previsualización del servidor
             currentWorkbook = null;
             currentSheetIdx = 0;
+            currentSheetStartRow = 1;
             const sheetTabsWrap = document.getElementById('tmExcelSheetTabsWrap');
             if (sheetTabsWrap) sheetTabsWrap.style.display = 'none';
             const inner = document.querySelector('.tm-excel-sheet-inner');
@@ -1512,6 +1581,7 @@
 
     let currentWorkbook = null;
     let currentSheetIdx = 0;
+    let currentSheetStartRow = 1;
 
     const switchToSheet = function(idx) {
         if (!currentWorkbook) return;
@@ -1519,7 +1589,17 @@
         if (idx < 0 || idx >= names.length) return;
         currentSheetIdx = idx;
         const worksheet = currentWorkbook.Sheets[names[idx]];
-        workbookData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+        let startRow = 1;
+        if (worksheet && worksheet['!ref']) {
+            try {
+                const range = XLSX.utils.decode_range(String(worksheet['!ref']));
+                if (range && range.s && Number.isFinite(range.s.r)) {
+                    startRow = range.s.r + 1;
+                }
+            } catch (_) {}
+        }
+        currentSheetStartRow = Math.max(1, startRow);
+        workbookData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: true, defval: '' });
         renderExcelPreview(workbookData);
     };
 
@@ -1659,10 +1739,11 @@
 
     document.getElementById('tmExcelAutoDetect')?.addEventListener('click', function() {
         if (!workbookData) return;
-        let found = 1;
+        let found = currentSheetStartRow;
         for (let i = 0; i < workbookData.length; i++) {
             if ((workbookData[i] || []).filter(c => c !== null && c !== '').length >= 3) {
-                found = i + 1; break;
+                found = currentSheetStartRow + i;
+                break;
             }
         }
         document.getElementById('tmExcelHeaderRow').value = found;

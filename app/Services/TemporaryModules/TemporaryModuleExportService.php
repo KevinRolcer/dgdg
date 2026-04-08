@@ -496,7 +496,7 @@ class TemporaryModuleExportService
 
             if ($municipioFieldKey) {
                 // Revisamos sobre TODOS los capturados a nivel global en este módulo (ya sean IDs o Nombres guardados)
-                foreach ($mr->getRelation('municipios') as $muni) {
+                foreach ($mr->municipios as $muni) {
                     $muniIdStr = (string)$muni->id;
                     $muniNombreStr = mb_strtolower(trim($muni->municipio));
 
@@ -700,7 +700,7 @@ class TemporaryModuleExportService
             ->withoutGlobalScopes()
             ->get()
             ->groupBy(fn ($e) => (string) ($e->data[$catKey] ?? ''))
-            ->map->count();
+            ->map(fn($g) => $g->count());
 
         $sheet->setCellValue('A1', 'Categoría');
         $sheet->setCellValue('B1', 'Total');
@@ -856,6 +856,296 @@ class TemporaryModuleExportService
         return ['groups' => $groups];
     }
 
+    private function normalizeSummaryText(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        $txt = trim((string) $value);
+
+        return mb_strtolower($txt, 'UTF-8');
+    }
+
+    private function parseSummaryNumber(mixed $value): ?float
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (is_int($value) || is_float($value)) {
+            return is_finite((float) $value) ? (float) $value : null;
+        }
+
+        $raw = preg_replace('/\s+/', '', trim((string) $value)) ?: '';
+        if ($raw === '') {
+            return null;
+        }
+
+        $commaPos = strrpos($raw, ',');
+        $dotPos = strrpos($raw, '.');
+        if ($commaPos !== false && $dotPos !== false) {
+            if ($commaPos > $dotPos) {
+                $raw = str_replace('.', '', $raw);
+                $raw = str_replace(',', '.', $raw);
+            } else {
+                $raw = str_replace(',', '', $raw);
+            }
+        } elseif ($commaPos !== false && $dotPos === false) {
+            $raw = str_replace(',', '.', $raw);
+        }
+
+        if (! is_numeric($raw)) {
+            return null;
+        }
+
+        return (float) $raw;
+    }
+
+    private function resolveMunicipioGroupLabel(array $entryData, array $fieldLabels): string
+    {
+        $raw = trim((string) ($entryData['_municipio_reporte'] ?? ''));
+        if ($raw !== '') {
+            return $raw;
+        }
+
+        foreach ($fieldLabels as $key => $label) {
+            $cmp = mb_strtolower((string) $key, 'UTF-8').' '.mb_strtolower((string) $label, 'UTF-8');
+            if (str_contains($cmp, 'municipio')) {
+                $v = trim((string) ($entryData[$key] ?? ''));
+                if ($v !== '') {
+                    return $v;
+                }
+            }
+        }
+
+        return 'Sin municipio';
+    }
+
+    /**
+     * @param  array<int,array{id:string,label:string,group?:string,field_key:string,agg:string,match_value?:string}>  $sumMetrics
+     * @param  array<int,array{id:string,label:string,group?:string,op:string,metric_ids:array<int,string>,base_metric_id?:string}>  $sumFormulas
+     * @param  array<string,string>  $fieldLabels
+     * @return array{group_label:string,metric_columns:array<int,array{id:string,label:string,group:string}>,formula_columns:array<int,array{id:string,label:string,group:string,op:string,base_metric_id:string}>,metric_labels:array<string,string>,formula_labels:array<string,string>,rows:array<int,array{group:string,metrics:array<string,float>,formulas:array<string,float>}>}
+     */
+    private function buildSumTableData(
+        Collection $entries,
+        array $sumMetrics,
+        array $sumFormulas,
+        string $groupBy,
+        array $fieldLabels,
+        Collection $microrregionMeta,
+    ): array {
+        $groupBy = $groupBy === 'municipio' ? 'municipio' : 'microrregion';
+        $metricLabels = [];
+        $formulaLabels = [];
+        $metricColumns = [];
+        $formulaColumns = [];
+        foreach ($sumMetrics as $metric) {
+            $id = (string) ($metric['id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+            $label = (string) ($metric['label'] ?? $id);
+            $group = trim((string) ($metric['group'] ?? ''));
+            $sortOrder = (int) ($metric['sort_order'] ?? 0);
+            $metricLabels[$id] = $label;
+            $metricColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'sort_order' => $sortOrder];
+        }
+        foreach ($sumFormulas as $formula) {
+            $id = (string) ($formula['id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+            $label = (string) ($formula['label'] ?? $id);
+            $group = trim((string) ($formula['group'] ?? ''));
+            $op = (string) ($formula['op'] ?? 'add');
+            $baseMetricId = (string) ($formula['base_metric_id'] ?? '');
+            $sortOrder = (int) ($formula['sort_order'] ?? 0);
+            $formulaLabels[$id] = $label;
+            $formulaColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'op' => $op, 'base_metric_id' => $baseMetricId, 'sort_order' => $sortOrder];
+        }
+
+        $rowsByKey = [];
+        $orderedKeys = [];
+        foreach ($entries as $entry) {
+            $entryData = (array) ($entry->data ?? []);
+            if ($groupBy === 'municipio') {
+                $groupLabel = $this->resolveMunicipioGroupLabel($entryData, $fieldLabels);
+            } else {
+                $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+                $groupLabel = (string) (($meta['label'] ?? null) ?: 'Sin microrregión');
+            }
+            $groupKey = $groupBy.':'.$groupLabel;
+            if (! isset($rowsByKey[$groupKey])) {
+                $orderedKeys[] = $groupKey;
+                $rowsByKey[$groupKey] = ['group' => $groupLabel, 'metrics' => [], 'formulas' => []];
+                foreach ($sumMetrics as $metric) {
+                    $rowsByKey[$groupKey]['metrics'][(string) $metric['id']] = 0.0;
+                }
+            }
+
+            foreach ($sumMetrics as $metric) {
+                $metricId = (string) ($metric['id'] ?? '');
+                $fieldKey = (string) ($metric['field_key'] ?? '');
+                $agg = (string) ($metric['agg'] ?? 'sum');
+                if ($metricId === '' || $fieldKey === '') {
+                    continue;
+                }
+                $raw = $entryData[$fieldKey] ?? null;
+                if ($agg === 'sum') {
+                    $acc = 0.0;
+                    if (is_array($raw)) {
+                        foreach ($raw as $part) {
+                            $n = $this->parseSummaryNumber($part);
+                            if ($n !== null) {
+                                $acc += $n;
+                            }
+                        }
+                    } else {
+                        $n = $this->parseSummaryNumber($raw);
+                        if ($n !== null) {
+                            $acc += $n;
+                        }
+                    }
+                    $rowsByKey[$groupKey]['metrics'][$metricId] += $acc;
+                } elseif ($agg === 'count_non_empty') {
+                    $hasValue = false;
+                    if (is_array($raw) && ! isset($raw['primary'])) {
+                        $hasValue = collect($raw)->contains(fn ($item) => trim((string) $item) !== '');
+                    } elseif (is_array($raw) && isset($raw['primary'])) {
+                        $hasValue = trim((string) ($raw['primary'] ?? '')) !== '';
+                    } else {
+                        $hasValue = trim((string) ($raw ?? '')) !== '';
+                    }
+                    if ($hasValue) {
+                        $rowsByKey[$groupKey]['metrics'][$metricId] += 1;
+                    }
+                } elseif ($agg === 'count_unique' || $agg === 'count_equals') {
+                    $target = $this->normalizeSummaryText((string) ($metric['match_value'] ?? ''));
+                    if ($agg === 'count_equals' && $target !== '') {
+                        $matched = false;
+                        if (is_array($raw) && ! isset($raw['primary'])) {
+                            foreach ($raw as $part) {
+                                if ($this->normalizeSummaryText($part) === $target) {
+                                    $matched = true;
+                                    break;
+                                }
+                            }
+                        } else {
+                            $matched = $this->normalizeSummaryText($raw) === $target;
+                        }
+                        if ($matched) {
+                            $rowsByKey[$groupKey]['metrics'][$metricId] += 1;
+                        }
+                    } else {
+                        if (! isset($rowsByKey[$groupKey]['_unique_sets'])) {
+                            $rowsByKey[$groupKey]['_unique_sets'] = [];
+                        }
+                        if (! isset($rowsByKey[$groupKey]['_unique_sets'][$metricId])) {
+                            $rowsByKey[$groupKey]['_unique_sets'][$metricId] = [];
+                        }
+                        $pushUnique = function (mixed $value) use (&$rowsByKey, $groupKey, $metricId): void {
+                            $key = $this->normalizeSummaryText($value);
+                            if ($key !== '') {
+                                $rowsByKey[$groupKey]['_unique_sets'][$metricId][$key] = true;
+                            }
+                        };
+                        if (is_array($raw) && ! isset($raw['primary'])) {
+                            foreach ($raw as $part) {
+                                $pushUnique($part);
+                            }
+                        } elseif (is_array($raw) && isset($raw['primary'])) {
+                            $pushUnique($raw['primary'] ?? null);
+                        } else {
+                            $pushUnique($raw);
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($groupBy === 'municipio') {
+            usort($orderedKeys, function ($a, $b) use ($rowsByKey) {
+                return strcasecmp((string) ($rowsByKey[$a]['group'] ?? ''), (string) ($rowsByKey[$b]['group'] ?? ''));
+            });
+        }
+
+        foreach ($orderedKeys as $groupKey) {
+            foreach ($sumMetrics as $metric) {
+                $metricId = (string) ($metric['id'] ?? '');
+                $agg = (string) ($metric['agg'] ?? 'sum');
+                $target = $this->normalizeSummaryText((string) ($metric['match_value'] ?? ''));
+                if ($metricId === '') {
+                    continue;
+                }
+                if ($agg === 'count_unique' || ($agg === 'count_equals' && $target === '')) {
+                    $set = $rowsByKey[$groupKey]['_unique_sets'][$metricId] ?? [];
+                    $rowsByKey[$groupKey]['metrics'][$metricId] = (float) count($set);
+                }
+            }
+            unset($rowsByKey[$groupKey]['_unique_sets']);
+        }
+
+        foreach ($orderedKeys as $groupKey) {
+            foreach ($sumFormulas as $formula) {
+                $formulaId = (string) ($formula['id'] ?? '');
+                $op = (string) ($formula['op'] ?? 'add');
+                $metricIds = array_values(array_filter(array_map('strval', (array) ($formula['metric_ids'] ?? []))));
+                $baseMetricId = (string) ($formula['base_metric_id'] ?? '');
+                if ($formulaId === '' || $metricIds === []) {
+                    continue;
+                }
+                $vals = array_map(function ($metricId) use ($rowsByKey, $groupKey) {
+                    return (float) ($rowsByKey[$groupKey]['metrics'][$metricId] ?? 0.0);
+                }, $metricIds);
+
+                $result = 0.0;
+                if ($op === 'subtract') {
+                    $result = array_shift($vals) ?? 0.0;
+                    foreach ($vals as $v) {
+                        $result -= $v;
+                    }
+                } elseif ($op === 'multiply') {
+                    $result = 1.0;
+                    foreach ($vals as $v) {
+                        $result *= $v;
+                    }
+                } elseif ($op === 'divide') {
+                    $result = array_shift($vals) ?? 0.0;
+                    foreach ($vals as $v) {
+                        if ($v == 0.0) {
+                            $result = 0.0;
+                            break;
+                        }
+                        $result /= $v;
+                    }
+                } elseif ($op === 'percent') {
+                    $numerator = (float) (($vals[0] ?? 0.0));
+                    $base = (float) ($rowsByKey[$groupKey]['metrics'][$baseMetricId] ?? 0.0);
+                    $result = ($base !== 0.0) ? (($numerator / $base) * 100.0) : 0.0;
+                } else {
+                    foreach ($vals as $v) {
+                        $result += $v;
+                    }
+                }
+                $rowsByKey[$groupKey]['formulas'][$formulaId] = $result;
+            }
+        }
+
+        $rows = [];
+        foreach ($orderedKeys as $key) {
+            $rows[] = $rowsByKey[$key];
+        }
+
+        return [
+            'group_label' => $groupBy === 'municipio' ? 'Municipio' : 'Microrregión',
+            'metric_columns' => $metricColumns,
+            'formula_columns' => $formulaColumns,
+            'metric_labels' => $metricLabels,
+            'formula_labels' => $formulaLabels,
+            'rows' => $rows,
+        ];
+    }
+
     private function fillSheet(Worksheet $sheet, TemporaryModule $temporaryModule, $entriesQuery, Collection $microrregionMeta, \DateTimeInterface $fechaCorte): void
     {
         $exportColumns = $this->buildExportColumns($temporaryModule);
@@ -893,22 +1183,36 @@ class TemporaryModuleExportService
             $sheet->getRowDimension(1)->setRowHeight(30);
         }
         $includeCountTable = !empty($this->exportConfig['include_count_table']);
+        $includeSumTable = !empty($this->exportConfig['include_sum_table']);
         $countByFields = $includeCountTable && is_array($this->exportConfig['count_by_fields'] ?? null)
             ? array_values(array_filter(array_map('strval', $this->exportConfig['count_by_fields'])))
             : [];
         $countTableColors = is_array($this->exportConfig['count_table_colors'] ?? null) ? $this->exportConfig['count_table_colors'] : [];
+        $sumGroupBy = (string) ($this->exportConfig['sum_group_by'] ?? 'microrregion');
+        $sumMetrics = $includeSumTable && is_array($this->exportConfig['sum_metrics'] ?? null)
+            ? array_values($this->exportConfig['sum_metrics'])
+            : [];
+        $sumFormulas = $includeSumTable && is_array($this->exportConfig['sum_formulas'] ?? null)
+            ? array_values($this->exportConfig['sum_formulas'])
+            : [];
+        $fieldLabels = [];
+        foreach ($exportColumns as $column) {
+            $field = $column['field'] ?? null;
+            if ($field && isset($field->key)) {
+                $fieldLabels[(string) $field->key] = (string) ($column['header2'] ?? $field->label ?? $field->key);
+            }
+        }
         $countTableRows = 0;
         $maxColIdx = $dataColumnsCount;
+        $entriesForSummary = null;
+        if ($includeCountTable || $includeSumTable) {
+            $entriesForSummary = (clone $entriesQuery)->get(['id', 'data', 'microrregion_id']);
+        }
 
         if ($includeCountTable) {
-            $entriesForCount = (clone $entriesQuery)->get(['id', 'data']);
-            $fieldLabels = [];
-            foreach ($exportColumns as $column) {
-                $field = $column['field'] ?? null;
-                if ($field && isset($field->key)) {
-                    $fieldLabels[(string) $field->key] = (string) ($column['header2'] ?? $field->label ?? $field->key);
-                }
-            }
+            $entriesForCount = $entriesForSummary instanceof Collection
+                ? $entriesForSummary
+                : (clone $entriesQuery)->get(['id', 'data', 'microrregion_id']);
             $countData = $this->buildCountTableData($entriesForCount, $countByFields, $fieldLabels);
             $countData = $this->transformCountTableLabels($countData, $headersUppercase);
             $groups = $countData['groups'];
@@ -997,6 +1301,211 @@ class TemporaryModuleExportService
                 }
             }
             $countTableRows = 4;
+        }
+
+        if ($includeSumTable && $sumMetrics !== [] && $entriesForSummary instanceof Collection) {
+            $sumData = $this->buildSumTableData(
+                $entriesForSummary,
+                $sumMetrics,
+                $sumFormulas,
+                $sumGroupBy,
+                $fieldLabels,
+                $microrregionMeta,
+            );
+            $sumRows = is_array($sumData['rows'] ?? null) ? $sumData['rows'] : [];
+            if ($sumRows !== []) {
+                $sumGroupColorArgb = $this->mapCssColorToArgb((string) ($this->exportConfig['sum_group_color'] ?? '')) ?: 'FF475569';
+                $sumStartRow = 4 + $countTableRows;
+                $sumTitleRow = $sumStartRow;
+                $sumHeaderRow = $sumStartRow + 1;
+                $sumDataStartRow = $sumStartRow + 2;
+
+                $sumMetricColumns = is_array($sumData['metric_columns'] ?? null) ? $sumData['metric_columns'] : [];
+                $sumFormulaColumns = is_array($sumData['formula_columns'] ?? null) ? $sumData['formula_columns'] : [];
+                $sumMetricLabels = [];
+                foreach ($sumMetricColumns as $col) {
+                    $sumMetricLabels[(string) ($col['id'] ?? '')] = (string) ($col['label'] ?? '');
+                }
+                if ($sumMetricLabels === []) {
+                    $sumMetricLabels = is_array($sumData['metric_labels'] ?? null) ? $sumData['metric_labels'] : [];
+                }
+                $sumFormulaLabels = [];
+                foreach ($sumFormulaColumns as $col) {
+                    $sumFormulaLabels[(string) ($col['id'] ?? '')] = (string) ($col['label'] ?? '');
+                }
+                if ($sumFormulaLabels === []) {
+                    $sumFormulaLabels = is_array($sumData['formula_labels'] ?? null) ? $sumData['formula_labels'] : [];
+                }
+                $sumGroupLabel = (string) ($sumData['group_label'] ?? 'Grupo');
+                $sumCols = 1 + count($sumMetricLabels) + count($sumFormulaLabels);
+                $sumLastCol = max(1, $sumCols);
+                $sumLastLetter = Coordinate::stringFromColumnIndex($sumLastCol);
+                $sumCombinedCols = [];
+                foreach ($sumMetricColumns as $col) {
+                    $sumCombinedCols[] = [
+                        'id' => (string) ($col['id'] ?? ''),
+                        'label' => (string) ($col['label'] ?? ''),
+                        'group' => trim((string) ($col['group'] ?? '')),
+                        'op' => 'metric',
+                        'sort_order' => (int) ($col['sort_order'] ?? 0),
+                    ];
+                }
+                if ($sumCombinedCols === [] && $sumMetricLabels !== []) {
+                    foreach ($sumMetricLabels as $id => $label) {
+                        $sumCombinedCols[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'metric', 'sort_order' => 0];
+                    }
+                }
+                foreach ($sumFormulaColumns as $col) {
+                    $sumCombinedCols[] = [
+                        'id' => (string) ($col['id'] ?? ''),
+                        'label' => (string) ($col['label'] ?? ''),
+                        'group' => trim((string) ($col['group'] ?? '')),
+                        'op' => (string) ($col['op'] ?? 'add'),
+                        'sort_order' => (int) ($col['sort_order'] ?? 0),
+                    ];
+                }
+                if (empty($sumFormulaColumns) && $sumFormulaLabels !== []) {
+                    foreach ($sumFormulaLabels as $id => $label) {
+                        $sumCombinedCols[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'add', 'sort_order' => 0];
+                    }
+                }
+                if ($sumCombinedCols !== []) {
+                    usort($sumCombinedCols, static function (array $a, array $b): int {
+                        $sa = (int) ($a['sort_order'] ?? 0);
+                        $sb = (int) ($b['sort_order'] ?? 0);
+                        if ($sa !== $sb) {
+                            if ($sa === 0) return 1;
+                            if ($sb === 0) return -1;
+                            return $sa <=> $sb;
+                        }
+                        return 0;
+                    });
+                }
+                $hasSumGroupHeaders = collect($sumCombinedCols)->contains(fn ($col) => ((string) ($col['group'] ?? '')) !== '');
+
+                $sumTitleBase = trim((string) ($this->exportConfig['sum_title'] ?? 'Sumatoria'));
+                if ($sumTitleBase === '') {
+                    $sumTitleBase = 'Sumatoria';
+                }
+                $sumTitleCase = strtolower((string) ($this->exportConfig['sum_title_case'] ?? 'normal'));
+                if (!in_array($sumTitleCase, ['normal', 'upper', 'lower'], true)) {
+                    $sumTitleCase = 'normal';
+                }
+                $sumTitleText = $this->normalizeExportHeading($sumTitleBase, $headersUppercase);
+                if ($sumTitleCase === 'upper') {
+                    $sumTitleText = mb_strtoupper($sumTitleText);
+                } elseif ($sumTitleCase === 'lower') {
+                    $sumTitleText = mb_strtolower($sumTitleText);
+                    $first = mb_substr($sumTitleText, 0, 1, 'UTF-8');
+                    $rest = mb_substr($sumTitleText, 1, null, 'UTF-8');
+                    $sumTitleText = mb_strtoupper($first, 'UTF-8').$rest;
+                }
+
+                $sheet->setCellValue('A'.$sumTitleRow, $sumTitleText.' '.$this->normalizeExportHeading('por '.$sumGroupLabel, $headersUppercase));
+                $sheet->mergeCells('A'.$sumTitleRow.':'.$sumLastLetter.$sumTitleRow);
+                $sheet->getStyle('A'.$sumTitleRow)->getFont()->setBold(true);
+
+                if ($hasSumGroupHeaders) {
+                    $sumHeaderRow = $sumStartRow + 2;
+                    $sumDataStartRow = $sumStartRow + 3;
+                    $sumGroupHeaderRow = $sumStartRow + 1;
+                    $sheet->setCellValue('A'.$sumGroupHeaderRow, '');
+                    $sheet->mergeCells('A'.$sumGroupHeaderRow.':A'.$sumHeaderRow);
+                    $colIdx = 2;
+                    $startCol = 2;
+                    $lastGroup = null;
+                    foreach ($sumCombinedCols as $col) {
+                        $groupLabel = (string) ($col['group'] ?? '');
+                        if ($lastGroup === null) {
+                            $lastGroup = $groupLabel;
+                        }
+                        if ($groupLabel !== $lastGroup) {
+                            $endCol = $colIdx - 1;
+                            if (trim($lastGroup) !== '') {
+                                $sheet->setCellValue(Coordinate::stringFromColumnIndex($startCol).$sumGroupHeaderRow, $this->normalizeExportHeading($lastGroup, $headersUppercase));
+                                if ($endCol > $startCol) {
+                                    $sheet->mergeCells(Coordinate::stringFromColumnIndex($startCol).$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($endCol).$sumGroupHeaderRow);
+                                }
+                            }
+                            $startCol = $colIdx;
+                            $lastGroup = $groupLabel;
+                        }
+                        $colIdx++;
+                    }
+                    $endCol = $colIdx - 1;
+                    if (trim((string) $lastGroup) !== '') {
+                        $sheet->setCellValue(Coordinate::stringFromColumnIndex($startCol).$sumGroupHeaderRow, $this->normalizeExportHeading((string) $lastGroup, $headersUppercase));
+                        if ($endCol > $startCol) {
+                            $sheet->mergeCells(Coordinate::stringFromColumnIndex($startCol).$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($endCol).$sumGroupHeaderRow);
+                        }
+                    }
+                    $sheet->getStyle('A'.$sumGroupHeaderRow.':'.$sumLastLetter.$sumGroupHeaderRow)
+                        ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF334155');
+                    $sheet->getStyle('A'.$sumGroupHeaderRow)
+                        ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($sumGroupColorArgb);
+                    $sheet->getStyle('A'.$sumGroupHeaderRow.':'.$sumLastLetter.$sumGroupHeaderRow)
+                        ->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
+                    $sheet->getStyle('A'.$sumGroupHeaderRow.':'.$sumLastLetter.$sumGroupHeaderRow)
+                        ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+                }
+
+                $sheet->setCellValue('A'.$sumHeaderRow, $this->normalizeExportHeading($sumGroupLabel, $headersUppercase));
+                $colIdx = 2;
+                foreach ($sumCombinedCols as $col) {
+                    $sheet->setCellValue(
+                        Coordinate::stringFromColumnIndex($colIdx).$sumHeaderRow,
+                        $this->normalizeExportHeading((string) ($col['label'] ?? ''), $headersUppercase)
+                    );
+                    $colIdx++;
+                }
+
+                $rowPtr = $sumDataStartRow;
+                foreach ($sumRows as $row) {
+                    $sheet->setCellValue('A'.$rowPtr, (string) ($row['group'] ?? ''));
+                    $colIdx = 2;
+                    foreach ($sumCombinedCols as $col) {
+                        $id = (string) ($col['id'] ?? '');
+                        if ((string) ($col['op'] ?? 'metric') === 'metric') {
+                            $v = (float) (($row['metrics'][$id] ?? 0.0));
+                            $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$rowPtr, round($v, 2));
+                        } else {
+                            $v = (float) (($row['formulas'][$id] ?? 0.0));
+                            $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$rowPtr, round($v, 2));
+                            if ((string) ($col['op'] ?? '') === 'percent') {
+                                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$rowPtr, $v / 100);
+                                $sheet->getStyle(Coordinate::stringFromColumnIndex($colIdx).$rowPtr)
+                                    ->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE_00);
+                            }
+                        }
+                        $colIdx++;
+                    }
+                    $rowPtr++;
+                }
+
+                $sumLastDataRow = $rowPtr - 1;
+                $sheet->getStyle('A'.$sumHeaderRow.':'.$sumLastLetter.$sumHeaderRow)
+                    ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF475569');
+                $sheet->getStyle('A'.$sumHeaderRow)
+                    ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($sumGroupColorArgb);
+                $sheet->getStyle('A'.$sumHeaderRow.':'.$sumLastLetter.$sumHeaderRow)
+                    ->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
+                $sheet->getStyle('A'.$sumHeaderRow.':'.$sumLastLetter.$sumLastDataRow)
+                    ->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+                $sheet->getStyle('A'.$sumHeaderRow.':'.$sumLastLetter.$sumLastDataRow)
+                    ->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle('A'.$sumDataStartRow.':'.$sumLastLetter.$sumLastDataRow)
+                    ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('A'.$sumDataStartRow.':A'.$sumLastDataRow)
+                    ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+
+                $sheet->getColumnDimension('A')->setWidth(max(20, (float) $sheet->getColumnDimension('A')->getWidth()));
+                for ($c = 2; $c <= $sumLastCol; $c++) {
+                    $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth(14);
+                }
+
+                $countTableRows += 2 + count($sumRows);
+                $maxColIdx = max($maxColIdx, $sumLastCol);
+            }
         }
 
         $lastColumnLetter = Coordinate::stringFromColumnIndex($maxColIdx);
@@ -1234,68 +1743,48 @@ class TemporaryModuleExportService
                         }
 
                         if ($this->shouldRenderAsImageCell($fieldType, $cell)) {
-                            if (is_string($cell) && trim($cell) !== '') {
-                                $rawValue = trim($cell);
+                            $rawPaths = is_array($cell) ? array_filter($cell) : ($cell ? [(string) $cell] : []);
+                            $imagesRendered = 0;
+                            foreach ($rawPaths as $idx => $rawValue) {
+                                if (!is_string($rawValue) || trim($rawValue) === '') continue;
+                                $rawValue = trim($rawValue);
+                                $localPath = null;
                                 if (filter_var($rawValue, FILTER_VALIDATE_URL)) {
-                                    // Intentar resolver a archivo local si la URL viene de /storage/...
-                                    $localFromUrl = $this->tryResolveLocalPathFromUrl($rawValue);
-                                    if (is_string($localFromUrl) && is_file($localFromUrl)) {
-                                        $drawing = new Drawing();
-                                        $drawing->setPath($localFromUrl);
-                                        $drawing->setCoordinates($cellCoordinate);
-                                        $drawing->setOffsetX(2);
-                                        $drawing->setOffsetY(2);
-                                        $drawing->setResizeProportional(true);
-                                        $height = 80;
-                                        $fieldCfg = $this->columnConfigByKey[(string) $field->key] ?? null;
-                                        if (is_array($fieldCfg) && isset($fieldCfg['image_height']) && is_numeric($fieldCfg['image_height'])) {
-                                            $height = max(20, min((int) $fieldCfg['image_height'], 400));
-                                        }
-                                        $drawing->setHeight($height);
-                                        $drawing->setWorksheet($sheet);
-                                        $currentRowHeight = (float) $sheet->getRowDimension($rowIndex)->getRowHeight();
-                                        // PhpSpreadsheet usa puntos (pt) para el alto de fila; convertir px → pt aprox (0.75).
-                                        $heightPt = ($height * 0.75) + 4;
-                                        if ($heightPt > $currentRowHeight || $currentRowHeight < 0) {
-                                            $sheet->getRowDimension($rowIndex)->setRowHeight($heightPt);
-                                        }
-                                    } else {
-                                        // Fallback: dejar vínculo visible.
-                                        $sheet->setCellValue($cellCoordinate, $rawValue);
-                                        $sheet->getCell($cellCoordinate)->getHyperlink()->setUrl($rawValue);
-                                    }
+                                    $localPath = $this->tryResolveLocalPathFromUrl($rawValue);
                                 } else {
-                                    $fullPath = $this->entryDataService->resolveStoredFilePath($rawValue);
-                                    if (is_string($fullPath) && is_file($fullPath)) {
-                                        $drawing = new Drawing();
-                                        $drawing->setPath($fullPath);
-                                        $drawing->setCoordinates($cellCoordinate);
-                                        $drawing->setOffsetX(2);
-                                        $drawing->setOffsetY(2);
-                                        $drawing->setResizeProportional(true);
-                                        $height = 80;
-                                        $fieldCfg = $this->columnConfigByKey[(string) $field->key] ?? null;
-                                        if (is_array($fieldCfg) && isset($fieldCfg['image_height']) && is_numeric($fieldCfg['image_height'])) {
-                                            $height = max(20, min((int) $fieldCfg['image_height'], 400));
-                                        }
-                                        $drawing->setHeight($height);
-                                        $drawing->setWorksheet($sheet);
-                                        // Asegurar que el alto de la fila sea suficiente para la imagen más alta en ella
-                                        $currentRowHeight = (float) $sheet->getRowDimension($rowIndex)->getRowHeight();
-                                        $heightPt = ($height * 0.75) + 4;
-                                        if ($heightPt > $currentRowHeight || $currentRowHeight < 0) {
-                                            $sheet->getRowDimension($rowIndex)->setRowHeight($heightPt);
-                                        }
-                                    } else {
-                                        $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
-                                    }
+                                    $localPath = $this->entryDataService->resolveStoredFilePath($rawValue);
                                 }
-                            } else {
+
+                                if (is_string($localPath) && is_file($localPath)) {
+                                    $drawing = new Drawing();
+                                    $drawing->setPath($localPath);
+                                    $drawing->setCoordinates($cellCoordinate);
+                                    $drawing->setOffsetX(2 + ($imagesRendered * 85)); // Offset horizontal para múltiples imágenes
+                                    $drawing->setOffsetY(2);
+                                    $drawing->setResizeProportional(true);
+                                    $height = 80;
+                                    $fieldKeyStr = (string)$field->key;
+                                    $fieldCfg = $this->columnConfigByKey[$fieldKeyStr] ?? null;
+                                    if (is_array($fieldCfg) && isset($fieldCfg['image_height']) && is_numeric($fieldCfg['image_height'])) {
+                                        $height = max(20, min((int) $fieldCfg['image_height'], 400));
+                                    }
+                                    $drawing->setHeight($height);
+                                    $drawing->setWorksheet($sheet);
+                                    $heightPt = ($height * 0.75) + 4;
+                                    $currentRowHeight = (float) $sheet->getRowDimension($rowIndex)->getRowHeight();
+                                    if ($heightPt > $currentRowHeight || $currentRowHeight < 0) {
+                                        $sheet->getRowDimension($rowIndex)->setRowHeight($heightPt);
+                                    }
+                                    $imagesRendered++;
+                                }
+                            }
+                            if ($imagesRendered === 0) {
                                 $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
                             }
                             $columnIndex++;
                             continue;
                         }
+
 
                         if ($fieldType === 'geopoint' && is_string($cell) && trim($cell) !== '') {
                             $geoValue = trim($cell);
@@ -1443,6 +1932,13 @@ class TemporaryModuleExportService
 
     private function shouldRenderAsImageCell(string $fieldType, mixed $value): bool
     {
+        if (is_array($value)) {
+            foreach ($value as $v) {
+                if ($this->shouldRenderAsImageCell($fieldType, $v)) return true;
+            }
+            return false;
+        }
+
         if (!is_scalar($value)) {
             return false;
         }
@@ -1477,6 +1973,7 @@ class TemporaryModuleExportService
 
         return str_starts_with($mime, 'image/');
     }
+
 
     private function tryResolveLocalPathFromUrl(string $url): ?string
     {
