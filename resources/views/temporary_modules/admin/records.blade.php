@@ -1811,11 +1811,129 @@
             { name: 'Tarjeta', value: 'var(--clr-card)' }
         ];
 
-        const closePersonalizeModal = function () {
+        const closePersonalizeModalImmediate = function () {
             if (!personalizeModal) { return; }
             personalizeModal.classList.remove('is-open');
             personalizeModal.setAttribute('aria-hidden', 'true');
             document.body.style.overflow = '';
+        };
+
+        const closePersonalizeModal = function (options) {
+            if (!personalizeModal) { return; }
+            var opts = options || {};
+            if (opts.force === true) {
+                closePersonalizeModalImmediate();
+                return;
+            }
+
+            var isOpen = personalizeModal.classList.contains('is-open');
+            if (!isOpen) {
+                return;
+            }
+
+            var collectCfg = personalizeModal._collectPersonalizeCfgObject;
+            if (typeof collectCfg !== 'function') {
+                closePersonalizeModalImmediate();
+                return;
+            }
+
+            var currentCfg = null;
+            try {
+                currentCfg = collectCfg();
+            } catch (eCollect) {
+                closePersonalizeModalImmediate();
+                return;
+            }
+
+            var exportUrl = personalizeModal._exportUrl || '';
+            var swalChoiceNow = personalizeModal._swalChoice || 'single';
+            var savedDraft = null;
+            if (exportUrl) {
+                try {
+                    var savedRaw = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
+                    if (savedRaw) {
+                        var parsedSaved = JSON.parse(savedRaw);
+                        if (parsedSaved && parsedSaved.v === 1 && parsedSaved.cfg && typeof parsedSaved.cfg === 'object') {
+                            savedDraft = parsedSaved;
+                        }
+                    }
+                } catch (eSaved) {}
+            }
+
+            var hasPendingChanges = false;
+            try {
+                var currentJson = JSON.stringify(currentCfg || {});
+                if (savedDraft) {
+                    hasPendingChanges = (currentJson !== JSON.stringify(savedDraft.cfg || {})) || ((savedDraft.swal_choice || 'single') !== swalChoiceNow);
+                } else {
+                    var openSnapshot = personalizeModal._openCfgSnapshot || '';
+                    var openChoice = personalizeModal._openSwalChoice || 'single';
+                    hasPendingChanges = (openSnapshot !== '' && currentJson !== openSnapshot) || (openChoice !== swalChoiceNow);
+                }
+            } catch (eCmp) {
+                hasPendingChanges = false;
+            }
+
+            if (!hasPendingChanges) {
+                closePersonalizeModalImmediate();
+                return;
+            }
+
+            var persistFn = personalizeModal._persistExportDraft;
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: '¿Salir sin guardar configuración?',
+                    text: 'Puedes salir sin guardar, guardar y salir, o cancelar.',
+                    showCancelButton: true,
+                    showDenyButton: true,
+                    confirmButtonText: 'Salir sin guardar',
+                    denyButtonText: 'Guardar y salir',
+                    cancelButtonText: 'Cancelar'
+                }).then(function (res) {
+                    if (!res) { return; }
+                    if (res.isConfirmed) {
+                        closePersonalizeModalImmediate();
+                        return;
+                    }
+                    if (res.isDenied) {
+                        var saveOk = false;
+                        if (typeof persistFn === 'function') {
+                            var saveRes = persistFn(currentCfg);
+                            saveOk = !!(saveRes && saveRes.ok);
+                        }
+                        if (saveOk) {
+                            closePersonalizeModalImmediate();
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Configuración guardada',
+                                text: 'Se guardó la configuración y se cerró el editor.',
+                                toast: true,
+                                position: 'top-end',
+                                timer: 2200,
+                                timerProgressBar: true,
+                                showConfirmButton: false
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'No se pudo guardar',
+                                text: 'No fue posible guardar la configuración en este navegador.',
+                                toast: true,
+                                position: 'top-end',
+                                timer: 2400,
+                                timerProgressBar: true,
+                                showConfirmButton: false
+                            });
+                        }
+                    }
+                });
+                return;
+            }
+
+            if (confirm('Hay cambios sin guardar. ¿Salir sin guardar?')) {
+                closePersonalizeModalImmediate();
+            }
         };
 
         /** Base64 UTF-8: evita que caracteres no Latin-1 rompan btoa y reduce corrupción del JSON en POST largos. */
@@ -1880,7 +1998,7 @@
                         var previewUrl = refBtn.getAttribute('data-analysis-preview-url');
                         var wordUrl = refBtn.getAttribute('data-analysis-word-url');
                         if (previewUrl && wordUrl) {
-                            closePersonalizeModal();
+                            closePersonalizeModal({ force: true });
                             window._tmAnalysisPreviewUrl = previewUrl;
                             window._tmAnalysisWordUrl = wordUrl;
                             var wpf = document.getElementById('tmAnalysisWordPersonalizeForm');
@@ -4420,6 +4538,19 @@
                         const exportMode = (fmt === 'excel') ? (mode || 'single') : 'single';
                         closePersonalizeModal();
                         submitTemporaryModuleExportPost(exportUrl, fmt, exportMode, cfg);
+                    }
+
+                    if (personalizeModal) {
+                        personalizeModal._collectPersonalizeCfgObject = collectPersonalizeCfgObject;
+                        personalizeModal._persistExportDraft = persistExportDraft;
+                        personalizeModal._exportUrl = exportUrl;
+                        personalizeModal._structureUrl = structureUrl;
+                        personalizeModal._openSwalChoice = personalizeModal._swalChoice || 'single';
+                        try {
+                            personalizeModal._openCfgSnapshot = JSON.stringify(collectPersonalizeCfgObject());
+                        } catch (eSnapshot) {
+                            personalizeModal._openCfgSnapshot = '';
+                        }
                     }
 
                     var saveCfgBtn = document.getElementById('tmExportSaveConfig');
