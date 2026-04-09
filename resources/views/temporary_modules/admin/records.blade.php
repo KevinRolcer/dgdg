@@ -379,10 +379,12 @@
         <div class="tm-modal-dialog tm-export-personalize-dialog">
             <div class="tm-modal-head">
                 <h3>Todos los registros</h3>
-                <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" id="tmExportSaveConfigTop">Guardar configuración</button>
-                <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" id="tmExportClearConfigTop" title="Limpiar configuración guardada" aria-label="Limpiar configuración guardada">
-                    <i class="fa-solid fa-broom" aria-hidden="true"></i>
-                </button>
+                <div class="tm-export-save-actions tm-export-save-actions--head">
+                    <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" id="tmExportSaveConfigTop">Guardar configuración</button>
+                    <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" id="tmExportClearConfigTop" title="Limpiar configuración guardada" aria-label="Limpiar configuración guardada">
+                        <i class="fa-solid fa-broom" aria-hidden="true"></i>
+                    </button>
+                </div>
                 <button type="button" class="tm-modal-close" data-close-export-personalize aria-label="Cerrar">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
@@ -713,10 +715,12 @@
             </div>
             <div class="tm-modal-foot tm-export-modal-foot tm-export-modal-foot--personalize">
                 <button type="button" class="tm-btn tm-btn-outline" data-close-export-personalize>Cancelar</button>
-                <button type="button" class="tm-btn tm-btn-primary" id="tmExportSaveConfig">Guardar configuración</button>
-                <button type="button" class="tm-btn tm-btn-outline" id="tmExportClearConfig" title="Limpiar configuración guardada" aria-label="Limpiar configuración guardada">
-                    <i class="fa-solid fa-broom" aria-hidden="true"></i>
-                </button>
+                <div class="tm-export-save-actions">
+                    <button type="button" class="tm-btn tm-btn-primary" id="tmExportSaveConfig">Guardar configuración</button>
+                    <button type="button" class="tm-btn tm-btn-outline" id="tmExportClearConfig" title="Limpiar configuración guardada" aria-label="Limpiar configuración guardada">
+                        <i class="fa-solid fa-broom" aria-hidden="true"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -4433,21 +4437,46 @@
                         if (!btn || !exportUrl) { return; }
                         btn.onclick = function () {
                             var hadDraft = !!readSavedExportDraft();
-                            try {
-                                localStorage.removeItem(tmExportDraftStorageKey(exportUrl));
-                            } catch (eRm) {}
-                            openExportPersonalizeModal(structureUrl, exportUrl);
+
+                            var doClear = function () {
+                                try {
+                                    localStorage.removeItem(tmExportDraftStorageKey(exportUrl));
+                                } catch (eRm) {}
+                                openExportPersonalizeModal(structureUrl, exportUrl);
+                                if (typeof Swal !== 'undefined') {
+                                    Swal.fire({
+                                        icon: hadDraft ? 'success' : 'info',
+                                        title: hadDraft ? 'Configuración limpiada' : 'Cambios limpiados',
+                                        text: hadDraft
+                                            ? 'Se eliminó la configuración guardada y se restauró la vista por defecto.'
+                                            : 'No había configuración guardada; se limpiaron los cambios actuales del modal.',
+                                        toast: true,
+                                        position: 'top-end',
+                                        timer: 2400,
+                                        timerProgressBar: true,
+                                        showConfirmButton: false
+                                    });
+                                }
+                            };
+
                             if (typeof Swal !== 'undefined') {
                                 Swal.fire({
-                                    icon: hadDraft ? 'success' : 'info',
-                                    title: hadDraft ? 'Configuración limpiada' : 'Sin configuración guardada',
-                                    text: hadDraft ? 'Se eliminó la configuración guardada y se restauró la vista por defecto.' : 'No había configuración guardada para limpiar.',
-                                    toast: true,
-                                    position: 'top-end',
-                                    timer: 2200,
-                                    timerProgressBar: true,
-                                    showConfirmButton: false
+                                    icon: 'warning',
+                                    title: '¿Quitar cambios de configuración?',
+                                    text: 'Se tendrá que configurar el reporte nuevamente.',
+                                    showCancelButton: true,
+                                    confirmButtonText: 'Sí, limpiar',
+                                    cancelButtonText: 'Cancelar'
+                                }).then(function (res) {
+                                    if (res && res.isConfirmed) {
+                                        doClear();
+                                    }
                                 });
+                                return;
+                            }
+
+                            if (confirm('¿Quitar cambios de configuración? Se tendrá que configurar el reporte nuevamente.')) {
+                                doClear();
                             }
                         };
                     });

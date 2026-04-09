@@ -3334,6 +3334,21 @@ html.theme-dark .tm-template-download-card--all .tm-template-download-icon {
     gap: 10px;
 }
 
+.tm-export-save-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tm-export-personalize-dialog > .tm-modal-head {
+    justify-content: flex-start;
+    gap: 8px;
+}
+
+.tm-export-personalize-dialog > .tm-modal-head > h3 {
+    margin-right: auto;
+}
+
 .tm-export-format-sections {
     display: flex;
     flex-direction: column;
