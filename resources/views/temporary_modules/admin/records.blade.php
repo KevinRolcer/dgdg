@@ -379,6 +379,10 @@
         <div class="tm-modal-dialog tm-export-personalize-dialog">
             <div class="tm-modal-head">
                 <h3>Todos los registros</h3>
+                <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" id="tmExportSaveConfigTop">Guardar configuración</button>
+                <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" id="tmExportClearConfigTop" title="Limpiar configuración guardada" aria-label="Limpiar configuración guardada">
+                    <i class="fa-solid fa-broom" aria-hidden="true"></i>
+                </button>
                 <button type="button" class="tm-modal-close" data-close-export-personalize aria-label="Cerrar">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
@@ -710,6 +714,9 @@
             <div class="tm-modal-foot tm-export-modal-foot tm-export-modal-foot--personalize">
                 <button type="button" class="tm-btn tm-btn-outline" data-close-export-personalize>Cancelar</button>
                 <button type="button" class="tm-btn tm-btn-primary" id="tmExportSaveConfig">Guardar configuración</button>
+                <button type="button" class="tm-btn tm-btn-outline" id="tmExportClearConfig" title="Limpiar configuración guardada" aria-label="Limpiar configuración guardada">
+                    <i class="fa-solid fa-broom" aria-hidden="true"></i>
+                </button>
             </div>
         </div>
     </div>
@@ -2709,7 +2716,7 @@
             return columns;
         }
 
-        function tmExportRenderSumPreviewTable(sumData, headersUppercase, sumTableAlign, sumTitle, sumTitleCase, sumTitleAlign, sumTitleFontSize, sumGroupColor, sumIncludeTotalsRow, sumTotalsBold, sumTotalsTextColor) {
+        function tmExportRenderSumPreviewTable(sumData, headersUppercase, sumTableAlign, sumTitle, sumTitleCase, sumTitleAlign, sumTitleFontSize, sumGroupColor, sumIncludeTotalsRow, sumTotalsBold, sumTotalsTextColor, groups) {
             if (!sumData || !Array.isArray(sumData.groups) || sumData.groups.length === 0) { return ''; }
             var rawTitle = String(sumTitle || '').trim() !== '' ? String(sumTitle) : 'Sumatoria';
             var title = normalizeExportHeadingText(rawTitle, !!headersUppercase);
@@ -2723,6 +2730,7 @@
             var sumTableMargin = align === 'center' ? 'margin:0 auto 1rem auto;' : (align === 'right' ? 'margin:0 0 1rem auto;' : 'margin:0 1rem 1rem 0;');
             var sumColumns = tmExportBuildOrderedSumColumns(sumData);
             var hasGroups = sumColumns.some(function (c) { return String(c.group || '').trim() !== ''; });
+            var groupColorMap = buildGroupColorMap(Array.isArray(groups) ? groups : []);
             var spans = [];
             if (hasGroups) {
                 sumColumns.forEach(function (c) {
@@ -2748,7 +2756,8 @@
                     if (s.label.trim() === '') {
                         html += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:#f8fafc;border:1px solid #e2e8f0;"></th>';
                     } else {
-                        html += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:#334155;color:#fff;border:1px solid #1e293b;">' + escapeHtml(normalizeExportHeadingText(s.label, headersUppercase)) + '</th>';
+                        var sumGroupHeaderColor = groupColorMap[s.label] || '#64748b';
+                        html += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:' + escapeHtml(sumGroupHeaderColor) + ';color:#fff;border:1px solid #1e293b;">' + escapeHtml(normalizeExportHeadingText(s.label, headersUppercase)) + '</th>';
                     }
                 });
                 html += '</tr>';
@@ -3286,7 +3295,8 @@
                 state.sumGroupColor || 'var(--clr-primary)',
                 !!state.sumIncludeTotalsRow,
                 !(state.sumTotalsBold === false),
-                state.sumTotalsTextColor || 'var(--clr-primary)'
+                state.sumTotalsTextColor || 'var(--clr-primary)',
+                state.groups || []
             );
 
             // Tabla de Datos (Desglose)
@@ -3998,7 +4008,7 @@
                         var rawDraft = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
                         if (rawDraft) {
                             var parsedDraft = JSON.parse(rawDraft);
-                            if (parsedDraft && parsedDraft.v === 1 && parsedDraft.cfg && parsedDraft.cfg.columns && parsedDraft.cfg.columns.length) {
+                            if (parsedDraft && parsedDraft.v === 1 && parsedDraft.cfg && typeof parsedDraft.cfg === 'object') {
                                 draftCfg = parsedDraft.cfg;
                             }
                         }
@@ -4088,7 +4098,8 @@
                             docMarginPresetEl.value = dm;
                         }
                         var orderedMerged = [];
-                        draftCfg.columns.forEach(function (sc) {
+                        var draftColumns = Array.isArray(draftCfg.columns) ? draftCfg.columns : [];
+                        draftColumns.forEach(function (sc) {
                             var b = columns.find(function (c) { return c.key === sc.key; });
                             if (b) {
                                 orderedMerged.push(Object.assign({}, b, {
@@ -4101,9 +4112,8 @@
                         });
                         if (orderedMerged.length) {
                             buildPersonalizeColumnsList(orderedMerged, columnsEl);
-                            applyColumnDraftVisuals(columnsEl, draftCfg.columns);
+                            applyColumnDraftVisuals(columnsEl, draftColumns);
                         } else {
-                            if (titleEl) { titleEl.value = data.title || ''; }
                             buildPersonalizeColumnsList(columns, columnsEl);
                         }
                     } else {
@@ -4335,8 +4345,73 @@
                         };
                     }
 
+                    function readSavedExportDraft() {
+                        if (!exportUrl) { return null; }
+                        try {
+                            var raw = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
+                            if (!raw) { return null; }
+                            var parsed = JSON.parse(raw);
+                            if (!parsed || parsed.v !== 1 || !parsed.cfg || typeof parsed.cfg !== 'object') {
+                                return null;
+                            }
+
+                            return parsed;
+                        } catch (eRead) {
+                            return null;
+                        }
+                    }
+
+                    function isSameExportCfg(a, b) {
+                        if (!a || !b) { return false; }
+                        try {
+                            return JSON.stringify(a) === JSON.stringify(b);
+                        } catch (eCmp) {
+                            return false;
+                        }
+                    }
+
+                    function showSaveConfigFeedback(hasChanges, savedOk) {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: savedOk ? (hasChanges ? 'success' : 'info') : 'error',
+                                title: savedOk
+                                    ? (hasChanges ? 'Configuración guardada' : 'Sin cambios por guardar')
+                                    : 'No se pudo guardar',
+                                text: savedOk
+                                    ? (hasChanges ? 'Se guardó la configuración actual.' : 'La configuración actual ya estaba guardada.')
+                                    : 'No fue posible guardar la configuración en este navegador.',
+                                toast: true,
+                                position: 'top-end',
+                                timer: 2200,
+                                timerProgressBar: true,
+                                showConfirmButton: false
+                            });
+                            return;
+                        }
+                        if (!savedOk) {
+                            alert('No fue posible guardar la configuración en este navegador.');
+                            return;
+                        }
+                        alert(hasChanges ? 'Se guardó la configuración actual.' : 'La configuración actual ya estaba guardada.');
+                    }
+
+                    function persistExportDraft(cfg) {
+                        if (!exportUrl) { return false; }
+                        var payloadCfg = cfg || collectPersonalizeCfgObject();
+                        var swalChoice = personalizeModal._swalChoice || 'single';
+                        var previous = readSavedExportDraft();
+                        var hadChanges = !previous || !isSameExportCfg(previous.cfg, payloadCfg) || previous.swal_choice !== swalChoice;
+                        try {
+                            localStorage.setItem(tmExportDraftStorageKey(exportUrl), JSON.stringify({ v: 1, swal_choice: swalChoice, cfg: payloadCfg, savedAt: Date.now() }));
+                            return { ok: true, changed: hadChanges };
+                        } catch (eSave) {
+                            return { ok: false, changed: hadChanges };
+                        }
+                    }
+
                     function applyExport(format, mode) {
                         const cfg = collectPersonalizeCfgObject();
+                        persistExportDraft(cfg);
                         const fmt = format || 'excel';
                         const exportMode = (fmt === 'excel') ? (mode || 'single') : 'single';
                         closePersonalizeModal();
@@ -4344,18 +4419,38 @@
                     }
 
                     var saveCfgBtn = document.getElementById('tmExportSaveConfig');
-                    if (saveCfgBtn && exportUrl) {
-                        saveCfgBtn.onclick = function () {
-                            var cfg = collectPersonalizeCfgObject();
-                            var swalChoice = personalizeModal._swalChoice || 'single';
-                            try {
-                                localStorage.setItem(tmExportDraftStorageKey(exportUrl), JSON.stringify({ v: 1, swal_choice: swalChoice, cfg: cfg, savedAt: Date.now() }));
-                            } catch (eSave) {}
-                            closePersonalizeModal();
-                            var ref = personalizeModal._exportButtonRef;
-                            if (ref) { openTemporaryModuleExportTypeDialog(ref); }
+                    var saveCfgTopBtn = document.getElementById('tmExportSaveConfigTop');
+                    var clearCfgBtn = document.getElementById('tmExportClearConfig');
+                    var clearCfgTopBtn = document.getElementById('tmExportClearConfigTop');
+                    [saveCfgTopBtn, saveCfgBtn].forEach(function (btn) {
+                        if (!btn || !exportUrl) { return; }
+                        btn.onclick = function () {
+                            var result = persistExportDraft();
+                            showSaveConfigFeedback(!!(result && result.changed), !!(result && result.ok));
                         };
-                    }
+                    });
+                    [clearCfgTopBtn, clearCfgBtn].forEach(function (btn) {
+                        if (!btn || !exportUrl) { return; }
+                        btn.onclick = function () {
+                            var hadDraft = !!readSavedExportDraft();
+                            try {
+                                localStorage.removeItem(tmExportDraftStorageKey(exportUrl));
+                            } catch (eRm) {}
+                            openExportPersonalizeModal(structureUrl, exportUrl);
+                            if (typeof Swal !== 'undefined') {
+                                Swal.fire({
+                                    icon: hadDraft ? 'success' : 'info',
+                                    title: hadDraft ? 'Configuración limpiada' : 'Sin configuración guardada',
+                                    text: hadDraft ? 'Se eliminó la configuración guardada y se restauró la vista por defecto.' : 'No había configuración guardada para limpiar.',
+                                    toast: true,
+                                    position: 'top-end',
+                                    timer: 2200,
+                                    timerProgressBar: true,
+                                    showConfirmButton: false
+                                });
+                            }
+                        };
+                    });
 
                     if (applyExcelSingleBtn && exportUrl) {
                         applyExcelSingleBtn.onclick = function () { applyExport('excel', 'single'); };

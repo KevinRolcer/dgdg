@@ -578,13 +578,17 @@ class TemporaryModuleWordPdfService
                         } elseif ($grp === $spanGroup) {
                             $spanCount++;
                         } else {
-                            $sumTbl->addCell(1600 * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => '334155', 'valign' => 'center'])
+                            $spanGroupKey = mb_strtolower(trim((string) $spanGroup), 'UTF-8');
+                            $spanBg = trim((string) $spanGroup) !== '' ? ($groupHeaderColors[$spanGroupKey] ?? '64748B') : '334155';
+                            $sumTbl->addCell(1600 * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => $spanBg, 'valign' => 'center'])
                                 ->addText(trim($spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                             $spanGroup = $grp;
                             $spanCount = 1;
                         }
                         if ($idx === count($sumCombinedCols) - 1) {
-                            $sumTbl->addCell(1600 * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => '334155', 'valign' => 'center'])
+                            $spanGroupKey = mb_strtolower(trim((string) $spanGroup), 'UTF-8');
+                            $spanBg = trim((string) $spanGroup) !== '' ? ($groupHeaderColors[$spanGroupKey] ?? '64748B') : '334155';
+                            $sumTbl->addCell(1600 * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => $spanBg, 'valign' => 'center'])
                                 ->addText(trim((string) $spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                         }
                     }
@@ -1308,16 +1312,30 @@ class TemporaryModuleWordPdfService
         if (preg_match('/^#([0-9A-Fa-f]{6})$/', $color, $m)) {
             return strtoupper($m[1]);
         }
+        if (preg_match('/^#([0-9A-Fa-f]{8})$/', $color, $m)) {
+            return strtoupper(substr($m[1], -6));
+        }
         if (preg_match('/^#([0-9A-Fa-f]{3})$/', $color, $m)) {
             $r = str_repeat($m[1][0], 2);
             $g = str_repeat($m[1][1], 2);
             $b = str_repeat($m[1][2], 2);
             return strtoupper($r.$g.$b);
         }
+        if (preg_match('/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(?:\d*\.?\d+))?\s*\)$/i', $color, $m)) {
+            $r = max(0, min(255, (int) $m[1]));
+            $g = max(0, min(255, (int) $m[2]));
+            $b = max(0, min(255, (int) $m[3]));
+
+            return strtoupper(sprintf('%02X%02X%02X', $r, $g, $b));
+        }
         $map = [
             'var(--clr-primary)' => '861E34',
-            'var(--clr-secondary)' => '2d5a27',
-            'var(--clr-accent)' => 'c9a227',
+            'var(--clr-secondary)' => '246257',
+            'var(--clr-accent)' => 'C79B66',
+            'var(--clr-text-main)' => '484747',
+            'var(--clr-text-light)' => '6B6A6A',
+            'var(--clr-bg)' => 'F7F7F8',
+            'var(--clr-card)' => 'FFFFFF',
         ];
         return $map[$color] ?? '861E34';
     }

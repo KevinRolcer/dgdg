@@ -1467,6 +1467,9 @@ class TemporaryModuleExportService
                                 if ($endCol > $startCol) {
                                     $sheet->mergeCells(Coordinate::stringFromColumnIndex($startCol).$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($endCol).$sumGroupHeaderRow);
                                 }
+                                $groupArgb = $this->groupHeaderColorByName[mb_strtolower(trim($lastGroup), 'UTF-8')] ?? 'FF64748B';
+                                $sheet->getStyle(Coordinate::stringFromColumnIndex($startCol).$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($endCol).$sumGroupHeaderRow)
+                                    ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($groupArgb);
                             }
                             $startCol = $colIdx;
                             $lastGroup = $groupLabel;
@@ -1479,9 +1482,10 @@ class TemporaryModuleExportService
                         if ($endCol > $startCol) {
                             $sheet->mergeCells(Coordinate::stringFromColumnIndex($startCol).$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($endCol).$sumGroupHeaderRow);
                         }
+                        $groupArgb = $this->groupHeaderColorByName[mb_strtolower(trim((string) $lastGroup), 'UTF-8')] ?? 'FF64748B';
+                        $sheet->getStyle(Coordinate::stringFromColumnIndex($startCol).$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($endCol).$sumGroupHeaderRow)
+                            ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($groupArgb);
                     }
-                    $sheet->getStyle('A'.$sumGroupHeaderRow.':'.$sumLastLetter.$sumGroupHeaderRow)
-                        ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF334155');
                     $sheet->getStyle('A'.$sumGroupHeaderRow)
                         ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($sumGroupColorArgb);
                     $sheet->getStyle('A'.$sumGroupHeaderRow.':'.$sumLastLetter.$sumGroupHeaderRow)
@@ -1580,7 +1584,8 @@ class TemporaryModuleExportService
                     $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth(14);
                 }
 
-                $countTableRows += 2 + count($sumRows) + ($sumIncludeTotalsRow ? 1 : 0);
+                $sumRowsConsumed = ($hasSumGroupHeaders ? 3 : 2) + count($sumRows) + ($sumIncludeTotalsRow ? 1 : 0);
+                $countTableRows += $sumRowsConsumed + 3;
                 $maxColIdx = max($maxColIdx, $sumLastCol);
             }
         }
@@ -1748,7 +1753,6 @@ class TemporaryModuleExportService
         }
 
         $dataStartRow = $headerStartRow + $headerRowCount;
-        $sheet->freezePane('A'.$dataStartRow);
         $sheet->setAutoFilter('A'.$tableHeaderFirstRow.':'.$lastColumnLetter.$tableHeaderLastRow);
 
         $rowIndex = $dataStartRow;

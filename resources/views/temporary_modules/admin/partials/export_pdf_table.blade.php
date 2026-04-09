@@ -398,6 +398,7 @@
     $sumIncludeTotalsRow = !empty($sumIncludeTotalsRow) || !empty($sumTable['include_totals_row']);
     $sumTotalsBold = !array_key_exists('sumTotalsBold', get_defined_vars()) ? (!array_key_exists('totals_bold', $sumTable) || !empty($sumTable['totals_bold'])) : !empty($sumTotalsBold);
     $sumTotalsTextColor = (string) ($sumTotalsTextColor ?? ('#'.((string) ($sumTable['totals_text_color'] ?? '861E34'))));
+    $sumGroupHeaderColors = is_array($groupHeaderColors ?? null) ? $groupHeaderColors : [];
     $sumGroupSpans = [];
     if ($sumHasGroups) {
         foreach ($sumCombinedColumns as $col) {
@@ -416,7 +417,11 @@
     <tr>
         <th style="background:{{ $sumGroupColor }};color:#fff;"></th>
         @foreach($sumGroupSpans as $gs)
-            <th colspan="{{ $gs['span'] }}" style="background:#334155;color:#fff;">{{ $gs['label'] }}</th>
+            @php
+                $sumGroupKey = mb_strtolower(trim((string) ($gs['label'] ?? '')));
+                $sumGroupBg = $gs['label'] !== '' ? ($sumGroupHeaderColors[$sumGroupKey] ?? '#64748b') : '#334155';
+            @endphp
+            <th colspan="{{ $gs['span'] }}" style="background:{{ $sumGroupBg }};color:#fff;">{{ $gs['label'] }}</th>
         @endforeach
     </tr>
     @endif
