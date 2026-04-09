@@ -560,6 +560,26 @@
                                     Totales en negrita
                                 </label>
                             </div>
+                            <div class="tm-export-sum-row tm-export-sum-row--sum-config">
+                                <label class="tm-export-count-table-toggle">
+                                    <input type="checkbox" id="tmExportIncludeTotalsTable" value="1">
+                                    Anexar fila de totales como tabla independiente
+                                </label>
+                            </div>
+                            <div class="tm-export-sum-block" id="tmExportTotalsTableWrap" hidden>
+                                <label class="tm-seed-label">
+                                    Título de tabla de totales
+                                    <input type="text" id="tmExportTotalsTableTitle" class="tm-input" placeholder="Totales">
+                                </label>
+                                <div class="tm-export-personalize-field tm-export-count-table-align-group">
+                                    <span class="tm-export-label-inline">Alineación de tabla de totales</span>
+                                    <div class="tm-export-align-btns" id="tmExportTotalsTableAlignGroup" role="group" aria-label="Alineación de la tabla de totales">
+                                        <button type="button" class="tm-export-align-btn is-active" data-totals-table-align="left">Izquierda</button>
+                                        <button type="button" class="tm-export-align-btn" data-totals-table-align="center">Centro</button>
+                                        <button type="button" class="tm-export-align-btn" data-totals-table-align="right">Derecha</button>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="tm-export-personalize-field">
                                 <span class="tm-export-label-inline">Color de texto de fila de totales</span>
                                 <div class="tm-export-col-color" id="tmExportSumTotalsColorWrap">
@@ -2844,6 +2864,86 @@
             return columns;
         }
 
+        function tmExportRenderTotalsStandalonePreviewTable(sumData, headersUppercase, totalsTableAlign, totalsTableTitle, totalsTableTitleAlign, totalsTableTitleFontSize, sumTotalsBold, sumTotalsTextColor, groups) {
+            if (!sumData || !Array.isArray(sumData.groups) || sumData.groups.length === 0) { return ''; }
+            var sumColumns = tmExportBuildOrderedSumColumns(sumData);
+            if (!sumColumns.length) { return ''; }
+            var align = (totalsTableAlign === 'center' || totalsTableAlign === 'right') ? totalsTableAlign : 'left';
+            var tableMargin = align === 'center' ? 'margin:0 auto 1rem auto;' : (align === 'right' ? 'margin:0 0 1rem auto;' : 'margin:0 1rem 1rem 0;');
+            var titleRaw = String(totalsTableTitle || '').trim() !== '' ? String(totalsTableTitle) : 'Totales';
+            var title = normalizeExportHeadingText(titleRaw, !!headersUppercase);
+            var titleAlign = (totalsTableTitleAlign === 'left' || totalsTableTitleAlign === 'right') ? totalsTableTitleAlign : 'left';
+            var titleFont = parseInt(String(totalsTableTitleFontSize || '14'), 10);
+            titleFont = Number.isNaN(titleFont) ? 14 : Math.max(10, Math.min(36, titleFont));
+            var hasGroups = sumColumns.some(function (c) { return String(c.group || '').trim() !== ''; });
+            var groupColorMap = buildGroupColorMap(Array.isArray(groups) ? groups : []);
+            var spans = [];
+            if (hasGroups) {
+                sumColumns.forEach(function (c) {
+                    var g = String(c.group || '');
+                    if (spans.length > 0 && spans[spans.length - 1].label === g) {
+                        spans[spans.length - 1].span++;
+                    } else {
+                        spans.push({ label: g, span: 1 });
+                    }
+                });
+            }
+
+            var totalsStyle = (sumTotalsBold ? 'font-weight:700;' : '') + 'color:' + escapeHtml(String(sumTotalsTextColor || 'var(--clr-primary)')) + ';';
+            var html = '<p class="tm-export-preview-desglose-label" style="font-weight:600;margin:10px 0 4px 0;text-align:' + titleAlign + ';font-size:' + titleFont + 'px;">' + escapeHtml(title) + '</p>';
+            html += '<table class="tm-export-preview-table tm-export-preview-sum-table" style="table-layout:auto;border-collapse:collapse;width:auto;' + tableMargin + '">';
+            if (hasGroups) {
+                html += '<tr class="tm-export-preview-row tm-export-preview-group-header">';
+                html += '<th class="tm-export-preview-cell" style="background:#475569;color:#fff;border:1px solid #334155;"></th>';
+                spans.forEach(function (s) {
+                    if (String(s.label || '').trim() === '') {
+                        html += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:#f8fafc;border:1px solid #e2e8f0;"></th>';
+                    } else {
+                        var gColor = groupColorMap[s.label] || '#64748b';
+                        html += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:' + escapeHtml(gColor) + ';color:#fff;border:1px solid #1e293b;">' + escapeHtml(normalizeExportHeadingText(s.label, !!headersUppercase)) + '</th>';
+                    }
+                });
+                html += '</tr>';
+            }
+            html += '<tr class="tm-export-preview-row tm-export-preview-header">';
+            html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:#475569;color:#fff;">' + escapeHtml(normalizeExportHeadingText('Total', !!headersUppercase)) + '</th>';
+            sumColumns.forEach(function (c) {
+                var cGroup = String(c.group || '').trim();
+                var cColor = cGroup !== '' ? (groupColorMap[cGroup] || '#64748b') : '#475569';
+                html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(cColor) + ';color:#fff;">' + escapeHtml(normalizeExportHeadingText(c.label || c.id, !!headersUppercase)) + '</th>';
+            });
+            html += '</tr>';
+            html += '<tr class="tm-export-preview-row tm-export-preview-data">';
+            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + totalsStyle + '">' + escapeHtml(normalizeExportHeadingText('Total', !!headersUppercase)) + '</td>';
+            sumColumns.forEach(function (c) {
+                var val = 0;
+                if (c.type === 'formula' && String((c.source && c.source.op) || '') === 'percent') {
+                    var metricIds = Array.isArray(c.source && c.source.metric_ids) ? c.source.metric_ids : [];
+                    var numeratorMetricId = String(metricIds.length ? (metricIds[0] || '') : '');
+                    var baseMetricId = String((c.source && c.source.base_metric_id) || '');
+                    var numeratorTotal = 0;
+                    var baseTotal = 0;
+                    if (numeratorMetricId !== '' && baseMetricId !== '') {
+                        sumData.groups.forEach(function (g) {
+                            numeratorTotal += Number(g.metrics && g.metrics[numeratorMetricId] || 0);
+                            baseTotal += Number(g.metrics && g.metrics[baseMetricId] || 0);
+                        });
+                    }
+                    val = baseTotal !== 0 ? ((numeratorTotal / baseTotal) * 100) : 0;
+                } else if (c.type === 'metric') {
+                    sumData.groups.forEach(function (g) { val += Number(g.metrics && g.metrics[c.id] || 0); });
+                } else {
+                    sumData.groups.forEach(function (g) { val += Number(g.formulas && g.formulas[c.id] || 0); });
+                }
+                var isPercent = c.type === 'formula' && String((c.source && c.source.op) || '') === 'percent';
+                var txt = String(Math.round((val + Number.EPSILON) * 100) / 100) + (isPercent ? '%' : '');
+                html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + totalsStyle + '">' + escapeHtml(txt) + '</td>';
+            });
+            html += '</tr>';
+            html += '</table>';
+            return html;
+        }
+
         function tmExportRenderSumPreviewTable(sumData, headersUppercase, sumTableAlign, sumTitle, sumTitleCase, sumTitleAlign, sumTitleFontSize, sumGroupColor, sumIncludeTotalsRow, sumTotalsBold, sumTotalsTextColor, groups) {
             if (!sumData || !Array.isArray(sumData.groups) || sumData.groups.length === 0) { return ''; }
             var rawTitle = String(sumTitle || '').trim() !== '' ? String(sumTitle) : 'Sumatoria';
@@ -2930,10 +3030,28 @@
                     cSize = Number.isNaN(cSize) ? 12 : Math.max(9, Math.min(28, cSize));
                     var totalVal = 0;
                     if (includeTotal) {
-                        sumData.groups.forEach(function (g) {
-                            var n = c.type === 'metric' ? Number(g.metrics[c.id] || 0) : Number(g.formulas[c.id] || 0);
-                            if (Number.isFinite(n)) { totalVal += n; }
-                        });
+                        var isPercentFormula = c.type === 'formula' && String((c.source && c.source.op) || '') === 'percent';
+                        if (isPercentFormula) {
+                            var metricIds = Array.isArray(c.source && c.source.metric_ids) ? c.source.metric_ids : [];
+                            var numeratorMetricId = String(metricIds.length ? (metricIds[0] || '') : '');
+                            var baseMetricId = String((c.source && c.source.base_metric_id) || '');
+                            var numeratorTotal = 0;
+                            var baseTotal = 0;
+                            if (numeratorMetricId !== '' && baseMetricId !== '') {
+                                sumData.groups.forEach(function (g) {
+                                    var nNum = Number(g.metrics && g.metrics[numeratorMetricId] || 0);
+                                    var nBase = Number(g.metrics && g.metrics[baseMetricId] || 0);
+                                    if (Number.isFinite(nNum)) { numeratorTotal += nNum; }
+                                    if (Number.isFinite(nBase)) { baseTotal += nBase; }
+                                });
+                                totalVal = baseTotal !== 0 ? ((numeratorTotal / baseTotal) * 100) : 0;
+                            }
+                        } else {
+                            sumData.groups.forEach(function (g) {
+                                var n = c.type === 'metric' ? Number(g.metrics[c.id] || 0) : Number(g.formulas[c.id] || 0);
+                                if (Number.isFinite(n)) { totalVal += n; }
+                            });
+                        }
                     }
                     var isPercent = c.type === 'formula' && String((c.source && c.source.op) || '') === 'percent';
                     var txt = includeTotal ? String(Math.round((totalVal + Number.EPSILON) * 100) / 100) + (isPercent ? '%' : '') : '';
@@ -2960,7 +3078,7 @@
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', sumMetrics: [], sumFormulas: [] };
+                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', sumMetrics: [], sumFormulas: [] };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
             const titleUppercaseEl = modal ? modal.querySelector('#tmExportTitleUppercase') : document.getElementById('tmExportTitleUppercase');
@@ -2984,10 +3102,14 @@
             const sumTitleFontEl = modal ? modal.querySelector('#tmExportSumTitleFontSize') : document.getElementById('tmExportSumTitleFontSize');
             const sumGroupColorTrigger = modal ? modal.querySelector('#tmExportSumGroupColorTrigger') : document.getElementById('tmExportSumGroupColorTrigger');
             const sumIncludeTotalsRowEl = modal ? modal.querySelector('#tmExportSumIncludeTotalsRow') : document.getElementById('tmExportSumIncludeTotalsRow');
+            const includeTotalsTableEl = modal ? modal.querySelector('#tmExportIncludeTotalsTable') : document.getElementById('tmExportIncludeTotalsTable');
+            const totalsTableTitleEl = modal ? modal.querySelector('#tmExportTotalsTableTitle') : document.getElementById('tmExportTotalsTableTitle');
             const sumTotalsBoldEl = modal ? modal.querySelector('#tmExportSumTotalsBold') : document.getElementById('tmExportSumTotalsBold');
             const sumTotalsColorTrigger = modal ? modal.querySelector('#tmExportSumTotalsColorTrigger') : document.getElementById('tmExportSumTotalsColorTrigger');
             const sumTitleAlignBtn = modal ? modal.querySelector('#tmExportSumTitleAlignGroup .tm-export-align-btn.is-active') : null;
+            const totalsTableAlignBtn = modal ? modal.querySelector('#tmExportTotalsTableAlignGroup .tm-export-align-btn.is-active') : null;
             const sumTitleAlign = (sumTitleAlignBtn && sumTitleAlignBtn.getAttribute('data-sum-title-align')) || 'center';
+            const totalsTableAlign = (totalsTableAlignBtn && totalsTableAlignBtn.getAttribute('data-totals-table-align')) || 'left';
             const sumTitleFontPx = sumTitleFontEl && sumTitleFontEl.value ? Math.max(10, Math.min(36, parseInt(sumTitleFontEl.value, 10) || 14)) : 14;
             const sumGroupColor = (sumGroupColorTrigger && sumGroupColorTrigger.getAttribute('data-color')) ? sumGroupColorTrigger.getAttribute('data-color') : 'var(--clr-primary)';
             const sumTotalsTextColor = (sumTotalsColorTrigger && sumTotalsColorTrigger.getAttribute('data-color')) ? sumTotalsColorTrigger.getAttribute('data-color') : 'var(--clr-primary)';
@@ -3067,6 +3189,9 @@
                 sumTitleFontPx: sumTitleFontPx,
                 sumGroupColor: sumGroupColor,
                 sumIncludeTotalsRow: !!(sumIncludeTotalsRowEl && sumIncludeTotalsRowEl.checked),
+                includeTotalsTable: !!(includeTotalsTableEl && includeTotalsTableEl.checked),
+                totalsTableTitle: totalsTableTitleEl && String(totalsTableTitleEl.value || '').trim() !== '' ? String(totalsTableTitleEl.value).trim() : 'Totales',
+                totalsTableAlign: ['left', 'center', 'right'].indexOf(totalsTableAlign) !== -1 ? totalsTableAlign : 'left',
                 sumTotalsBold: !(sumTotalsBoldEl && !sumTotalsBoldEl.checked),
                 sumTotalsTextColor: sumTotalsTextColor,
                 titleUppercase: !!(titleUppercaseEl && titleUppercaseEl.checked),
@@ -3150,6 +3275,7 @@
             const colorMap = {};
             state.columns.forEach(function (c) { colorMap[c.key] = c.color; });
             const cellFontPx = state.cellFontPx || 12;
+            const headerFontPx = state.headerFontPx || 12;
             const titleFontPx = state.titleFontPx || 18;
             const titleAlign = state.titleAlign || 'center';
             const countTableAlign = state.countTableAlign || 'left';
@@ -3424,11 +3550,27 @@
             html += '</table>';
             html += '</div>';
 
+            var sumPreviewData = tmExportBuildSumPreviewData(entries, meta, columns, state);
+
+            // Tabla independiente de totales (si está habilitada)
+            if (state.includeTotalsTable) {
+                html += tmExportRenderTotalsStandalonePreviewTable(
+                    sumPreviewData,
+                    headersUppercase,
+                    state.totalsTableAlign || 'left',
+                    state.totalsTableTitle || 'Totales',
+                    state.totalsTableAlign || 'left',
+                    state.sumTitleFontPx || 14,
+                    !(state.sumTotalsBold === false),
+                    state.sumTotalsTextColor || 'var(--clr-primary)',
+                    state.groups || []
+                );
+            }
+
             // Tabla de Conteo (Resumen)
             html += countTableHtml;
 
             // Tabla de Sumatoria (agregados y cálculos)
-            var sumPreviewData = tmExportBuildSumPreviewData(entries, meta, columns, state);
             html += tmExportRenderSumPreviewTable(
                 sumPreviewData,
                 headersUppercase,
@@ -3466,7 +3608,7 @@
                 var gColIdx = 0;
                 groupSpans.forEach(function (gs) {
                     var groupColor = gs.label ? (groupColorMap[gs.label] || '#64748b') : 'transparent';
-                    var style = gs.label ? ('background-color:' + escapeHtml(groupColor) + '; color:white; border:1px solid #475569; font-weight:bold; border-bottom:none;') : 'border:none;';
+                    var style = gs.label ? ('background-color:' + escapeHtml(groupColor) + '; color:white; border:1px solid #475569; font-weight:bold; border-bottom:none; font-size:' + headerFontPx + 'px;') : 'border:none;';
                     if (forceFullWidthDataTable) {
                         var gPct = 0;
                         for (var gi = 0; gi < gs.span; gi++) {
@@ -3488,9 +3630,9 @@
                 if (col.is_image) {
                     const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
                     const h = (c.imageHeight || 80) + 'px';
-                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell tm-export-preview-image-cell" style="background-color:' + escapeHtml(color) + ';' + widthStyle + 'height:' + h + ';min-height:' + h + '"><span class="tm-export-preview-image-placeholder">' + escapeHtml(normalizeExportHeadingText('Imagen', headersUppercase)) + '</span></th>';
+                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell tm-export-preview-image-cell" style="background-color:' + escapeHtml(color) + ';' + widthStyle + 'height:' + h + ';min-height:' + h + ';font-size:' + headerFontPx + 'px;"><span class="tm-export-preview-image-placeholder">' + escapeHtml(normalizeExportHeadingText('Imagen', headersUppercase)) + '</span></th>';
                 } else {
-                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(color) + ';' + widthStyle + '">' + escapeHtml(normalizeExportHeadingText(col.label, headersUppercase)) + '</th>';
+                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(color) + ';' + widthStyle + 'font-size:' + headerFontPx + 'px;">' + escapeHtml(normalizeExportHeadingText(col.label, headersUppercase)) + '</th>';
                 }
             });
             html += '</tr>';
@@ -3721,6 +3863,7 @@
             const titleUppercaseEl = document.getElementById('tmExportTitleUppercase');
             const headersUppercaseEl = document.getElementById('tmExportHeadersUppercase');
             const cellFontEl = document.getElementById('tmExportCellFontSize');
+                const headerFontEl = document.getElementById('tmExportHeaderFontSize');
             const titleFontEl = document.getElementById('tmExportTitleFontSize');
                     const docMarginPresetEl = document.getElementById('tmExportDocMarginPreset');
             const applyExcelSingleBtn = document.getElementById('tmExportApplyExcelSingle');
@@ -3743,6 +3886,9 @@
             const sumGroupColorTriggerEl = document.getElementById('tmExportSumGroupColorTrigger');
             const sumGroupColorMenuEl = document.getElementById('tmExportSumGroupColorMenu');
             const sumIncludeTotalsRowEl = document.getElementById('tmExportSumIncludeTotalsRow');
+            const includeTotalsTableEl = document.getElementById('tmExportIncludeTotalsTable');
+            const totalsTableWrapEl = document.getElementById('tmExportTotalsTableWrap');
+            const totalsTableTitleEl = document.getElementById('tmExportTotalsTableTitle');
             const sumTotalsBoldEl = document.getElementById('tmExportSumTotalsBold');
             const sumTotalsColorWrapEl = document.getElementById('tmExportSumTotalsColorWrap');
             const sumTotalsColorTriggerEl = document.getElementById('tmExportSumTotalsColorTrigger');
@@ -3882,8 +4028,17 @@
 
                     if (includeSumTableEl && sumWrapEl) {
                         sumWrapEl.hidden = !includeSumTableEl.checked;
+                        if (totalsTableWrapEl && includeTotalsTableEl) {
+                            totalsTableWrapEl.hidden = !includeSumTableEl.checked || !includeTotalsTableEl.checked;
+                        }
                         includeSumTableEl.onchange = function () {
                             sumWrapEl.hidden = !includeSumTableEl.checked;
+                            if (!includeSumTableEl.checked && includeTotalsTableEl) {
+                                includeTotalsTableEl.checked = false;
+                            }
+                            if (totalsTableWrapEl && includeTotalsTableEl) {
+                                totalsTableWrapEl.hidden = !includeSumTableEl.checked || !includeTotalsTableEl.checked;
+                            }
                             refreshSumPreview();
                         };
                     }
@@ -4217,6 +4372,15 @@
                         }
                         setSumGroupColor(draftCfg.sum_group_color || 'var(--clr-primary)');
                         if (sumIncludeTotalsRowEl) { sumIncludeTotalsRowEl.checked = !!draftCfg.include_sum_totals_row; }
+                        if (includeTotalsTableEl) { includeTotalsTableEl.checked = !!draftCfg.include_totals_table; }
+                        if (totalsTableWrapEl) { totalsTableWrapEl.hidden = !(includeTotalsTableEl && includeTotalsTableEl.checked); }
+                        if (totalsTableTitleEl) {
+                            totalsTableTitleEl.value = (draftCfg.totals_table_title != null && String(draftCfg.totals_table_title).trim() !== '') ? String(draftCfg.totals_table_title) : 'Totales';
+                        }
+                        personalizeModal.querySelectorAll('#tmExportTotalsTableAlignGroup .tm-export-align-btn').forEach(function (b) {
+                            var current = String(draftCfg.totals_table_align || 'left');
+                            b.classList.toggle('is-active', (b.getAttribute('data-totals-table-align') || '') === current);
+                        });
                         if (sumTotalsBoldEl) { sumTotalsBoldEl.checked = !Object.prototype.hasOwnProperty.call(draftCfg, 'sum_totals_bold') ? true : !!draftCfg.sum_totals_bold; }
                         setSumTotalsColor(draftCfg.sum_totals_text_color || 'var(--clr-primary)');
                         if (countByFieldsEl && Array.isArray(draftCfg.count_by_fields)) {
@@ -4237,6 +4401,10 @@
                         if (cellFontEl && draftCfg.cell_font_size_px != null) {
                             var cfn = parseInt(draftCfg.cell_font_size_px, 10);
                             if (!Number.isNaN(cfn)) { cellFontEl.value = String(Math.max(9, Math.min(24, cfn))); }
+                        }
+                        if (headerFontEl && draftCfg.header_font_size_px != null) {
+                            var hfn = parseInt(draftCfg.header_font_size_px, 10);
+                            if (!Number.isNaN(hfn)) { headerFontEl.value = String(Math.max(9, Math.min(28, hfn))); }
                         }
                         if (titleFontEl && draftCfg.title_font_size_px != null) {
                             var tfn = parseInt(draftCfg.title_font_size_px, 10);
@@ -4271,6 +4439,7 @@
                         if (titleEl) { titleEl.value = data.title || ''; }
                         if (titleUppercaseEl) { titleUppercaseEl.checked = false; }
                         if (headersUppercaseEl) { headersUppercaseEl.checked = false; }
+                        if (headerFontEl) { headerFontEl.value = '12'; }
                         if (docMarginPresetEl) { docMarginPresetEl.value = 'compact'; }
                         var paperSizeElDefault = document.getElementById('tmExportPaperSize');
                         if (paperSizeElDefault) { paperSizeElDefault.value = 'letter'; }
@@ -4288,6 +4457,12 @@
                         if (sumTitleFontEl) { sumTitleFontEl.value = '14'; }
                         setSumGroupColor('var(--clr-primary)');
                         if (sumIncludeTotalsRowEl) { sumIncludeTotalsRowEl.checked = false; }
+                        if (includeTotalsTableEl) { includeTotalsTableEl.checked = false; }
+                        if (totalsTableWrapEl) { totalsTableWrapEl.hidden = true; }
+                        if (totalsTableTitleEl) { totalsTableTitleEl.value = 'Totales'; }
+                        personalizeModal.querySelectorAll('#tmExportTotalsTableAlignGroup .tm-export-align-btn').forEach(function (b) {
+                            b.classList.toggle('is-active', (b.getAttribute('data-totals-table-align') || '') === 'left');
+                        });
                         if (sumTotalsBoldEl) { sumTotalsBoldEl.checked = true; }
                         setSumTotalsColor('var(--clr-primary)');
                         applyExportPreviewPageLayout('portrait', 'letter');
@@ -4403,6 +4578,10 @@
                         cellFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                         cellFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
+                    if (headerFontEl) {
+                        headerFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        headerFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
                     if (titleFontEl) {
                         titleFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                         titleFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
@@ -4419,6 +4598,16 @@
                     }
                     if (sumIncludeTotalsRowEl) {
                         sumIncludeTotalsRowEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
+                    if (includeTotalsTableEl) {
+                        includeTotalsTableEl.addEventListener('change', function () {
+                            if (totalsTableWrapEl) { totalsTableWrapEl.hidden = !includeTotalsTableEl.checked; }
+                            buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                        });
+                    }
+                    if (totalsTableTitleEl) {
+                        totalsTableTitleEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        totalsTableTitleEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
                     if (sumTotalsBoldEl) {
                         sumTotalsBoldEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
@@ -4468,6 +4657,9 @@
                             title_uppercase: !!state.titleUppercase,
                             headers_uppercase: !!state.headersUppercase,
                             cell_font_size_px: state.cellFontPx || 12,
+                            cellFontPx: state.cellFontPx || 12,
+                            header_font_size_px: state.headerFontPx || 12,
+                            headerFontPx: state.headerFontPx || 12,
                             title_font_size_px: state.titleFontPx || 18,
                             doc_margin_preset: state.docMarginPreset || 'compact',
                             orientation: orientation,
@@ -4481,6 +4673,9 @@
                             sum_title_font_size_px: state.sumTitleFontPx || 14,
                             sum_group_color: state.sumGroupColor || 'var(--clr-primary)',
                             include_sum_totals_row: !!state.sumIncludeTotalsRow,
+                            include_totals_table: !!state.includeTotalsTable,
+                            totals_table_title: state.totalsTableTitle || 'Totales',
+                            totals_table_align: state.totalsTableAlign || 'left',
                             sum_totals_bold: !(state.sumTotalsBold === false),
                             sum_totals_text_color: state.sumTotalsTextColor || 'var(--clr-primary)',
                             include_count_table: includeCountTable,

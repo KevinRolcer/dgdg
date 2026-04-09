@@ -1345,6 +1345,83 @@ document.addEventListener('DOMContentLoaded', function() {
         if (calLabel) calLabel.textContent = monthName.toUpperCase();
     }
 
+    function paExtractScheduledDayKey(note) {
+        if (!note || note.scheduled_date == null || note.scheduled_date === '') {
+            return null;
+        }
+        const s = String(note.scheduled_date);
+        const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+        return m ? m[1] : null;
+    }
+
+    function paBuildHomeCalendarClientNotePayload(note) {
+        const FALLBACK = ['#f0f4ff', '#f0fff4', '#fffdf0', '#fff0f0', '#f8f0ff'];
+        const dayKey = paExtractScheduledDayKey(note);
+        const idNum = Number(note.id);
+        const dotColor = (note.color && String(note.color).trim())
+            ? String(note.color).trim()
+            : FALLBACK[(Number.isFinite(idNum) ? idNum : 0) % FALLBACK.length];
+        let timeLabel = ' · Todo el día';
+        if (note.scheduled_time) {
+            const st = String(note.scheduled_time);
+            const hm = st.match(/(\d{1,2}:\d{2})/);
+            timeLabel = hm ? ` · ${hm[1]}` : ` · ${st.slice(0, 5)}`;
+        }
+        let displayDate = '';
+        if (dayKey) {
+            const d = new Date(`${dayKey}T12:00:00`);
+            displayDate = d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) + timeLabel;
+        }
+        const serveTpl = window.paRoutes && window.paRoutes.attachmentsServe ? window.paRoutes.attachmentsServe : '';
+        const att = Array.isArray(note.attachments) ? note.attachments.map((a) => ({
+            id: a.id,
+            file_name: a.file_name,
+            file_path: serveTpl ? serveTpl.replace(':id', a.id) : '',
+            file_type: a.file_type,
+        })) : [];
+        return {
+            kind: 'note',
+            id: note.id,
+            title: note.title,
+            content: note.is_encrypted ? null : (note.content != null ? String(note.content) : ''),
+            priority: note.priority,
+            color: note.color,
+            dot_color: dotColor,
+            folder_id: note.folder_id,
+            is_encrypted: !!note.is_encrypted,
+            is_archived: !!note.is_archived,
+            scheduled_date: dayKey,
+            scheduled_time: note.scheduled_time || null,
+            displayDate,
+            attachments: att,
+        };
+    }
+
+    window.paApplyHomeCalendarNoteSave = function(note) {
+        if (!note || note.id == null) {
+            return;
+        }
+        if (!document.getElementById('calendarGrid')) {
+            return;
+        }
+        const idNum = Number(note.id);
+        const dayKey = paExtractScheduledDayKey(note);
+        if (note.is_archived || !dayKey) {
+            window.dispatchEvent(new CustomEvent('segob:home-calendar-notes-patch', {
+                detail: { action: 'remove', noteId: idNum },
+            }));
+            return;
+        }
+        window.dispatchEvent(new CustomEvent('segob:home-calendar-notes-patch', {
+            detail: {
+                action: 'upsert',
+                dayKey,
+                noteId: idNum,
+                entry: paBuildHomeCalendarClientNotePayload(note),
+            },
+        }));
+    };
+
     window.saveNote = async function(data) {
         const isEdit = !!data.id;
         const url = isEdit ? window.paRoutes.update.replace(':id', data.id) : window.paRoutes.store;
@@ -1376,7 +1453,20 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             if (response.ok) {
+                const rawText = await response.text();
+                let payload = null;
+                try {
+                    if (rawText && rawText.trim().startsWith('{')) {
+                        payload = JSON.parse(rawText);
+                    }
+                } catch (_) {
+                    payload = null;
+                }
                 segobToast('success', isEdit ? 'Nota actualizada' : 'Nota creada');
+                const willReloadHome = !!document.getElementById('pa-home-personal-notes');
+                if (payload && payload.note && !willReloadHome && typeof window.paApplyHomeCalendarNoteSave === 'function') {
+                    window.paApplyHomeCalendarNoteSave(payload.note);
+                }
                 paRefreshNotesAfterMutation();
                 // Refresh folder counts
                 loadFolders();
@@ -1678,10 +1768,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Note Preview (read-only full content view); sourceEl = miniatura calendario (.pa-cal-note)
+    window.previewNoteFromHomeCalendar = function(noteData) {
+        if (!noteData || noteData.id == null) return;
+        const holder = document.createElement('div');
+        holder.setAttribute('data-note-data', JSON.stringify(noteData));
+        window.previewNote(noteData.id, holder);
+    };
+
     window.previewNote = function(id, sourceEl) {
         const card = document.querySelector(`.pa-card--note[data-id="${id}"]`);
         const pill = sourceEl && sourceEl.closest ? sourceEl.closest('.pa-cal-note') : null;
-        const noteData = paParseNoteDataFromEl(pill) || paParseNoteDataFromEl(card);
+        const noteData = paParseNoteDataFromEl(pill) || paParseNoteDataFromEl(card)
+            || (sourceEl && paParseNoteDataFromEl(sourceEl));
         if (!noteData) return;
         if (noteData.is_encrypted) { decryptNote(id, 'preview', pill || sourceEl); return; }
 
@@ -1736,7 +1834,8 @@ document.addEventListener('DOMContentLoaded', function() {
         action = action || 'preview'; // 'preview' or 'edit'
         const card = document.querySelector(`.pa-card--note[data-id="${id}"]`);
         const pill = sourceEl && sourceEl.closest ? sourceEl.closest('.pa-cal-note') : document.querySelector(`.pa-cal-note[data-note-id="${id}"]`);
-        const noteData = paParseNoteDataFromEl(card) || paParseNoteDataFromEl(pill);
+        const noteData = paParseNoteDataFromEl(card) || paParseNoteDataFromEl(pill)
+            || (sourceEl && paParseNoteDataFromEl(sourceEl));
         if (!noteData) {
             if (typeof segobToast === 'function') {
                 segobToast('error', 'No se pudo leer los datos de la nota.');
@@ -2358,6 +2457,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!hash) return;
 
         const params = new URLSearchParams(hash);
+        const calendarDate = params.get('calendar_date');
+        if (calendarDate && /^\d{4}-\d{2}-\d{2}$/.test(calendarDate)) {
+            const y = parseInt(calendarDate.slice(0, 4), 10);
+            const mo = parseInt(calendarDate.slice(5, 7), 10);
+            if (!Number.isNaN(y) && !Number.isNaN(mo) && mo >= 1 && mo <= 12) {
+                window.paCurrentYear = y;
+                window.paCurrentMonth = mo;
+            }
+        }
         const filter = params.get('filter');
         const tab = params.get('tab');
         const folderId = params.get('folder_id');

@@ -445,8 +445,8 @@ html.theme-dark .home-calendar-view-btn.is-active:hover {
     border-color: var(--cal-cell-hover-border, var(--clr-border));
 }
 
-.home-shell-aside .calendar-day.has-agenda:hover:not(.is-empty):not(.is-today),
-.home-shell-aside .calendar-day.has-agenda:focus-visible {
+.home-shell-aside .calendar-day.has-cal-tooltip:hover:not(.is-empty):not(.is-today),
+.home-shell-aside .calendar-day.has-cal-tooltip:focus-visible {
     transform: scale(1.04);
 }
 
@@ -455,8 +455,43 @@ html.theme-dark .home-calendar-view-btn.is-active:hover {
     transition: color 0.2s ease;
 }
 
-.home-shell-aside .calendar-day.has-agenda {
+.home-shell-aside .calendar-day.has-cal-tooltip {
     cursor: default;
+}
+
+.home-shell-aside .calendar-day-dots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    justify-content: center;
+    align-items: center;
+    max-width: 100%;
+    margin-top: 1px;
+}
+
+.home-shell-aside .calendar-pa-note-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.home-shell-aside .calendar-pa-note-overflow {
+    flex-shrink: 0;
+    font-size: 0.5rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--clr-text-light);
+    padding: 1px 2px 0;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.06);
+}
+
+html.theme-dark .home-shell-aside .calendar-pa-note-overflow {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--clr-text-main);
 }
 
 .home-shell-aside .calendar-agenda-dot {
@@ -528,6 +563,64 @@ html.theme-dark .home-calendar-view-btn.is-active:hover {
     margin-top: 2px;
 }
 
+.home-shell-aside .calendar-agenda-tooltip--interactive {
+    pointer-events: auto;
+}
+
+.home-shell-aside .calendar-agenda-tooltip-note-title {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--clr-accent);
+    text-align: left;
+    cursor: pointer;
+    line-height: 1.25;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.home-shell-aside .calendar-agenda-tooltip-note-title:hover {
+    color: var(--clr-primary);
+}
+
+html.theme-dark .home-shell-aside .calendar-agenda-tooltip-note-title {
+    color: var(--clr-primary-light, var(--clr-accent));
+}
+
+.home-calendar-ctx-menu {
+    min-width: 11rem;
+    padding: 4px 0;
+    border-radius: 8px;
+    background: var(--clr-card);
+    border: 1px solid var(--clr-border);
+    box-shadow: var(--shadow-soft, 0 4px 16px rgba(0, 0, 0, 0.12));
+}
+
+.home-calendar-ctx-menu-item {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0.45rem 0.75rem;
+    border: none;
+    background: transparent;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--clr-text-main);
+    text-align: left;
+    cursor: pointer;
+}
+
+.home-calendar-ctx-menu-item:hover {
+    background: rgba(134, 30, 52, 0.06);
+}
+
 body:has(.home-shell) .calendar-agenda-tooltip {
     max-width: min(260px, calc(100vw - 24px));
     padding: 8px 10px;
@@ -537,6 +630,10 @@ body:has(.home-shell) .calendar-agenda-tooltip {
     box-shadow: var(--shadow-soft, 0 2px 8px rgba(0,0,0,0.08));
     pointer-events: none;
     font-size: 0.75rem;
+}
+
+body:has(.home-shell) .calendar-agenda-tooltip--interactive {
+    pointer-events: auto;
 }
 
 body:has(.home-shell) .calendar-agenda-tooltip-row + .calendar-agenda-tooltip-row {

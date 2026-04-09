@@ -1012,7 +1012,8 @@ class TemporaryModuleExportService
             $sortOrder = (int) ($formula['sort_order'] ?? 0);
             $includeTotal = !array_key_exists('include_total', $formula) || !empty($formula['include_total']);
             $formulaLabels[$id] = $label;
-            $formulaColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'op' => $op, 'base_metric_id' => $baseMetricId, 'include_total' => $includeTotal, 'sort_order' => $sortOrder];
+            $metricIds = array_values(array_filter(array_map('strval', (array) ($formula['metric_ids'] ?? []))));
+            $formulaColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'op' => $op, 'base_metric_id' => $baseMetricId, 'metric_ids' => $metricIds, 'include_total' => $includeTotal, 'sort_order' => $sortOrder];
         }
 
         $rowsByKey = [];
@@ -1419,6 +1420,8 @@ class TemporaryModuleExportService
                         'label' => (string) ($col['label'] ?? ''),
                         'group' => trim((string) ($col['group'] ?? '')),
                         'op' => (string) ($col['op'] ?? 'add'),
+                        'base_metric_id' => (string) ($col['base_metric_id'] ?? ''),
+                        'metric_ids' => array_values(array_map('strval', (array) ($col['metric_ids'] ?? []))),
                         'include_total' => !array_key_exists('include_total', $col) || !empty($col['include_total']),
                         'sort_order' => (int) ($col['sort_order'] ?? 0),
                     ];
@@ -1557,16 +1560,33 @@ class TemporaryModuleExportService
                         }
 
                         $id = (string) ($col['id'] ?? '');
+                        $op = (string) ($col['op'] ?? 'metric');
                         $total = 0.0;
-                        foreach ($sumRows as $row) {
-                            if ((string) ($col['op'] ?? 'metric') === 'metric') {
-                                $total += (float) (($row['metrics'][$id] ?? 0.0));
-                            } else {
-                                $total += (float) (($row['formulas'][$id] ?? 0.0));
+
+                        if ($op === 'percent') {
+                            $metricIds = array_values(array_map('strval', (array) ($col['metric_ids'] ?? [])));
+                            $numeratorMetricId = (string) ($metricIds[0] ?? '');
+                            $baseMetricId = (string) ($col['base_metric_id'] ?? '');
+                            $numeratorTotal = 0.0;
+                            $baseTotal = 0.0;
+                            if ($numeratorMetricId !== '' && $baseMetricId !== '') {
+                                foreach ($sumRows as $row) {
+                                    $numeratorTotal += (float) (($row['metrics'][$numeratorMetricId] ?? 0.0));
+                                    $baseTotal += (float) (($row['metrics'][$baseMetricId] ?? 0.0));
+                                }
+                            }
+                            $total = $baseTotal !== 0.0 ? (($numeratorTotal / $baseTotal) * 100.0) : 0.0;
+                        } else {
+                            foreach ($sumRows as $row) {
+                                if ($op === 'metric') {
+                                    $total += (float) (($row['metrics'][$id] ?? 0.0));
+                                } else {
+                                    $total += (float) (($row['formulas'][$id] ?? 0.0));
+                                }
                             }
                         }
 
-                        if ((string) ($col['op'] ?? '') === 'percent') {
+                        if ($op === 'percent') {
                             $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$rowPtr, $total / 100);
                             $sheet->getStyle(Coordinate::stringFromColumnIndex($colIdx).$rowPtr)
                                 ->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE_00);
@@ -1712,9 +1732,13 @@ class TemporaryModuleExportService
 
         $tableHeaderFirstRow = $headerStartRow;
         $tableHeaderLastRow = $headerStartRow + $headerRowCount - 1;
+        $cellFontSizePx = max(9, min(24, (int) ($this->exportConfig['cell_font_size_px'] ?? $this->exportConfig['cellFontPx'] ?? 12)));
+        $cellFontSizePt = max(7, min(18, (int) round($cellFontSizePx * 0.75)));
+        $headerFontSizePx = max(9, min(28, (int) ($this->exportConfig['header_font_size_px'] ?? $this->exportConfig['headerFontPx'] ?? 12)));
+        $headerFontSizePt = max(7, min(21, (int) round($headerFontSizePx * 0.75)));
         $headerRange = 'A'.$tableHeaderFirstRow.':'.$lastColumnLetter.$tableHeaderLastRow;
         $sheet->getStyle($headerRange)
-            ->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
+            ->getFont()->setBold(true)->setSize($headerFontSizePt)->getColor()->setARGB(self::HEADER_FONT_COLOR);
         $sheet->getStyle($headerRange)
             ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::HEADER_FILL_COLOR);
         $sheet->getStyle($headerRange)
@@ -1949,6 +1973,10 @@ class TemporaryModuleExportService
         $sheet->getStyle($tableRange)->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setVertical(Alignment::VERTICAL_CENTER);
+        if ($lastDataRow > $tableHeaderLastRow) {
+            $sheet->getStyle('A'.$dataStartRow.':'.$lastColumnLetter.$lastDataRow)
+                ->getFont()->setSize($cellFontSizePt);
+        }
 
         if ($lastDataRow > $tableHeaderLastRow) {
             $sheet->getStyle('A'.$dataStartRow.':'.$lastColumnLetter.$lastDataRow)

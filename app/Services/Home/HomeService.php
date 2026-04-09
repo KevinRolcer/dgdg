@@ -26,6 +26,10 @@ class HomeService
             ? $this->personalNoteService->getFolders((int) $user->id)
             : collect();
 
+        $homeCalendarNoteDays = $user
+            ? $this->personalNoteService->getScheduledNotesByDayForHomeCalendar((int) $user->id)
+            : [];
+
         return [
             'pageTitle' => 'Inicio',
             'pageDescription' => 'Panel principal del sistema',
@@ -34,6 +38,8 @@ class HomeService
             'pastEvents' => $cal['pastEvents'],
             /** Por día Y-m-d → [{ title, time }, …] — para calendario (viñetas). */
             'agendaDays' => $cal['agendaDays'],
+            /** Por día Y-m-d → payload de notas con recordatorio (misma forma que data-note-data). */
+            'homeCalendarNoteDays' => $homeCalendarNoteDays,
             'personalAgendaHomeNotes' => $personalAgendaHomeNotes,
             'paFoldersForHomeJson' => $paFoldersForHomeJson,
         ];

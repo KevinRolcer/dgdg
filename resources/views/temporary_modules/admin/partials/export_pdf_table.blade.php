@@ -63,6 +63,9 @@
         default => 'width:auto; margin: 0 auto 16px 0;',
     };
     $sumGroupColor = trim((string) ($sumGroupColor ?? 'var(--clr-primary)'));
+    $summaryCompactLogoHeightPx = 36;
+    $summaryCompactTitlePx = max(12, min($titleFontSizePx - 3, 16));
+    $summaryCompactDatePx = max(8, min(10, $summaryCompactTitlePx - 5));
 
     if ($forceFullWidthDataTable || $stretch || $dataTableAlign === 'left') {
         $dataTableStyle = 'width:100%; margin-top:10px;';
@@ -188,11 +191,19 @@
             background: #475569;
             color: #fff;
             text-align: center;
-            font-size: 9px;
+            font-size: var(--sum-header-fs, 9px);
+            padding: var(--sum-cell-pad, 4px);
+            line-height: 1.08;
         }
         .sum-table td {
             text-align: center;
-            font-size: 10px;
+            font-size: var(--sum-cell-fs, 10px);
+            padding: var(--sum-cell-pad, 4px);
+            line-height: 1.08;
+        }
+        .summary-page-break {
+            page-break-before: always;
+            margin-top: 0;
         }
     </style>
 </head>
@@ -201,32 +212,134 @@
     @if (!empty($logoDataUri))
     <tr>
         <td colspan="2" style="text-align: left; vertical-align: bottom; padding-bottom: 2px;">
-            <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobierno de Puebla">
+            <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobierno de Puebla" style="max-height: {{ $summaryCompactLogoHeightPx }}px;">
         </td>
     </tr>
     <tr>
-        <td colspan="2" style="padding-top: 10px; padding-bottom: 4px;">
-            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 0;">{{ $title }}</h1>
+        <td colspan="2" style="padding-top: 6px; padding-bottom: 3px;">
+            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 0; font-size: {{ $summaryCompactTitlePx }}px;">{{ $title }}</h1>
         </td>
     </tr>
     <tr>
-        <td colspan="2" style="text-align: right; font-size: 10px; padding-bottom: 10px;">
+        <td colspan="2" style="text-align: right; font-size: {{ $summaryCompactDatePx }}px; padding-bottom: 6px;">
             @if(isset($fechaCorteStr))Fecha y hora de corte: {{ $fechaCorteStr }}@endif
         </td>
     </tr>
     @else
     <tr>
         <td class="doc-head-title-cell" style="padding-bottom: 4px;">
-            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 0;">{{ $title }}</h1>
+            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 0; font-size: {{ $summaryCompactTitlePx }}px;">{{ $title }}</h1>
         </td>
     </tr>
     @if(isset($fechaCorteStr))
     <tr>
-        <td style="text-align: right; font-size: 10px; padding-bottom: 10px;">Fecha y hora de corte: {{ $fechaCorteStr }}</td>
+        <td style="text-align: right; font-size: {{ $summaryCompactDatePx }}px; padding-bottom: 6px;">Fecha y hora de corte: {{ $fechaCorteStr }}</td>
     </tr>
     @endif
     @endif
 </table>
+
+@if(!empty($includeTotalsTable) && !empty($totalsTable) && is_array($totalsTable) && !empty($totalsTable['columns']))
+@php
+    $totalsTableAlign = 'center';
+    $totalsTableTitle = trim((string) ($totalsTableTitle ?? 'Totales'));
+    if ($totalsTableTitle === '') { $totalsTableTitle = 'Totales'; }
+    if (!empty($headersUppercase)) { $totalsTableTitle = mb_strtoupper($totalsTableTitle); }
+    $totalsWrapStyle = 'text-align:center; margin-bottom: 16px;';
+    $totalsStyle = 'width:auto; margin: 0 auto 16px auto;';
+    $totalsCols = is_array($totalsTable['columns'] ?? null) ? $totalsTable['columns'] : [];
+    $totalsVals = is_array($totalsTable['values'] ?? null) ? $totalsTable['values'] : [];
+    $totalsHasGroups = collect($totalsCols)->contains(fn ($c) => ((string) ($c['group'] ?? '')) !== '');
+    $totalsGroupSpans = [];
+    if ($totalsHasGroups) {
+        foreach ($totalsCols as $col) {
+            $g = (string) ($col['group'] ?? '');
+            if (!empty($totalsGroupSpans) && $totalsGroupSpans[count($totalsGroupSpans) - 1]['label'] === $g) {
+                $totalsGroupSpans[count($totalsGroupSpans) - 1]['span']++;
+            } else {
+                $totalsGroupSpans[] = ['label' => $g, 'span' => 1];
+            }
+        }
+    }
+@endphp
+<p style="font-weight: bold; margin: 6px 0 6px 0; text-align: {{ $totalsTableAlign }}; font-size: {{ $sumTitleFontSizePx ?? 14 }}px;">{{ $totalsTableTitle }}</p>
+<div style="{{ $totalsWrapStyle }}">
+    <table class="sum-table" style="{{ $totalsStyle }} {{ $countTableInlineStyle }}">
+        <thead>
+        @if($totalsHasGroups)
+            <tr>
+                <th style="background:{{ $sumGroupColor }};color:#fff;"></th>
+                @foreach($totalsGroupSpans as $gs)
+                    @php
+                        $tGroupKey = mb_strtolower(trim((string) ($gs['label'] ?? '')));
+                        $tGroupBg = $gs['label'] !== '' ? (($groupHeaderColors[$tGroupKey] ?? '#64748b')) : '#334155';
+                    @endphp
+                    <th colspan="{{ $gs['span'] }}" style="background:{{ $tGroupBg }};color:#fff;">{{ $gs['label'] }}</th>
+                @endforeach
+            </tr>
+        @endif
+            <tr>
+                <th style="background:{{ $sumGroupColor }};color:#fff;">{{ !empty($headersUppercase) ? mb_strtoupper('Total') : 'Total' }}</th>
+                @foreach ($totalsCols as $col)
+                    <th>{{ $col['label'] }}</th>
+                @endforeach
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="color: {{ '#'.((string) ($sumTable['totals_text_color'] ?? '861E34')) }}; {{ (!array_key_exists('totals_bold', $sumTable ?? []) || !empty($sumTable['totals_bold'])) ? 'font-weight:700;' : '' }}">{{ !empty($headersUppercase) ? mb_strtoupper('Total') : 'Total' }}</td>
+                @foreach ($totalsCols as $col)
+                    @php
+                        $id = (string) ($col['id'] ?? '');
+                        $v = (float) ($totalsVals[$id] ?? 0.0);
+                        $txt = round($v, 2);
+                        if ((string) ($col['op'] ?? '') === 'percent') { $txt = $txt.'%'; }
+                    @endphp
+                    <td style="color: {{ '#'.((string) ($sumTable['totals_text_color'] ?? '861E34')) }}; {{ (!array_key_exists('totals_bold', $sumTable ?? []) || !empty($sumTable['totals_bold'])) ? 'font-weight:700;' : '' }}">{{ $txt }}</td>
+                @endforeach
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+@php
+    $hasCountSummary = !empty($countTable) && isset($countTable['groups']);
+    $hasSumSummary = !empty($sumTable) && !empty($sumTable['rows']) && is_array($sumTable['rows']);
+@endphp
+@if($hasCountSummary || $hasSumSummary)
+<div class="summary-page-break"></div>
+<table class="doc-head-table" role="presentation">
+    @if (!empty($logoDataUri))
+    <tr>
+        <td colspan="2" style="text-align: left; vertical-align: bottom; padding-bottom: 2px;">
+            <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobierno de Puebla" style="max-height: {{ $summaryCompactLogoHeightPx }}px;">
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" style="padding-top: 6px; padding-bottom: 3px;">
+            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 0; font-size: {{ $summaryCompactTitlePx }}px;">{{ $title }}</h1>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" style="text-align: right; font-size: {{ $summaryCompactDatePx }}px; padding-bottom: 6px;">
+            @if(isset($fechaCorteStr))Fecha y hora de corte: {{ $fechaCorteStr }}@endif
+        </td>
+    </tr>
+    @else
+    <tr>
+        <td class="doc-head-title-cell" style="padding-bottom: 4px;">
+            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 0; font-size: {{ $summaryCompactTitlePx }}px;">{{ $title }}</h1>
+        </td>
+    </tr>
+    @if(isset($fechaCorteStr))
+    <tr>
+        <td style="text-align: right; font-size: {{ $summaryCompactDatePx }}px; padding-bottom: 6px;">Fecha y hora de corte: {{ $fechaCorteStr }}</td>
+    </tr>
+    @endif
+    @endif
+</table>
+@endif
+@endif
 
 @if(!empty($countTable) && isset($countTable['groups']))
 @php
@@ -324,6 +437,40 @@
     </tbody>
 </table>
 </div>
+
+@if((!empty($countTable) && isset($countTable['groups'])) && (!empty($sumTable) && !empty($sumTable['rows']) && is_array($sumTable['rows'])))
+<div class="summary-page-break"></div>
+<table class="doc-head-table" role="presentation">
+    @if (!empty($logoDataUri))
+    <tr>
+        <td colspan="2" style="text-align: left; vertical-align: bottom; padding-bottom: 2px;">
+            <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobierno de Puebla">
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" style="padding-top: 10px; padding-bottom: 4px;">
+            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 0;">{{ $title }}</h1>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" style="text-align: right; font-size: 10px; padding-bottom: 10px;">
+            @if(isset($fechaCorteStr))Fecha y hora de corte: {{ $fechaCorteStr }}@endif
+        </td>
+    </tr>
+    @else
+    <tr>
+        <td class="doc-head-title-cell" style="padding-bottom: 4px;">
+            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 0;">{{ $title }}</h1>
+        </td>
+    </tr>
+    @if(isset($fechaCorteStr))
+    <tr>
+        <td style="text-align: right; font-size: 10px; padding-bottom: 10px;">Fecha y hora de corte: {{ $fechaCorteStr }}</td>
+    </tr>
+    @endif
+    @endif
+</table>
+@endif
 @endif
 
 @if(!empty($sumTable) && !empty($sumTable['rows']) && is_array($sumTable['rows']))
@@ -345,8 +492,21 @@
         $sumHeadingText = mb_strtolower($sumHeadingText);
         $sumHeadingText = mb_strtoupper(mb_substr($sumHeadingText, 0, 1, 'UTF-8'), 'UTF-8').mb_substr($sumHeadingText, 1, null, 'UTF-8');
     }
+    $sumRawMetricCols = count((array) ($sumTable['metric_columns'] ?? []));
+    $sumRawFormulaCols = count((array) ($sumTable['formula_columns'] ?? []));
+    if (($sumRawMetricCols + $sumRawFormulaCols) === 0) {
+        $sumRawMetricCols = count((array) ($sumTable['metric_labels'] ?? []));
+        $sumRawFormulaCols = count((array) ($sumTable['formula_labels'] ?? []));
+    }
+    $sumRowCount = count($sumTable['rows'] ?? []);
+    $sumColumnCount = max(2, 1 + $sumRawMetricCols + $sumRawFormulaCols);
+    $sumDensityScore = $sumRowCount + (int) ceil($sumColumnCount * 1.8) + (($orientation ?? 'portrait') === 'landscape' ? 4 : 0);
+    $sumHeadingFontSizePx = max(10, min($sumTitleFontSizePx, $sumDensityScore >= 34 ? 11 : 12));
+    $sumHeaderFontPx = max(7, min(10, $cellFontSizePx - ($sumDensityScore >= 34 ? 3 : 2)));
+    $sumCellFontPx = max(7, min(10, $cellFontSizePx - ($sumDensityScore >= 34 ? 2 : 1)));
+    $sumCellPadding = $sumDensityScore >= 34 ? '2px 3px' : '3px 4px';
 @endphp
-<p style="font-weight: bold; margin: 6px 0 6px 0; text-align: {{ $sumTitleAlign }}; font-size: {{ $sumTitleFontSizePx }}px;">{{ $sumHeadingText }}</p>
+<p style="font-weight: bold; margin: 4px 0 4px 0; text-align: {{ $sumTitleAlign }}; font-size: {{ $sumHeadingFontSizePx }}px;">{{ $sumHeadingText }}</p>
 <div style="{{ $sumTableWrapStyle }}">
 @php
     $sumMetricColumns = is_array($sumTable['metric_columns'] ?? null) ? $sumTable['metric_columns'] : [];
@@ -373,6 +533,8 @@
             'label' => (string) ($col['label'] ?? ''),
             'group' => trim((string) ($col['group'] ?? '')),
             'op' => (string) ($col['op'] ?? 'add'),
+            'base_metric_id' => (string) ($col['base_metric_id'] ?? ''),
+            'metric_ids' => array_values(array_map('strval', (array) ($col['metric_ids'] ?? []))),
             'include_total' => !array_key_exists('include_total', $col) || !empty($col['include_total']),
             'sort_order' => (int) ($col['sort_order'] ?? 0),
         ];
@@ -411,7 +573,7 @@
         }
     }
 @endphp
-<table class="sum-table" style="{{ $sumTableStyle }} {{ $countTableInlineStyle }}">
+<table class="sum-table" style="{{ $sumTableStyle }} {{ $countTableInlineStyle }} --sum-header-fs: {{ $sumHeaderFontPx }}px; --sum-cell-fs: {{ $sumCellFontPx }}px; --sum-cell-pad: {{ $sumCellPadding }};">
     <thead>
     @if($sumHasGroups)
     <tr>
@@ -463,12 +625,28 @@
                     $includeTotal = !array_key_exists('include_total', $col) || !empty($col['include_total']);
                     $totalVal = 0.0;
                     if ($includeTotal) {
-                        foreach (($sumTable['rows'] ?? []) as $sumRow) {
-                            $id = (string) ($col['id'] ?? '');
-                            $isMetric = (string) ($col['op'] ?? 'metric') === 'metric';
-                            $totalVal += $isMetric
-                                ? (float) (($sumRow['metrics'][$id] ?? 0.0))
-                                : (float) (($sumRow['formulas'][$id] ?? 0.0));
+                        $id = (string) ($col['id'] ?? '');
+                        $op = (string) ($col['op'] ?? 'metric');
+                        if ($op === 'percent') {
+                            $metricIds = array_values(array_map('strval', (array) ($col['metric_ids'] ?? [])));
+                            $numeratorMetricId = (string) ($metricIds[0] ?? '');
+                            $baseMetricId = (string) ($col['base_metric_id'] ?? '');
+                            $numeratorTotal = 0.0;
+                            $baseTotal = 0.0;
+                            if ($numeratorMetricId !== '' && $baseMetricId !== '') {
+                                foreach (($sumTable['rows'] ?? []) as $sumRow) {
+                                    $numeratorTotal += (float) (($sumRow['metrics'][$numeratorMetricId] ?? 0.0));
+                                    $baseTotal += (float) (($sumRow['metrics'][$baseMetricId] ?? 0.0));
+                                }
+                            }
+                            $totalVal = $baseTotal !== 0.0 ? (($numeratorTotal / $baseTotal) * 100.0) : 0.0;
+                        } else {
+                            foreach (($sumTable['rows'] ?? []) as $sumRow) {
+                                $isMetric = $op === 'metric';
+                                $totalVal += $isMetric
+                                    ? (float) (($sumRow['metrics'][$id] ?? 0.0))
+                                    : (float) (($sumRow['formulas'][$id] ?? 0.0));
+                            }
                         }
                     }
                     $totalTxt = $includeTotal ? (string) round($totalVal, 2) : '';
@@ -485,7 +663,44 @@
 </div>
 @endif
 
-@if((!empty($countTable) && isset($countTable['groups'])) || (!empty($sumTable) && !empty($sumTable['rows']) && is_array($sumTable['rows'])))
+@php
+    $hasSummaryContent = (!empty($includeTotalsTable) && !empty($totalsTable) && is_array($totalsTable) && !empty($totalsTable['columns']))
+        || (!empty($countTable) && isset($countTable['groups']))
+        || (!empty($sumTable) && !empty($sumTable['rows']) && is_array($sumTable['rows']));
+@endphp
+
+@if($hasSummaryContent)
+<div class="summary-page-break"></div>
+<table class="doc-head-table" role="presentation">
+    @if (!empty($logoDataUri))
+    <tr>
+        <td colspan="2" style="text-align: left; vertical-align: bottom; padding-bottom: 2px;">
+            <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobierno de Puebla">
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" style="padding-top: 10px; padding-bottom: 4px;">
+            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 0;">{{ $title }}</h1>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" style="text-align: right; font-size: 10px; padding-bottom: 10px;">
+            @if(isset($fechaCorteStr))Fecha y hora de corte: {{ $fechaCorteStr }}@endif
+        </td>
+    </tr>
+    @else
+    <tr>
+        <td class="doc-head-title-cell" style="padding-bottom: 4px;">
+            <h1 style="text-align: {{ ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center') }}; margin-bottom: 0;">{{ $title }}</h1>
+        </td>
+    </tr>
+    @if(isset($fechaCorteStr))
+    <tr>
+        <td style="text-align: right; font-size: 10px; padding-bottom: 10px;">Fecha y hora de corte: {{ $fechaCorteStr }}</td>
+    </tr>
+    @endif
+    @endif
+</table>
 <p style="font-weight: bold; margin: 8px 0 4px 0;">{{ $sectionLabel ?? 'Desglose' }}</p>
 @endif
 

@@ -747,33 +747,47 @@ document.addEventListener('DOMContentLoaded', function () {
         agendaDaysMap = {};
     }
 
+    var noteDaysMap = {};
+    try {
+        var noteJsonEl = document.getElementById('homeCalendarNoteDays');
+        var noteRaw = (noteJsonEl && noteJsonEl.textContent) ? noteJsonEl.textContent.trim() : '{}';
+        noteDaysMap = JSON.parse(noteRaw);
+        if (!noteDaysMap || typeof noteDaysMap !== 'object' || Array.isArray(noteDaysMap)) {
+            noteDaysMap = {};
+        }
+    } catch (e2) {
+        noteDaysMap = {};
+    }
+
+    var personalAgendaUrl = calendarCard.getAttribute('data-personal-agenda-url') || '';
+
     var agendaTooltipEl = null;
+    var agendaTooltipHideTimer = null;
+
+    function cancelAgendaTooltipHide() {
+        if (agendaTooltipHideTimer) {
+            clearTimeout(agendaTooltipHideTimer);
+            agendaTooltipHideTimer = null;
+        }
+    }
+
+    function scheduleHideAgendaTooltip() {
+        cancelAgendaTooltipHide();
+        agendaTooltipHideTimer = setTimeout(function () {
+            agendaTooltipHideTimer = null;
+            hideAgendaTooltip();
+        }, 200);
+    }
+
     function hideAgendaTooltip() {
+        cancelAgendaTooltipHide();
         if (agendaTooltipEl && agendaTooltipEl.parentNode) {
             agendaTooltipEl.parentNode.removeChild(agendaTooltipEl);
         }
         agendaTooltipEl = null;
     }
-    function showAgendaTooltip(dayCell, items) {
-        hideAgendaTooltip();
-        if (!items || !items.length) return;
-        var el = document.createElement('div');
-        el.className = 'calendar-agenda-tooltip';
-        el.setAttribute('role', 'tooltip');
-        items.forEach(function (it) {
-            var row = document.createElement('div');
-            row.className = 'calendar-agenda-tooltip-row';
-            var t = document.createElement('div');
-            t.className = 'calendar-agenda-tooltip-title';
-            t.textContent = it.title || '';
-            var time = document.createElement('div');
-            time.className = 'calendar-agenda-tooltip-time';
-            time.textContent = it.time || '';
-            row.appendChild(t);
-            row.appendChild(time);
-            el.appendChild(row);
-        });
-        document.body.appendChild(el);
+
+    function positionHomeCalendarTooltip(el, dayCell) {
         el.style.position = 'fixed';
         el.style.zIndex = '10000';
         var rect = dayCell.getBoundingClientRect();
@@ -786,8 +800,157 @@ document.addEventListener('DOMContentLoaded', function () {
         if (top < 8) top = rect.bottom + 8;
         el.style.left = left + 'px';
         el.style.top = top + 'px';
+    }
+
+    function showHomeCalendarTooltip(dayCell, rows) {
+        hideAgendaTooltip();
+        if (!rows || !rows.length) return;
+        var hasNotes = rows.some(function (r) { return r.kind === 'note'; });
+        var el = document.createElement('div');
+        el.className = 'calendar-agenda-tooltip' + (hasNotes ? ' calendar-agenda-tooltip--interactive' : '');
+        el.setAttribute('role', 'tooltip');
+
+        rows.forEach(function (row) {
+            if (row.kind === 'note' && row.payload) {
+                var rowEl = document.createElement('div');
+                rowEl.className = 'calendar-agenda-tooltip-row';
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'calendar-agenda-tooltip-note-title';
+                btn.textContent = row.payload.title || 'Sin título';
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    hideAgendaTooltip();
+                    if (typeof window.previewNoteFromHomeCalendar === 'function') {
+                        window.previewNoteFromHomeCalendar(row.payload);
+                    }
+                });
+                rowEl.appendChild(btn);
+                el.appendChild(rowEl);
+            } else {
+                var rowEl2 = document.createElement('div');
+                rowEl2.className = 'calendar-agenda-tooltip-row';
+                var t = document.createElement('div');
+                t.className = 'calendar-agenda-tooltip-title';
+                t.textContent = row.title || '';
+                var time = document.createElement('div');
+                time.className = 'calendar-agenda-tooltip-time';
+                time.textContent = row.time || '';
+                rowEl2.appendChild(t);
+                rowEl2.appendChild(time);
+                el.appendChild(rowEl2);
+            }
+        });
+
+        if (hasNotes) {
+            el.addEventListener('mouseenter', cancelAgendaTooltipHide);
+            el.addEventListener('mouseleave', scheduleHideAgendaTooltip);
+        }
+
+        document.body.appendChild(el);
+        positionHomeCalendarTooltip(el, dayCell);
         agendaTooltipEl = el;
     }
+
+    function normalizeAgendaDayItems(raw) {
+        if (!raw || !raw.length) return [];
+        return raw.map(function (it) {
+            return {
+                title: it.title || '',
+                time: it.time || '',
+                kind: it.kind || 'agenda',
+            };
+        });
+    }
+
+    function mergeHomeCalendarTooltipRows(agendaItems, notePayloads) {
+        var rows = [];
+        agendaItems.forEach(function (it) {
+            rows.push({ kind: 'agenda', title: it.title, time: it.time });
+        });
+        notePayloads.forEach(function (p) {
+            rows.push({ kind: 'note', payload: p });
+        });
+        return rows;
+    }
+
+    var homeCalendarCtxMenuEl = null;
+
+    function hideHomeCalendarCtxMenu() {
+        if (homeCalendarCtxMenuEl && homeCalendarCtxMenuEl.parentNode) {
+            homeCalendarCtxMenuEl.parentNode.removeChild(homeCalendarCtxMenuEl);
+        }
+        homeCalendarCtxMenuEl = null;
+    }
+
+    function showHomeCalendarContextMenu(clientX, clientY, dayKey) {
+        hideHomeCalendarCtxMenu();
+        var menu = document.createElement('div');
+        menu.className = 'home-calendar-ctx-menu';
+        menu.setAttribute('role', 'menu');
+
+        function addItem(label, onActivate) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'home-calendar-ctx-menu-item';
+            b.textContent = label;
+            b.setAttribute('role', 'menuitem');
+            b.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                hideHomeCalendarCtxMenu();
+                onActivate();
+            });
+            menu.appendChild(b);
+        }
+
+        addItem('Crear nota personal', function () {
+            if (typeof window.openPersonalNoteModal === 'function') {
+                window.openPersonalNoteModal({ scheduled_date: dayKey });
+                return;
+            }
+            if (personalAgendaUrl) {
+                window.location.href = personalAgendaUrl;
+            }
+        });
+
+        addItem('Ir a agenda personal', function () {
+            var base = personalAgendaUrl || (window.location.origin + '/personal-agenda');
+            var hash = 'filter=calendar&tab=month&calendar_date=' + encodeURIComponent(dayKey);
+            window.location.href = base.split('#')[0] + '#' + hash;
+        });
+
+        document.body.appendChild(menu);
+        menu.style.position = 'fixed';
+        menu.style.left = clientX + 'px';
+        menu.style.top = clientY + 'px';
+        menu.style.zIndex = '10001';
+        homeCalendarCtxMenuEl = menu;
+
+        requestAnimationFrame(function () {
+            var r = menu.getBoundingClientRect();
+            var x = clientX;
+            var y = clientY;
+            if (r.right > window.innerWidth - 8) x = Math.max(8, clientX - r.width);
+            if (r.bottom > window.innerHeight - 8) y = Math.max(8, clientY - r.height);
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        });
+    }
+
+    document.addEventListener('click', function (e) {
+        if (homeCalendarCtxMenuEl && !e.target.closest('.home-calendar-ctx-menu')) {
+            hideHomeCalendarCtxMenu();
+        }
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            hideHomeCalendarCtxMenu();
+        }
+    });
+    document.addEventListener('scroll', function () {
+        hideHomeCalendarCtxMenu();
+    }, true);
 
     function openCalendarDrawer() {
         if (!calendarCard || !calendarMobileBackdrop) {
@@ -860,16 +1023,18 @@ document.addEventListener('DOMContentLoaded', function () {
             var dayCell = document.createElement('span');
             dayCell.className = 'calendar-day';
             var dayKey = year + '-' + pad(month + 1) + '-' + pad(day);
-            var dayEvents = agendaDaysMap[dayKey];
+            var agendaItems = normalizeAgendaDayItems(agendaDaysMap[dayKey]);
+            var noteItems = noteDaysMap[dayKey] || [];
+            var hasDirectiva = agendaItems.length > 0;
+            var tooltipRows = mergeHomeCalendarTooltipRows(agendaItems, noteItems);
+
             var num = document.createElement('span');
             num.className = 'calendar-day-num';
             num.textContent = String(day);
             dayCell.appendChild(num);
 
-            if (dayEvents && dayEvents.length) {
-                (function (cell, list, y, m, d) {
-                    cell.classList.add('has-agenda');
-                    var dot = document.createElement('span');
+            if (tooltipRows.length) {
+                (function (cell, rows, y, m, d, dk, notesForDots, directiva) {
                     var cellMidnight = new Date(y, m, d).setHours(0, 0, 0, 0);
                     var todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).setHours(0, 0, 0, 0);
                     var dotKind = 'future';
@@ -878,20 +1043,63 @@ document.addEventListener('DOMContentLoaded', function () {
                     } else if (cellMidnight === todayMidnight) {
                         dotKind = 'today';
                     }
-                    dot.className = 'calendar-agenda-dot calendar-agenda-dot--' + dotKind;
-                    dot.setAttribute('aria-hidden', 'true');
-                    cell.appendChild(dot);
-                    cell.addEventListener('mouseenter', function () {
-                        showAgendaTooltip(cell, list);
-                    });
-                    cell.addEventListener('mouseleave', hideAgendaTooltip);
-                    cell.addEventListener('focus', function () {
-                        showAgendaTooltip(cell, list);
-                    });
+
+                    cell.classList.add('has-cal-tooltip');
+
+                    if (directiva) {
+                        cell.classList.add('has-agenda');
+                        var dot = document.createElement('span');
+                        dot.className = 'calendar-agenda-dot calendar-agenda-dot--' + dotKind;
+                        dot.setAttribute('aria-hidden', 'true');
+                        cell.appendChild(dot);
+                    }
+
+                    if (notesForDots && notesForDots.length) {
+                        cell.classList.add('has-pa-notes');
+                        var dotsWrap = document.createElement('span');
+                        dotsWrap.className = 'calendar-day-dots';
+                        var cap = 4;
+                        for (var ni = 0; ni < Math.min(notesForDots.length, cap); ni++) {
+                            var nd = document.createElement('span');
+                            nd.className = 'calendar-pa-note-dot calendar-agenda-dot--' + dotKind;
+                            var col = notesForDots[ni].dot_color || notesForDots[ni].color;
+                            if (col) {
+                                nd.style.background = col;
+                                nd.style.borderColor = col;
+                            }
+                            nd.setAttribute('aria-hidden', 'true');
+                            dotsWrap.appendChild(nd);
+                        }
+                        var overflowCount = notesForDots.length - cap;
+                        if (overflowCount > 0) {
+                            var plusEl = document.createElement('span');
+                            plusEl.className = 'calendar-pa-note-overflow';
+                            plusEl.textContent = '+' + overflowCount;
+                            plusEl.setAttribute('title', overflowCount + ' nota' + (overflowCount === 1 ? '' : 's') + ' más');
+                            dotsWrap.appendChild(plusEl);
+                        }
+                        cell.appendChild(dotsWrap);
+                    }
+
+                    function showTip() {
+                        cancelAgendaTooltipHide();
+                        showHomeCalendarTooltip(cell, rows);
+                    }
+
+                    cell.addEventListener('mouseenter', showTip);
+                    cell.addEventListener('mouseleave', scheduleHideAgendaTooltip);
+                    cell.addEventListener('focus', showTip);
                     cell.addEventListener('blur', hideAgendaTooltip);
                     cell.setAttribute('tabindex', '0');
-                })(dayCell, dayEvents, year, month, day);
+                })(dayCell, tooltipRows, year, month, day, dayKey, noteItems, hasDirectiva);
             }
+
+            (function (cell, dk) {
+                cell.addEventListener('contextmenu', function (e) {
+                    e.preventDefault();
+                    showHomeCalendarContextMenu(e.clientX, e.clientY, dk);
+                });
+            })(dayCell, dayKey);
 
             if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
                 dayCell.classList.add('is-today');
@@ -900,6 +1108,46 @@ document.addEventListener('DOMContentLoaded', function () {
             calendarGrid.appendChild(dayCell);
         }
     }
+
+    window.segobRenderHomeCalendarMonth = renderMonthGrid;
+
+    window.addEventListener('segob:home-calendar-notes-patch', function (ev) {
+        var d = ev.detail;
+        if (!d || !calendarGrid) {
+            return;
+        }
+        var nid = d.noteId;
+        if (d.action === 'remove' && nid != null) {
+            Object.keys(noteDaysMap).forEach(function (k) {
+                var arr = noteDaysMap[k] || [];
+                noteDaysMap[k] = arr.filter(function (n) {
+                    return Number(n.id) !== Number(nid);
+                });
+                if (noteDaysMap[k].length === 0) {
+                    delete noteDaysMap[k];
+                }
+            });
+        } else if (d.action === 'upsert' && d.entry && d.dayKey) {
+            Object.keys(noteDaysMap).forEach(function (k) {
+                var arr = noteDaysMap[k] || [];
+                noteDaysMap[k] = arr.filter(function (n) {
+                    return Number(n.id) !== Number(nid);
+                });
+                if (noteDaysMap[k].length === 0) {
+                    delete noteDaysMap[k];
+                }
+            });
+            if (!noteDaysMap[d.dayKey]) {
+                noteDaysMap[d.dayKey] = [];
+            }
+            noteDaysMap[d.dayKey].push(d.entry);
+        } else {
+            return;
+        }
+        hideAgendaTooltip();
+        hideHomeCalendarCtxMenu();
+        renderMonthGrid();
+    });
 
     viewButtons.forEach(function (button) {
         button.addEventListener('click', function () {

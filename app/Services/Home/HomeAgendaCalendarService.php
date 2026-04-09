@@ -18,7 +18,7 @@ class HomeAgendaCalendarService
 
     /**
      * @return array{
-     *   agendaDays: array<string, list<array{title: string, time: string}>>,
+     *   agendaDays: array<string, list<array{title: string, time: string, kind: string}>>,
      *   upcomingEvents: list<array{summary: string, starts_at: \Carbon\Carbon, ends_at: \Carbon\Carbon}>,
      *   pastEvents: list<array{summary: string, starts_at: \Carbon\Carbon, ends_at: \Carbon\Carbon}>
      * }
@@ -64,7 +64,11 @@ class HomeAgendaCalendarService
                 if (! isset($byDay[$dayKey])) {
                     $byDay[$dayKey] = [];
                 }
-                $byDay[$dayKey][] = ['title' => $title, 'time' => $time];
+                $byDay[$dayKey][] = [
+                    'title' => $title,
+                    'time' => $time,
+                    'kind' => 'agenda',
+                ];
 
                 $occurrences[] = [
                     'summary' => $title,

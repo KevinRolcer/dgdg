@@ -320,6 +320,77 @@ class PersonalNoteService
             ->get();
     }
 
+    /**
+     * Notas con recordatorio (fecha programada) agrupadas por día, para el calendario de inicio.
+     *
+     * @return array<string, list<array<string, mixed>>>
+     */
+    public function getScheduledNotesByDayForHomeCalendar(int $userId): array
+    {
+        $from = now()->subYear()->startOfDay();
+        $to = now()->addYears(2)->endOfDay();
+
+        $notes = PersonalNote::forUser($userId)
+            ->with(['folder', 'attachments'])
+            ->where('is_archived', false)
+            ->whereNotNull('scheduled_date')
+            ->whereBetween('scheduled_date', [$from->toDateString(), $to->toDateString()])
+            ->orderBy('scheduled_date')
+            ->orderByRaw('COALESCE(scheduled_time, "23:59:59") ASC')
+            ->get();
+
+        $fallbackColors = ['#f0f4ff', '#f0fff4', '#fffdf0', '#fff0f0', '#f8f0ff'];
+        $byDay = [];
+        $idx = 0;
+
+        foreach ($notes as $note) {
+            $key = $note->scheduled_date->format('Y-m-d');
+            $dotColor = $note->color ? (string) $note->color : $fallbackColors[$idx % count($fallbackColors)];
+            $idx++;
+
+            if (! isset($byDay[$key])) {
+                $byDay[$key] = [];
+            }
+            $byDay[$key][] = $this->serializeNoteForHomeCalendarClient($note, $dotColor);
+        }
+
+        return $byDay;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeNoteForHomeCalendarClient(PersonalNote $note, string $dotColor): array
+    {
+        $scheduled = $note->scheduled_date;
+        $displayDate = $scheduled
+            ? $scheduled->translatedFormat('d M Y')
+                . ($note->scheduled_time ? ' · '.\Carbon\Carbon::parse($note->scheduled_time)->format('H:i') : ' · Todo el día')
+            : $note->created_at->translatedFormat('d M Y');
+
+        return [
+            'kind' => 'note',
+            'id' => $note->id,
+            'title' => $note->title,
+            'content' => $note->is_encrypted ? null : (string) $note->content,
+            'priority' => $note->priority,
+            'color' => $note->color,
+            'dot_color' => $dotColor,
+            'folder_id' => $note->folder_id,
+            'is_encrypted' => (bool) $note->is_encrypted,
+            'is_archived' => (bool) $note->is_archived,
+            'scheduled_date' => $scheduled ? $scheduled->format('Y-m-d') : null,
+            'scheduled_time' => $note->scheduled_time,
+            'displayDate' => $displayDate,
+            'attachments' => $note->attachments->map(fn ($a) => [
+                'id' => $a->id,
+                'file_name' => $a->file_name,
+                'file_path' => route('personal-agenda.attachments.serve', $a->id),
+                'file_type' => $a->file_type,
+            ])->values()->all(),
+        ];
+    }
+
     public function pinnedFoldersCount(int $userId): int
     {
         return \App\Models\PersonalNoteFolder::where('user_id', $userId)

@@ -44,8 +44,12 @@
         </section>
     </div>
 
-    <aside class="home-shell-aside" id="calendarCard" aria-label="Calendario de eventos">
+    <aside class="home-shell-aside" id="calendarCard" aria-label="Calendario de eventos"
+        @auth data-personal-agenda-url="{{ route('personal-agenda.index') }}" @endauth>
         <script type="application/json" id="homeCalendarAgendaDays">@json($agendaDays ?? [])</script>
+        @auth
+        <script type="application/json" id="homeCalendarNoteDays">@json($homeCalendarNoteDays ?? [])</script>
+        @endauth
         <header class="home-aside-head">
             <h3 class="home-aside-title">Calendario de Eventos</h3>
             <button type="button" class="home-aside-close" id="calendarDrawerClose" aria-label="Cerrar calendario">
@@ -110,7 +114,7 @@
 </div>
 @endsection
 
-@if (($personalAgendaHomeNotes ?? collect())->isNotEmpty())
+@auth
 @push('scripts')
 <script id="pa-folders-json" type="application/json">
 {!! json_encode($paFoldersForHomeJson ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) !!}
@@ -118,4 +122,4 @@
 @include('agenda.personal.partials.pa_routes_script')
 <script src="{{ asset('assets/js/modules/personal-agenda.js') }}?v={{ @filemtime(public_path('assets/js/modules/personal-agenda.js')) ?: time() }}"></script>
 @endpush
-@endif
+@endauth
