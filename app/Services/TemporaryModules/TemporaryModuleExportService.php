@@ -46,6 +46,26 @@ class TemporaryModuleExportService
         return in_array($direction, ['asc', 'desc'], true) ? $direction : 'asc';
     }
 
+    private function buildStandardDocumentName(TemporaryModule $temporaryModule, string $extension): string
+    {
+        $rawModuleName = trim((string) $temporaryModule->name);
+        if ($rawModuleName === '') {
+            $rawModuleName = 'Modulo'.$temporaryModule->id;
+        }
+
+        $cleanModuleName = (string) Str::of(Str::ascii($rawModuleName))
+            ->replaceMatches('/[^A-Za-z0-9]+/', '')
+            ->trim();
+
+        if ($cleanModuleName === '') {
+            $cleanModuleName = 'Modulo'.$temporaryModule->id;
+        }
+
+        $safeExt = ltrim(strtolower($extension), '.');
+
+        return 'DGDG_'.$cleanModuleName.'.'.now()->format('d.m.Y').'.'.$safeExt;
+    }
+
     private function orderEntriesByMicrorregion($query)
     {
         $direction = strtoupper($this->resolveMicrorregionSortDirection());
@@ -75,12 +95,7 @@ class TemporaryModuleExportService
             return $temporaryModule->entries()->withoutGlobalScopes()->get();
         });
 
-        $baseName = Str::slug((string) $temporaryModule->name, '_');
-        if ($baseName === '') {
-            $baseName = 'modulo_temporal_'.$temporaryModule->id;
-        }
-
-        $fileName = $baseName.'_'.now()->format('Ymd_His').'.xlsx';
+        $fileName = $this->buildStandardDocumentName($temporaryModule, 'xlsx');
         $exportDir = storage_path('app/public/temporary-exports');
         $tempFilePath = $exportDir.'/'.$fileName;
 
@@ -1232,6 +1247,7 @@ class TemporaryModuleExportService
             ? array_values($this->exportConfig['sum_formulas'])
             : [];
         $sumIncludeTotalsRow = $includeSumTable && !empty($this->exportConfig['include_sum_totals_row']);
+        $sumTableAlign = strtolower((string) ($this->exportConfig['sum_table_align'] ?? 'left'));
         $sumTotalsBold = !array_key_exists('sum_totals_bold', $this->exportConfig ?? []) || !empty($this->exportConfig['sum_totals_bold']);
         $sumTotalsTextColorArgb = $this->mapCssColorToArgb((string) ($this->exportConfig['sum_totals_text_color'] ?? '')) ?: self::HEADER_FILL_COLOR;
         $fieldLabels = [];
@@ -1355,6 +1371,8 @@ class TemporaryModuleExportService
             if ($sumRows !== []) {
                 $sumGroupColorArgb = $this->mapCssColorToArgb((string) ($this->exportConfig['sum_group_color'] ?? '')) ?: 'FF475569';
                 $sumStartRow = 4 + $countTableRows;
+                $sumStartCol = $sumTableAlign === 'left' ? 2 : 1;
+                $sumFirstLetter = Coordinate::stringFromColumnIndex($sumStartCol);
                 $sumTitleRow = $sumStartRow;
                 $sumHeaderRow = $sumStartRow + 1;
                 $sumDataStartRow = $sumStartRow + 2;
@@ -1377,7 +1395,7 @@ class TemporaryModuleExportService
                 }
                 $sumGroupLabel = (string) ($sumData['group_label'] ?? 'Grupo');
                 $sumCols = 1 + count($sumMetricLabels) + count($sumFormulaLabels);
-                $sumLastCol = max(1, $sumCols);
+                $sumLastCol = max($sumStartCol, $sumStartCol + $sumCols - 1);
                 $sumLastLetter = Coordinate::stringFromColumnIndex($sumLastCol);
                 $sumCombinedCols = [];
                 foreach ($sumMetricColumns as $col) {
@@ -1442,18 +1460,18 @@ class TemporaryModuleExportService
                     $sumTitleText = mb_strtoupper($first, 'UTF-8').$rest;
                 }
 
-                $sheet->setCellValue('A'.$sumTitleRow, $sumTitleText.' '.$this->normalizeExportHeading('por '.$sumGroupLabel, $headersUppercase));
-                $sheet->mergeCells('A'.$sumTitleRow.':'.$sumLastLetter.$sumTitleRow);
-                $sheet->getStyle('A'.$sumTitleRow)->getFont()->setBold(true);
+                $sheet->setCellValue($sumFirstLetter.$sumTitleRow, $sumTitleText.' '.$this->normalizeExportHeading('por '.$sumGroupLabel, $headersUppercase));
+                $sheet->mergeCells($sumFirstLetter.$sumTitleRow.':'.$sumLastLetter.$sumTitleRow);
+                $sheet->getStyle($sumFirstLetter.$sumTitleRow)->getFont()->setBold(true);
 
                 if ($hasSumGroupHeaders) {
                     $sumHeaderRow = $sumStartRow + 2;
                     $sumDataStartRow = $sumStartRow + 3;
                     $sumGroupHeaderRow = $sumStartRow + 1;
-                    $sheet->setCellValue('A'.$sumGroupHeaderRow, '');
-                    $sheet->mergeCells('A'.$sumGroupHeaderRow.':A'.$sumHeaderRow);
-                    $colIdx = 2;
-                    $startCol = 2;
+                    $sheet->setCellValue($sumFirstLetter.$sumGroupHeaderRow, '');
+                    $sheet->mergeCells($sumFirstLetter.$sumGroupHeaderRow.':'.$sumFirstLetter.$sumHeaderRow);
+                    $colIdx = $sumStartCol + 1;
+                    $startCol = $sumStartCol + 1;
                     $lastGroup = null;
                     foreach ($sumCombinedCols as $col) {
                         $groupLabel = (string) ($col['group'] ?? '');
@@ -1486,16 +1504,16 @@ class TemporaryModuleExportService
                         $sheet->getStyle(Coordinate::stringFromColumnIndex($startCol).$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($endCol).$sumGroupHeaderRow)
                             ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($groupArgb);
                     }
-                    $sheet->getStyle('A'.$sumGroupHeaderRow)
+                    $sheet->getStyle($sumFirstLetter.$sumGroupHeaderRow)
                         ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($sumGroupColorArgb);
-                    $sheet->getStyle('A'.$sumGroupHeaderRow.':'.$sumLastLetter.$sumGroupHeaderRow)
+                    $sheet->getStyle($sumFirstLetter.$sumGroupHeaderRow.':'.$sumLastLetter.$sumGroupHeaderRow)
                         ->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
-                    $sheet->getStyle('A'.$sumGroupHeaderRow.':'.$sumLastLetter.$sumGroupHeaderRow)
+                    $sheet->getStyle($sumFirstLetter.$sumGroupHeaderRow.':'.$sumLastLetter.$sumGroupHeaderRow)
                         ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
                 }
 
-                $sheet->setCellValue('A'.$sumHeaderRow, $this->normalizeExportHeading($sumGroupLabel, $headersUppercase));
-                $colIdx = 2;
+                $sheet->setCellValue($sumFirstLetter.$sumHeaderRow, $this->normalizeExportHeading($sumGroupLabel, $headersUppercase));
+                $colIdx = $sumStartCol + 1;
                 foreach ($sumCombinedCols as $col) {
                     $sheet->setCellValue(
                         Coordinate::stringFromColumnIndex($colIdx).$sumHeaderRow,
@@ -1506,8 +1524,8 @@ class TemporaryModuleExportService
 
                 $rowPtr = $sumDataStartRow;
                 foreach ($sumRows as $row) {
-                    $sheet->setCellValue('A'.$rowPtr, (string) ($row['group'] ?? ''));
-                    $colIdx = 2;
+                    $sheet->setCellValue($sumFirstLetter.$rowPtr, (string) ($row['group'] ?? ''));
+                    $colIdx = $sumStartCol + 1;
                     foreach ($sumCombinedCols as $col) {
                         $id = (string) ($col['id'] ?? '');
                         if ((string) ($col['op'] ?? 'metric') === 'metric') {
@@ -1528,8 +1546,8 @@ class TemporaryModuleExportService
                 }
 
                 if ($sumIncludeTotalsRow) {
-                    $sheet->setCellValue('A'.$rowPtr, $this->normalizeExportHeading('Total', $headersUppercase));
-                    $colIdx = 2;
+                    $sheet->setCellValue($sumFirstLetter.$rowPtr, $this->normalizeExportHeading('Total', $headersUppercase));
+                    $colIdx = $sumStartCol + 1;
                     foreach ($sumCombinedCols as $col) {
                         $includeTotal = !array_key_exists('include_total', $col) || !empty($col['include_total']);
                         if (!$includeTotal) {
@@ -1558,29 +1576,41 @@ class TemporaryModuleExportService
                         $colIdx++;
                     }
 
-                    $sheet->getStyle('A'.$rowPtr.':'.$sumLastLetter.$rowPtr)
+                    $sheet->getStyle($sumFirstLetter.$rowPtr.':'.$sumLastLetter.$rowPtr)
                         ->getFont()->setBold($sumTotalsBold)->getColor()->setARGB($sumTotalsTextColorArgb);
                     $rowPtr++;
                 }
 
                 $sumLastDataRow = $rowPtr - 1;
-                $sheet->getStyle('A'.$sumHeaderRow.':'.$sumLastLetter.$sumHeaderRow)
+                $sheet->getStyle($sumFirstLetter.$sumHeaderRow.':'.$sumLastLetter.$sumHeaderRow)
                     ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF475569');
-                $sheet->getStyle('A'.$sumHeaderRow)
+                $sheet->getStyle($sumFirstLetter.$sumHeaderRow)
                     ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($sumGroupColorArgb);
-                $sheet->getStyle('A'.$sumHeaderRow.':'.$sumLastLetter.$sumHeaderRow)
+                foreach ($sumCombinedCols as $idx => $col) {
+                    $groupLabel = trim((string) ($col['group'] ?? ''));
+                    if ($groupLabel === '') {
+                        continue;
+                    }
+                    $groupKey = mb_strtolower($groupLabel, 'UTF-8');
+                    $groupArgb = $this->groupHeaderColorByName[$groupKey] ?? 'FF64748B';
+                    $colIndex = $sumStartCol + 1 + $idx;
+                    $letter = Coordinate::stringFromColumnIndex($colIndex);
+                    $sheet->getStyle($letter.$sumHeaderRow)
+                        ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($groupArgb);
+                }
+                $sheet->getStyle($sumFirstLetter.$sumHeaderRow.':'.$sumLastLetter.$sumHeaderRow)
                     ->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
-                $sheet->getStyle('A'.$sumHeaderRow.':'.$sumLastLetter.$sumLastDataRow)
+                $sheet->getStyle($sumFirstLetter.$sumHeaderRow.':'.$sumLastLetter.$sumLastDataRow)
                     ->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-                $sheet->getStyle('A'.$sumHeaderRow.':'.$sumLastLetter.$sumLastDataRow)
+                $sheet->getStyle($sumFirstLetter.$sumHeaderRow.':'.$sumLastLetter.$sumLastDataRow)
                     ->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-                $sheet->getStyle('A'.$sumDataStartRow.':'.$sumLastLetter.$sumLastDataRow)
+                $sheet->getStyle($sumFirstLetter.$sumDataStartRow.':'.$sumLastLetter.$sumLastDataRow)
                     ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('A'.$sumDataStartRow.':A'.$sumLastDataRow)
-                    ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+                $sheet->getStyle($sumFirstLetter.$sumDataStartRow.':'.$sumFirstLetter.$sumLastDataRow)
+                    ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-                $sheet->getColumnDimension('A')->setWidth(max(20, (float) $sheet->getColumnDimension('A')->getWidth()));
-                for ($c = 2; $c <= $sumLastCol; $c++) {
+                $sheet->getColumnDimension($sumFirstLetter)->setWidth(max(20, (float) $sheet->getColumnDimension($sumFirstLetter)->getWidth()));
+                for ($c = $sumStartCol + 1; $c <= $sumLastCol; $c++) {
                     $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth(14);
                 }
 
@@ -1745,10 +1775,10 @@ class TemporaryModuleExportService
                 $argb = $this->groupHeaderColorByName[$groupKey] ?? 'FF64748B';
                 $colIndex = $numFixed + $idx + 1;
                 $letter = Coordinate::stringFromColumnIndex($colIndex);
-                $sheet->getStyle($letter.$groupHeaderRow)->getFill()
+                $sheet->getStyle($letter.$tableHeaderFirstRow.':'.$letter.$tableHeaderLastRow)->getFill()
                     ->setFillType(Fill::FILL_SOLID)
                     ->getStartColor()->setARGB($argb);
-                $sheet->getStyle($letter.$groupHeaderRow)->getFont()->getColor()->setARGB(self::HEADER_FONT_COLOR);
+                $sheet->getStyle($letter.$tableHeaderFirstRow.':'.$letter.$tableHeaderLastRow)->getFont()->getColor()->setARGB(self::HEADER_FONT_COLOR);
             }
         }
 

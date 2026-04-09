@@ -2536,7 +2536,7 @@ class TemporaryModuleController extends Controller
         abort_unless($request->user()->can('Modulos-Temporales-Admin'), 403);
 
         $file = trim($file);
-        abort_unless($file !== '' && preg_match('/\A[A-Za-z0-9_\-]+\.(xlsx|docx|pdf)\z/', $file) === 1, 404);
+        abort_unless($file !== '' && preg_match('/\A[A-Za-z0-9_\-.]+\.(xlsx|docx|pdf)\z/', $file) === 1, 404);
 
         $path = storage_path('app/public/temporary-exports/'.$file);
         abort_unless(is_file($path), 404);

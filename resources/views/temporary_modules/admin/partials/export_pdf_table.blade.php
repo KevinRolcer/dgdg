@@ -133,7 +133,10 @@
             border: 1px solid #000;
             padding: 5px;
             vertical-align: middle;
+            white-space: normal;
             word-wrap: break-word;
+            overflow-wrap: anywhere;
+            word-break: break-word;
             overflow: visible;
             font-size: {{ $cellFontSizePx }}px;
         }
@@ -190,9 +193,6 @@
         .sum-table td {
             text-align: center;
             font-size: 10px;
-        }
-        .sum-table td:first-child {
-            text-align: left;
         }
     </style>
 </head>
@@ -534,7 +534,7 @@
                         $groupKey = mb_strtolower(trim((string) ($gs['label'] ?? '')));
                         $groupBg = $gs['label'] !== '' ? ($groupHeaderColors[$groupKey] ?? '#64748b') : 'transparent';
                     @endphp
-                    <th colspan="{{ $gs['span'] }}" style="background-color: {{ $groupBg }}; color: #fff; border: {{ $gs['label'] !== '' ? '1px solid #000' : 'none' }}; width: {{ $pct }}%;">
+                    <th colspan="{{ $gs['span'] }}" style="background-color: {{ $groupBg }}; color: #fff; border: {{ $gs['label'] !== '' ? '1px solid #000' : 'none' }};">
                         {{ $gs['label'] }}
                     </th>
                 @endforeach
@@ -543,7 +543,11 @@
         <tr>
             @foreach ($colHeaders as $col)
                 @php
-                    $bg    = !empty($col['color']) ? $resolveCss($col['color']) : '#861E34';
+                    $groupLabel = trim((string) ($col['group'] ?? ''));
+                    $groupKey = mb_strtolower($groupLabel);
+                    $bg = $groupLabel !== ''
+                        ? ($groupHeaderColors[$groupKey] ?? '#64748b')
+                        : (!empty($col['color']) ? $resolveCss($col['color']) : '#861E34');
                     $pct   = (float) ($columnWidthPercents[$loop->index] ?? (100 / max(1, $nCols)));
                     $wStyle = 'width: '.$pct.'%;';
                 @endphp
@@ -630,9 +634,7 @@
                                     }
                                 }
                             }
-                            $tdAlign = '';
-                            if ($key === 'municipio') $tdAlign = 'text-align: left;';
-                            if ($key === 'estatus')   $tdAlign = 'text-align: center;';
+                            $tdAlign = 'text-align: center; vertical-align: middle;';
                             $thumbWidth = count($imageSources) > 1 ? 52 : 110;
                             $thumbHeight = count($imageSources) > 1 ? 52 : 85;
                         @endphp

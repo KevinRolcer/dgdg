@@ -54,6 +54,26 @@ class TemporaryModuleAnalysisWordService
         })->values();
     }
 
+    private function buildStandardDocumentName(TemporaryModule $module, string $extension): string
+    {
+        $rawModuleName = trim((string) $module->name);
+        if ($rawModuleName === '') {
+            $rawModuleName = 'Modulo'.$module->id;
+        }
+
+        $cleanModuleName = (string) Str::of(Str::ascii($rawModuleName))
+            ->replaceMatches('/[^A-Za-z0-9]+/', '')
+            ->trim();
+
+        if ($cleanModuleName === '') {
+            $cleanModuleName = 'Modulo'.$module->id;
+        }
+
+        $safeExt = ltrim(strtolower($extension), '.');
+
+        return 'DGDG_'.$cleanModuleName.'.'.now()->format('d.m.Y').'.'.$safeExt;
+    }
+
     /**
      * @param  array<string, mixed>  $config
      * @return array<string, mixed>
@@ -309,8 +329,7 @@ class TemporaryModuleAnalysisWordService
             }
         }
 
-        $baseName = Str::slug((string) $module->name, '_') ?: 'modulo_'.$module->id;
-        $fileName = $baseName.'_analisis_'.now()->format('Ymd_His').'.docx';
+        $fileName = $this->buildStandardDocumentName($module, 'docx');
         $exportDir = storage_path('app/public/temporary-exports');
         if (! is_dir($exportDir)) {
             mkdir($exportDir, 0755, true);

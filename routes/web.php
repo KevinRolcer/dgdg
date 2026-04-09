@@ -151,7 +151,7 @@ Route::middleware('auth')->group(function () {
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.export-status');
             Route::get('/exportaciones/{file}', [TemporaryModuleController::class, 'downloadExport'])
-                ->where('file', '[A-Za-z0-9_\-]+\.(xlsx|docx|pdf)')
+                ->where('file', '[A-Za-z0-9_\-.]+\.(xlsx|docx|pdf)')
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.exports.download');
             Route::get('/{module}/campos', [TemporaryModuleController::class, 'fieldsJson'])

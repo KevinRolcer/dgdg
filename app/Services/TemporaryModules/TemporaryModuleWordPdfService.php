@@ -51,6 +51,26 @@ class TemporaryModuleWordPdfService
         })->values();
     }
 
+    private function buildStandardDocumentName(TemporaryModule $temporaryModule, string $extension): string
+    {
+        $rawModuleName = trim((string) $temporaryModule->name);
+        if ($rawModuleName === '') {
+            $rawModuleName = 'Modulo'.$temporaryModule->id;
+        }
+
+        $cleanModuleName = (string) Str::of(Str::ascii($rawModuleName))
+            ->replaceMatches('/[^A-Za-z0-9]+/', '')
+            ->trim();
+
+        if ($cleanModuleName === '') {
+            $cleanModuleName = 'Modulo'.$temporaryModule->id;
+        }
+
+        $safeExt = ltrim(strtolower($extension), '.');
+
+        return 'DGDG_'.$cleanModuleName.'.'.now()->format('d.m.Y').'.'.$safeExt;
+    }
+
     /**
      * @param string $format 'word' or 'pdf'
      * @param array|null $exportConfig
@@ -174,7 +194,6 @@ class TemporaryModuleWordPdfService
             ->get(['microrregion_id', 'data', 'submitted_at']);
         $entries = $this->sortEntriesByMicrorregion($entries, $microrregionMeta, $sortDirection);
 
-        $baseSlug = Str::slug($fileName, '_') ?: 'modulo_temporal_'.$temporaryModule->id;
         $exportDir = storage_path('app/public/temporary-exports');
         if (!is_dir($exportDir)) {
             mkdir($exportDir, 0755, true);
@@ -184,6 +203,11 @@ class TemporaryModuleWordPdfService
         $headersUppercase = !empty($exportConfig['headers_uppercase']);
         $title = $this->normalizeExportHeading((string) ($exportConfig['title'] ?? $fileName), $titleUppercase);
         $orientationConfig = ($exportConfig['orientation'] ?? 'portrait') === 'landscape' ? 'landscape' : 'portrait';
+        $paperSizeRaw = strtolower(trim((string) ($exportConfig['paper_size'] ?? 'letter')));
+        if ($paperSizeRaw === 'oficio') {
+            $paperSizeRaw = 'legal';
+        }
+        $paperSize = in_array($paperSizeRaw, ['letter', 'legal'], true) ? $paperSizeRaw : 'letter';
         $docMarginPreset = strtolower((string) ($exportConfig['doc_margin_preset'] ?? 'compact'));
         if (!in_array($docMarginPreset, ['normal', 'compact', 'none'], true)) {
             $docMarginPreset = 'compact';
@@ -230,8 +254,12 @@ class TemporaryModuleWordPdfService
 
         $columns = $this->transformExportColumns($columns, $headersUppercase);
 
+        $paperPortraitWidthTwips = 12240;
+        $paperPortraitHeightTwips = $paperSize === 'legal' ? 20160 : 15840;
+        $marginTwips = $docMarginPreset === 'none' ? 0 : ($docMarginPreset === 'normal' ? 1134 : 720);
+        $paperCurrentWidthTwips = $orientationConfig === 'landscape' ? $paperPortraitHeightTwips : $paperPortraitWidthTwips;
+        $usableTableTwips = max(7200, $paperCurrentWidthTwips - ($marginTwips * 2));
         $columnWidthFractions = $this->computeColumnWidthFractions($columns);
-        $usableTableTwips = $orientationConfig === 'landscape' ? 14570 : 9638;
         $columnTwips = $this->distributeTwipsFromFractions($columnWidthFractions, $usableTableTwips);
 
         $includeCountTable = !empty($exportConfig['include_count_table']);
@@ -302,7 +330,7 @@ class TemporaryModuleWordPdfService
         }
 
         if ($format === 'word') {
-            $wordFileName = $baseSlug.'_'.now()->format('Ymd_His').'.docx';
+            $wordFileName = $this->buildStandardDocumentName($temporaryModule, 'docx');
             $fullPath = $exportDir.'/'.$wordFileName;
 
             $phpWord = new \PhpOffice\PhpWord\PhpWord();
@@ -313,10 +341,12 @@ class TemporaryModuleWordPdfService
                 : \PhpOffice\PhpWord\Style\Section::ORIENTATION_PORTRAIT;
             $section = $phpWord->addSection([
                 'orientation' => $orientation,
-                'marginTop' => $docMarginPreset === 'none' ? 0 : ($docMarginPreset === 'normal' ? 1134 : 720),
-                'marginBottom' => $docMarginPreset === 'none' ? 0 : ($docMarginPreset === 'normal' ? 1134 : 720),
-                'marginLeft' => $docMarginPreset === 'none' ? 0 : ($docMarginPreset === 'normal' ? 1134 : 720),
-                'marginRight' => $docMarginPreset === 'none' ? 0 : ($docMarginPreset === 'normal' ? 1134 : 720),
+                'pageSizeW' => $orientationConfig === 'landscape' ? $paperPortraitHeightTwips : $paperPortraitWidthTwips,
+                'pageSizeH' => $orientationConfig === 'landscape' ? $paperPortraitWidthTwips : $paperPortraitHeightTwips,
+                'marginTop' => $marginTwips,
+                'marginBottom' => $marginTwips,
+                'marginLeft' => $marginTwips,
+                'marginRight' => $marginTwips,
             ]);
 
             $jc = match ($titleAlign) {
@@ -463,10 +493,10 @@ class TemporaryModuleWordPdfService
                         $subLabel = $v['label'] !== '' ? $v['label'] : $group['label'];
                         $cellTwips = $resolveCountWidth($key, $subLabel, false);
                         $pctTwips = $resolveCountWidth($key, $subLabel, true);
-                        $countTbl->addCell($cellTwips)->addText((string) $v['count'], ['name' => $exportFontName, 'size' => $cellFontSizePt, 'color' => 'c00000']);
+                        $countTbl->addCell($cellTwips, ['valign' => 'center'])->addText((string) $v['count'], ['name' => $exportFontName, 'size' => $cellFontSizePt, 'color' => 'c00000'], ['alignment' => Jc::CENTER]);
                         if ($includePct) {
                             $pct = $gTotal > 0 ? round(($v['count'] / $gTotal) * 100, 2) : 0;
-                            $countTbl->addCell($pctTwips)->addText($pct . '%', ['name' => $exportFontName, 'size' => $cellFontSizePt, 'color' => 'c00000']);
+                            $countTbl->addCell($pctTwips, ['valign' => 'center'])->addText($pct . '%', ['name' => $exportFontName, 'size' => $cellFontSizePt, 'color' => 'c00000'], ['alignment' => Jc::CENTER]);
                         }
                     }
                 }
@@ -598,13 +628,16 @@ class TemporaryModuleWordPdfService
                 $sumTbl->addCell(2200, ['bgColor' => $sumGroupColorHex, 'valign' => 'center'])
                     ->addText((string) $sumGroupLabel, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                 foreach ($sumCombinedCols as $col) {
-                    $sumTbl->addCell(1600, ['bgColor' => '475569', 'valign' => 'center'])
+                    $sumColGroup = trim((string) ($col['group'] ?? ''));
+                    $sumColGroupKey = mb_strtolower($sumColGroup, 'UTF-8');
+                    $sumColBg = $sumColGroup !== '' ? ($groupHeaderColors[$sumColGroupKey] ?? '64748B') : '475569';
+                    $sumTbl->addCell(1600, ['bgColor' => $sumColBg, 'valign' => 'center'])
                         ->addText((string) ($col['label'] ?? ''), ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                 }
 
                 foreach ($sumRows as $row) {
                     $sumTbl->addRow();
-                    $sumTbl->addCell(2200)->addText((string) ($row['group'] ?? ''), ['name' => $exportFontName, 'size' => $cellFontSizePt]);
+                    $sumTbl->addCell(2200, ['valign' => 'center'])->addText((string) ($row['group'] ?? ''), ['name' => $exportFontName, 'size' => $cellFontSizePt], ['alignment' => Jc::CENTER]);
 
                     foreach ($sumCombinedCols as $col) {
                         $id = (string) ($col['id'] ?? '');
@@ -626,9 +659,10 @@ class TemporaryModuleWordPdfService
                     $sumTotalsBoldCfg = !array_key_exists('totals_bold', $sumTable) || !empty($sumTable['totals_bold']);
                     $sumTotalsTextColorCfg = (string) ($sumTable['totals_text_color'] ?? '861E34');
                     $sumTbl->addRow();
-                    $sumTbl->addCell(2200)->addText(
+                    $sumTbl->addCell(2200, ['valign' => 'center'])->addText(
                         $this->normalizeExportHeading('Total', $headersUppercase),
-                        ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $sumTotalsBoldCfg, 'color' => $sumTotalsTextColorCfg]
+                        ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $sumTotalsBoldCfg, 'color' => $sumTotalsTextColorCfg],
+                        ['alignment' => Jc::CENTER]
                     );
 
                     foreach ($sumCombinedCols as $col) {
@@ -725,7 +759,13 @@ class TemporaryModuleWordPdfService
             $table->addRow();
             foreach ($columns as $idx => $col) {
                 // Determinar color de fondo para encabezados dinámicos
-                $bgIdx = $this->getColumnBgColor($col, $idx);
+                $groupName = trim((string) ($col['group'] ?? ''));
+                if ($groupName !== '') {
+                    $groupKey = mb_strtolower($groupName, 'UTF-8');
+                    $bgIdx = $groupHeaderColors[$groupKey] ?? '64748B';
+                } else {
+                    $bgIdx = $this->getColumnBgColor($col, $idx);
+                }
                 $w = $columnTwips[$idx] ?? null;
                 $table->addCell($w, ['bgColor' => $bgIdx, 'valign' => 'center'])->addText((string) $col['label'], ['name' => $exportFontName, 'bold' => true, 'size' => $headerFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
             }
@@ -756,7 +796,7 @@ class TemporaryModuleWordPdfService
                         $text = (string) $itemNumber;
                         $itemNumber++;
                         $w = $columnTwips[$idx] ?? null;
-                        $table->addCell($w)->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt]);
+                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt], ['alignment' => Jc::CENTER]);
                         continue;
                     }
 
@@ -764,7 +804,7 @@ class TemporaryModuleWordPdfService
                         $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                         $text = (string) ($meta['label'] ?? $meta->label ?? '');
                         $w = $columnTwips[$idx] ?? null;
-                        $table->addCell($w)->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt]);
+                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt], ['alignment' => Jc::CENTER]);
                         continue;
                     }
 
@@ -799,7 +839,7 @@ class TemporaryModuleWordPdfService
                             $text = '';
                         }
                         $w = $columnTwips[$idx] ?? null;
-                        $table->addCell($w)->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt]);
+                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt], ['alignment' => Jc::CENTER]);
                     }
                 }
             }
@@ -813,7 +853,7 @@ class TemporaryModuleWordPdfService
         }
 
         // PDF
-        $pdfFileName = $baseSlug.'_'.now()->format('Ymd_His').'.pdf';
+        $pdfFileName = $this->buildStandardDocumentName($temporaryModule, 'pdf');
         $fullPdfPath = $exportDir.'/'.$pdfFileName;
 
         $fechaCorteStr = now()->format('d/m/Y H:i');
@@ -844,6 +884,7 @@ class TemporaryModuleWordPdfService
             'sectionLabel' => $this->normalizeExportHeading('Desglose', $headersUppercase),
             'fontFamily' => $exportFontName,
             'cellFontSizePx' => $cellFontSizePx,
+            'headerFontSizePx' => $headerFontSizePx,
             'titleFontSizePx' => $titleFontSizePx,
             'logoDataUri' => $this->buildLogoDataUri($logoPath),
             'fechaCorteStr' => $fechaCorteStr,
@@ -865,12 +906,12 @@ class TemporaryModuleWordPdfService
         ])->render();
 
         $dompdf = new Dompdf([
-            'defaultPaperSize' => 'A4',
+            'defaultPaperSize' => $paperSize,
             'isRemoteEnabled' => true,
             'defaultFont' => strtolower($exportFontName) === 'gilroy' ? 'gilroy' : 'Arial',
         ]);
         $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4', $orientationConfig === 'landscape' ? 'landscape' : 'portrait');
+        $dompdf->setPaper($paperSize, $orientationConfig === 'landscape' ? 'landscape' : 'portrait');
         $dompdf->render();
         file_put_contents($fullPdfPath, $dompdf->output());
 

@@ -697,6 +697,13 @@
                                     <button type="button" class="tm-export-zoom-reset" title="100%" aria-label="Zoom 100%"><span id="tmExportZoomValue">100</span>%</button>
                                     <button type="button" class="tm-export-zoom-btn" data-zoom-in title="Acercar" aria-label="Acercar">+</button>
                                 </div>
+                                <label class="tm-export-paper-size" for="tmExportPaperSize" title="Tipo de hoja para PDF y Word">
+                                    Hoja
+                                    <select id="tmExportPaperSize" class="tm-input tm-export-paper-size-select" aria-label="Tipo de hoja">
+                                        <option value="letter">Carta</option>
+                                        <option value="legal">Oficio</option>
+                                    </select>
+                                </label>
                                 <div class="tm-export-orient-group" role="group" aria-label="Orientación de la hoja">
                                     <button type="button" class="tm-export-orient-btn is-active" data-orientation="portrait">Vertical</button>
                                     <button type="button" class="tm-export-orient-btn" data-orientation="landscape">Horizontal</button>
@@ -2028,10 +2035,9 @@
                     var orientation = orientBtn.getAttribute('data-orientation') || 'portrait';
                     personalizeModal.querySelectorAll('.tm-export-orient-btn').forEach(function (b) { b.classList.remove('is-active'); });
                     orientBtn.classList.add('is-active');
-                    var page = document.getElementById('tmExportPreviewPage');
-                    if (page) {
-                        page.classList.toggle('is-landscape', orientation === 'landscape');
-                    }
+                    var paperSizeToolbarEl = document.getElementById('tmExportPaperSize');
+                    var paperSizeToolbar = (paperSizeToolbarEl && paperSizeToolbarEl.value) ? paperSizeToolbarEl.value : 'letter';
+                    applyExportPreviewPageLayout(orientation, paperSizeToolbar);
                 }
             });
         }
@@ -2887,7 +2893,10 @@
             html += '<tr class="tm-export-preview-row tm-export-preview-header">';
             html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(firstColColor) + ';color:#fff;">' + escapeHtml(normalizeExportHeadingText(sumData.groupLabel, !!headersUppercase)) + '</th>';
             sumColumns.forEach(function (c) {
-                var cColor = (c.source && c.source.text_color) ? String(c.source.text_color) : '#0f172a';
+                var cGroup = String(c.group || '').trim();
+                var cColor = cGroup !== ''
+                    ? (groupColorMap[cGroup] || '#64748b')
+                    : ((c.source && c.source.text_color) ? String(c.source.text_color) : '#0f172a');
                 var cSize = parseInt(String((c.source && c.source.font_size) || '12'), 10);
                 cSize = Number.isNaN(cSize) ? 12 : Math.max(9, Math.min(28, cSize));
                 html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(cColor) + ';color:#fff;font-size:' + cSize + 'px;">' + escapeHtml(normalizeExportHeadingText(c.label || c.id, !!headersUppercase)) + '</th>';
@@ -2937,11 +2946,21 @@
             return html;
         }
 
+        function applyExportPreviewPageLayout(orientation, paperSize) {
+            var previewPage = document.getElementById('tmExportPreviewPage');
+            if (!previewPage) { return; }
+            var orient = orientation === 'landscape' ? 'landscape' : 'portrait';
+            var paper = paperSize === 'legal' ? 'legal' : 'letter';
+            previewPage.classList.toggle('is-landscape', orient === 'landscape');
+            previewPage.classList.toggle('is-legal', paper === 'legal');
+            previewPage.classList.toggle('is-letter', paper !== 'legal');
+        }
+
         function getPersonalizeState() {
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', sumMetrics: [], sumFormulas: [] };
+                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', sumMetrics: [], sumFormulas: [] };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
             const titleUppercaseEl = modal ? modal.querySelector('#tmExportTitleUppercase') : document.getElementById('tmExportTitleUppercase');
@@ -2951,6 +2970,7 @@
             const headerFontEl = modal ? modal.querySelector('#tmExportHeaderFontSize') : document.getElementById('tmExportHeaderFontSize');
             const microrregionSortEl = modal ? modal.querySelector('#tmExportMicrorregionSort') : document.getElementById('tmExportMicrorregionSort');
             const docMarginPresetEl = modal ? modal.querySelector('#tmExportDocMarginPreset') : document.getElementById('tmExportDocMarginPreset');
+            const paperSizeEl = modal ? modal.querySelector('#tmExportPaperSize') : document.getElementById('tmExportPaperSize');
             const alignBtn = modal ? modal.querySelector('#tmExportTitleAlignGroup .tm-export-align-btn.is-active') : null;
             const titleAlign = (alignBtn && alignBtn.getAttribute('data-title-align')) || 'center';
             const countTableAlignBtn = modal ? modal.querySelector('#tmExportCountAlignGroup .tm-export-align-btn.is-active') : null;
@@ -3058,6 +3078,7 @@
                 titleFontPx: titleFontPx,
                 headerFontPx: headerFontPx,
                 docMarginPreset: (docMarginPresetEl && ['normal', 'compact', 'none'].indexOf(docMarginPresetEl.value) !== -1) ? docMarginPresetEl.value : 'compact',
+                paperSize: (paperSizeEl && ['letter', 'legal'].indexOf(String(paperSizeEl.value || '').toLowerCase()) !== -1) ? String(paperSizeEl.value).toLowerCase() : 'letter',
                 groups: groups,
                 microrregionSort: (microrregionSortEl && microrregionSortEl.value === 'desc') ? 'desc' : 'asc',
                 includeSumTable: !!(includeSumTableEl && includeSumTableEl.checked),
@@ -3175,7 +3196,9 @@
             var effectiveDataTableAlign = forceFullWidthDataTable ? 'left' : dataTableAlign;
             var dataTableMargin = effectiveDataTableAlign === 'center' ? 'margin: 1.5rem auto;' : effectiveDataTableAlign === 'right' ? 'margin: 1.5rem 0 1.5rem auto;' : 'margin: 1.5rem auto 1.5rem 0;';
             var dataTableStyle = (forceFullWidthDataTable || effectiveDataTableAlign === 'left') ? 'width:100%;' : 'width:auto;display:table;';
-            var previewPadding = docMarginPreset === 'none' ? '0' : (docMarginPreset === 'normal' ? '18px' : '10px');
+            var previewPadding = docMarginPreset === 'none'
+                ? '0mm'
+                : (docMarginPreset === 'normal' ? '15mm 15mm 15mm 15mm' : '12mm 12mm 10mm 12mm');
             previewEl.style.padding = previewPadding;
 
             var getDataColWidthStyle = function (col) {
@@ -4167,8 +4190,12 @@
                         personalizeModal.querySelectorAll('.tm-export-orient-btn').forEach(function (b) {
                             b.classList.toggle('is-active', (b.getAttribute('data-orientation') || '') === dOrient);
                         });
-                        var previewPage = document.getElementById('tmExportPreviewPage');
-                        if (previewPage) { previewPage.classList.toggle('is-landscape', dOrient === 'landscape'); }
+                        var paperSizeElDraft = document.getElementById('tmExportPaperSize');
+                        var draftPaper = String(draftCfg.paper_size || 'letter').toLowerCase();
+                        if (paperSizeElDraft) {
+                            paperSizeElDraft.value = draftPaper === 'legal' ? 'legal' : 'letter';
+                        }
+                        applyExportPreviewPageLayout(dOrient, draftPaper);
                         if (includeCountTableEl) {
                             includeCountTableEl.checked = !!draftCfg.include_count_table;
                             if (countByWrapEl) { countByWrapEl.hidden = !includeCountTableEl.checked; }
@@ -4245,6 +4272,8 @@
                         if (titleUppercaseEl) { titleUppercaseEl.checked = false; }
                         if (headersUppercaseEl) { headersUppercaseEl.checked = false; }
                         if (docMarginPresetEl) { docMarginPresetEl.value = 'compact'; }
+                        var paperSizeElDefault = document.getElementById('tmExportPaperSize');
+                        if (paperSizeElDefault) { paperSizeElDefault.value = 'letter'; }
                         personalizeModal.querySelectorAll('#tmExportSumAlignGroup .tm-export-align-btn').forEach(function (b) {
                             b.classList.toggle('is-active', (b.getAttribute('data-sum-table-align') || '') === 'left');
                         });
@@ -4261,6 +4290,7 @@
                         if (sumIncludeTotalsRowEl) { sumIncludeTotalsRowEl.checked = false; }
                         if (sumTotalsBoldEl) { sumTotalsBoldEl.checked = true; }
                         setSumTotalsColor('var(--clr-primary)');
+                        applyExportPreviewPageLayout('portrait', 'letter');
                         var mrSortDefaultEl = document.getElementById('tmExportMicrorregionSort');
                         if (mrSortDefaultEl) { mrSortDefaultEl.value = data.microrregion_sort || 'asc'; }
                         buildPersonalizeColumnsList(columns, columnsEl);
@@ -4287,8 +4317,9 @@
                                     group.querySelectorAll('.tm-export-orient-btn').forEach(function (b) { b.classList.remove('is-active'); });
                                     orientBtn.classList.add('is-active');
                                     var orient = orientBtn.getAttribute('data-orientation') || 'portrait';
-                                    var previewPage = document.getElementById('tmExportPreviewPage');
-                                    if (previewPage) { previewPage.classList.toggle('is-landscape', orient === 'landscape'); }
+                                    var paperSizeCurrentEl = document.getElementById('tmExportPaperSize');
+                                    var paperCurrent = (paperSizeCurrentEl && paperSizeCurrentEl.value) ? paperSizeCurrentEl.value : 'letter';
+                                    applyExportPreviewPageLayout(orient, paperCurrent);
                                     buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
                                 }
                             }
@@ -4399,6 +4430,15 @@
                     if (docMarginPresetEl) {
                         docMarginPresetEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
+                    var paperSizeEl = document.getElementById('tmExportPaperSize');
+                    if (paperSizeEl) {
+                        paperSizeEl.addEventListener('change', function () {
+                            var orientBtn = personalizeModal.querySelector('.tm-export-orient-btn.is-active');
+                            var orient = orientBtn ? (orientBtn.getAttribute('data-orientation') || 'portrait') : 'portrait';
+                            applyExportPreviewPageLayout(orient, paperSizeEl.value || 'letter');
+                            buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                        });
+                    }
 
                     if (restoreBtn && restoreWrap) {
                         restoreBtn.onclick = function () {
@@ -4431,6 +4471,7 @@
                             title_font_size_px: state.titleFontPx || 18,
                             doc_margin_preset: state.docMarginPreset || 'compact',
                             orientation: orientation,
+                            paper_size: state.paperSize || 'letter',
                             count_table_align: state.countTableAlign || 'left',
                             table_align: state.dataTableAlign || 'left',
                             sum_table_align: state.sumTableAlign || 'left',

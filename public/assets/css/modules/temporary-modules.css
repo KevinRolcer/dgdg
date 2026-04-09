@@ -4723,6 +4723,22 @@ html.theme-dark .tm-analysis-word-personalize-modal .tm-analysis-sidebar-title--
     gap: 8px;
 }
 
+.tm-export-paper-size {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: var(--clr-text-main);
+    font-weight: 600;
+}
+
+.tm-export-paper-size-select {
+    height: 28px;
+    min-width: 92px;
+    padding: 2px 8px;
+    font-size: 0.78rem;
+}
+
 .tm-export-zoom-btns {
     display: flex;
     align-items: center;
@@ -4772,20 +4788,30 @@ html.theme-dark .tm-analysis-word-personalize-modal .tm-analysis-sidebar-title--
 }
 
 .tm-export-preview-page {
-    width: 210mm;
-    min-height: 297mm;
+    width: 215.9mm;
+    min-height: 279.4mm;
     margin: 0 auto;
     position: relative;
     overflow: visible;
     background: #fff;
-    border: 2px dotted #c00;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    border: 1px solid #d1d5db;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
     box-sizing: border-box;
 }
 
 .tm-export-preview-page.is-landscape {
-    width: 297mm;
-    min-height: 210mm;
+    width: 279.4mm;
+    min-height: 215.9mm;
+}
+
+.tm-export-preview-page.is-legal {
+    width: 215.9mm;
+    min-height: 355.6mm;
+}
+
+.tm-export-preview-page.is-legal.is-landscape {
+    width: 355.6mm;
+    min-height: 215.9mm;
 }
 
 .tm-export-preview-zoom-wrap {
@@ -4796,8 +4822,9 @@ html.theme-dark .tm-analysis-word-personalize-modal .tm-analysis-sidebar-title--
 .tm-export-personalize-preview {
     min-width: min-content;
     width: 100%;
-    padding: 10px;
-    background: var(--clr-bg);
+    min-height: 100%;
+    padding: 12mm 12mm 10mm 12mm;
+    background: #fff;
     border-radius: 4px;
     box-sizing: border-box;
 }
