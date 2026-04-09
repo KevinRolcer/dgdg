@@ -4642,15 +4642,23 @@ html.theme-dark .tm-analysis-word-personalize-modal .tm-analysis-sidebar-title--
     background: rgba(134, 30, 52, 0.04);
 }
 
-.tm-export-drag-handle {
-    cursor: grab;
-    color: var(--clr-text-light);
-    font-size: 1.1rem;
-    user-select: none;
+.tm-export-col-move-inline {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
 }
 
-.tm-export-personalize-col:active .tm-export-drag-handle {
-    cursor: grabbing;
+.tm-export-col-move-btn {
+    width: 24px;
+    min-width: 24px;
+    height: 22px;
+    min-height: 22px;
+    padding: 0;
+    line-height: 1;
+    border-radius: 6px;
+    font-size: 0.8rem;
 }
 
 .tm-export-col-label {

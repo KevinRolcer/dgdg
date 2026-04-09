@@ -2153,7 +2153,7 @@
                 item.dataset.fillEmptyValue = String(col.fill_empty_value != null ? col.fill_empty_value : (col.fillEmptyValue || ''));
                 item.dataset.contentBold = (col.content_bold || col.contentBold) ? '1' : '0';
                 item.dataset.headerColor = String(col.color || TEMPLATE_COLORS[0].value);
-                item.draggable = true;
+                item.draggable = false;
 
                 var groupSelect = '<select class="tm-input tm-export-col-group-select" data-key="' + escapeHtml(col.key) + '">' +
                     '<option value="">Sin grupo</option>' +
@@ -2196,7 +2196,10 @@
                 }
                 var currentLabel = (col.label != null && String(col.label).trim() !== '') ? String(col.label) : String(col.key || '');
                 item.innerHTML =
-                    '<span class="tm-export-drag-handle" aria-hidden="true" title="Arrastrar para reordenar">&#9776;</span>' +
+                    '<span class="tm-export-col-move-inline">'
+                    + '<button type="button" class="tm-btn tm-btn-outline tm-export-col-move-btn" data-move-col-up title="Subir columna">&#8593;</button>'
+                    + '<button type="button" class="tm-btn tm-btn-outline tm-export-col-move-btn" data-move-col-down title="Bajar columna">&#8595;</button>'
+                    + '</span>' +
                     '<div class="tm-export-col-main">' +
                         '<div class="tm-export-col-row tm-export-col-row--primary">' +
                         '<label class="tm-export-col-field tm-export-col-field--grow">' +
@@ -5414,6 +5417,36 @@
                         tmExportShowColumnCtxMenu(e.clientX, e.clientY, row);
                     });
                     columnsEl.addEventListener('click', function (e) {
+                        const upBtn = e.target.closest('[data-move-col-up]');
+                        if (upBtn) {
+                            const row = upBtn.closest('.tm-export-personalize-col');
+                            if (!row) { return; }
+                            var prev = row.previousElementSibling;
+                            while (prev && (!prev.classList || !prev.classList.contains('tm-export-personalize-col'))) {
+                                prev = prev.previousElementSibling;
+                            }
+                            if (prev) {
+                                columnsEl.insertBefore(row, prev);
+                                buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                            }
+                            return;
+                        }
+
+                        const downBtn = e.target.closest('[data-move-col-down]');
+                        if (downBtn) {
+                            const row = downBtn.closest('.tm-export-personalize-col');
+                            if (!row) { return; }
+                            var next = row.nextElementSibling;
+                            while (next && (!next.classList || !next.classList.contains('tm-export-personalize-col'))) {
+                                next = next.nextElementSibling;
+                            }
+                            if (next) {
+                                columnsEl.insertBefore(next, row);
+                                buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                            }
+                            return;
+                        }
+
                         const omitBtn = e.target.closest('.tm-export-omit-btn');
                         if (omitBtn) {
                             const row = omitBtn.closest('.tm-export-personalize-col');
