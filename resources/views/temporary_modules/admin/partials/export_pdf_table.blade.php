@@ -104,7 +104,7 @@
     $sumTableCellFontSizePx = max(9, min(24, (int) ($sumTableCellFontSizePx ?? $recordsCellFontSizePx)));
     $sumTableHeaderFontSizePx = max(9, min(28, (int) ($sumTableHeaderFontSizePx ?? $recordsHeaderFontSizePx)));
     $totalsTableCellFontSizePx = max(9, min(24, (int) ($totalsTableCellFontSizePx ?? $sumTableCellFontSizePx)));
-    $totalsTableHeaderFontSizePx = max(9, min(28, (int) ($totalsTableHeaderFontSizePx ?? $sumTableHeaderFontSizePx)));
+    $totalsTableHeaderFontSizePx = max(9, min(48, (int) ($totalsTableHeaderFontSizePx ?? $sumTableHeaderFontSizePx)));
     $titleFontSizePx = max(10, min(36, (int) ($titleFontSizePx ?? 18)));
     $varsCss = ['var(--clr-primary)' => '#861E34', 'var(--clr-secondary)' => '#2d5a27', 'var(--clr-accent)' => '#c9a227'];
     $resolveCss = function ($css) use ($varsCss) {

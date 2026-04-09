@@ -384,8 +384,8 @@ class TemporaryModuleWordPdfService
         $sumHeaderFontSizePt = max(7, min(21, (int) round($sumHeaderFontSizePx * 0.75)));
         $totalsTableCellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['totals_table_cell_font_size_px'] ?? $sumTableCellFontSizePx);
         $totalsTableCellFontSizePt = $this->cellPxToWordPt($totalsTableCellFontSizePx);
-        $totalsHeaderFontSizePx = max(9, min(28, (int) ($exportConfig['totals_table_header_font_size_px'] ?? $sumHeaderFontSizePx)));
-        $totalsHeaderFontSizePt = max(7, min(21, (int) round($totalsHeaderFontSizePx * 0.75)));
+        $totalsHeaderFontSizePx = max(9, min(48, (int) ($exportConfig['totals_table_header_font_size_px'] ?? $sumHeaderFontSizePx)));
+        $totalsHeaderFontSizePt = max(7, min(36, (int) round($totalsHeaderFontSizePx * 0.75)));
         $titleFontSizePx = max(10, min(36, (int) ($exportConfig['title_font_size_px'] ?? 18)));
         $titleFontSizePt = max(8, min(27, (int) round($titleFontSizePx * 0.75)));
         $exportFontName = $this->resolveExportFontName();

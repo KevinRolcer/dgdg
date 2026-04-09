@@ -454,7 +454,7 @@
                         </div>
                         <div class="tm-export-personalize-field">
                             <label for="tmExportTotalsHeaderFontSize" title="Tamaño de letra de encabezados de la tabla independiente de totales">Totales: encabezados (px)</label>
-                            <input type="number" id="tmExportTotalsHeaderFontSize" class="tm-input tm-input--num-compact" min="9" max="28" value="12">
+                            <input type="number" id="tmExportTotalsHeaderFontSize" class="tm-input tm-input--num-compact" min="9" max="48" value="12">
                         </div>
                     </div>
                     <div class="tm-export-personalize-field-row tm-export-title-row-group" style="margin-top:8px;">
@@ -3110,7 +3110,7 @@
             var titleFont = parseInt(String(totalsTableTitleFontSize || '14'), 10);
             titleFont = Number.isNaN(titleFont) ? 14 : Math.max(10, Math.min(36, titleFont));
             var headerFont = parseInt(String(totalsHeaderFontPx || '12'), 10);
-            headerFont = Number.isNaN(headerFont) ? 12 : Math.max(9, Math.min(28, headerFont));
+            headerFont = Number.isNaN(headerFont) ? 12 : Math.max(9, Math.min(48, headerFont));
             var cellFont = parseInt(String(totalsCellFontPx || '12'), 10);
             cellFont = Number.isNaN(cellFont) ? 12 : Math.max(9, Math.min(24, cellFont));
             var hasGroups = sumColumns.some(function (c) { return String(c.group || '').trim() !== ''; });
@@ -3361,7 +3361,7 @@
             const sumCellFontPx = sumCellFontEl && sumCellFontEl.value ? Math.max(9, Math.min(24, parseInt(sumCellFontEl.value, 10) || 12)) : 12;
             const sumHeaderFontPx = sumHeaderFontEl && sumHeaderFontEl.value ? Math.max(9, Math.min(28, parseInt(sumHeaderFontEl.value, 10) || 12)) : 12;
             const totalsCellFontPx = totalsCellFontEl && totalsCellFontEl.value ? Math.max(9, Math.min(24, parseInt(totalsCellFontEl.value, 10) || 12)) : 12;
-            const totalsHeaderFontPx = totalsHeaderFontEl && totalsHeaderFontEl.value ? Math.max(9, Math.min(28, parseInt(totalsHeaderFontEl.value, 10) || 12)) : 12;
+            const totalsHeaderFontPx = totalsHeaderFontEl && totalsHeaderFontEl.value ? Math.max(9, Math.min(48, parseInt(totalsHeaderFontEl.value, 10) || 12)) : 12;
             const items = Array.from(container.children).filter(function (el) {
                 return el.classList && el.classList.contains('tm-export-personalize-col');
             });
@@ -5044,7 +5044,7 @@
                         }
                         if (totalsHeaderFontEl && draftCfg.totals_table_header_font_size_px != null) {
                             var thf = parseInt(draftCfg.totals_table_header_font_size_px, 10);
-                            if (!Number.isNaN(thf)) { totalsHeaderFontEl.value = String(Math.max(9, Math.min(28, thf))); }
+                            if (!Number.isNaN(thf)) { totalsHeaderFontEl.value = String(Math.max(9, Math.min(48, thf))); }
                         }
                         personalizeModal.querySelectorAll('#tmExportTotalsTableAlignGroup .tm-export-align-btn').forEach(function (b) {
                             var current = String(draftCfg.totals_table_align || 'left');
