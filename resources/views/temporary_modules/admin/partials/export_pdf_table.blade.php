@@ -101,10 +101,13 @@
     };
     $recordsCellFontSizePx = max(9, min(24, (int) ($cellFontSizePx ?? 12)));
     $recordsHeaderFontSizePx = isset($headerFontSizePx) ? max(9, min(28, (int) $headerFontSizePx)) : 12;
+    $recordsGroupHeaderFontSizePx = max(9, min(48, (int) ($recordsGroupHeaderFontSizePx ?? $recordsHeaderFontSizePx)));
     $sumTableCellFontSizePx = max(9, min(24, (int) ($sumTableCellFontSizePx ?? $recordsCellFontSizePx)));
     $sumTableHeaderFontSizePx = max(9, min(28, (int) ($sumTableHeaderFontSizePx ?? $recordsHeaderFontSizePx)));
+    $sumGroupHeaderFontSizePx = max(9, min(48, (int) ($sumGroupHeaderFontSizePx ?? $sumTableHeaderFontSizePx)));
     $totalsTableCellFontSizePx = max(9, min(24, (int) ($totalsTableCellFontSizePx ?? $sumTableCellFontSizePx)));
     $totalsTableHeaderFontSizePx = max(9, min(48, (int) ($totalsTableHeaderFontSizePx ?? $sumTableHeaderFontSizePx)));
+    $totalsGroupHeaderFontSizePx = max(9, min(48, (int) ($totalsGroupHeaderFontSizePx ?? $totalsTableHeaderFontSizePx)));
     $titleFontSizePx = max(10, min(36, (int) ($titleFontSizePx ?? 18)));
     $varsCss = ['var(--clr-primary)' => '#861E34', 'var(--clr-secondary)' => '#2d5a27', 'var(--clr-accent)' => '#c9a227'];
     $resolveCss = function ($css) use ($varsCss) {
@@ -284,7 +287,7 @@
             background: #475569;
             color: #fff;
             text-align: center;
-            font-size: var(--sum-header-fs, 9px);
+            font-size: var(--sum-header-fs, 9px) !important;
             padding: var(--sum-cell-pad, 4px);
             line-height: 1.08;
         }
@@ -367,7 +370,7 @@
                         $tGroupKey = mb_strtolower(trim((string) ($gs['label'] ?? '')));
                         $tGroupBg = $gs['label'] !== '' ? (($groupHeaderColors[$tGroupKey] ?? '#64748b')) : '#334155';
                     @endphp
-                    <th colspan="{{ $gs['span'] }}" style="background:{{ $tGroupBg }};color:#fff;">{{ $gs['label'] }}</th>
+                    <th colspan="{{ $gs['span'] }}" style="background:{{ $tGroupBg }};color:#fff;font-size:{{ $totalsGroupHeaderFontSizePx }}px !important;">{{ $gs['label'] }}</th>
                 @endforeach
             </tr>
         @endif
@@ -676,7 +679,7 @@
                 $sumGroupKey = mb_strtolower(trim((string) ($gs['label'] ?? '')));
                 $sumGroupBg = $gs['label'] !== '' ? ($sumGroupHeaderColors[$sumGroupKey] ?? '#64748b') : '#334155';
             @endphp
-            <th colspan="{{ $gs['span'] }}" style="background:{{ $sumGroupBg }};color:#fff;">{{ $gs['label'] }}</th>
+            <th colspan="{{ $gs['span'] }}" style="background:{{ $sumGroupBg }};color:#fff;font-size:{{ $sumGroupHeaderFontSizePx }}px !important;">{{ $gs['label'] }}</th>
         @endforeach
     </tr>
     @endif
@@ -842,7 +845,7 @@
                         $groupKey = mb_strtolower(trim((string) ($gs['label'] ?? '')));
                         $groupBg = $gs['label'] !== '' ? ($groupHeaderColors[$groupKey] ?? '#64748b') : 'transparent';
                     @endphp
-                    <th colspan="{{ $gs['span'] }}" style="background-color: {{ $groupBg }}; color: #fff; border: {{ $gs['label'] !== '' ? '1px solid #000' : 'none' }};">
+                    <th colspan="{{ $gs['span'] }}" style="background-color: {{ $groupBg }}; color: #fff; border: {{ $gs['label'] !== '' ? '1px solid #000' : 'none' }}; font-size: {{ $recordsGroupHeaderFontSizePx }}px !important;">
                         {!! nl2br(e((string) ($gs['label'] ?? ''))) !!}
                     </th>
                 @endforeach

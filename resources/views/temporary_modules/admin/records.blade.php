@@ -457,6 +457,20 @@
                             <input type="number" id="tmExportTotalsHeaderFontSize" class="tm-input tm-input--num-compact" min="9" max="48" value="12">
                         </div>
                     </div>
+                    <div class="tm-export-field-row tm-export-field-row--fonts">
+                        <div class="tm-export-personalize-field">
+                            <label for="tmExportRecordsGroupHeaderFontSize" title="Tamaño de letra de títulos de grupo en la tabla de registros">Registros: grupos (px)</label>
+                            <input type="number" id="tmExportRecordsGroupHeaderFontSize" class="tm-input tm-input--num-compact" min="9" max="48" value="12">
+                        </div>
+                        <div class="tm-export-personalize-field">
+                            <label for="tmExportSumGroupHeaderFontSize" title="Tamaño de letra de títulos de grupo en la tabla de sumatoria">Sumatoria: grupos (px)</label>
+                            <input type="number" id="tmExportSumGroupHeaderFontSize" class="tm-input tm-input--num-compact" min="9" max="48" value="12">
+                        </div>
+                        <div class="tm-export-personalize-field">
+                            <label for="tmExportTotalsGroupHeaderFontSize" title="Tamaño de letra de títulos de grupo en la tabla de totales">Totales: grupos (px)</label>
+                            <input type="number" id="tmExportTotalsGroupHeaderFontSize" class="tm-input tm-input--num-compact" min="9" max="48" value="12">
+                        </div>
+                    </div>
                     <div class="tm-export-personalize-field-row tm-export-title-row-group" style="margin-top:8px;">
                         <div class="tm-export-personalize-field tm-export-field-title-input">
                             <label for="tmExportSumTitle">Título de sumatoria</label>
@@ -3098,7 +3112,7 @@
             return columns;
         }
 
-        function tmExportRenderTotalsStandalonePreviewTable(sumData, headersUppercase, totalsTableAlign, totalsTableTitle, totalsTableTitleAlign, totalsTableTitleFontSize, totalsHeaderFontPx, totalsCellFontPx, sumTotalsBold, sumTotalsTextColor, groups) {
+        function tmExportRenderTotalsStandalonePreviewTable(sumData, headersUppercase, totalsTableAlign, totalsTableTitle, totalsTableTitleAlign, totalsTableTitleFontSize, totalsHeaderFontPx, totalsGroupHeaderFontPx, totalsCellFontPx, sumTotalsBold, sumTotalsTextColor, groups) {
             if (!sumData || !Array.isArray(sumData.groups) || sumData.groups.length === 0) { return ''; }
             var sumColumns = tmExportBuildOrderedSumColumns(sumData);
             if (!sumColumns.length) { return ''; }
@@ -3111,6 +3125,8 @@
             titleFont = Number.isNaN(titleFont) ? 14 : Math.max(10, Math.min(36, titleFont));
             var headerFont = parseInt(String(totalsHeaderFontPx || '12'), 10);
             headerFont = Number.isNaN(headerFont) ? 12 : Math.max(9, Math.min(48, headerFont));
+            var groupHeaderFont = parseInt(String(totalsGroupHeaderFontPx || headerFont || '12'), 10);
+            groupHeaderFont = Number.isNaN(groupHeaderFont) ? headerFont : Math.max(9, Math.min(48, groupHeaderFont));
             var cellFont = parseInt(String(totalsCellFontPx || '12'), 10);
             cellFont = Number.isNaN(cellFont) ? 12 : Math.max(9, Math.min(24, cellFont));
             var hasGroups = sumColumns.some(function (c) { return String(c.group || '').trim() !== ''; });
@@ -3135,10 +3151,10 @@
                 html += '<th class="tm-export-preview-cell" style="background:#475569;color:#fff;border:1px solid #334155;"></th>';
                 spans.forEach(function (s) {
                     if (String(s.label || '').trim() === '') {
-                        html += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:#f8fafc;border:1px solid #e2e8f0;"></th>';
+                        html += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:#f8fafc;border:1px solid #e2e8f0;font-size:' + groupHeaderFont + 'px;"></th>';
                     } else {
                         var gColor = groupColorMap[s.label] || '#64748b';
-                        html += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:' + escapeHtml(gColor) + ';color:#fff;border:1px solid #1e293b;">' + escapeHtml(normalizeExportHeadingText(s.label, !!headersUppercase)) + '</th>';
+                        html += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:' + escapeHtml(gColor) + ';color:#fff;border:1px solid #1e293b;font-size:' + groupHeaderFont + 'px;">' + escapeHtml(normalizeExportHeadingText(s.label, !!headersUppercase)) + '</th>';
                     }
                 });
                 html += '</tr>';
@@ -3182,7 +3198,7 @@
             return html;
         }
 
-        function tmExportRenderSumPreviewTable(sumData, headersUppercase, sumTableAlign, sumTitle, sumTitleCase, sumTitleAlign, sumTitleFontSize, sumHeaderFontPx, sumCellFontPx, sumGroupColor, sumIncludeTotalsRow, sumTotalsBold, sumTotalsTextColor, groups) {
+        function tmExportRenderSumPreviewTable(sumData, headersUppercase, sumTableAlign, sumTitle, sumTitleCase, sumTitleAlign, sumTitleFontSize, sumHeaderFontPx, sumGroupHeaderFontPx, sumCellFontPx, sumGroupColor, sumIncludeTotalsRow, sumTotalsBold, sumTotalsTextColor, groups) {
             if (!sumData || !Array.isArray(sumData.groups) || sumData.groups.length === 0) { return ''; }
             var rawTitle = String(sumTitle || '').trim() !== '' ? String(sumTitle) : 'Sumatoria';
             var title = normalizeExportHeadingText(rawTitle, !!headersUppercase);
@@ -3214,6 +3230,8 @@
             titleFont = Number.isNaN(titleFont) ? 14 : Math.max(10, Math.min(36, titleFont));
             var sumHeaderFont = parseInt(String(sumHeaderFontPx || '12'), 10);
             sumHeaderFont = Number.isNaN(sumHeaderFont) ? 12 : Math.max(9, Math.min(28, sumHeaderFont));
+            var sumGroupHeaderFont = parseInt(String(sumGroupHeaderFontPx || sumHeaderFont || '12'), 10);
+            sumGroupHeaderFont = Number.isNaN(sumGroupHeaderFont) ? sumHeaderFont : Math.max(9, Math.min(48, sumGroupHeaderFont));
             var sumCellFont = parseInt(String(sumCellFontPx || '12'), 10);
             sumCellFont = Number.isNaN(sumCellFont) ? 12 : Math.max(9, Math.min(24, sumCellFont));
             var firstColColor = String(sumGroupColor || 'var(--clr-primary)');
@@ -3224,10 +3242,10 @@
                 html += '<th class="tm-export-preview-cell" style="background:' + escapeHtml(firstColColor) + ';color:#fff;border:1px solid #334155;"></th>';
                 spans.forEach(function (s) {
                     if (s.label.trim() === '') {
-                        html += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:#f8fafc;border:1px solid #e2e8f0;"></th>';
+                        html += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:#f8fafc;border:1px solid #e2e8f0;font-size:' + sumGroupHeaderFont + 'px;"></th>';
                     } else {
                         var sumGroupHeaderColor = groupColorMap[s.label] || '#64748b';
-                        html += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:' + escapeHtml(sumGroupHeaderColor) + ';color:#fff;border:1px solid #1e293b;">' + escapeHtml(normalizeExportHeadingText(s.label, headersUppercase)) + '</th>';
+                        html += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:' + escapeHtml(sumGroupHeaderColor) + ';color:#fff;border:1px solid #1e293b;font-size:' + sumGroupHeaderFont + 'px;">' + escapeHtml(normalizeExportHeadingText(s.label, headersUppercase)) + '</th>';
                     }
                 });
                 html += '</tr>';
@@ -3314,7 +3332,7 @@
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, recordsCellFontPx: 12, recordsHeaderFontPx: 12, sumCellFontPx: 12, sumHeaderFontPx: 12, totalsCellFontPx: 12, totalsHeaderFontPx: 12, cellFontPx: 12, headerFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', includeCalculatedColumns: false, calculatedColumns: [], includeOperationsColumn: false, operationsLabel: 'Operaciones', operationsReferenceField: '', operationsIncludePercent: true, operationsFields: [], sumMetrics: [], sumFormulas: [] };
+                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, recordsCellFontPx: 12, recordsHeaderFontPx: 12, recordsGroupHeaderFontPx: 12, sumCellFontPx: 12, sumHeaderFontPx: 12, sumGroupHeaderFontPx: 12, totalsCellFontPx: 12, totalsHeaderFontPx: 12, totalsGroupHeaderFontPx: 12, cellFontPx: 12, headerFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', includeCalculatedColumns: false, calculatedColumns: [], includeOperationsColumn: false, operationsLabel: 'Operaciones', operationsReferenceField: '', operationsIncludePercent: true, operationsFields: [], sumMetrics: [], sumFormulas: [] };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
             const titleUppercaseEl = modal ? modal.querySelector('#tmExportTitleUppercase') : document.getElementById('tmExportTitleUppercase');
@@ -3342,10 +3360,13 @@
             const sumIncludeTotalsRowEl = modal ? modal.querySelector('#tmExportSumIncludeTotalsRow') : document.getElementById('tmExportSumIncludeTotalsRow');
             const sumCellFontEl = modal ? modal.querySelector('#tmExportSumCellFontSize') : document.getElementById('tmExportSumCellFontSize');
             const sumHeaderFontEl = modal ? modal.querySelector('#tmExportSumHeaderFontSize') : document.getElementById('tmExportSumHeaderFontSize');
+            const recordsGroupHeaderFontEl = modal ? modal.querySelector('#tmExportRecordsGroupHeaderFontSize') : document.getElementById('tmExportRecordsGroupHeaderFontSize');
+            const sumGroupHeaderFontEl = modal ? modal.querySelector('#tmExportSumGroupHeaderFontSize') : document.getElementById('tmExportSumGroupHeaderFontSize');
             const includeTotalsTableEl = modal ? modal.querySelector('#tmExportIncludeTotalsTable') : document.getElementById('tmExportIncludeTotalsTable');
             const totalsTableTitleEl = modal ? modal.querySelector('#tmExportTotalsTableTitle') : document.getElementById('tmExportTotalsTableTitle');
             const totalsCellFontEl = modal ? modal.querySelector('#tmExportTotalsCellFontSize') : document.getElementById('tmExportTotalsCellFontSize');
             const totalsHeaderFontEl = modal ? modal.querySelector('#tmExportTotalsHeaderFontSize') : document.getElementById('tmExportTotalsHeaderFontSize');
+            const totalsGroupHeaderFontEl = modal ? modal.querySelector('#tmExportTotalsGroupHeaderFontSize') : document.getElementById('tmExportTotalsGroupHeaderFontSize');
             const sumTotalsBoldEl = modal ? modal.querySelector('#tmExportSumTotalsBold') : document.getElementById('tmExportSumTotalsBold');
             const sumTotalsColorTrigger = modal ? modal.querySelector('#tmExportSumTotalsColorTrigger') : document.getElementById('tmExportSumTotalsColorTrigger');
             const sumTitleAlignBtn = modal ? modal.querySelector('#tmExportSumTitleAlignGroup .tm-export-align-btn.is-active') : null;
@@ -3358,10 +3379,13 @@
             const recordsCellFontPx = cellFontEl && cellFontEl.value ? Math.max(9, Math.min(24, parseInt(cellFontEl.value, 10) || 12)) : 12;
             const titleFontPx = titleFontEl && titleFontEl.value ? Math.max(10, Math.min(36, parseInt(titleFontEl.value, 10) || 18)) : 18;
             const recordsHeaderFontPx = headerFontEl && headerFontEl.value ? Math.max(9, Math.min(28, parseInt(headerFontEl.value, 10) || 12)) : 12;
+            const recordsGroupHeaderFontPx = recordsGroupHeaderFontEl && recordsGroupHeaderFontEl.value ? Math.max(9, Math.min(48, parseInt(recordsGroupHeaderFontEl.value, 10) || 12)) : recordsHeaderFontPx;
             const sumCellFontPx = sumCellFontEl && sumCellFontEl.value ? Math.max(9, Math.min(24, parseInt(sumCellFontEl.value, 10) || 12)) : 12;
             const sumHeaderFontPx = sumHeaderFontEl && sumHeaderFontEl.value ? Math.max(9, Math.min(28, parseInt(sumHeaderFontEl.value, 10) || 12)) : 12;
+            const sumGroupHeaderFontPx = sumGroupHeaderFontEl && sumGroupHeaderFontEl.value ? Math.max(9, Math.min(48, parseInt(sumGroupHeaderFontEl.value, 10) || 12)) : sumHeaderFontPx;
             const totalsCellFontPx = totalsCellFontEl && totalsCellFontEl.value ? Math.max(9, Math.min(24, parseInt(totalsCellFontEl.value, 10) || 12)) : 12;
             const totalsHeaderFontPx = totalsHeaderFontEl && totalsHeaderFontEl.value ? Math.max(9, Math.min(48, parseInt(totalsHeaderFontEl.value, 10) || 12)) : 12;
+            const totalsGroupHeaderFontPx = totalsGroupHeaderFontEl && totalsGroupHeaderFontEl.value ? Math.max(9, Math.min(48, parseInt(totalsGroupHeaderFontEl.value, 10) || 12)) : totalsHeaderFontPx;
             const items = Array.from(container.children).filter(function (el) {
                 return el.classList && el.classList.contains('tm-export-personalize-col');
             });
@@ -3486,10 +3510,13 @@
                 countTableCellWidth: countTableCellWidth,
                 recordsCellFontPx: recordsCellFontPx,
                 recordsHeaderFontPx: recordsHeaderFontPx,
+                recordsGroupHeaderFontPx: recordsGroupHeaderFontPx,
                 sumCellFontPx: sumCellFontPx,
                 sumHeaderFontPx: sumHeaderFontPx,
+                sumGroupHeaderFontPx: sumGroupHeaderFontPx,
                 totalsCellFontPx: totalsCellFontPx,
                 totalsHeaderFontPx: totalsHeaderFontPx,
+                totalsGroupHeaderFontPx: totalsGroupHeaderFontPx,
                 cellFontPx: recordsCellFontPx,
                 titleFontPx: titleFontPx,
                 headerFontPx: recordsHeaderFontPx,
@@ -3696,10 +3723,13 @@
             state.columns.forEach(function (c) { colorMap[c.key] = c.color; });
             const recordsCellFontPx = state.recordsCellFontPx || state.cellFontPx || 12;
             const recordsHeaderFontPx = state.recordsHeaderFontPx || state.headerFontPx || 12;
+            const recordsGroupHeaderFontPx = state.recordsGroupHeaderFontPx || recordsHeaderFontPx;
             const sumCellFontPx = state.sumCellFontPx || recordsCellFontPx;
             const sumHeaderFontPx = state.sumHeaderFontPx || recordsHeaderFontPx;
+            const sumGroupHeaderFontPx = state.sumGroupHeaderFontPx || sumHeaderFontPx;
             const totalsCellFontPx = state.totalsCellFontPx || sumCellFontPx;
             const totalsHeaderFontPx = state.totalsHeaderFontPx || sumHeaderFontPx;
+            const totalsGroupHeaderFontPx = state.totalsGroupHeaderFontPx || totalsHeaderFontPx;
             const titleFontPx = state.titleFontPx || 18;
             const titleAlign = state.titleAlign || 'center';
             const countTableAlign = state.countTableAlign || 'left';
@@ -4031,6 +4061,7 @@
                     state.totalsTableAlign || 'left',
                     state.sumTitleFontPx || 14,
                     totalsHeaderFontPx,
+                    totalsGroupHeaderFontPx,
                     totalsCellFontPx,
                     !(state.sumTotalsBold === false),
                     state.sumTotalsTextColor || 'var(--clr-primary)',
@@ -4051,6 +4082,7 @@
                 state.sumTitleAlign || 'center',
                 state.sumTitleFontPx || 14,
                 sumHeaderFontPx,
+                sumGroupHeaderFontPx,
                 sumCellFontPx,
                 state.sumGroupColor || 'var(--clr-primary)',
                 !!state.sumIncludeTotalsRow,
@@ -4081,7 +4113,7 @@
                 var gColIdx = 0;
                 groupSpans.forEach(function (gs) {
                     var groupColor = gs.label ? (groupColorMap[gs.label] || '#64748b') : 'transparent';
-                    var style = gs.label ? ('background-color:' + escapeHtml(groupColor) + '; color:white; border:1px solid #475569; font-weight:bold; border-bottom:none; font-size:' + recordsHeaderFontPx + 'px;') : 'border:none;';
+                    var style = gs.label ? ('background-color:' + escapeHtml(groupColor) + '; color:white; border:1px solid #475569; font-weight:bold; border-bottom:none; font-size:' + recordsGroupHeaderFontPx + 'px;') : 'border:none;';
                     if (forceFullWidthDataTable) {
                         var gPct = 0;
                         for (var gi = 0; gi < gs.span; gi++) {
@@ -4389,11 +4421,14 @@
             const sumIncludeTotalsRowEl = document.getElementById('tmExportSumIncludeTotalsRow');
             const sumCellFontEl = document.getElementById('tmExportSumCellFontSize');
             const sumHeaderFontEl = document.getElementById('tmExportSumHeaderFontSize');
+            const recordsGroupHeaderFontEl = document.getElementById('tmExportRecordsGroupHeaderFontSize');
+            const sumGroupHeaderFontEl = document.getElementById('tmExportSumGroupHeaderFontSize');
             const includeTotalsTableEl = document.getElementById('tmExportIncludeTotalsTable');
             const totalsTableWrapEl = document.getElementById('tmExportTotalsTableWrap');
             const totalsTableTitleEl = document.getElementById('tmExportTotalsTableTitle');
             const totalsCellFontEl = document.getElementById('tmExportTotalsCellFontSize');
             const totalsHeaderFontEl = document.getElementById('tmExportTotalsHeaderFontSize');
+            const totalsGroupHeaderFontEl = document.getElementById('tmExportTotalsGroupHeaderFontSize');
             const sumTotalsBoldEl = document.getElementById('tmExportSumTotalsBold');
             const sumTotalsColorWrapEl = document.getElementById('tmExportSumTotalsColorWrap');
             const sumTotalsColorTriggerEl = document.getElementById('tmExportSumTotalsColorTrigger');
@@ -5033,6 +5068,14 @@
                             var shf = parseInt(draftCfg.sum_table_header_font_size_px, 10);
                             if (!Number.isNaN(shf)) { sumHeaderFontEl.value = String(Math.max(9, Math.min(28, shf))); }
                         }
+                        if (recordsGroupHeaderFontEl) {
+                            var rghf = parseInt((draftCfg.records_group_header_font_size_px != null ? draftCfg.records_group_header_font_size_px : draftCfg.records_header_font_size_px), 10);
+                            if (!Number.isNaN(rghf)) { recordsGroupHeaderFontEl.value = String(Math.max(9, Math.min(48, rghf))); }
+                        }
+                        if (sumGroupHeaderFontEl) {
+                            var sghf = parseInt((draftCfg.sum_group_header_font_size_px != null ? draftCfg.sum_group_header_font_size_px : draftCfg.sum_table_header_font_size_px), 10);
+                            if (!Number.isNaN(sghf)) { sumGroupHeaderFontEl.value = String(Math.max(9, Math.min(48, sghf))); }
+                        }
                         if (includeTotalsTableEl) { includeTotalsTableEl.checked = !!draftCfg.include_totals_table; }
                         if (totalsTableWrapEl) { totalsTableWrapEl.hidden = !(includeTotalsTableEl && includeTotalsTableEl.checked); }
                         if (totalsTableTitleEl) {
@@ -5045,6 +5088,10 @@
                         if (totalsHeaderFontEl && draftCfg.totals_table_header_font_size_px != null) {
                             var thf = parseInt(draftCfg.totals_table_header_font_size_px, 10);
                             if (!Number.isNaN(thf)) { totalsHeaderFontEl.value = String(Math.max(9, Math.min(48, thf))); }
+                        }
+                        if (totalsGroupHeaderFontEl) {
+                            var tghf = parseInt((draftCfg.totals_group_header_font_size_px != null ? draftCfg.totals_group_header_font_size_px : draftCfg.totals_table_header_font_size_px), 10);
+                            if (!Number.isNaN(tghf)) { totalsGroupHeaderFontEl.value = String(Math.max(9, Math.min(48, tghf))); }
                         }
                         personalizeModal.querySelectorAll('#tmExportTotalsTableAlignGroup .tm-export-align-btn').forEach(function (b) {
                             var current = String(draftCfg.totals_table_align || 'left');
@@ -5134,6 +5181,8 @@
                         if (sumTitleFontEl) { sumTitleFontEl.value = '14'; }
                         if (sumCellFontEl) { sumCellFontEl.value = '12'; }
                         if (sumHeaderFontEl) { sumHeaderFontEl.value = '12'; }
+                        if (recordsGroupHeaderFontEl) { recordsGroupHeaderFontEl.value = '12'; }
+                        if (sumGroupHeaderFontEl) { sumGroupHeaderFontEl.value = '12'; }
                         setSumGroupColor('var(--clr-primary)');
                         if (sumIncludeTotalsRowEl) { sumIncludeTotalsRowEl.checked = false; }
                         if (includeTotalsTableEl) { includeTotalsTableEl.checked = false; }
@@ -5141,6 +5190,7 @@
                         if (totalsTableTitleEl) { totalsTableTitleEl.value = 'Totales'; }
                         if (totalsCellFontEl) { totalsCellFontEl.value = '12'; }
                         if (totalsHeaderFontEl) { totalsHeaderFontEl.value = '12'; }
+                        if (totalsGroupHeaderFontEl) { totalsGroupHeaderFontEl.value = '12'; }
                         personalizeModal.querySelectorAll('#tmExportTotalsTableAlignGroup .tm-export-align-btn').forEach(function (b) {
                             b.classList.toggle('is-active', (b.getAttribute('data-totals-table-align') || '') === 'left');
                         });
@@ -5476,6 +5526,10 @@
                         headerFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                         headerFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
+                    if (recordsGroupHeaderFontEl) {
+                        recordsGroupHeaderFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        recordsGroupHeaderFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
                     if (titleFontEl) {
                         titleFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                         titleFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
@@ -5501,6 +5555,10 @@
                         sumHeaderFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                         sumHeaderFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
+                    if (sumGroupHeaderFontEl) {
+                        sumGroupHeaderFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        sumGroupHeaderFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
                     if (includeTotalsTableEl) {
                         includeTotalsTableEl.addEventListener('change', function () {
                             if (totalsTableWrapEl) { totalsTableWrapEl.hidden = !includeTotalsTableEl.checked; }
@@ -5518,6 +5576,10 @@
                     if (totalsHeaderFontEl) {
                         totalsHeaderFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                         totalsHeaderFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
+                    if (totalsGroupHeaderFontEl) {
+                        totalsGroupHeaderFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        totalsGroupHeaderFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
                     if (sumTotalsBoldEl) {
                         sumTotalsBoldEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
@@ -5570,6 +5632,7 @@
                             headers_uppercase: !!state.headersUppercase,
                             records_cell_font_size_px: state.recordsCellFontPx || state.cellFontPx || 12,
                             records_header_font_size_px: state.recordsHeaderFontPx || state.headerFontPx || 12,
+                            records_group_header_font_size_px: state.recordsGroupHeaderFontPx || state.recordsHeaderFontPx || state.headerFontPx || 12,
                             cell_font_size_px: state.recordsCellFontPx || state.cellFontPx || 12,
                             cellFontPx: state.recordsCellFontPx || state.cellFontPx || 12,
                             header_font_size_px: state.recordsHeaderFontPx || state.headerFontPx || 12,
@@ -5587,6 +5650,7 @@
                             sum_title_font_size_px: state.sumTitleFontPx || 14,
                             sum_table_cell_font_size_px: state.sumCellFontPx || 12,
                             sum_table_header_font_size_px: state.sumHeaderFontPx || 12,
+                            sum_group_header_font_size_px: state.sumGroupHeaderFontPx || state.sumHeaderFontPx || 12,
                             sum_group_color: state.sumGroupColor || 'var(--clr-primary)',
                             include_sum_totals_row: !!state.sumIncludeTotalsRow,
                             include_totals_table: !!state.includeTotalsTable,
@@ -5594,6 +5658,7 @@
                             totals_table_align: state.totalsTableAlign || 'left',
                             totals_table_cell_font_size_px: state.totalsCellFontPx || 12,
                             totals_table_header_font_size_px: state.totalsHeaderFontPx || 12,
+                            totals_group_header_font_size_px: state.totalsGroupHeaderFontPx || state.totalsHeaderFontPx || 12,
                             sum_totals_bold: !(state.sumTotalsBold === false),
                             sum_totals_text_color: state.sumTotalsTextColor || 'var(--clr-primary)',
                             include_count_table: includeCountTable,

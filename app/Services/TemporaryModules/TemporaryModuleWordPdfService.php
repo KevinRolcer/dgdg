@@ -382,10 +382,16 @@ class TemporaryModuleWordPdfService
         $sumTableCellFontSizePt = $this->cellPxToWordPt($sumTableCellFontSizePx);
         $sumHeaderFontSizePx = max(9, min(28, (int) ($exportConfig['sum_table_header_font_size_px'] ?? $headerFontSizePx)));
         $sumHeaderFontSizePt = max(7, min(21, (int) round($sumHeaderFontSizePx * 0.75)));
+        $recordsGroupHeaderFontSizePx = max(9, min(48, (int) ($exportConfig['records_group_header_font_size_px'] ?? $headerFontSizePx)));
+        $recordsGroupHeaderFontSizePt = max(7, min(36, (int) round($recordsGroupHeaderFontSizePx * 0.75)));
+        $sumGroupHeaderFontSizePx = max(9, min(48, (int) ($exportConfig['sum_group_header_font_size_px'] ?? $sumHeaderFontSizePx)));
+        $sumGroupHeaderFontSizePt = max(7, min(36, (int) round($sumGroupHeaderFontSizePx * 0.75)));
         $totalsTableCellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['totals_table_cell_font_size_px'] ?? $sumTableCellFontSizePx);
         $totalsTableCellFontSizePt = $this->cellPxToWordPt($totalsTableCellFontSizePx);
         $totalsHeaderFontSizePx = max(9, min(48, (int) ($exportConfig['totals_table_header_font_size_px'] ?? $sumHeaderFontSizePx)));
         $totalsHeaderFontSizePt = max(7, min(36, (int) round($totalsHeaderFontSizePx * 0.75)));
+        $totalsGroupHeaderFontSizePx = max(9, min(48, (int) ($exportConfig['totals_group_header_font_size_px'] ?? $totalsHeaderFontSizePx)));
+        $totalsGroupHeaderFontSizePt = max(7, min(36, (int) round($totalsGroupHeaderFontSizePx * 0.75)));
         $titleFontSizePx = max(10, min(36, (int) ($exportConfig['title_font_size_px'] ?? 18)));
         $titleFontSizePt = max(8, min(27, (int) round($titleFontSizePx * 0.75)));
         $exportFontName = $this->resolveExportFontName();
@@ -569,7 +575,7 @@ class TemporaryModuleWordPdfService
                             $spanGroupKey = mb_strtolower(trim((string) $spanGroup), 'UTF-8');
                             $spanBg = trim((string) $spanGroup) !== '' ? ($groupHeaderColors[$spanGroupKey] ?? '64748B') : '334155';
                             $totalsTbl->addCell(1600 * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => $spanBg, 'valign' => 'center'])
-                                ->addText(trim($spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $totalsHeaderFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                                ->addText(trim($spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $totalsGroupHeaderFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                             $spanGroup = $grp;
                             $spanCount = 1;
                         }
@@ -577,7 +583,7 @@ class TemporaryModuleWordPdfService
                             $spanGroupKey = mb_strtolower(trim((string) $spanGroup), 'UTF-8');
                             $spanBg = trim((string) $spanGroup) !== '' ? ($groupHeaderColors[$spanGroupKey] ?? '64748B') : '334155';
                             $totalsTbl->addCell(1600 * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => $spanBg, 'valign' => 'center'])
-                                ->addText(trim((string) $spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $totalsHeaderFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                                ->addText(trim((string) $spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $totalsGroupHeaderFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                         }
                     }
                 }
@@ -867,6 +873,7 @@ class TemporaryModuleWordPdfService
                 $sumCompactDatePt = $sumDensityScore >= 34 ? 8 : 9;
                 $sumHeadingPt = max(10, min($sumTitleFontSizePt, $sumDensityScore >= 34 ? 11 : 12));
                 $sumHeaderCellPt = max(7, $sumHeaderFontSizePt - ($sumDensityScore >= 34 ? 3 : 2));
+                $sumGroupHeaderCellPt = max(7, $sumGroupHeaderFontSizePt - ($sumDensityScore >= 34 ? 3 : 2));
                 $sumCellPt = max(7, $sumTableCellFontSizePt - ($sumDensityScore >= 34 ? 2 : 1));
                 $sumCellMarginTwips = $sumDensityScore >= 34 ? 30 : 50;
                 $sumFirstColTwips = max(1200, min(2600, (int) round($usableTableTwips * 0.24)));
@@ -915,7 +922,7 @@ class TemporaryModuleWordPdfService
                             $spanGroupKey = mb_strtolower(trim((string) $spanGroup), 'UTF-8');
                             $spanBg = trim((string) $spanGroup) !== '' ? ($groupHeaderColors[$spanGroupKey] ?? '64748B') : '334155';
                             $sumTbl->addCell($sumDataColTwips * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => $spanBg, 'valign' => 'center'])
-                                ->addText(trim($spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $sumHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                                ->addText(trim($spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $sumGroupHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                             $spanGroup = $grp;
                             $spanCount = 1;
                         }
@@ -923,7 +930,7 @@ class TemporaryModuleWordPdfService
                             $spanGroupKey = mb_strtolower(trim((string) $spanGroup), 'UTF-8');
                             $spanBg = trim((string) $spanGroup) !== '' ? ($groupHeaderColors[$spanGroupKey] ?? '64748B') : '334155';
                             $sumTbl->addCell($sumDataColTwips * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => $spanBg, 'valign' => 'center'])
-                                ->addText(trim((string) $spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $sumHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                                ->addText(trim((string) $spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $sumGroupHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                         }
                     }
                 }
@@ -1092,7 +1099,7 @@ class TemporaryModuleWordPdfService
                             'gridSpan' => $gs['span'],
                             'bgColor' => (string) ($gs['color'] ?? '64748B'),
                             'valign' => 'center'
-                        ])->addText((string) $gs['label'], ['bold' => true, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                        ])->addText((string) $gs['label'], ['name' => $exportFontName, 'bold' => true, 'size' => $recordsGroupHeaderFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
                     } else {
                         $table->addCell($mergedTwips > 0 ? $mergedTwips : null, [
                             'gridSpan' => $gs['span'],
@@ -1253,8 +1260,11 @@ class TemporaryModuleWordPdfService
             'headerFontSizePx' => $headerFontSizePx,
             'sumTableCellFontSizePx' => $sumTableCellFontSizePx,
             'sumTableHeaderFontSizePx' => $sumHeaderFontSizePx,
+            'recordsGroupHeaderFontSizePx' => $recordsGroupHeaderFontSizePx,
+            'sumGroupHeaderFontSizePx' => $sumGroupHeaderFontSizePx,
             'totalsTableCellFontSizePx' => $totalsTableCellFontSizePx,
             'totalsTableHeaderFontSizePx' => $totalsHeaderFontSizePx,
+            'totalsGroupHeaderFontSizePx' => $totalsGroupHeaderFontSizePx,
             'titleFontSizePx' => $titleFontSizePx,
             'logoDataUri' => $this->buildLogoDataUri($logoPath),
             'fechaCorteStr' => $fechaCorteStr,
