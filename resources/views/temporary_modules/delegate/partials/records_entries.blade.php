@@ -2,6 +2,7 @@
     $module = $module;
     $entries = $entries;
     $municipioField = $municipioField ?? null;
+    $entryDataService = app(\App\Services\TemporaryModules\TemporaryModuleEntryDataService::class);
 @endphp
 <div class="tm-records-fragment-inner" data-module-id="{{ $module->id }}">
     <p class="tm-module-subtitle">{{ $module->name }}</p>
@@ -31,6 +32,7 @@
                                             ? array_values(array_filter($cell, fn ($path) => is_string($path) && trim($path) !== ''))
                                             : ((is_string($cell) && trim($cell) !== '') ? [trim($cell)] : []))
                                         : [];
+                                    $mediaPaths = array_values(array_filter($mediaPaths, fn ($path) => $entryDataService->resolveStoredFilePath((string) $path) !== null));
                                 @endphp
                                 @if (count($mediaPaths) > 0)
                                     <div style="display:flex; flex-wrap:wrap; gap:6px;">
@@ -42,6 +44,8 @@
                                             </button>
                                         @endforeach
                                     </div>
+                                @elseif (in_array($field->type, ['file', 'image'], true))
+                                    -
                                 @elseif (is_bool($cell))
                                     {{ $cell ? 'Si' : 'No' }}
                                 @elseif ($field->type === 'semaforo' && is_string($cell) && $cell !== '')
@@ -79,8 +83,12 @@
             <div class="tm-record-empty">Sin registros capturados.</div>
         @endforelse
     </div>
-    <div class="tm-table-wrap tm-table-wrap-scroll tm-records-desktop">
-        <table class="tm-table">
+    <div class="tm-records-hscroll" data-h-scroll-container>
+        <button type="button" class="tm-records-hscroll-btn tm-records-hscroll-btn--prev" data-h-scroll-prev aria-label="Mover tabla a la izquierda" title="Mover a la izquierda">
+            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+        </button>
+        <div class="tm-table-wrap tm-table-wrap-scroll tm-records-desktop" data-h-scroll-target>
+            <table class="tm-table">
             <thead>
                 <tr>
                     <th class="tm-bulk-col tm-hidden" style="width:40px; text-align:center;">
@@ -109,6 +117,7 @@
                                             ? array_values(array_filter($cell, fn ($path) => is_string($path) && trim($path) !== ''))
                                             : ((is_string($cell) && trim($cell) !== '') ? [trim($cell)] : []))
                                         : [];
+                                    $mediaPaths = array_values(array_filter($mediaPaths, fn ($path) => $entryDataService->resolveStoredFilePath((string) $path) !== null));
                                 @endphp
                                 @if (count($mediaPaths) > 0)
                                     <div style="display:flex; flex-wrap:wrap; gap:6px;">
@@ -120,6 +129,8 @@
                                             </button>
                                         @endforeach
                                     </div>
+                                @elseif (in_array($field->type, ['file', 'image'], true))
+                                    -
                                 @elseif (is_bool($cell))
                                     {{ $cell ? 'Si' : 'No' }}
                                 @elseif ($field->type === 'semaforo' && is_string($cell) && $cell !== '')
@@ -159,7 +170,11 @@
                     <tr><td colspan="{{ $module->fields->count() + 2 }}">Sin registros capturados.</td></tr>
                 @endforelse
             </tbody>
-        </table>
+            </table>
+        </div>
+        <button type="button" class="tm-records-hscroll-btn tm-records-hscroll-btn--next" data-h-scroll-next aria-label="Mover tabla a la derecha" title="Mover a la derecha">
+            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+        </button>
     </div>
     @if ($entries->hasPages())
         <div class="tm-pagination tm-pagination--footer">
@@ -235,6 +250,7 @@
                                     $existingImagePaths = is_array($existingImageValue)
                                         ? array_values(array_filter($existingImageValue, fn ($path) => is_string($path) && trim($path) !== ''))
                                         : ((is_string($existingImageValue) && trim($existingImageValue) !== '') ? [trim($existingImageValue)] : []);
+                                    $existingImagePaths = array_values(array_filter($existingImagePaths, fn ($path) => $entryDataService->resolveStoredFilePath((string) $path) !== null));
                                     $hasExistingImage = count($existingImagePaths) > 0;
                                 @endphp
                                 @if ($field->type === 'seccion')
@@ -389,17 +405,36 @@
                                                 <button type="button" class="tm-btn tm-btn-outline" data-paste-image-button data-target-input="{{ $id }}" aria-label="Pegar imagen" title="Pegar imagen">
                                                     <i class="fa-solid fa-paste" aria-hidden="true"></i> Pegar
                                                 </button>
+                                                @if ($hasExistingImage)
+                                                    <button type="button" class="tm-btn tm-btn-outline" data-remove-existing-images data-target-input="{{ $id }}" aria-label="Quitar imagenes actuales" title="Quitar imagenes actuales">
+                                                        <i class="fa-solid fa-trash" aria-hidden="true"></i> Quitar actuales
+                                                    </button>
+                                                @endif
                                             </div>
                                             <small class="tm-upload-evidence-hint">Arrastra aqui o usa los botones.</small>
                                             <div class="tm-upload-evidence-dropzone" data-paste-upload-wrap>
                                                 <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}[]" class="d-none" {{ ($field->is_required && !$hasExistingImage) ? 'required' : '' }} multiple data-max-files="2">
+                                                <div data-remove-existing-container></div>
                                                 <div class="tm-upload-evidence-placeholder" {{ $hasExistingImage ? 'hidden' : '' }}>
                                                     <i class="fa-solid fa-images" aria-hidden="true"></i>
                                                     <p>Suelta las imagenes aqui (Max. 2)</p>
                                                 </div>
-                                                <div class="tm-image-preview" data-image-preview {{ $hasExistingImage ? '' : 'hidden' }}>
-                                                    <img src="{{ $hasExistingImage ? route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key, 'i' => 0]) : '' }}" data-image-preview-img>
-                                                    <button type="button" class="tm-image-clear" data-image-remove>&times;</button>
+                                                <div class="tm-inline-image-preview-container" data-inline-image-preview-container style="display:flex; flex-wrap:wrap; gap:8px; width:100%; justify-content:center;">
+                                                    @foreach ($existingImagePaths as $existingImageIndex => $existingImagePath)
+                                                        <div class="tm-inline-image-preview tm-image-preview" data-existing-preview="1" style="position:relative;">
+                                                            <img src="{{ route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key, 'i' => $existingImageIndex]) }}" style="max-width:120px; max-height:120px; border-radius:8px; object-fit:cover;" alt="Imagen {{ $existingImageIndex + 1 }}">
+                                                            <button
+                                                                type="button"
+                                                                class="tm-image-clear"
+                                                                data-remove-existing-image
+                                                                data-target-input="{{ $id }}"
+                                                                data-existing-path="{{ $existingImagePath }}"
+                                                                data-remove-existing-name="remove_existing_images[{{ $field->key }}][]"
+                                                                aria-label="Quitar imagen {{ $existingImageIndex + 1 }}"
+                                                                title="Quitar imagen"
+                                                            >&times;</button>
+                                                        </div>
+                                                    @endforeach
                                                 </div>
                                             </div>
                                         </div>

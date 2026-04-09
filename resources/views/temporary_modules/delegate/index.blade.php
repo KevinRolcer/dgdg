@@ -35,6 +35,47 @@
         border-color: #246257 !important;
         box-shadow: 0 0 8px rgba(142,68,173,0.3) !important;
     }
+
+    .tm-records-hscroll {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .tm-records-hscroll-btn {
+        width: 34px;
+        height: 34px;
+        border: 1px solid var(--clr-border);
+        border-radius: 999px;
+        background: var(--clr-bg-card, #fff);
+        color: var(--clr-text-main);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+    }
+
+    .tm-records-hscroll-btn:hover:not([disabled]) {
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    .tm-records-hscroll-btn[disabled] {
+        opacity: 0.35;
+        cursor: not-allowed;
+    }
+
+    @media (max-width: 900px) {
+        .tm-records-hscroll {
+            grid-template-columns: 1fr;
+            gap: 6px;
+        }
+
+        .tm-records-hscroll-btn {
+            display: none;
+        }
+    }
 </style>
 @endpush
 
@@ -1844,21 +1885,26 @@
             if (!container) {
                 return;
             }
+            const placeholder = wrap.querySelector('.tm-upload-evidence-placeholder');
 
-            container.innerHTML = '';
+            Array.from(container.querySelectorAll('[data-new-preview="1"]')).forEach(function (node) {
+                node.remove();
+            });
 
             const files = Array.from(input.files || []);
-            if (files.length === 0) {
-                return;
-            }
+            const existingCount = container.querySelectorAll('[data-existing-preview="1"]').length;
+
+            let renderedCount = 0;
 
             files.forEach(function (file, index) {
                 if (!String(file.type || '').startsWith('image/')) {
                     return;
                 }
+                renderedCount += 1;
 
                 const previewDiv = document.createElement('div');
                 previewDiv.className = 'tm-inline-image-preview tm-image-preview';
+                previewDiv.setAttribute('data-new-preview', '1');
                 previewDiv.style.position = 'relative';
 
                 const img = document.createElement('img');
@@ -1901,6 +1947,28 @@
                 };
                 reader.readAsDataURL(file);
             });
+
+            if (placeholder) {
+                placeholder.hidden = (renderedCount + existingCount) > 0;
+            }
+        };
+
+        const getActiveExistingImageCount = function (input) {
+            if (!(input instanceof HTMLInputElement)) {
+                return 0;
+            }
+
+            const wrap = input.closest('[data-paste-upload-wrap]');
+            if (!(wrap instanceof HTMLElement)) {
+                return 0;
+            }
+
+            const container = wrap.querySelector('[data-inline-image-preview-container]');
+            if (!(container instanceof HTMLElement)) {
+                return 0;
+            }
+
+            return container.querySelectorAll('[data-existing-preview="1"]').length;
         };
 
         const initializeImagePreview = function (input) {
@@ -2066,9 +2134,101 @@
                     }
                 });
             });
+
+            Array.from(scope.querySelectorAll('[data-remove-existing-image]')).forEach(function (button) {
+                if (button.dataset.tmBoundRemoveExistingSingle === '1') return;
+                button.dataset.tmBoundRemoveExistingSingle = '1';
+                button.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                    const targetId = button.getAttribute('data-target-input') || '';
+                    const input = targetId ? document.getElementById(targetId) : null;
+                    if (!(input instanceof HTMLInputElement)) {
+                        return;
+                    }
+
+                    const existingPath = String(button.getAttribute('data-existing-path') || '').trim();
+                    const removeName = String(button.getAttribute('data-remove-existing-name') || '').trim();
+                    const evidence = input.closest('.tm-upload-evidence');
+                    const removeContainer = evidence ? evidence.querySelector('[data-remove-existing-container]') : null;
+
+                    if (existingPath && removeName && removeContainer instanceof HTMLElement) {
+                        const hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = removeName;
+                        hidden.value = existingPath;
+                        removeContainer.appendChild(hidden);
+                    }
+
+                    const previewItem = button.closest('[data-existing-preview="1"]');
+                    if (previewItem instanceof HTMLElement) {
+                        previewItem.remove();
+                    }
+
+                    const wrap = input.closest('[data-paste-upload-wrap]');
+                    if (wrap instanceof HTMLElement) {
+                        const container = wrap.querySelector('[data-inline-image-preview-container]');
+                        const placeholder = wrap.querySelector('.tm-upload-evidence-placeholder');
+                        const existingCount = container ? container.querySelectorAll('[data-existing-preview="1"]').length : 0;
+                        const newCount = Array.from(input.files || []).length;
+                        if (placeholder) {
+                            placeholder.hidden = (existingCount + newCount) > 0;
+                        }
+                    }
+
+                    const removeFlag = evidence ? evidence.querySelector('[data-remove-flag]') : null;
+                    if (removeFlag instanceof HTMLInputElement) {
+                        removeFlag.value = (getActiveExistingImageCount(input) + Array.from(input.files || []).length) === 0 ? '1' : '0';
+                    }
+                });
+            });
+
+            Array.from(scope.querySelectorAll('[data-remove-existing-images]')).forEach(function (button) {
+                if (button.dataset.tmBoundRemoveExisting === '1') return;
+                button.dataset.tmBoundRemoveExisting = '1';
+                button.addEventListener('click', function () {
+                    const targetId = button.getAttribute('data-target-input') || '';
+                    const input = targetId ? document.getElementById(targetId) : null;
+                    if (!(input instanceof HTMLInputElement)) {
+                        return;
+                    }
+
+                    input.value = '';
+                    const wrap = input.closest('[data-paste-upload-wrap]');
+                    const evidence = input.closest('.tm-upload-evidence');
+                    const removeFlag = evidence ? evidence.querySelector('[data-remove-flag]') : null;
+                    if (removeFlag instanceof HTMLInputElement) {
+                        removeFlag.value = '1';
+                    }
+
+                    if (wrap instanceof HTMLElement) {
+                        const container = wrap.querySelector('[data-inline-image-preview-container]');
+                        if (container) {
+                            const removeContainer = evidence ? evidence.querySelector('[data-remove-existing-container]') : null;
+                            Array.from(container.querySelectorAll('[data-existing-preview="1"]')).forEach(function (existingPreview) {
+                                const existingButton = existingPreview.querySelector('[data-remove-existing-image]');
+                                const existingPath = String(existingButton ? (existingButton.getAttribute('data-existing-path') || '') : '').trim();
+                                const removeName = String(existingButton ? (existingButton.getAttribute('data-remove-existing-name') || '') : '').trim();
+                                if (existingPath && removeName && removeContainer instanceof HTMLElement) {
+                                    const hidden = document.createElement('input');
+                                    hidden.type = 'hidden';
+                                    hidden.name = removeName;
+                                    hidden.value = existingPath;
+                                    removeContainer.appendChild(hidden);
+                                }
+                            });
+                            container.innerHTML = '';
+                        }
+                        const placeholder = wrap.querySelector('.tm-upload-evidence-placeholder');
+                        if (placeholder) {
+                            placeholder.hidden = false;
+                        }
+                    }
+                });
+            });
         };
 
         bindImageUploadInteractions(document);
+        bindHorizontalScrollControls(document);
 
         const getPasteTargetInput = function (event) {
             const eventTarget = event.target instanceof HTMLElement ? event.target : null;
@@ -2171,7 +2331,8 @@
 
             const maxFiles = parseInt(input.dataset.maxFiles || (input.multiple ? '2' : '1'), 10) || 1;
             const existingFiles = Array.from(input.files || []);
-            if (existingFiles.length >= maxFiles) {
+            const existingServerImages = getActiveExistingImageCount(input);
+            if ((existingFiles.length + existingServerImages) >= maxFiles) {
                 notify('Aviso', 'Solo puedes adjuntar hasta ' + maxFiles + ' imagen(es).', 'warning');
                 return false;
             }
@@ -2451,6 +2612,57 @@
             return qs;
         };
 
+        function bindHorizontalScrollControls(root) {
+            const scope = root instanceof HTMLElement ? root : document;
+            const containers = Array.from(scope.querySelectorAll('[data-h-scroll-container]'));
+
+            containers.forEach(function (container) {
+                const target = container.querySelector('[data-h-scroll-target]');
+                const prevBtn = container.querySelector('[data-h-scroll-prev]');
+                const nextBtn = container.querySelector('[data-h-scroll-next]');
+
+                if (!(target instanceof HTMLElement) || !(prevBtn instanceof HTMLButtonElement) || !(nextBtn instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                const updateState = function () {
+                    const maxScroll = Math.max(0, target.scrollWidth - target.clientWidth);
+                    const hasOverflow = maxScroll > 6;
+
+                    prevBtn.hidden = !hasOverflow;
+                    nextBtn.hidden = !hasOverflow;
+
+                    if (!hasOverflow) {
+                        prevBtn.disabled = true;
+                        nextBtn.disabled = true;
+                        return;
+                    }
+
+                    prevBtn.disabled = target.scrollLeft <= 2;
+                    nextBtn.disabled = target.scrollLeft >= (maxScroll - 2);
+                };
+
+                if (container.dataset.tmHScrollBound !== '1') {
+                    container.dataset.tmHScrollBound = '1';
+
+                    prevBtn.addEventListener('click', function () {
+                        const step = Math.max(280, Math.round(target.clientWidth * 0.65));
+                        target.scrollBy({ left: -step, behavior: 'smooth' });
+                    });
+
+                    nextBtn.addEventListener('click', function () {
+                        const step = Math.max(280, Math.round(target.clientWidth * 0.65));
+                        target.scrollBy({ left: step, behavior: 'smooth' });
+                    });
+
+                    target.addEventListener('scroll', updateState, { passive: true });
+                    window.addEventListener('resize', updateState);
+                }
+
+                updateState();
+            });
+        }
+
         const loadRecordsFragment = function (host, moduleId, queryString) {
             if (!host || !fragmentRecordsBase || !moduleId) {
                 return Promise.resolve();
@@ -2484,6 +2696,7 @@
                     initializeImagePreview(inp);
                 });
                 bindImageUploadInteractions(host);
+                bindHorizontalScrollControls(host);
             }).catch(function (err) {
                 console.error('Fragment load error:', err);
                 host.innerHTML = '<p class="inline-alert inline-alert-error">No se pudo cargar el listado. <a href="' + (recordsUrl ? recordsUrl + '?module=' + moduleId : '#') + '">Recargar página</a></p>';

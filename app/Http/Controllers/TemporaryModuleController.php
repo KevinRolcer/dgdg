@@ -1339,7 +1339,13 @@ class TemporaryModuleController extends Controller
 
             if (in_array($field->type, ['file', 'image'], true)) {
                 $existingValue = $existingEntry?->data[$field->key] ?? null;
-                $hasExistingImage = (is_string($existingValue) && trim((string)$existingValue) !== '') || (is_array($existingValue) && count($existingValue) > 0);
+                $existingPaths = is_array($existingValue)
+                    ? array_values(array_filter($existingValue, fn ($path) => is_string($path) && trim($path) !== ''))
+                    : ((is_string($existingValue) && trim((string) $existingValue) !== '') ? [trim((string) $existingValue)] : []);
+                $removeExistingPaths = Arr::wrap($request->input('remove_existing_images.'.$field->key, []));
+                $removeExistingPaths = array_values(array_filter($removeExistingPaths, fn ($path) => is_string($path) && trim($path) !== ''));
+                $remainingExistingPaths = array_values(array_filter($existingPaths, fn ($path) => ! in_array($path, $removeExistingPaths, true)));
+                $hasExistingImage = count($remainingExistingPaths) > 0;
                 $removeRequested = filter_var($request->input('remove_images.'.$field->key), FILTER_VALIDATE_BOOLEAN);
                 $isRequiredNow = (bool) $field->is_required && (! $hasExistingImage || $removeRequested);
 
@@ -1350,6 +1356,8 @@ class TemporaryModuleController extends Controller
                     $rules[$key.'.*'] = ['file', $field->type === 'image' ? 'image' : 'nullable', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,txt,csv', 'max:20480'];
                 }
                 $rules['remove_images.'.$field->key] = ['nullable', 'boolean'];
+                $rules['remove_existing_images.'.$field->key] = ['nullable', 'array'];
+                $rules['remove_existing_images.'.$field->key.'.*'] = ['string'];
             } elseif ($field->type === 'multiselect') {
                 $opts = is_array($field->options) ? $field->options : [];
                 $rules[$key] = $field->is_required ? ['required', 'array'] : ['nullable', 'array'];
@@ -1376,6 +1384,7 @@ class TemporaryModuleController extends Controller
 
         $validated = $request->validate($rules, [], $attributes);
         $values = Arr::get($validated, 'values', []);
+        $pathsPendingDeletion = [];
 
         $seccionKeys = $temporaryModule->fields->where('type', 'seccion')->pluck('key')->all();
         foreach ($seccionKeys as $sk) {
@@ -1395,6 +1404,14 @@ class TemporaryModuleController extends Controller
                 $existingPaths = is_array($existingValue)
                     ? array_values(array_filter($existingValue, fn ($path) => is_string($path) && trim($path) !== ''))
                     : ((is_string($existingValue) && trim($existingValue) !== '') ? [trim($existingValue)] : []);
+                $existingPaths = array_values(array_filter($existingPaths, function ($path) {
+                    return $this->entryDataService->resolveStoredFilePath((string) $path) !== null;
+                }));
+                $removeExistingPaths = Arr::wrap(Arr::get($validated, 'remove_existing_images.'.$field->key, []));
+                $removeExistingPaths = array_values(array_filter($removeExistingPaths, fn ($path) => is_string($path) && trim($path) !== ''));
+                $pathsToDelete = array_values(array_filter($existingPaths, fn ($path) => in_array($path, $removeExistingPaths, true)));
+                $pathsPendingDeletion = array_merge($pathsPendingDeletion, $pathsToDelete);
+                $remainingExistingPaths = array_values(array_filter($existingPaths, fn ($path) => ! in_array($path, $removeExistingPaths, true)));
                 $uploadedFiles = $request->file('values.'.$field->key);
                 if ($uploadedFiles) {
                     if (!is_array($uploadedFiles)) { $uploadedFiles = [$uploadedFiles]; }
@@ -1407,23 +1424,21 @@ class TemporaryModuleController extends Controller
                     }
 
                     if ($removeRequested) {
-                        foreach ($existingPaths as $oldPath) {
-                            $this->entryDataService->deleteStoredPath($oldPath);
-                        }
+                        $pathsPendingDeletion = array_merge($pathsPendingDeletion, $remainingExistingPaths);
                         $value = array_slice(array_values(array_unique($storedPaths)), 0, 2);
                     } else {
-                        if (count($existingPaths) + count($storedPaths) > 2) {
+                        if (count($remainingExistingPaths) + count($storedPaths) > 2) {
                             throw ValidationException::withMessages([
                                 'values.'.$field->key => 'Solo se permiten hasta 2 imagenes por campo. Elimina una existente o sube menos archivos.',
                             ]);
                         }
-                        $value = array_slice(array_values(array_unique(array_merge($existingPaths, $storedPaths))), 0, 2);
+                        $value = array_slice(array_values(array_unique(array_merge($remainingExistingPaths, $storedPaths))), 0, 2);
                     }
                 } elseif ($removeRequested) {
-                    foreach ($existingPaths as $oldPath) { $this->entryDataService->deleteStoredPath($oldPath); }
+                    $pathsPendingDeletion = array_merge($pathsPendingDeletion, $remainingExistingPaths);
                     $value = null;
                 } else {
-                    $value = $existingValue;
+                    $value = count($remainingExistingPaths) > 0 ? $remainingExistingPaths : null;
                 }
             }
 
@@ -1491,6 +1506,11 @@ class TemporaryModuleController extends Controller
                 'main_image_field_key' => null,
                 'submitted_at' => Carbon::now(),
             ]);
+        }
+
+        $pathsPendingDeletion = array_values(array_unique(array_filter($pathsPendingDeletion, fn ($path) => is_string($path) && trim($path) !== '')));
+        foreach ($pathsPendingDeletion as $oldPath) {
+            $this->entryDataService->deleteStoredPath($oldPath);
         }
 
         if ($request->expectsJson() || $request->ajax()) {
