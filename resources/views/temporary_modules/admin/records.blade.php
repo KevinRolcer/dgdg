@@ -533,6 +533,26 @@
                                 </div>
                             </div>
 
+                            <div class="tm-export-sum-row tm-export-sum-row--sum-config">
+                                <label class="tm-export-count-table-toggle">
+                                    <input type="checkbox" id="tmExportSumIncludeTotalsRow" value="1">
+                                    Incluir fila final de totales
+                                </label>
+                                <label class="tm-export-count-table-toggle">
+                                    <input type="checkbox" id="tmExportSumTotalsBold" value="1" checked>
+                                    Totales en negrita
+                                </label>
+                            </div>
+                            <div class="tm-export-personalize-field">
+                                <span class="tm-export-label-inline">Color de texto de fila de totales</span>
+                                <div class="tm-export-col-color" id="tmExportSumTotalsColorWrap">
+                                    <button type="button" class="tm-export-color-trigger" id="tmExportSumTotalsColorTrigger" data-color="var(--clr-primary)" aria-haspopup="listbox" aria-expanded="false" title="Color del texto de la fila de totales">
+                                        <span class="tm-export-color-swatch" style="background-color:var(--clr-primary)"></span>
+                                    </button>
+                                    <div class="tm-export-color-menu" id="tmExportSumTotalsColorMenu" role="listbox" hidden></div>
+                                </div>
+                            </div>
+
                             <div class="tm-export-personalize-field tm-export-count-table-align-group">
                                 <span class="tm-export-label-inline">Alineación de tabla de sumatoria</span>
                                 <div class="tm-export-align-btns tm-export-sum-table-align-btns" id="tmExportSumAlignGroup" role="group" aria-label="Alineación de la tabla de sumatoria">
@@ -1880,20 +1900,33 @@
             var listEl = document.getElementById('tmExportGroupsList');
             var hintEl = document.getElementById('tmExportNoGroupsHint');
             if (!listEl) return;
-            var groups = (personalizeModal && personalizeModal._exportGroups) || [];
+            var groups = normalizeExportGroups((personalizeModal && personalizeModal._exportGroups) || []);
+            if (personalizeModal) {
+                personalizeModal._exportGroups = groups;
+            }
             listEl.innerHTML = '';
             if (groups.length === 0) {
                 if (hintEl) hintEl.hidden = false;
                 return;
             }
             if (hintEl) hintEl.hidden = true;
-            groups.forEach(function (g) {
+            var groupColorOptions = TEMPLATE_COLORS.map(function (c) {
+                return '<option value="' + escapeHtml(c.value) + '">' + escapeHtml(c.name) + '</option>';
+            }).join('');
+            groups.forEach(function (g, idx) {
                 var tag = document.createElement('div');
                 tag.className = 'tm-export-group-tag';
-                tag.style.cssText = 'background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 16px; display: flex; align-items: center; gap: 8px; font-size: 0.8rem;';
-                tag.innerHTML = '<strong>' + escapeHtml(g) + '</strong>' +
-                    '<button type="button" class="tm-export-group-remove" data-group="' + escapeHtml(g) + '" style="border:none; background:none; cursor:pointer; color:#ef4444; font-weight:bold; padding:0 4px;">&times;</button>';
+                tag.style.cssText = 'background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 16px; display: flex; align-items: center; gap: 8px; font-size: 0.8rem;';
+                tag.innerHTML =
+                    '<span class="tm-export-group-color-dot" style="width:12px;height:12px;border-radius:999px;border:1px solid #64748b;background:' + escapeHtml(g.color) + ';"></span>' +
+                    '<input type="text" class="tm-input tm-export-group-name-input" data-group-index="' + idx + '" value="' + escapeHtml(g.name) + '" placeholder="Nombre del grupo" style="min-width: 160px; max-width: 240px; font-size: 0.8rem; padding: 4px 8px;">' +
+                    '<select class="tm-input tm-export-group-color-select" data-group-index="' + idx + '" style="min-width: 150px; font-size: 0.78rem; padding: 4px 8px;">' + groupColorOptions + '</select>' +
+                    '<button type="button" class="tm-export-group-remove" data-group-index="' + idx + '" data-group="' + escapeHtml(g.name) + '" style="border:none; background:none; cursor:pointer; color:#ef4444; font-weight:bold; padding:0 4px;">&times;</button>';
                 listEl.appendChild(tag);
+                var colorSel = tag.querySelector('.tm-export-group-color-select');
+                if (colorSel) {
+                    colorSel.value = g.color || TEMPLATE_COLORS[0].value;
+                }
             });
             // Re-render columns list to update selects
             var columnsEl = document.getElementById('tmExportPersonalizeColumns');
@@ -1907,7 +1940,7 @@
 
         function buildPersonalizeColumnsList(columns, container) {
             container.innerHTML = '';
-            var groups = (personalizeModal && personalizeModal._exportGroups) || [];
+            var groups = normalizeExportGroups((personalizeModal && personalizeModal._exportGroups) || []);
             var colorMenuHtml = TEMPLATE_COLORS.map(function (c, i) {
                 return '<button type="button" class="tm-export-color-option' + (i === 0 ? ' is-active' : '') + '" data-color="' + escapeHtml(c.value) + '">' +
                     '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c.value) + '"></span>' +
@@ -1924,7 +1957,8 @@
                 var groupSelect = '<select class="tm-input tm-export-col-group-select" data-key="' + escapeHtml(col.key) + '">' +
                     '<option value="">Sin grupo</option>' +
                     groups.map(function(g) {
-                        return '<option value="' + escapeHtml(g) + '"' + (col.group === g ? ' selected' : '') + '>' + escapeHtml(g) + '</option>';
+                        var gName = String((g && g.name) || '').trim();
+                        return '<option value="' + escapeHtml(gName) + '"' + (col.group === gName ? ' selected' : '') + '>' + escapeHtml(gName) + '</option>';
                     }).join('') +
                     '</select>';
 
@@ -2208,6 +2242,7 @@
                         agg: ['sum', 'count_non_empty', 'count_unique', 'count_equals'].indexOf(String(m.agg || 'sum')) !== -1 ? String(m.agg) : 'sum',
                         match_value: String(m.match_value || ''),
                         text_color: String(m.text_color || 'var(--clr-primary)'),
+                        include_total: !Object.prototype.hasOwnProperty.call(m || {}, 'include_total') ? true : !!m.include_total,
                         font_size: Math.max(9, Math.min(28, parseInt(String(m.font_size || '12'), 10) || 12)),
                         sort_order: Math.max(1, parseInt(String(m.sort_order || (idx + 1)), 10) || (idx + 1))
                     };
@@ -2224,6 +2259,7 @@
                         metric_ids: ids,
                         base_metric_id: String(f.base_metric_id || ''),
                         text_color: String(f.text_color || 'var(--clr-primary)'),
+                        include_total: !Object.prototype.hasOwnProperty.call(f || {}, 'include_total') ? true : !!f.include_total,
                         font_size: Math.max(9, Math.min(28, parseInt(String(f.font_size || '12'), 10) || 12)),
                         sort_order: Math.max(1, parseInt(String(f.sort_order || (idx + 1)), 10) || (idx + 1))
                     };
@@ -2238,6 +2274,7 @@
                     agg: 'count_non_empty',
                     match_value: '',
                     text_color: 'var(--clr-primary)',
+                    include_total: true,
                     font_size: 12,
                     sort_order: 1
                 }];
@@ -2247,14 +2284,49 @@
 
         function tmExportBuildGroupOptionsHtml(selectedGroup) {
             var selected = String(selectedGroup || '');
-            var groups = (personalizeModal && Array.isArray(personalizeModal._exportGroups)) ? personalizeModal._exportGroups : [];
+            var groups = normalizeExportGroups((personalizeModal && Array.isArray(personalizeModal._exportGroups)) ? personalizeModal._exportGroups : []);
             var html = '<option value="">Sin grupo</option>';
             groups.forEach(function (g) {
-                var name = String(g || '').trim();
+                var name = String((g && g.name) || '').trim();
                 if (!name) { return; }
                 html += '<option value="' + escapeHtml(name) + '"' + (selected === name ? ' selected' : '') + '>' + escapeHtml(name) + '</option>';
             });
             return html;
+        }
+
+        function normalizeExportGroups(groupsRaw) {
+            var source = Array.isArray(groupsRaw) ? groupsRaw : [];
+            var used = {};
+            var fallbackColor = (TEMPLATE_COLORS && TEMPLATE_COLORS[0] && TEMPLATE_COLORS[0].value) ? TEMPLATE_COLORS[0].value : 'var(--clr-primary)';
+            var out = [];
+
+            source.forEach(function (g) {
+                var name = '';
+                var color = fallbackColor;
+                if (typeof g === 'string') {
+                    name = g.trim();
+                } else if (g && typeof g === 'object') {
+                    name = String(g.name || '').trim();
+                    if (g.color) {
+                        color = String(g.color);
+                    }
+                }
+                if (!name) { return; }
+                var key = name.toLocaleLowerCase();
+                if (used[key]) { return; }
+                used[key] = true;
+                out.push({ name: name, color: color || fallbackColor });
+            });
+
+            return out;
+        }
+
+        function buildGroupColorMap(groupsRaw) {
+            var map = {};
+            normalizeExportGroups(groupsRaw).forEach(function (g) {
+                map[g.name] = g.color || 'var(--clr-primary)';
+            });
+            return map;
         }
 
         function tmExportRenderSumConfigurator(countableColumns) {
@@ -2296,6 +2368,7 @@
                     + '<button type="button" class="tm-export-color-trigger" data-sum-metric-color-trigger data-color="' + escapeHtml(String(m.text_color || 'var(--clr-primary)')) + '" aria-haspopup="listbox" aria-expanded="false" title="Color del encabezado">'
                     + '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(String(m.text_color || 'var(--clr-primary)')) + '"></span></button>'
                     + '<div class="tm-export-color-menu" role="listbox" hidden>' + colorMenuHtml + '</div></div>'
+                    + '<label class="tm-export-count-table-toggle" style="white-space:nowrap;"><input type="checkbox" data-sum-metric-include-total ' + (m.include_total === false ? '' : 'checked') + '> Total</label>'
                     + '<input type="number" class="tm-input" data-sum-metric-size min="9" max="28" value="' + escapeHtml(String(m.font_size || 12)) + '" title="Tamaño texto (px)">'
                     + '<input type="text" class="tm-input" data-sum-metric-match placeholder="Valor a contar (si aplica)" value="' + escapeHtml(m.match_value || '') + '">'
                     + '<input type="hidden" data-sum-metric-order value="' + escapeHtml(String(m.sort_order || (idx + 1))) + '">'
@@ -2348,6 +2421,7 @@
                     + '<button type="button" class="tm-export-color-trigger" data-sum-formula-color-trigger data-color="' + escapeHtml(String(f.text_color || 'var(--clr-primary)')) + '" aria-haspopup="listbox" aria-expanded="false" title="Color del encabezado">'
                     + '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(String(f.text_color || 'var(--clr-primary)')) + '"></span></button>'
                     + '<div class="tm-export-color-menu" role="listbox" hidden>' + colorMenuHtml + '</div></div>'
+                    + '<label class="tm-export-count-table-toggle" style="white-space:nowrap;"><input type="checkbox" data-sum-formula-include-total ' + (f.include_total === false ? '' : 'checked') + '> Total</label>'
                     + '<input type="number" class="tm-input" data-sum-formula-size min="9" max="28" value="' + escapeHtml(String(f.font_size || 12)) + '" title="Tamaño texto (px)">'
                     + '<input type="hidden" data-sum-formula-order value="' + escapeHtml(String(f.sort_order || (idx + 1))) + '">'
                     + '<button type="button" class="tm-btn tm-btn-danger" data-remove-sum-formula>&times;</button>';
@@ -2390,6 +2464,7 @@
                     var metricColorTrigger = row.querySelector('[data-sum-metric-color-trigger]');
                     var textColor = (metricColorTrigger && metricColorTrigger.getAttribute('data-color')) ? metricColorTrigger.getAttribute('data-color') : 'var(--clr-primary)';
                     var fontSize = parseInt((row.querySelector('[data-sum-metric-size]') || {}).value || '12', 10);
+                    var includeTotal = !!((row.querySelector('[data-sum-metric-include-total]') || {}).checked);
                     var order = parseInt((row.querySelector('[data-sum-metric-order]') || {}).value || '0', 10);
                     if (!id || !fieldKey) { return; }
                     metrics.push({
@@ -2400,6 +2475,7 @@
                         agg: agg,
                         match_value: String(match || '').trim(),
                         text_color: String(textColor || 'var(--clr-primary)'),
+                        include_total: includeTotal,
                         font_size: Number.isNaN(fontSize) ? 12 : Math.max(9, Math.min(28, fontSize)),
                         sort_order: Number.isNaN(order) ? 0 : order
                     });
@@ -2420,6 +2496,7 @@
                     var formulaColorTrigger = row.querySelector('[data-sum-formula-color-trigger]');
                     var textColor = (formulaColorTrigger && formulaColorTrigger.getAttribute('data-color')) ? formulaColorTrigger.getAttribute('data-color') : 'var(--clr-primary)';
                     var fontSize = parseInt((row.querySelector('[data-sum-formula-size]') || {}).value || '12', 10);
+                    var includeTotal = !!((row.querySelector('[data-sum-formula-include-total]') || {}).checked);
                     var order = parseInt((row.querySelector('[data-sum-formula-order]') || {}).value || '0', 10);
                     if (!id || metricIds.length === 0) { return; }
                     formulas.push({
@@ -2430,6 +2507,7 @@
                         metric_ids: metricIds,
                         base_metric_id: baseMetricId,
                         text_color: String(textColor || 'var(--clr-primary)'),
+                        include_total: includeTotal,
                         font_size: Number.isNaN(fontSize) ? 12 : Math.max(9, Math.min(28, fontSize)),
                         sort_order: Number.isNaN(order) ? 0 : order
                     });
@@ -2620,7 +2698,7 @@
             return columns;
         }
 
-        function tmExportRenderSumPreviewTable(sumData, headersUppercase, sumTableAlign, sumTitle, sumTitleCase, sumTitleAlign, sumTitleFontSize, sumGroupColor) {
+        function tmExportRenderSumPreviewTable(sumData, headersUppercase, sumTableAlign, sumTitle, sumTitleCase, sumTitleAlign, sumTitleFontSize, sumGroupColor, sumIncludeTotalsRow, sumTotalsBold, sumTotalsTextColor) {
             if (!sumData || !Array.isArray(sumData.groups) || sumData.groups.length === 0) { return ''; }
             var rawTitle = String(sumTitle || '').trim() !== '' ? String(sumTitle) : 'Sumatoria';
             var title = normalizeExportHeadingText(rawTitle, !!headersUppercase);
@@ -2685,6 +2763,34 @@
                 });
                 html += '</tr>';
             });
+
+            if (sumIncludeTotalsRow) {
+                var totalsStyle = '';
+                if (sumTotalsBold) {
+                    totalsStyle += 'font-weight:700;';
+                }
+                totalsStyle += 'color:' + escapeHtml(String(sumTotalsTextColor || 'var(--clr-primary)')) + ';';
+
+                html += '<tr class="tm-export-preview-row tm-export-preview-data">';
+                html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + totalsStyle + '">' + escapeHtml(normalizeExportHeadingText('Total', !!headersUppercase)) + '</td>';
+                sumColumns.forEach(function (c) {
+                    var includeTotal = !(c.source && Object.prototype.hasOwnProperty.call(c.source, 'include_total')) || !!c.source.include_total;
+                    var cSize = parseInt(String((c.source && c.source.font_size) || '12'), 10);
+                    cSize = Number.isNaN(cSize) ? 12 : Math.max(9, Math.min(28, cSize));
+                    var totalVal = 0;
+                    if (includeTotal) {
+                        sumData.groups.forEach(function (g) {
+                            var n = c.type === 'metric' ? Number(g.metrics[c.id] || 0) : Number(g.formulas[c.id] || 0);
+                            if (Number.isFinite(n)) { totalVal += n; }
+                        });
+                    }
+                    var isPercent = c.type === 'formula' && String((c.source && c.source.op) || '') === 'percent';
+                    var txt = includeTotal ? String(Math.round((totalVal + Number.EPSILON) * 100) / 100) + (isPercent ? '%' : '') : '';
+                    html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="font-size:' + cSize + 'px;' + totalsStyle + '">' + escapeHtml(txt) + '</td>';
+                });
+                html += '</tr>';
+            }
+
             html += '</table>';
             return html;
         }
@@ -2693,7 +2799,7 @@
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumGroupColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', sumMetrics: [], sumFormulas: [] };
+                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', sumMetrics: [], sumFormulas: [] };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
             const titleUppercaseEl = modal ? modal.querySelector('#tmExportTitleUppercase') : document.getElementById('tmExportTitleUppercase');
@@ -2715,10 +2821,14 @@
             const sumTitleUppercaseEl = modal ? modal.querySelector('#tmExportSumTitleUppercase') : document.getElementById('tmExportSumTitleUppercase');
             const sumTitleFontEl = modal ? modal.querySelector('#tmExportSumTitleFontSize') : document.getElementById('tmExportSumTitleFontSize');
             const sumGroupColorTrigger = modal ? modal.querySelector('#tmExportSumGroupColorTrigger') : document.getElementById('tmExportSumGroupColorTrigger');
+            const sumIncludeTotalsRowEl = modal ? modal.querySelector('#tmExportSumIncludeTotalsRow') : document.getElementById('tmExportSumIncludeTotalsRow');
+            const sumTotalsBoldEl = modal ? modal.querySelector('#tmExportSumTotalsBold') : document.getElementById('tmExportSumTotalsBold');
+            const sumTotalsColorTrigger = modal ? modal.querySelector('#tmExportSumTotalsColorTrigger') : document.getElementById('tmExportSumTotalsColorTrigger');
             const sumTitleAlignBtn = modal ? modal.querySelector('#tmExportSumTitleAlignGroup .tm-export-align-btn.is-active') : null;
             const sumTitleAlign = (sumTitleAlignBtn && sumTitleAlignBtn.getAttribute('data-sum-title-align')) || 'center';
             const sumTitleFontPx = sumTitleFontEl && sumTitleFontEl.value ? Math.max(10, Math.min(36, parseInt(sumTitleFontEl.value, 10) || 14)) : 14;
             const sumGroupColor = (sumGroupColorTrigger && sumGroupColorTrigger.getAttribute('data-color')) ? sumGroupColorTrigger.getAttribute('data-color') : 'var(--clr-primary)';
+            const sumTotalsTextColor = (sumTotalsColorTrigger && sumTotalsColorTrigger.getAttribute('data-color')) ? sumTotalsColorTrigger.getAttribute('data-color') : 'var(--clr-primary)';
             const cellFontPx = cellFontEl && cellFontEl.value ? Math.max(9, Math.min(24, parseInt(cellFontEl.value, 10) || 12)) : 12;
             const titleFontPx = titleFontEl && titleFontEl.value ? Math.max(10, Math.min(36, parseInt(titleFontEl.value, 10) || 18)) : 18;
             const headerFontPx = headerFontEl && headerFontEl.value ? Math.max(9, Math.min(28, parseInt(headerFontEl.value, 10) || 12)) : 12;
@@ -2779,7 +2889,7 @@
             }
             var countTableCellWidthEl = modal ? modal.querySelector('#tmExportCountTableCellWidth') : document.getElementById('tmExportCountTableCellWidth');
             var countTableCellWidth = (countTableCellWidthEl && countTableCellWidthEl.value) ? (parseInt(countTableCellWidthEl.value, 10) || 12) : 12;
-            var groups = (personalizeModal && personalizeModal._exportGroups) || [];
+            var groups = normalizeExportGroups((personalizeModal && personalizeModal._exportGroups) || []);
             var includeSumTableEl = modal ? modal.querySelector('#tmExportIncludeSumTable') : document.getElementById('tmExportIncludeSumTable');
             var sumGroupByEl = modal ? modal.querySelector('#tmExportSumGroupBy') : document.getElementById('tmExportSumGroupBy');
             var sumCfg = tmExportReadSumConfigurator();
@@ -2794,6 +2904,9 @@
                 sumTitleAlign: sumTitleAlign,
                 sumTitleFontPx: sumTitleFontPx,
                 sumGroupColor: sumGroupColor,
+                sumIncludeTotalsRow: !!(sumIncludeTotalsRowEl && sumIncludeTotalsRowEl.checked),
+                sumTotalsBold: !(sumTotalsBoldEl && !sumTotalsBoldEl.checked),
+                sumTotalsTextColor: sumTotalsTextColor,
                 titleUppercase: !!(titleUppercaseEl && titleUppercaseEl.checked),
                 headersUppercase: !!(headersUppercaseEl && headersUppercaseEl.checked),
                 columns: columns,
@@ -3159,7 +3272,10 @@
                 state.sumTitleCase || 'normal',
                 state.sumTitleAlign || 'center',
                 state.sumTitleFontPx || 14,
-                state.sumGroupColor || 'var(--clr-primary)'
+                state.sumGroupColor || 'var(--clr-primary)',
+                !!state.sumIncludeTotalsRow,
+                !(state.sumTotalsBold === false),
+                state.sumTotalsTextColor || 'var(--clr-primary)'
             );
 
             // Tabla de Datos (Desglose)
@@ -3179,10 +3295,12 @@
 
             var hasAnyGroup = groupSpans.some(function (gs) { return gs.label !== ''; });
             if (hasAnyGroup) {
+                var groupColorMap = buildGroupColorMap(state.groups || []);
                 html += '<tr class="tm-export-preview-row tm-export-preview-group-header">';
                 var gColIdx = 0;
                 groupSpans.forEach(function (gs) {
-                    var style = gs.label ? 'background-color:#64748b; color:white; border:1px solid #475569; font-weight:bold; border-bottom:none;' : 'border:none;';
+                    var groupColor = gs.label ? (groupColorMap[gs.label] || '#64748b') : 'transparent';
+                    var style = gs.label ? ('background-color:' + escapeHtml(groupColor) + '; color:white; border:1px solid #475569; font-weight:bold; border-bottom:none;') : 'border:none;';
                     if (forceFullWidthDataTable) {
                         var gPct = 0;
                         for (var gi = 0; gi < gs.span; gi++) {
@@ -3458,11 +3576,23 @@
             const sumGroupColorWrapEl = document.getElementById('tmExportSumGroupColorWrap');
             const sumGroupColorTriggerEl = document.getElementById('tmExportSumGroupColorTrigger');
             const sumGroupColorMenuEl = document.getElementById('tmExportSumGroupColorMenu');
+            const sumIncludeTotalsRowEl = document.getElementById('tmExportSumIncludeTotalsRow');
+            const sumTotalsBoldEl = document.getElementById('tmExportSumTotalsBold');
+            const sumTotalsColorWrapEl = document.getElementById('tmExportSumTotalsColorWrap');
+            const sumTotalsColorTriggerEl = document.getElementById('tmExportSumTotalsColorTrigger');
+            const sumTotalsColorMenuEl = document.getElementById('tmExportSumTotalsColorMenu');
             const addSumMetricBtn = document.getElementById('tmExportAddSumMetricBtn');
             const addSumFormulaBtn = document.getElementById('tmExportAddSumFormulaBtn');
 
             if (sumGroupColorMenuEl) {
                 sumGroupColorMenuEl.innerHTML = TEMPLATE_COLORS.map(function (c, i) {
+                    return '<button type="button" class="tm-export-color-option' + (i === 0 ? ' is-active' : '') + '" data-color="' + escapeHtml(c.value) + '">' +
+                        '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c.value) + '"></span>' +
+                        '<span class="tm-export-color-name">' + escapeHtml(c.name) + '</span></button>';
+                }).join('');
+            }
+            if (sumTotalsColorMenuEl) {
+                sumTotalsColorMenuEl.innerHTML = TEMPLATE_COLORS.map(function (c, i) {
                     return '<button type="button" class="tm-export-color-option' + (i === 0 ? ' is-active' : '') + '" data-color="' + escapeHtml(c.value) + '">' +
                         '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c.value) + '"></span>' +
                         '<span class="tm-export-color-name">' + escapeHtml(c.name) + '</span></button>';
@@ -3477,6 +3607,19 @@
                 }
                 if (sumGroupColorMenuEl) {
                     sumGroupColorMenuEl.querySelectorAll('.tm-export-color-option').forEach(function (opt) {
+                        opt.classList.toggle('is-active', (opt.getAttribute('data-color') || '') === c);
+                    });
+                }
+            };
+            var setSumTotalsColor = function (color) {
+                var c = String(color || 'var(--clr-primary)');
+                if (sumTotalsColorTriggerEl) {
+                    sumTotalsColorTriggerEl.setAttribute('data-color', c);
+                    var sw = sumTotalsColorTriggerEl.querySelector('.tm-export-color-swatch');
+                    if (sw) { sw.style.backgroundColor = c; }
+                }
+                if (sumTotalsColorMenuEl) {
+                    sumTotalsColorMenuEl.querySelectorAll('.tm-export-color-option').forEach(function (opt) {
                         opt.classList.toggle('is-active', (opt.getAttribute('data-color') || '') === c);
                     });
                 }
@@ -3499,6 +3642,28 @@
                     if (option) {
                         setSumGroupColor(option.getAttribute('data-color') || 'var(--clr-primary)');
                         if (sumGroupColorMenuEl) { sumGroupColorMenuEl.hidden = true; }
+                        buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                    }
+                });
+            }
+            if (sumTotalsColorWrapEl && !sumTotalsColorWrapEl.dataset.bound) {
+                sumTotalsColorWrapEl.dataset.bound = '1';
+                sumTotalsColorWrapEl.addEventListener('click', function (e) {
+                    var trigger = e.target.closest('#tmExportSumTotalsColorTrigger');
+                    if (trigger) {
+                        var menu = document.getElementById('tmExportSumTotalsColorMenu');
+                        if (menu instanceof HTMLElement) {
+                            var isOpen = !menu.hidden;
+                            Array.from(personalizeModal.querySelectorAll('.tm-export-color-menu')).forEach(function (m) { m.hidden = true; });
+                            trigger.setAttribute('aria-expanded', String(!isOpen));
+                            menu.hidden = isOpen;
+                        }
+                        return;
+                    }
+                    var option = e.target.closest('#tmExportSumTotalsColorMenu .tm-export-color-option');
+                    if (option) {
+                        setSumTotalsColor(option.getAttribute('data-color') || 'var(--clr-primary)');
+                        if (sumTotalsColorMenuEl) { sumTotalsColorMenuEl.hidden = true; }
                         buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
                     }
                 });
@@ -3578,6 +3743,7 @@
                                 agg: 'sum',
                                 match_value: '',
                                 text_color: 'var(--clr-primary)',
+                                include_total: true,
                                 font_size: 12,
                                 sort_order: (tmExportGetSumCombinedSorted().length + 1)
                             });
@@ -3597,6 +3763,7 @@
                                 metric_ids: defaultMetricId ? [defaultMetricId] : [],
                                 base_metric_id: defaultMetricId,
                                 text_color: 'var(--clr-primary)',
+                                include_total: true,
                                 font_size: 12,
                                 sort_order: (tmExportGetSumCombinedSorted().length + 1)
                             });
@@ -3620,6 +3787,7 @@
                             m.match_value = (row.querySelector('[data-sum-metric-match]') || {}).value || '';
                             var mColorTrigger = row.querySelector('[data-sum-metric-color-trigger]');
                             m.text_color = (mColorTrigger && mColorTrigger.getAttribute('data-color')) ? mColorTrigger.getAttribute('data-color') : (m.text_color || 'var(--clr-primary)');
+                            m.include_total = !!((row.querySelector('[data-sum-metric-include-total]') || {}).checked);
                             var mFont = parseInt((row.querySelector('[data-sum-metric-size]') || {}).value || String(m.font_size || '12'), 10);
                             m.font_size = Number.isNaN(mFont) ? 12 : Math.max(9, Math.min(28, mFont));
                             var mOrder = parseInt((row.querySelector('[data-sum-metric-order]') || {}).value || String(m.sort_order || '0'), 10);
@@ -3722,6 +3890,7 @@
                             }
                             var fColorTrigger = row.querySelector('[data-sum-formula-color-trigger]');
                             f.text_color = (fColorTrigger && fColorTrigger.getAttribute('data-color')) ? fColorTrigger.getAttribute('data-color') : (f.text_color || 'var(--clr-primary)');
+                            f.include_total = !!((row.querySelector('[data-sum-formula-include-total]') || {}).checked);
                             var fFont = parseInt((row.querySelector('[data-sum-formula-size]') || {}).value || String(f.font_size || '12'), 10);
                             f.font_size = Number.isNaN(fFont) ? 12 : Math.max(9, Math.min(28, fFont));
                             var fOrder = parseInt((row.querySelector('[data-sum-formula-order]') || {}).value || String(f.sort_order || '0'), 10);
@@ -3825,7 +3994,7 @@
                     } catch (eDraft) {}
 
                     if (personalizeModal) {
-                        personalizeModal._exportGroups = [];
+                        personalizeModal._exportGroups = normalizeExportGroups([]);
                     }
 
                     if (draftCfg) {
@@ -3877,6 +4046,9 @@
                             sumTitleFontEl.value = String(Number.isNaN(stf) ? 14 : Math.max(10, Math.min(36, stf)));
                         }
                         setSumGroupColor(draftCfg.sum_group_color || 'var(--clr-primary)');
+                        if (sumIncludeTotalsRowEl) { sumIncludeTotalsRowEl.checked = !!draftCfg.include_sum_totals_row; }
+                        if (sumTotalsBoldEl) { sumTotalsBoldEl.checked = !Object.prototype.hasOwnProperty.call(draftCfg, 'sum_totals_bold') ? true : !!draftCfg.sum_totals_bold; }
+                        setSumTotalsColor(draftCfg.sum_totals_text_color || 'var(--clr-primary)');
                         if (countByFieldsEl && Array.isArray(draftCfg.count_by_fields)) {
                             countByFieldsEl.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
                                 var ck = cb.getAttribute('data-count-key') || cb.value;
@@ -3884,7 +4056,7 @@
                             });
                         }
                         if (personalizeModal) {
-                            personalizeModal._exportGroups = Array.isArray(draftCfg.groups) ? draftCfg.groups.slice() : [];
+                            personalizeModal._exportGroups = normalizeExportGroups(Array.isArray(draftCfg.groups) ? draftCfg.groups : []);
                         }
                         renderExportGroups();
                         var cwEl = document.getElementById('tmExportCountTableCellWidth');
@@ -3943,6 +4115,9 @@
                         if (sumTitleUppercaseEl) { sumTitleUppercaseEl.checked = false; }
                         if (sumTitleFontEl) { sumTitleFontEl.value = '14'; }
                         setSumGroupColor('var(--clr-primary)');
+                        if (sumIncludeTotalsRowEl) { sumIncludeTotalsRowEl.checked = false; }
+                        if (sumTotalsBoldEl) { sumTotalsBoldEl.checked = true; }
+                        setSumTotalsColor('var(--clr-primary)');
                         var mrSortDefaultEl = document.getElementById('tmExportMicrorregionSort');
                         if (mrSortDefaultEl) { mrSortDefaultEl.value = data.microrregion_sort || 'asc'; }
                         buildPersonalizeColumnsList(columns, columnsEl);
@@ -4068,6 +4243,12 @@
                         sumTitleFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                         sumTitleFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
+                    if (sumIncludeTotalsRowEl) {
+                        sumIncludeTotalsRowEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
+                    if (sumTotalsBoldEl) {
+                        sumTotalsBoldEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
                     var microrregionSortEl = document.getElementById('tmExportMicrorregionSort');
                     if (microrregionSortEl) {
                         microrregionSortEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
@@ -4115,6 +4296,9 @@
                             sum_title_align: state.sumTitleAlign || 'center',
                             sum_title_font_size_px: state.sumTitleFontPx || 14,
                             sum_group_color: state.sumGroupColor || 'var(--clr-primary)',
+                            include_sum_totals_row: !!state.sumIncludeTotalsRow,
+                            sum_totals_bold: !(state.sumTotalsBold === false),
+                            sum_totals_text_color: state.sumTotalsTextColor || 'var(--clr-primary)',
                             include_count_table: includeCountTable,
                             count_by_fields: countByFields,
                             count_table_colors: state.countTableColors || {},
@@ -4193,8 +4377,10 @@
                                         if (!personalizeModal._exportGroups) {
                                             personalizeModal._exportGroups = [];
                                         }
-                                        if (name && personalizeModal._exportGroups.indexOf(name) === -1) {
-                                            personalizeModal._exportGroups.push(name);
+                                        personalizeModal._exportGroups = normalizeExportGroups(personalizeModal._exportGroups);
+                                        var exists = personalizeModal._exportGroups.some(function (g) { return String(g.name || '').toLocaleLowerCase() === name.toLocaleLowerCase(); });
+                                        if (name && !exists) {
+                                            personalizeModal._exportGroups.push({ name: name, color: TEMPLATE_COLORS[0].value });
                                             renderExportGroups();
                                             buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
                                         }
@@ -4206,8 +4392,10 @@
                                     if (!personalizeModal._exportGroups) {
                                         personalizeModal._exportGroups = [];
                                     }
-                                    if (personalizeModal._exportGroups.indexOf(name) === -1) {
-                                        personalizeModal._exportGroups.push(name);
+                                    personalizeModal._exportGroups = normalizeExportGroups(personalizeModal._exportGroups);
+                                    var exists = personalizeModal._exportGroups.some(function (g) { return String(g.name || '').toLocaleLowerCase() === name.toLocaleLowerCase(); });
+                                    if (!exists) {
+                                        personalizeModal._exportGroups.push({ name: name, color: TEMPLATE_COLORS[0].value });
                                         renderExportGroups();
                                         buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
                                     }
@@ -4215,25 +4403,31 @@
                             }
                         };
                     }
-                    if (countTableColorListEl) {
-                        // Usar event delegation para los remove de grupos
-                        var groupsListEl = document.getElementById('tmExportGroupsList');
-                        if (groupsListEl) {
-                            groupsListEl.onclick = function(e) {
-                                var removeBtn = e.target.closest('.tm-export-group-remove');
-                                if (removeBtn) {
-                                    var gName = removeBtn.getAttribute('data-group');
-                                    if (!Array.isArray(personalizeModal._exportGroups)) {
-                                        personalizeModal._exportGroups = [];
-                                    }
-                                    personalizeModal._exportGroups = personalizeModal._exportGroups.filter(function(g) { return g !== gName; });
+                    // Usar event delegation para edición y remove de grupos
+                    var groupsListEl = document.getElementById('tmExportGroupsList');
+                    if (groupsListEl) {
+                        groupsListEl.onclick = function(e) {
+                            var removeBtn = e.target.closest('.tm-export-group-remove');
+                            if (removeBtn) {
+                                var gIndex = parseInt(removeBtn.getAttribute('data-group-index') || '-1', 10);
+                                if (!Array.isArray(personalizeModal._exportGroups)) {
+                                    personalizeModal._exportGroups = [];
+                                }
+                                personalizeModal._exportGroups = normalizeExportGroups(personalizeModal._exportGroups);
+                                var removed = (gIndex >= 0 && gIndex < personalizeModal._exportGroups.length)
+                                    ? personalizeModal._exportGroups[gIndex]
+                                    : null;
+                                personalizeModal._exportGroups = personalizeModal._exportGroups.filter(function (_, idx) { return idx !== gIndex; });
+
+                                var removedName = removed ? String(removed.name || '') : '';
+                                if (removedName !== '') {
                                     // Limpiar grupo de las columnas
                                     columnsEl.querySelectorAll('.tm-export-col-group-select').forEach(function(sel) {
-                                        if (sel.value === gName) sel.value = '';
+                                        if (sel.value === removedName) sel.value = '';
                                     });
                                     if (Array.isArray(personalizeModal._sumMetrics)) {
                                         personalizeModal._sumMetrics = personalizeModal._sumMetrics.map(function (m) {
-                                            if ((m.group || '') === gName) {
+                                            if ((m.group || '') === removedName) {
                                                 m.group = '';
                                             }
                                             return m;
@@ -4241,17 +4435,74 @@
                                     }
                                     if (Array.isArray(personalizeModal._sumFormulas)) {
                                         personalizeModal._sumFormulas = personalizeModal._sumFormulas.map(function (f) {
-                                            if ((f.group || '') === gName) {
+                                            if ((f.group || '') === removedName) {
                                                 f.group = '';
                                             }
                                             return f;
                                         });
                                     }
-                                    renderExportGroups();
-                                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
                                 }
-                            };
-                        }
+                                renderExportGroups();
+                                buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                            }
+                        };
+                        groupsListEl.onchange = function (e) {
+                            var colorSel = e.target.closest('.tm-export-group-color-select');
+                            if (colorSel) {
+                                var idx = parseInt(colorSel.getAttribute('data-group-index') || '-1', 10);
+                                if (!Array.isArray(personalizeModal._exportGroups)) {
+                                    personalizeModal._exportGroups = [];
+                                }
+                                personalizeModal._exportGroups = normalizeExportGroups(personalizeModal._exportGroups);
+                                if (idx < 0 || idx >= personalizeModal._exportGroups.length) { return; }
+                                personalizeModal._exportGroups[idx].color = colorSel.value || TEMPLATE_COLORS[0].value;
+                                renderExportGroups();
+                                buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                                return;
+                            }
+
+                            var nameInput = e.target.closest('.tm-export-group-name-input');
+                            if (!nameInput) { return; }
+                            var idx = parseInt(nameInput.getAttribute('data-group-index') || '-1', 10);
+                            if (!Array.isArray(personalizeModal._exportGroups)) {
+                                personalizeModal._exportGroups = [];
+                            }
+                            personalizeModal._exportGroups = normalizeExportGroups(personalizeModal._exportGroups);
+                            if (idx < 0 || idx >= personalizeModal._exportGroups.length) { return; }
+                            var oldName = String(personalizeModal._exportGroups[idx].name || '');
+                            var newName = String(nameInput.value || '').trim();
+                            if (!newName || oldName === newName) { return; }
+                            var dup = personalizeModal._exportGroups.some(function (g, gIdx) {
+                                if (gIdx === idx) { return false; }
+                                return String(g.name || '').toLocaleLowerCase() === newName.toLocaleLowerCase();
+                            });
+                            if (dup) { return; }
+                            personalizeModal._exportGroups[idx].name = newName;
+
+                            // Propagar renombre a columnas/sumatorias
+                            columnsEl.querySelectorAll('.tm-export-col-group-select').forEach(function(sel) {
+                                if (sel.value === oldName) { sel.value = newName; }
+                            });
+                            if (Array.isArray(personalizeModal._sumMetrics)) {
+                                personalizeModal._sumMetrics = personalizeModal._sumMetrics.map(function (m) {
+                                    if ((m.group || '') === oldName) {
+                                        m.group = newName;
+                                    }
+                                    return m;
+                                });
+                            }
+                            if (Array.isArray(personalizeModal._sumFormulas)) {
+                                personalizeModal._sumFormulas = personalizeModal._sumFormulas.map(function (f) {
+                                    if ((f.group || '') === oldName) {
+                                        f.group = newName;
+                                    }
+                                    return f;
+                                });
+                            }
+
+                            renderExportGroups();
+                            buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                        };
                     }
 
                 })

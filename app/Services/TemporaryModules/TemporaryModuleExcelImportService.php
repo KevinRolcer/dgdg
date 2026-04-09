@@ -1513,14 +1513,20 @@ class TemporaryModuleExcelImportService
     }
 
     /**
-     * Busca registros existentes que coincidan por campos de texto/datos y completa campos vacíos.
+     * Busca registros por llaves base (1..n), actualiza diferencias y crea nuevos si no hay coincidencia.
+     *
+     * @return array{updated:int, created:int, skipped:int, row_errors:list<array>}
      */
     public function updateFromDataArray(TemporaryModule $module, array $rows, array $options): array
     {
         $mapping = $options['mapping'] ?? [];
+        $matchingKeys = array_values(array_unique(array_map('strval', $options['matching_keys'] ?? [])));
+        $updateKeys = array_values(array_unique(array_map('strval', $options['update_keys'] ?? [])));
         $rowOffset = (int) ($options['row_offset'] ?? 1);
         $allMicrorregions = (bool) ($options['all_microrregions'] ?? false);
         $microrregionId = $options['selected_microrregion_id'] ? (int) $options['selected_microrregion_id'] : null;
+        $selectedMunicipio = trim((string) ($options['selected_municipio'] ?? ''));
+        $autoIdentifyMunicipio = (bool) ($options['auto_identify_municipio'] ?? true);
         $userId = auth()->id();
 
         $importable = $module->fields->filter(fn ($f) => in_array($f->type, self::IMPORTABLE_TYPES, true));
@@ -1528,6 +1534,51 @@ class TemporaryModuleExcelImportService
 
         $municipioField = $importable->firstWhere('type', 'municipio');
         $municipioKey = $municipioField ? $municipioField->key : null;
+        $municipioMapped = $municipioKey !== null
+            && array_key_exists($municipioKey, $mapping)
+            && $mapping[$municipioKey] !== null;
+
+        if (empty($matchingKeys)) {
+            return [
+                'updated' => 0,
+                'created' => 0,
+                'skipped' => count($rows),
+                'row_errors' => [[
+                    'row' => 'General',
+                    'message' => 'Selecciona al menos una columna base para identificar registros existentes.',
+                    'data' => [],
+                    'failed_fields' => [[
+                        'key' => '__matching_keys__',
+                        'label' => 'Columnas base',
+                        'reason' => 'No se definieron columnas base para buscar coincidencias.',
+                        'received' => '',
+                    ]],
+                    'suggestions' => [],
+                ]],
+            ];
+        }
+
+        $matchingKeys = array_values(array_filter($matchingKeys, fn ($key) => isset($fieldsByKey[$key])));
+
+        if (empty($matchingKeys)) {
+            return [
+                'updated' => 0,
+                'created' => 0,
+                'skipped' => count($rows),
+                'row_errors' => [[
+                    'row' => 'General',
+                    'message' => 'Las columnas base seleccionadas no corresponden a campos importables del módulo.',
+                    'data' => [],
+                    'failed_fields' => [[
+                        'key' => '__matching_keys__',
+                        'label' => 'Columnas base',
+                        'reason' => 'Las columnas base no son válidas para este módulo.',
+                        'received' => '',
+                    ]],
+                    'suggestions' => [],
+                ]],
+            ];
+        }
 
         $microrregionesAsignadas = (new TemporaryModuleAccessService())->microrregionesConMunicipiosPorUsuario($userId);
         $suggestionBaseMunicipios = [];
@@ -1542,7 +1593,7 @@ class TemporaryModuleExcelImportService
             }
         }
 
-        // Cargar todos los registros existentes del módulo para las microrregiones permitidas
+        // Cargar todos los registros existentes del módulo para el alcance permitido
         $microsToPreload = $allMicrorregions
             ? $microrregionesAsignadas->pluck('id')->all()
             : ($microrregionId ? [$microrregionId] : []);
@@ -1559,12 +1610,51 @@ class TemporaryModuleExcelImportService
                 });
         }
 
-        // Campos que se usan como "llave de coincidencia" (todos los campos de texto/datos, no imágenes)
-        $matchFields = $importable->filter(fn ($f) => ! in_array($f->type, ['image', 'file'], true));
-        // Campos que se pueden completar (imágenes y archivos, más cualquier campo vacío)
-        $fillableFields = $importable;
+        $existingByMicroAndSignature = [];
+        $existingBySignatureGlobal = [];
+
+        foreach ($existingEntries as $entry) {
+            $entryData = (array) ($entry->data ?? []);
+            $signature = $this->buildMatchingSignature($entryData, $matchingKeys);
+            if ($signature === null) {
+                continue;
+            }
+            $entryMicro = (int) $entry->microrregion_id;
+            $existingByMicroAndSignature[$entryMicro][$signature][] = $entry;
+            $existingBySignatureGlobal[$signature][] = $entry;
+        }
+
+        $mappedFieldKeys = collect($mapping)
+            ->filter(fn ($colIndex) => $colIndex !== null)
+            ->keys()
+            ->filter(fn ($fieldKey) => isset($fieldsByKey[$fieldKey]))
+            ->values()
+            ->all();
+
+        if (empty($updateKeys)) {
+            return [
+                'updated' => 0,
+                'created' => 0,
+                'skipped' => count($rows),
+                'row_errors' => [[
+                    'row' => 'General',
+                    'message' => 'Selecciona al menos una columna a actualizar.',
+                    'data' => [],
+                    'failed_fields' => [[
+                        'key' => '__update_keys__',
+                        'label' => 'Columnas a actualizar',
+                        'reason' => 'No se definieron columnas para actualización.',
+                        'received' => '',
+                    ]],
+                    'suggestions' => [],
+                ]],
+            ];
+        }
+
+        $updateKeys = array_values(array_filter($updateKeys, fn ($key) => in_array($key, $mappedFieldKeys, true)));
 
         $updated = 0;
+        $created = 0;
         $skipped = 0;
         $rowErrors = [];
 
@@ -1596,114 +1686,244 @@ class TemporaryModuleExcelImportService
                 $values[$fieldKey] = $this->coerceValue($field, $raw, $raw, $str, $suggestionBaseMunicipios);
             }
 
+            // Si no viene municipio en el archivo y está desactivada la auto-identificación,
+            // tomar municipio manual seleccionado para todas las filas.
+            if ($municipioKey !== null && $selectedMunicipio !== '') {
+                $rawMunicipio = trim((string) ($values[$municipioKey] ?? ''));
+                $hasAutoMunicipio = $municipioMapped && $autoIdentifyMunicipio && $rawMunicipio !== '';
+                if (! $hasAutoMunicipio) {
+                    $values[$municipioKey] = $selectedMunicipio;
+                    $hasAnyMappedData = true;
+                }
+            }
+
             if (! $hasAnyMappedData) {
                 $skipped++;
                 continue;
             }
 
-            // Buscar registro existente que coincida por los campos de texto
-            $matchedEntry = $this->findMatchingEntry($existingEntries, $values, $matchFields);
+            // Resolver microrregión para búsqueda/creación
+            $rowMrId = $microrregionId;
+            if ($rowMrId === null && $municipioKey) {
+                $munVal = $values[$municipioKey] ?? null;
+                if (is_string($munVal) && trim($munVal) !== '') {
+                    $rowMrId = $municipioToMrMap[$this->normalizeLabel($munVal)] ?? null;
+                }
+            }
 
-            if ($matchedEntry === null) {
+            $matchingSignature = $this->buildMatchingSignature($values, $matchingKeys);
+
+            if ($matchingSignature === null) {
                 $rowErrors[] = [
                     'row' => $row,
-                    'message' => "Fila {$row}: no se encontró un registro existente que coincida.",
+                    'message' => "Fila {$row}: falta al menos una columna base para buscar coincidencias.",
                     'data' => $values,
-                    'failed_fields' => [['key' => '__no_match__', 'label' => 'Coincidencia', 'reason' => 'No hay registro existente con los mismos datos de texto.', 'received' => '']],
+                    'failed_fields' => [[
+                        'key' => '__matching_values__',
+                        'label' => 'Columnas base',
+                        'reason' => 'Una o más columnas base están vacías en esta fila.',
+                        'received' => '',
+                    ]],
                     'suggestions' => [],
                 ];
                 $skipped++;
                 continue;
             }
 
-            // Determinar qué campos del registro existente están vacíos y el Excel los tiene
+            $candidateEntries = [];
+            $attemptedGlobalLookup = false;
+            if ($rowMrId !== null && $rowMrId > 0) {
+                $candidateEntries = $existingByMicroAndSignature[(int) $rowMrId][$matchingSignature] ?? [];
+            } else {
+                $attemptedGlobalLookup = true;
+                $candidateEntries = $existingBySignatureGlobal[$matchingSignature] ?? [];
+            }
+
+            if (count($candidateEntries) > 1) {
+                $rowErrors[] = [
+                    'row' => $row,
+                    'message' => "Fila {$row}: se encontraron múltiples registros con la misma llave base; ajusta columnas base para mayor precisión.",
+                    'data' => $values,
+                    'failed_fields' => [[
+                        'key' => '__ambiguous_match__',
+                        'label' => 'Coincidencia ambigua',
+                        'reason' => 'Más de un registro coincide con las columnas base.',
+                        'received' => '',
+                    ]],
+                    'suggestions' => [],
+                ];
+                $skipped++;
+                continue;
+            }
+
+            $matchedEntry = count($candidateEntries) === 1 ? $candidateEntries[0] : null;
+
+            // Sin coincidencia: crear nuevo registro con valores mapeados.
+            if ($matchedEntry === null) {
+                if ($rowMrId === null || $rowMrId <= 0) {
+                    $rowErrors[] = [
+                        'row' => $row,
+                        'message' => $attemptedGlobalLookup
+                            ? "Fila {$row}: no hubo coincidencia global por columnas base y no se pudo determinar microrregión para crear el registro."
+                            : "Fila {$row}: no se pudo determinar la microrregión para crear el nuevo registro.",
+                        'data' => $values,
+                        'failed_fields' => [[
+                            'key' => '__microrregion__',
+                            'label' => 'Microrregión',
+                            'reason' => $attemptedGlobalLookup
+                                ? 'Se intentó búsqueda global por columnas base sin éxito y la fila no trae datos para inferir microrregión.'
+                                : 'No se pudo inferir la microrregión para esta fila.',
+                            'received' => '',
+                        ]],
+                        'suggestions' => [],
+                    ];
+                    $skipped++;
+                    continue;
+                }
+
+                $newData = [];
+                foreach ($importable as $field) {
+                    $newData[$field->key] = $values[$field->key] ?? null;
+                }
+
+                $newEntry = $module->entries()->create([
+                    'user_id' => $userId,
+                    'microrregion_id' => (int) $rowMrId,
+                    'data' => $newData,
+                    'submitted_at' => Carbon::now(),
+                ]);
+
+                $created++;
+
+                $existingByMicroAndSignature[(int) $rowMrId][$matchingSignature][] = $newEntry;
+                $existingBySignatureGlobal[$matchingSignature][] = $newEntry;
+                continue;
+            }
+
             $entryData = (array) ($matchedEntry->data ?? []);
             $fieldsToUpdate = [];
 
-            foreach ($fillableFields as $field) {
-                $excelVal = $values[$field->key] ?? null;
-                $existingVal = $entryData[$field->key] ?? null;
+            foreach ($updateKeys as $fieldKey) {
+                $excelVal = $values[$fieldKey] ?? null;
+                $existingVal = $entryData[$fieldKey] ?? null;
 
-                // ¿El campo del registro existente está vacío?
-                $existingEmpty = $existingVal === null || $existingVal === ''
-                    || (is_string($existingVal) && trim($existingVal) === '');
+                if (! $this->hasMeaningfulValue($excelVal)) {
+                    continue;
+                }
 
-                // ¿El Excel tiene un valor para este campo?
-                $excelHasValue = $excelVal !== null && $excelVal !== ''
-                    && (! is_string($excelVal) || trim($excelVal) !== '');
-
-                if ($existingEmpty && $excelHasValue) {
-                    $fieldsToUpdate[$field->key] = $excelVal;
+                if (! $this->valuesAreEquivalent($existingVal, $excelVal)) {
+                    $fieldsToUpdate[$fieldKey] = $excelVal;
                 }
             }
 
             if (empty($fieldsToUpdate)) {
-                $rowErrors[] = [
-                    'row' => $row,
-                    'message' => "Fila {$row}: el registro ya tiene todos los campos completos.",
-                    'data' => $values,
-                    'failed_fields' => [['key' => '__complete__', 'label' => 'Sin cambios', 'reason' => 'No hay campos vacíos que completar.', 'received' => '']],
-                    'suggestions' => [],
-                ];
                 $skipped++;
                 continue;
             }
 
-            // Aplicar la actualización parcial
             $newData = array_merge($entryData, $fieldsToUpdate);
             $matchedEntry->data = $newData;
             $matchedEntry->save();
             $updated++;
         }
 
-        return ['updated' => $updated, 'skipped' => $skipped, 'row_errors' => array_slice($rowErrors, 0, 50)];
+        return [
+            'updated' => $updated,
+            'created' => $created,
+            'skipped' => $skipped,
+            'row_errors' => array_slice($rowErrors, 0, 50),
+        ];
     }
 
     /**
-     * Busca un registro existente que coincida por los campos de comparación (no-imagen).
+     * Firma de coincidencia exacta por 1..n columnas base.
      */
-    private function findMatchingEntry(array $entries, array $excelValues, Collection $matchFields): ?object
+    private function buildMatchingSignature(array $values, array $matchingKeys): ?string
     {
-        $bestMatch = null;
-        $bestScore = 0;
+        $normalized = [];
 
-        foreach ($entries as $entry) {
-            $entryData = (array) ($entry->data ?? []);
-            $score = 0;
-            $totalMatchable = 0;
-
-            foreach ($matchFields as $field) {
-                $excelVal = $excelValues[$field->key] ?? null;
-                $entryVal = $entryData[$field->key] ?? null;
-
-                // Saltar campos que no están en el Excel (no mapeados)
-                if ($excelVal === null || ($excelVal === '' && ($entryVal === null || $entryVal === ''))) {
-                    continue;
-                }
-
-                $totalMatchable++;
-
-                $normExcel = $this->normalizeLabel($this->stringifyCell($excelVal));
-                $normEntry = $this->normalizeLabel($this->stringifyCell($entryVal));
-
-                if ($normExcel === $normEntry) {
-                    $score++;
-                }
+        foreach ($matchingKeys as $key) {
+            $value = $values[$key] ?? null;
+            if (! $this->hasMeaningfulValue($value)) {
+                return null;
             }
 
-            // Necesita al menos 2 campos coincidentes y un 80% de coincidencia
-            if ($totalMatchable >= 2 && $score > 0) {
-                $pct = $score / $totalMatchable;
-                if ($pct >= 0.8 && $score > $bestScore) {
-                    $bestScore = $score;
-                    $bestMatch = $entry;
-                }
-            } elseif ($totalMatchable === 1 && $score === 1 && $bestScore === 0) {
-                $bestMatch = $entry;
-                $bestScore = $score;
+            if (is_array($value)) {
+                $normalized[$key] = $this->normalizeDataForSignature($value);
+                continue;
             }
+
+            $stringValue = $this->stringifyCell($value);
+            $normalized[$key] = $this->normalizeLabel($stringValue);
         }
 
-        return $bestMatch;
+        ksort($normalized);
+
+        return md5(json_encode($normalized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
+
+    private function hasMeaningfulValue(mixed $value): bool
+    {
+        if ($value === null) {
+            return false;
+        }
+
+        if (is_string($value)) {
+            return trim($value) !== '';
+        }
+
+        if (is_array($value)) {
+            if (empty($value)) {
+                return false;
+            }
+
+            foreach ($value as $item) {
+                if ($this->hasMeaningfulValue($item)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function valuesAreEquivalent(mixed $left, mixed $right): bool
+    {
+        $normLeft = $this->normalizeDataForCompare($left);
+        $normRight = $this->normalizeDataForCompare($right);
+
+        return $normLeft == $normRight;
+    }
+
+    private function normalizeDataForCompare(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            $normalized = [];
+            foreach ($value as $k => $v) {
+                $normalized[(string) $k] = $this->normalizeDataForCompare($v);
+            }
+            ksort($normalized);
+
+            return $normalized;
+        }
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (string) (0 + $value);
+        }
+
+        return $this->normalizeLabel($this->stringifyCell($value));
+    }
+
 }
+
+

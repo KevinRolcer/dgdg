@@ -331,16 +331,47 @@ iv>
                         <!-- PASO 2: Mapeo de columnas (Integrado) -->
                         <div id="tmExcelStep2" class="tm-hidden" style="display:flex; flex-direction:column; padding-top:20px; border-top: 1px dashed var(--clr-border); margin-top:20px;">
                             <h4 class="tm-excel-step-title">Relacionar columnas</h4>
-                                <label class="tm-excel-search-all-wrap" id="tmExcelAutoMunicipioWrap" style="margin-bottom:10px;">
-                                    <input type="checkbox" id="tmExcelAutoIdentifyMunicipio" checked>
-                                    <span>Identificar municipio automáticamente (por columna Municipio)</span>
-                                </label>
-                            <div class="tm-table-wrap" style="margin-bottom:12px; border:1px solid var(--clr-border); border-radius:8px; background: rgba(0,0,0,0.02);">
-                                <table class="tm-table tm-table-sm tm-excel-map-table" style="font-size:12px; width:100%;">
-                                    <thead><tr><th style="padding:10px 8px;">Campo del módulo</th><th style="padding:10px 8px;">Columna del Excel</th></tr></thead>
-                                    <tbody id="tmExcelMapBody" class="tm-excel-map-body"></tbody>
-                                </table>
-                            </div>
+                                <div class="tm-excel-mode-tabs" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+                                    <button type="button" class="tm-btn tm-btn-primary tm-excel-mode-tab is-active" data-excel-mode="import">Importar</button>
+                                    <button type="button" class="tm-btn tm-btn-outline tm-excel-mode-tab" data-excel-mode="update">Actualizar</button>
+                                </div>
+
+                                <div class="tm-excel-mode-panel tm-excel-mode-panel-import" data-excel-mode-panel="import">
+                                    <div class="inline-alert inline-alert-success" style="margin-bottom:10px;">Solo registra filas nuevas; si detecta duplicados no las sube y muestra sugerencias.</div>
+                                    <label class="tm-excel-search-all-wrap" id="tmExcelAutoMunicipioWrap" style="margin-bottom:10px;">
+                                        <input type="checkbox" id="tmExcelAutoIdentifyMunicipio" checked>
+                                        <span>Identificar municipio automáticamente (por columna Municipio)</span>
+                                    </label>
+                                    <div class="tm-table-wrap" style="margin-bottom:12px; border:1px solid var(--clr-border); border-radius:8px; background: rgba(0,0,0,0.02);">
+                                        <table class="tm-table tm-table-sm tm-excel-map-table" style="font-size:12px; width:100%;">
+                                            <thead><tr><th style="padding:10px 8px;">Campo del módulo</th><th style="padding:10px 8px;">Columna del Excel</th></tr></thead>
+                                            <tbody id="tmExcelMapBodyImport"></tbody>
+                                        </table>
+                                    </div>
+                                    <div class="tm-actions" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                        <button type="button" class="tm-btn" id="tmExcelVolver">Restablecer</button>
+                                        <button type="button" class="tm-btn tm-btn-primary" id="tmExcelImportar">Importar filas</button>
+                                    </div>
+                                </div>
+
+                                <div class="tm-excel-mode-panel tm-excel-mode-panel-update tm-hidden" data-excel-mode-panel="update">
+                                    <div class="inline-alert inline-alert-success" style="margin-bottom:10px;">Define columnas base para buscar coincidencias y columnas a actualizar para aplicar cambios.</div>
+                                    <label class="tm-excel-search-all-wrap" style="margin-bottom:10px;">
+                                        <input type="checkbox" id="tmExcelAutoIdentifyMunicipioUpdate" checked>
+                                        <span>Identificar municipio automáticamente (por columna Municipio)</span>
+                                    </label>
+                                    <div class="tm-table-wrap" style="margin-bottom:12px; border:1px solid var(--clr-border); border-radius:8px; background: rgba(0,0,0,0.02);">
+                                        <table class="tm-table tm-table-sm tm-excel-map-table" style="font-size:12px; width:100%;">
+                                            <thead><tr><th style="padding:10px 8px;">Campo del módulo</th><th style="padding:10px 8px;">Configuración de actualización</th></tr></thead>
+                                            <tbody id="tmExcelMapBodyUpdate"></tbody>
+                                        </table>
+                                    </div>
+                                    <div class="tm-actions" style="display:grid; grid-template-columns:1fr; gap:10px; margin-top:8px;">
+                                        <button type="button" class="tm-btn tm-btn-outline" id="tmExcelActualizarExistentes" title="Busca por columnas base y actualiza solo columnas marcadas">
+                                            <i class="fa-solid fa-arrows-rotate"></i> Actualizar registros existentes
+                                        </button>
+                                    </div>
+                                </div>
                             <div id="tmExcelImportErr" class="inline-alert inline-alert-error tm-hidden" role="alert"></div>
                             <div id="tmExcelImportOk" class="inline-alert inline-alert-success tm-hidden" role="alert"></div>
 
@@ -349,15 +380,6 @@ iv>
                                 <h4 class="tm-excel-step-title" style="color:var(--clr-primary); border-bottom-color:var(--clr-primary);">Errores de Importación</h4>
                                 <p style="font-size:0.85rem; color:var(--clr-text-light); margin-bottom:15px;">Las siguientes filas no se pudieron importar. Puedes corregirlas seleccionando una sugerencia:</p>
                                 <div id="tmExcelErrorsList" style="display:grid; gap:12px;"></div>
-                            </div>
-                            <div class="tm-actions" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                                <button type="button" class="tm-btn" id="tmExcelVolver">Restablecer</button>
-                                <button type="button" class="tm-btn tm-btn-primary" id="tmExcelImportar">Importar filas</button>
-                            </div>
-                            <div class="tm-actions" style="display:grid; grid-template-columns:1fr; gap:10px; margin-top:8px;">
-                                <button type="button" class="tm-btn tm-btn-outline" id="tmExcelActualizarExistentes" title="Solo completa campos vacíos (ej: imágenes) en registros que ya existen">
-                                    <i class="fa-solid fa-arrows-rotate"></i> Actualizar registros existentes
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -1684,6 +1706,39 @@ iv>
     const municipioSelectImport = document.getElementById('tmExcelSelectedMunicipio');
     const autoMunicipioWrap = document.getElementById('tmExcelAutoMunicipioWrap');
     const autoMunicipioCheck = document.getElementById('tmExcelAutoIdentifyMunicipio');
+    const autoMunicipioCheckUpdate = document.getElementById('tmExcelAutoIdentifyMunicipioUpdate');
+    const modeTabs = Array.from(document.querySelectorAll('.tm-excel-mode-tab'));
+    const modePanels = Array.from(document.querySelectorAll('.tm-excel-mode-panel'));
+    let activeExcelMode = 'import';
+
+    const getActiveMapSelector = () => activeExcelMode === 'update'
+        ? '.tm-excel-map-select-update'
+        : '.tm-excel-map-select-import';
+
+    const getActiveAutoMunicipioCheck = () => activeExcelMode === 'update'
+        ? autoMunicipioCheckUpdate
+        : autoMunicipioCheck;
+
+    const setExcelMode = (mode) => {
+        activeExcelMode = mode === 'update' ? 'update' : 'import';
+        modeTabs.forEach((tab) => {
+            const isActive = tab.getAttribute('data-excel-mode') === activeExcelMode;
+            tab.classList.toggle('is-active', isActive);
+            tab.classList.toggle('tm-btn-primary', isActive);
+            tab.classList.toggle('tm-btn-outline', !isActive);
+        });
+        modePanels.forEach((panel) => {
+            const isActive = panel.getAttribute('data-excel-mode-panel') === activeExcelMode;
+            panel.classList.toggle('tm-hidden', !isActive);
+        });
+        updateMunicipioImportMode();
+    };
+
+    modeTabs.forEach((tab) => {
+        tab.addEventListener('click', function () {
+            setExcelMode(tab.getAttribute('data-excel-mode') || 'import');
+        });
+    });
 
     function renderImportMunicipios() {
         if (!mrSelect || !municipioSelectImport) return;
@@ -1700,18 +1755,19 @@ iv>
     function updateMunicipioImportMode() {
         const municipioField = Array.isArray(excelFields) ? excelFields.find(function (f) { return f && f.type === 'municipio'; }) : null;
         const municipioMapSelect = municipioField
-            ? document.querySelector('.tm-excel-map-select[data-field-key="' + String(municipioField.key || '').replace(/"/g, '') + '"]')
+            ? document.querySelector(getActiveMapSelector() + '[data-field-key="' + String(municipioField.key || '').replace(/"/g, '') + '"]')
             : null;
         const hasMunicipioColumnMapped = !!(municipioMapSelect && municipioMapSelect.value !== '');
         if (autoMunicipioWrap) autoMunicipioWrap.style.display = municipioMapSelect ? '' : 'none';
-        if (autoMunicipioCheck) {
-            autoMunicipioCheck.disabled = !hasMunicipioColumnMapped;
-            if (!hasMunicipioColumnMapped) autoMunicipioCheck.checked = false;
-            if (hasMunicipioColumnMapped && autoMunicipioCheck.dataset.userTouched !== '1') {
-                autoMunicipioCheck.checked = true;
+        const activeAutoCheck = getActiveAutoMunicipioCheck();
+        if (activeAutoCheck) {
+            activeAutoCheck.disabled = !hasMunicipioColumnMapped;
+            if (!hasMunicipioColumnMapped) activeAutoCheck.checked = false;
+            if (hasMunicipioColumnMapped && activeAutoCheck.dataset.userTouched !== '1') {
+                activeAutoCheck.checked = true;
             }
         }
-        const useManualMunicipio = !hasMunicipioColumnMapped || !autoMunicipioCheck || !autoMunicipioCheck.checked;
+        const useManualMunicipio = !hasMunicipioColumnMapped || !activeAutoCheck || !activeAutoCheck.checked;
         if (municipioLabel) {
             const shouldShow = !searchAllCheck?.checked && useManualMunicipio;
             municipioLabel.style.display = shouldShow ? 'block' : 'none';
@@ -1730,10 +1786,8 @@ iv>
         renderImportMunicipios();
         updateMunicipioImportMode();
     });
-    autoMunicipioCheck?.addEventListener('change', function () {
-        this.dataset.userTouched = '1';
-        updateMunicipioImportMode();
-    });
+    autoMunicipioCheck?.addEventListener('change', function () { this.dataset.userTouched = '1'; updateMunicipioImportMode(); });
+    autoMunicipioCheckUpdate?.addEventListener('change', function () { this.dataset.userTouched = '1'; updateMunicipioImportMode(); });
     renderImportMunicipios();
     updateMunicipioImportMode();
 
@@ -1792,7 +1846,7 @@ iv>
 
                 const updateMappedColumns = () => {
                     document.querySelectorAll('.is-mapped-column').forEach(el => el.classList.remove('is-mapped-column'));
-                    document.querySelectorAll('.tm-excel-map-select').forEach(sel => {
+                    document.querySelectorAll(getActiveMapSelector()).forEach(sel => {
                         if (sel.value === '') return;
                         const idx = parseInt(sel.value, 10);
                         const th = document.querySelector(`.tm-excel-preview-table thead th:nth-child(${idx + 2})`);
@@ -1801,6 +1855,35 @@ iv>
                             const td = tr.querySelector(`td:nth-child(${idx + 2})`);
                             if (td) td.classList.add('is-mapped-column');
                         });
+                    });
+                };
+
+                const updateMatchingKeyPriorities = () => {
+                    let rank = 1;
+                    document.querySelectorAll('.tm-excel-map-select-update').forEach(sel => {
+                        const key = sel.getAttribute('data-field-key');
+                        if (!key) return;
+                        const checkbox = document.querySelector('.tm-excel-match-key[data-field-key="' + String(key).replace(/"/g, '') + '"]');
+                        const badge = document.querySelector('.tm-excel-match-order[data-field-key="' + String(key).replace(/"/g, '') + '"]');
+                        if (!checkbox || !badge) return;
+
+                        if (sel.value === '') {
+                            checkbox.checked = false;
+                            checkbox.disabled = true;
+                            badge.style.display = 'none';
+                            badge.textContent = '';
+                            return;
+                        }
+
+                        checkbox.disabled = false;
+                        if (checkbox.checked) {
+                            badge.textContent = 'Base ' + rank;
+                            badge.style.display = 'inline-flex';
+                            rank++;
+                        } else {
+                            badge.style.display = 'none';
+                            badge.textContent = '';
+                        }
                     });
                 };
 
@@ -1815,11 +1898,14 @@ iv>
                     'textarea': 'Texto largo'
                 };
 
-                const tbody = document.getElementById('tmExcelMapBody');
-                if (tbody) {
-                    tbody.innerHTML = '';
+                const tbodyImport = document.getElementById('tmExcelMapBodyImport');
+                const tbodyUpdate = document.getElementById('tmExcelMapBodyUpdate');
+                if (tbodyImport && tbodyUpdate) {
+                    tbodyImport.innerHTML = '';
+                    tbodyUpdate.innerHTML = '';
                     excelFields.forEach(f => {
-                        const tr = document.createElement('tr');
+                        const trImport = document.createElement('tr');
+                        const trUpdate = document.createElement('tr');
                         const sug = excelSuggested[f.key];
                         const friendly = friendlyTypes[f.type] || f.type;
                         let opts = '<option value="">— No importar —</option>';
@@ -1827,19 +1913,29 @@ iv>
                             const sel = (sug === h.index) ? ' selected' : '';
                             opts += '<option value="' + h.index + '"' + sel + '>' + (h.letter + ': ' + (h.label || '(vacío)')).replace(/</g, '') + '</option>';
                         });
-                        tr.innerHTML = '<td title="Tipo: ' + friendly + '" style="cursor:help; font-weight:600;">' + String(f.label).replace(/</g, '') + (f.is_required ? ' *' : '') + '</td><td><select class="tm-excel-map-select" data-field-key="' + String(f.key).replace(/"/g, '') + '">' + opts + '</select></td>';
-                        tbody.appendChild(tr);
+                        trImport.innerHTML = '<td title="Tipo: ' + friendly + '" style="cursor:help; font-weight:600;">' + String(f.label).replace(/</g, '') + (f.is_required ? ' *' : '') + '</td><td><select class="tm-excel-map-select-import" data-field-key="' + String(f.key).replace(/"/g, '') + '">' + opts + '</select></td>';
+                        trUpdate.innerHTML = '<td title="Tipo: ' + friendly + '" style="cursor:help; font-weight:600; width:38%;">' + String(f.label).replace(/</g, '') + (f.is_required ? ' *' : '') + '</td><td><div style="display:flex; flex-direction:column; gap:8px;"><div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:10px; color:var(--clr-text-light);">Columna del Excel</span><select class="tm-excel-map-select-update" data-field-key="' + String(f.key).replace(/"/g, '') + '" style="width:100%; min-width:0;">' + opts + '</select></div><div style="display:flex; flex-wrap:wrap; gap:12px 18px; align-items:center;"><label style="display:flex; align-items:center; gap:6px; font-size:12px; line-height:1.2;"><input type="checkbox" class="tm-excel-match-key" data-field-key="' + String(f.key).replace(/"/g, '') + '"><span>Usar como base</span></label><span class="tm-excel-match-order" data-field-key="' + String(f.key).replace(/"/g, '') + '" style="display:none; padding:2px 8px; border-radius:999px; background:rgba(47,111,237,0.12); color:#2f6fed; font-weight:700;"></span><label style="display:flex; align-items:center; gap:6px; font-size:12px; line-height:1.2;"><input type="checkbox" class="tm-excel-update-key" data-field-key="' + String(f.key).replace(/"/g, '') + '"><span>Actualizar</span></label></div></div></td>';
+                        tbodyImport.appendChild(trImport);
+                        tbodyUpdate.appendChild(trUpdate);
                     });
 
-                    document.querySelectorAll('.tm-excel-map-select').forEach(sel => {
+                    document.querySelectorAll('.tm-excel-map-select-import, .tm-excel-map-select-update').forEach(sel => {
                         sel.addEventListener('change', function () {
                             updateMappedColumns();
                             updateMunicipioImportMode();
+                            updateMatchingKeyPriorities();
+                        });
+                    });
+                    document.querySelectorAll('.tm-excel-match-key').forEach(chk => {
+                        chk.addEventListener('change', function () {
+                            updateMatchingKeyPriorities();
                         });
                     });
                     updateMappedColumns();
                     updateMunicipioImportMode();
+                    updateMatchingKeyPriorities();
                 }
+                setExcelMode(activeExcelMode);
                 document.getElementById('tmExcelStep2')?.classList.remove('tm-hidden');
 
                 // Desplazar suavemente hacia abajo dentro del contenedor lateral
@@ -1882,7 +1978,7 @@ iv>
         const file = document.getElementById('tmExcelFile')?.files[0];
         if (!file) return;
         const mapping = {};
-        document.querySelectorAll('.tm-excel-map-select').forEach(sel => {
+        document.querySelectorAll('.tm-excel-map-select-import').forEach(sel => {
             const key = sel.getAttribute('data-field-key');
             if (key) mapping[key] = sel.value === '' ? null : parseInt(sel.value, 10);
         });
@@ -2031,17 +2127,54 @@ iv>
         const file = document.getElementById('tmExcelFile')?.files[0];
         if (!file) return;
         const mapping = {};
-        document.querySelectorAll('.tm-excel-map-select').forEach(sel => {
+        document.querySelectorAll('.tm-excel-map-select-update').forEach(sel => {
             const key = sel.getAttribute('data-field-key');
             if (key) mapping[key] = sel.value === '' ? null : parseInt(sel.value, 10);
         });
+        const matchingKeys = [];
+        document.querySelectorAll('.tm-excel-match-key:checked').forEach(chk => {
+            const key = chk.getAttribute('data-field-key');
+            if (!key) return;
+            if (!Object.prototype.hasOwnProperty.call(mapping, key)) return;
+            if (mapping[key] === null) return;
+            matchingKeys.push(key);
+        });
+        if (matchingKeys.length === 0) {
+            const err = document.getElementById('tmExcelImportErr');
+            if (err) {
+                err.textContent = 'Selecciona al menos una columna base mapeada para identificar coincidencias.';
+                err.classList.remove('tm-hidden');
+            }
+            return;
+        }
+        const updateKeys = [];
+        document.querySelectorAll('.tm-excel-update-key:checked').forEach(chk => {
+            const key = chk.getAttribute('data-field-key');
+            if (!key) return;
+            if (!Object.prototype.hasOwnProperty.call(mapping, key)) return;
+            if (mapping[key] === null) return;
+            if (matchingKeys.includes(key)) return;
+            updateKeys.push(key);
+        });
+        if (updateKeys.length === 0) {
+            const err = document.getElementById('tmExcelImportErr');
+            if (err) {
+                err.textContent = 'Selecciona al menos una columna a actualizar (distinta de las columnas base).';
+                err.classList.remove('tm-hidden');
+            }
+            return;
+        }
         const fd = new FormData();
         fd.append('archivo_excel', file);
         fd.append('header_row', document.getElementById('tmExcelHeaderRow')?.value || '1');
         fd.append('data_start_row', document.getElementById('tmExcelDataStartRow')?.value || '2');
         fd.append('mapping', JSON.stringify(mapping));
+        fd.append('matching_keys', JSON.stringify(matchingKeys));
+        fd.append('update_keys', JSON.stringify(updateKeys));
         fd.append('all_microrregions', document.getElementById('tmExcelSearchAll')?.checked ? '1' : '0');
         fd.append('selected_microrregion_id', document.getElementById('tmExcelMicrorregionId')?.value || '');
+        fd.append('selected_municipio', document.getElementById('tmExcelSelectedMunicipio')?.value || '');
+        fd.append('auto_identify_municipio', document.getElementById('tmExcelAutoIdentifyMunicipioUpdate')?.checked ? '1' : '0');
         fd.append('sheet_index', currentSheetIdx);
         fd.append('_token', csrfToken);
 

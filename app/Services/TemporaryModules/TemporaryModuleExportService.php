@@ -30,6 +30,9 @@ class TemporaryModuleExportService
 
     /** @var array<string,array<string,mixed>> */
     private array $columnConfigByKey = [];
+
+    /** @var array<string,string> lower group name => ARGB */
+    private array $groupHeaderColorByName = [];
     public function __construct(
         private readonly TemporaryModuleFieldService $fieldService,
         private readonly TemporaryModuleEntryDataService $entryDataService,
@@ -90,6 +93,7 @@ class TemporaryModuleExportService
         // Normalizar configuración opcional desde el front
         $this->exportConfig = $exportConfig ?? [];
         $this->columnConfigByKey = [];
+        $this->groupHeaderColorByName = $this->resolveGroupHeaderColorMap(is_array($this->exportConfig['groups'] ?? null) ? $this->exportConfig['groups'] : []);
         foreach (($this->exportConfig['columns'] ?? []) as $colCfg) {
             if (!is_array($colCfg)) {
                 continue;
@@ -693,6 +697,36 @@ class TemporaryModuleExportService
         return null;
     }
 
+    /**
+     * @param array<int,mixed> $groups
+     * @return array<string,string>
+     */
+    private function resolveGroupHeaderColorMap(array $groups): array
+    {
+        $map = [];
+        foreach ($groups as $group) {
+            if (is_string($group)) {
+                $name = trim($group);
+                if ($name === '') {
+                    continue;
+                }
+                $map[mb_strtolower($name, 'UTF-8')] = 'FF64748B';
+                continue;
+            }
+            if (!is_array($group)) {
+                continue;
+            }
+            $name = trim((string) ($group['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $argb = $this->mapCssColorToArgb((string) ($group['color'] ?? '#64748B'));
+            $map[mb_strtolower($name, 'UTF-8')] = $argb ?? 'FF64748B';
+        }
+
+        return $map;
+    }
+
     private function fillTotalesPorCategoriaSheet(Worksheet $sheet, TemporaryModule $temporaryModule, $categoriaField): void
     {
         $catKey = $categoriaField->key;
@@ -924,7 +958,7 @@ class TemporaryModuleExportService
      * @param  array<int,array{id:string,label:string,group?:string,field_key:string,agg:string,match_value?:string}>  $sumMetrics
      * @param  array<int,array{id:string,label:string,group?:string,op:string,metric_ids:array<int,string>,base_metric_id?:string}>  $sumFormulas
      * @param  array<string,string>  $fieldLabels
-     * @return array{group_label:string,metric_columns:array<int,array{id:string,label:string,group:string}>,formula_columns:array<int,array{id:string,label:string,group:string,op:string,base_metric_id:string}>,metric_labels:array<string,string>,formula_labels:array<string,string>,rows:array<int,array{group:string,metrics:array<string,float>,formulas:array<string,float>}>}
+    * @return array{group_label:string,metric_columns:array<int,array{id:string,label:string,group:string,include_total:bool}>,formula_columns:array<int,array{id:string,label:string,group:string,op:string,base_metric_id:string,include_total:bool}>,metric_labels:array<string,string>,formula_labels:array<string,string>,rows:array<int,array{group:string,metrics:array<string,float>,formulas:array<string,float>}>}
      */
     private function buildSumTableData(
         Collection $entries,
@@ -947,8 +981,9 @@ class TemporaryModuleExportService
             $label = (string) ($metric['label'] ?? $id);
             $group = trim((string) ($metric['group'] ?? ''));
             $sortOrder = (int) ($metric['sort_order'] ?? 0);
+            $includeTotal = !array_key_exists('include_total', $metric) || !empty($metric['include_total']);
             $metricLabels[$id] = $label;
-            $metricColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'sort_order' => $sortOrder];
+            $metricColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'include_total' => $includeTotal, 'sort_order' => $sortOrder];
         }
         foreach ($sumFormulas as $formula) {
             $id = (string) ($formula['id'] ?? '');
@@ -960,8 +995,9 @@ class TemporaryModuleExportService
             $op = (string) ($formula['op'] ?? 'add');
             $baseMetricId = (string) ($formula['base_metric_id'] ?? '');
             $sortOrder = (int) ($formula['sort_order'] ?? 0);
+            $includeTotal = !array_key_exists('include_total', $formula) || !empty($formula['include_total']);
             $formulaLabels[$id] = $label;
-            $formulaColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'op' => $op, 'base_metric_id' => $baseMetricId, 'sort_order' => $sortOrder];
+            $formulaColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'op' => $op, 'base_metric_id' => $baseMetricId, 'include_total' => $includeTotal, 'sort_order' => $sortOrder];
         }
 
         $rowsByKey = [];
@@ -1195,6 +1231,9 @@ class TemporaryModuleExportService
         $sumFormulas = $includeSumTable && is_array($this->exportConfig['sum_formulas'] ?? null)
             ? array_values($this->exportConfig['sum_formulas'])
             : [];
+        $sumIncludeTotalsRow = $includeSumTable && !empty($this->exportConfig['include_sum_totals_row']);
+        $sumTotalsBold = !array_key_exists('sum_totals_bold', $this->exportConfig ?? []) || !empty($this->exportConfig['sum_totals_bold']);
+        $sumTotalsTextColorArgb = $this->mapCssColorToArgb((string) ($this->exportConfig['sum_totals_text_color'] ?? '')) ?: self::HEADER_FILL_COLOR;
         $fieldLabels = [];
         foreach ($exportColumns as $column) {
             $field = $column['field'] ?? null;
@@ -1347,12 +1386,13 @@ class TemporaryModuleExportService
                         'label' => (string) ($col['label'] ?? ''),
                         'group' => trim((string) ($col['group'] ?? '')),
                         'op' => 'metric',
+                        'include_total' => !array_key_exists('include_total', $col) || !empty($col['include_total']),
                         'sort_order' => (int) ($col['sort_order'] ?? 0),
                     ];
                 }
                 if ($sumCombinedCols === [] && $sumMetricLabels !== []) {
                     foreach ($sumMetricLabels as $id => $label) {
-                        $sumCombinedCols[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'metric', 'sort_order' => 0];
+                        $sumCombinedCols[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'metric', 'include_total' => true, 'sort_order' => 0];
                     }
                 }
                 foreach ($sumFormulaColumns as $col) {
@@ -1361,12 +1401,13 @@ class TemporaryModuleExportService
                         'label' => (string) ($col['label'] ?? ''),
                         'group' => trim((string) ($col['group'] ?? '')),
                         'op' => (string) ($col['op'] ?? 'add'),
+                        'include_total' => !array_key_exists('include_total', $col) || !empty($col['include_total']),
                         'sort_order' => (int) ($col['sort_order'] ?? 0),
                     ];
                 }
                 if (empty($sumFormulaColumns) && $sumFormulaLabels !== []) {
                     foreach ($sumFormulaLabels as $id => $label) {
-                        $sumCombinedCols[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'add', 'sort_order' => 0];
+                        $sumCombinedCols[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'add', 'include_total' => true, 'sort_order' => 0];
                     }
                 }
                 if ($sumCombinedCols !== []) {
@@ -1482,6 +1523,42 @@ class TemporaryModuleExportService
                     $rowPtr++;
                 }
 
+                if ($sumIncludeTotalsRow) {
+                    $sheet->setCellValue('A'.$rowPtr, $this->normalizeExportHeading('Total', $headersUppercase));
+                    $colIdx = 2;
+                    foreach ($sumCombinedCols as $col) {
+                        $includeTotal = !array_key_exists('include_total', $col) || !empty($col['include_total']);
+                        if (!$includeTotal) {
+                            $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$rowPtr, '');
+                            $colIdx++;
+                            continue;
+                        }
+
+                        $id = (string) ($col['id'] ?? '');
+                        $total = 0.0;
+                        foreach ($sumRows as $row) {
+                            if ((string) ($col['op'] ?? 'metric') === 'metric') {
+                                $total += (float) (($row['metrics'][$id] ?? 0.0));
+                            } else {
+                                $total += (float) (($row['formulas'][$id] ?? 0.0));
+                            }
+                        }
+
+                        if ((string) ($col['op'] ?? '') === 'percent') {
+                            $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$rowPtr, $total / 100);
+                            $sheet->getStyle(Coordinate::stringFromColumnIndex($colIdx).$rowPtr)
+                                ->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE_00);
+                        } else {
+                            $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$rowPtr, round($total, 2));
+                        }
+                        $colIdx++;
+                    }
+
+                    $sheet->getStyle('A'.$rowPtr.':'.$sumLastLetter.$rowPtr)
+                        ->getFont()->setBold($sumTotalsBold)->getColor()->setARGB($sumTotalsTextColorArgb);
+                    $rowPtr++;
+                }
+
                 $sumLastDataRow = $rowPtr - 1;
                 $sheet->getStyle('A'.$sumHeaderRow.':'.$sumLastLetter.$sumHeaderRow)
                     ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF475569');
@@ -1503,7 +1580,7 @@ class TemporaryModuleExportService
                     $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth(14);
                 }
 
-                $countTableRows += 2 + count($sumRows);
+                $countTableRows += 2 + count($sumRows) + ($sumIncludeTotalsRow ? 1 : 0);
                 $maxColIdx = max($maxColIdx, $sumLastCol);
             }
         }
@@ -1649,6 +1726,24 @@ class TemporaryModuleExportService
                 $sheet->getStyle($range)->getFill()
                     ->setFillType(Fill::FILL_SOLID)
                     ->getStartColor()->setARGB($argb);
+            }
+        }
+
+        if ($hasSections) {
+            $groupHeaderRow = $tableHeaderFirstRow;
+            foreach ($exportColumns as $idx => $col) {
+                $group = trim((string) ($col['header1'] ?? ''));
+                if ($group === '') {
+                    continue;
+                }
+                $groupKey = mb_strtolower($group, 'UTF-8');
+                $argb = $this->groupHeaderColorByName[$groupKey] ?? 'FF64748B';
+                $colIndex = $numFixed + $idx + 1;
+                $letter = Coordinate::stringFromColumnIndex($colIndex);
+                $sheet->getStyle($letter.$groupHeaderRow)->getFill()
+                    ->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()->setARGB($argb);
+                $sheet->getStyle($letter.$groupHeaderRow)->getFont()->getColor()->setARGB(self::HEADER_FONT_COLOR);
             }
         }
 

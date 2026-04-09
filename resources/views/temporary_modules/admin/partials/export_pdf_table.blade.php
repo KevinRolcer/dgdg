@@ -358,12 +358,13 @@
             'label' => (string) ($col['label'] ?? ''),
             'group' => trim((string) ($col['group'] ?? '')),
             'op' => 'metric',
+            'include_total' => !array_key_exists('include_total', $col) || !empty($col['include_total']),
             'sort_order' => (int) ($col['sort_order'] ?? 0),
         ];
     }
     if ($sumCombinedColumns === [] && is_array($sumTable['metric_labels'] ?? null)) {
         foreach (($sumTable['metric_labels'] ?? []) as $id => $label) {
-            $sumCombinedColumns[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'metric', 'sort_order' => 0];
+            $sumCombinedColumns[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'metric', 'include_total' => true, 'sort_order' => 0];
         }
     }
     foreach ($sumFormulaColumns as $col) {
@@ -372,12 +373,13 @@
             'label' => (string) ($col['label'] ?? ''),
             'group' => trim((string) ($col['group'] ?? '')),
             'op' => (string) ($col['op'] ?? 'add'),
+            'include_total' => !array_key_exists('include_total', $col) || !empty($col['include_total']),
             'sort_order' => (int) ($col['sort_order'] ?? 0),
         ];
     }
     if ($sumFormulaColumns === [] && is_array($sumTable['formula_labels'] ?? null)) {
         foreach (($sumTable['formula_labels'] ?? []) as $id => $label) {
-            $sumCombinedColumns[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'add', 'sort_order' => 0];
+            $sumCombinedColumns[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'add', 'include_total' => true, 'sort_order' => 0];
         }
     }
     if ($sumCombinedColumns !== []) {
@@ -393,6 +395,9 @@
         });
     }
     $sumHasGroups = collect($sumCombinedColumns)->contains(fn ($c) => ((string) ($c['group'] ?? '')) !== '');
+    $sumIncludeTotalsRow = !empty($sumIncludeTotalsRow) || !empty($sumTable['include_totals_row']);
+    $sumTotalsBold = !array_key_exists('sumTotalsBold', get_defined_vars()) ? (!array_key_exists('totals_bold', $sumTable) || !empty($sumTable['totals_bold'])) : !empty($sumTotalsBold);
+    $sumTotalsTextColor = (string) ($sumTotalsTextColor ?? ('#'.((string) ($sumTable['totals_text_color'] ?? '861E34'))));
     $sumGroupSpans = [];
     if ($sumHasGroups) {
         foreach ($sumCombinedColumns as $col) {
@@ -442,6 +447,34 @@
             @endforeach
         </tr>
     @endforeach
+    @if($sumIncludeTotalsRow)
+        @php
+            $totalsLabel = !empty($headersUppercase) ? mb_strtoupper('Total') : 'Total';
+        @endphp
+        <tr>
+            <td style="color: {{ $sumTotalsTextColor }}; {{ $sumTotalsBold ? 'font-weight:700;' : '' }}">{{ $totalsLabel }}</td>
+            @foreach ($sumCombinedColumns as $col)
+                @php
+                    $includeTotal = !array_key_exists('include_total', $col) || !empty($col['include_total']);
+                    $totalVal = 0.0;
+                    if ($includeTotal) {
+                        foreach (($sumTable['rows'] ?? []) as $sumRow) {
+                            $id = (string) ($col['id'] ?? '');
+                            $isMetric = (string) ($col['op'] ?? 'metric') === 'metric';
+                            $totalVal += $isMetric
+                                ? (float) (($sumRow['metrics'][$id] ?? 0.0))
+                                : (float) (($sumRow['formulas'][$id] ?? 0.0));
+                        }
+                    }
+                    $totalTxt = $includeTotal ? (string) round($totalVal, 2) : '';
+                    if ($includeTotal && (string) ($col['op'] ?? '') === 'percent') {
+                        $totalTxt .= '%';
+                    }
+                @endphp
+                <td style="color: {{ $sumTotalsTextColor }}; {{ $sumTotalsBold ? 'font-weight:700;' : '' }}">{{ $totalTxt }}</td>
+            @endforeach
+        </tr>
+    @endif
     </tbody>
 </table>
 </div>
@@ -462,6 +495,7 @@
     }
 
     $groupSpans = [];
+    $groupHeaderColors = is_array($groupHeaderColors ?? null) ? $groupHeaderColors : [];
     foreach ($colHeaders as $col) {
         $g = $col['group'] ?? '';
         if (!empty($groupSpans) && $groupSpans[count($groupSpans) - 1]['label'] === $g) {
@@ -491,7 +525,11 @@
                         }
                         $gColIdx += $span;
                     @endphp
-                    <th colspan="{{ $gs['span'] }}" style="background-color: {{ $gs['label'] !== '' ? '#64748b' : 'transparent' }}; color: #fff; border: {{ $gs['label'] !== '' ? '1px solid #000' : 'none' }}; width: {{ $pct }}%;">
+                    @php
+                        $groupKey = mb_strtolower(trim((string) ($gs['label'] ?? '')));
+                        $groupBg = $gs['label'] !== '' ? ($groupHeaderColors[$groupKey] ?? '#64748b') : 'transparent';
+                    @endphp
+                    <th colspan="{{ $gs['span'] }}" style="background-color: {{ $groupBg }}; color: #fff; border: {{ $gs['label'] !== '' ? '1px solid #000' : 'none' }}; width: {{ $pct }}%;">
                         {{ $gs['label'] }}
                     </th>
                 @endforeach

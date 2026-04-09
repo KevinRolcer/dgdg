@@ -66,6 +66,10 @@ class TemporaryModuleWordPdfService
         $temporaryModule = TemporaryModule::query()->findOrFail($moduleId);
         $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$moduleId;
 
+        // PDF/Word export can be expensive with many rows/images; relax runtime constraints.
+        set_time_limit(0);
+        ini_set('max_execution_time', '0');
+        ini_set('memory_limit', '1024M');
         $columnsCfg = is_array($exportConfig) && isset($exportConfig['columns']) && is_array($exportConfig['columns'])
             ? $exportConfig['columns']
             : [];
@@ -208,6 +212,9 @@ class TemporaryModuleWordPdfService
         $sumTitleFontSizePx = max(10, min(36, (int) ($exportConfig['sum_title_font_size_px'] ?? 14)));
         $sumTitleFontSizePt = max(8, min(27, (int) round($sumTitleFontSizePx * 0.75)));
         $sumGroupColorHex = $this->cssColorToHex((string) ($exportConfig['sum_group_color'] ?? 'var(--clr-primary)'));
+        $sumIncludeTotalsRow = !empty($exportConfig['include_sum_totals_row']);
+        $sumTotalsBold = !array_key_exists('sum_totals_bold', $exportConfig) || !empty($exportConfig['sum_totals_bold']);
+        $sumTotalsTextColorHex = $this->cssColorToHex((string) ($exportConfig['sum_totals_text_color'] ?? 'var(--clr-primary)'));
         $dataTableAlign = strtolower((string) ($exportConfig['table_align'] ?? 'left'));
         if (!in_array($dataTableAlign, ['left', 'center', 'right', 'stretch'], true)) {
             $dataTableAlign = 'left';
@@ -219,6 +226,7 @@ class TemporaryModuleWordPdfService
         $exportFontName = $this->resolveExportFontName();
         $logoPath = public_path('images/LogoSegobHorizontal.png');
         $hasLogo = is_file($logoPath);
+        $groupHeaderColors = $this->resolveGroupHeaderColorMap(is_array($exportConfig['groups'] ?? null) ? $exportConfig['groups'] : []);
 
         $columns = $this->transformExportColumns($columns, $headersUppercase);
 
@@ -258,6 +266,9 @@ class TemporaryModuleWordPdfService
                 $fieldLabels,
                 $microrregionMeta,
             );
+            $sumTable['include_totals_row'] = $sumIncludeTotalsRow;
+            $sumTable['totals_bold'] = $sumTotalsBold;
+            $sumTable['totals_text_color'] = $sumTotalsTextColorHex;
             if ($headersUppercase) {
                 $sumTable['group_label'] = $this->normalizeExportHeading((string) ($sumTable['group_label'] ?? ''), true);
                 if (is_array($sumTable['metric_labels'] ?? null)) {
@@ -488,12 +499,13 @@ class TemporaryModuleWordPdfService
                         'label' => (string) ($col['label'] ?? ''),
                         'group' => trim((string) ($col['group'] ?? '')),
                         'op' => 'metric',
+                        'include_total' => !array_key_exists('include_total', $col) || !empty($col['include_total']),
                         'sort_order' => (int) ($col['sort_order'] ?? 0),
                     ];
                 }
                 if ($sumCombinedCols === [] && $sumMetricLabels !== []) {
                     foreach ($sumMetricLabels as $id => $label) {
-                        $sumCombinedCols[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'metric', 'sort_order' => 0];
+                        $sumCombinedCols[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'metric', 'include_total' => true, 'sort_order' => 0];
                     }
                 }
                 foreach ($sumFormulaColumns as $col) {
@@ -502,12 +514,13 @@ class TemporaryModuleWordPdfService
                         'label' => (string) ($col['label'] ?? ''),
                         'group' => trim((string) ($col['group'] ?? '')),
                         'op' => (string) ($col['op'] ?? 'add'),
+                        'include_total' => !array_key_exists('include_total', $col) || !empty($col['include_total']),
                         'sort_order' => (int) ($col['sort_order'] ?? 0),
                     ];
                 }
                 if (empty($sumFormulaColumns) && $sumFormulaLabels !== []) {
                     foreach ($sumFormulaLabels as $id => $label) {
-                        $sumCombinedCols[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'add', 'sort_order' => 0];
+                        $sumCombinedCols[] = ['id' => (string) $id, 'label' => (string) $label, 'group' => '', 'op' => 'add', 'include_total' => true, 'sort_order' => 0];
                     }
                 }
                 if ($sumCombinedCols !== []) {
@@ -605,6 +618,45 @@ class TemporaryModuleWordPdfService
                     }
                 }
 
+                if (!empty($sumTable['include_totals_row'])) {
+                    $sumTotalsBoldCfg = !array_key_exists('totals_bold', $sumTable) || !empty($sumTable['totals_bold']);
+                    $sumTotalsTextColorCfg = (string) ($sumTable['totals_text_color'] ?? '861E34');
+                    $sumTbl->addRow();
+                    $sumTbl->addCell(2200)->addText(
+                        $this->normalizeExportHeading('Total', $headersUppercase),
+                        ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $sumTotalsBoldCfg, 'color' => $sumTotalsTextColorCfg]
+                    );
+
+                    foreach ($sumCombinedCols as $col) {
+                        $includeTotal = !array_key_exists('include_total', $col) || !empty($col['include_total']);
+                        if (!$includeTotal) {
+                            $sumTbl->addCell(1600)->addText('');
+                            continue;
+                        }
+
+                        $id = (string) ($col['id'] ?? '');
+                        $total = 0.0;
+                        foreach ($sumRows as $row) {
+                            if ((string) ($col['op'] ?? 'metric') === 'metric') {
+                                $total += (float) (($row['metrics'][$id] ?? 0.0));
+                            } else {
+                                $total += (float) (($row['formulas'][$id] ?? 0.0));
+                            }
+                        }
+
+                        $text = (string) round($total, 2);
+                        if ((string) ($col['op'] ?? '') === 'percent') {
+                            $text .= '%';
+                        }
+
+                        $sumTbl->addCell(1600)->addText(
+                            $text,
+                            ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $sumTotalsBoldCfg, 'color' => $sumTotalsTextColorCfg],
+                            ['alignment' => Jc::CENTER]
+                        );
+                    }
+                }
+
                 $section->addTextBreak(1);
                 $hasSummarySections = true;
             }
@@ -633,7 +685,8 @@ class TemporaryModuleWordPdfService
                 if (!empty($groupSpans) && $groupSpans[count($groupSpans) - 1]['label'] === $g) {
                     $groupSpans[count($groupSpans) - 1]['span']++;
                 } else {
-                    $groupSpans[] = ['label' => $g, 'span' => 1];
+                    $groupKey = mb_strtolower(trim((string) $g), 'UTF-8');
+                    $groupSpans[] = ['label' => $g, 'span' => 1, 'color' => ($groupHeaderColors[$groupKey] ?? '64748B')];
                 }
             }
 
@@ -653,7 +706,7 @@ class TemporaryModuleWordPdfService
                     if ($gs['label'] !== '') {
                         $table->addCell($mergedTwips > 0 ? $mergedTwips : null, [
                             'gridSpan' => $gs['span'],
-                            'bgColor' => '64748B',
+                            'bgColor' => (string) ($gs['color'] ?? '64748B'),
                             'valign' => 'center'
                         ])->addText((string) $gs['label'], ['bold' => true, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
                     } else {
@@ -771,6 +824,9 @@ class TemporaryModuleWordPdfService
             'sumTitleAlign' => $sumTitleAlign,
             'sumTitleFontSizePx' => $sumTitleFontSizePx,
             'sumGroupColor' => '#'.$sumGroupColorHex,
+            'sumIncludeTotalsRow' => $sumIncludeTotalsRow,
+            'sumTotalsBold' => $sumTotalsBold,
+            'sumTotalsTextColor' => '#'.$sumTotalsTextColorHex,
             'tableAlign' => $dataTableAlign,
             'sectionLabel' => $this->normalizeExportHeading('Desglose', $headersUppercase),
             'fontFamily' => $exportFontName,
@@ -781,6 +837,7 @@ class TemporaryModuleWordPdfService
             'orientation' => $orientationConfig,
             'docMarginPreset' => $docMarginPreset,
             'columns' => $columns,
+            'groupHeaderColors' => array_map(static fn (string $hex): string => '#'.$hex, $groupHeaderColors),
             'columnWidthPercents' => $columnWidthPercents,
             'entries' => $entries,
             'microrregionMeta' => $microrregionMeta,
@@ -973,7 +1030,7 @@ class TemporaryModuleWordPdfService
      * @param  array<int,array{id:string,label:string,group?:string,field_key:string,agg:string,match_value?:string}>  $sumMetrics
      * @param  array<int,array{id:string,label:string,group?:string,op:string,metric_ids:array<int,string>,base_metric_id?:string}>  $sumFormulas
      * @param  array<string,string>  $fieldLabels
-     * @return array{group_label:string,metric_columns:array<int,array{id:string,label:string,group:string}>,formula_columns:array<int,array{id:string,label:string,group:string,op:string,base_metric_id:string}>,metric_labels:array<string,string>,formula_labels:array<string,string>,rows:array<int,array{group:string,metrics:array<string,float>,formulas:array<string,float>}>}
+    * @return array{group_label:string,metric_columns:array<int,array{id:string,label:string,group:string,include_total:bool}>,formula_columns:array<int,array{id:string,label:string,group:string,op:string,base_metric_id:string,include_total:bool}>,metric_labels:array<string,string>,formula_labels:array<string,string>,rows:array<int,array{group:string,metrics:array<string,float>,formulas:array<string,float>}>}
      */
     private function buildSumTableData(
         Collection $entries,
@@ -996,8 +1053,9 @@ class TemporaryModuleWordPdfService
             $label = (string) ($metric['label'] ?? $id);
             $group = trim((string) ($metric['group'] ?? ''));
             $sortOrder = (int) ($metric['sort_order'] ?? 0);
+            $includeTotal = !array_key_exists('include_total', $metric) || !empty($metric['include_total']);
             $metricLabels[$id] = $label;
-            $metricColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'sort_order' => $sortOrder];
+            $metricColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'include_total' => $includeTotal, 'sort_order' => $sortOrder];
         }
         foreach ($sumFormulas as $formula) {
             $id = (string) ($formula['id'] ?? '');
@@ -1009,8 +1067,9 @@ class TemporaryModuleWordPdfService
             $op = (string) ($formula['op'] ?? 'add');
             $baseMetricId = (string) ($formula['base_metric_id'] ?? '');
             $sortOrder = (int) ($formula['sort_order'] ?? 0);
+            $includeTotal = !array_key_exists('include_total', $formula) || !empty($formula['include_total']);
             $formulaLabels[$id] = $label;
-            $formulaColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'op' => $op, 'base_metric_id' => $baseMetricId, 'sort_order' => $sortOrder];
+            $formulaColumns[] = ['id' => $id, 'label' => $label, 'group' => $group, 'op' => $op, 'base_metric_id' => $baseMetricId, 'include_total' => $includeTotal, 'sort_order' => $sortOrder];
         }
 
         $rowsByKey = [];
@@ -1252,6 +1311,35 @@ class TemporaryModuleWordPdfService
             'var(--clr-accent)' => 'c9a227',
         ];
         return $map[$color] ?? '861E34';
+    }
+
+    /**
+     * @param array<int,mixed> $groups
+     * @return array<string,string> lower group name => HEX (sin #)
+     */
+    private function resolveGroupHeaderColorMap(array $groups): array
+    {
+        $map = [];
+        foreach ($groups as $group) {
+            if (is_string($group)) {
+                $name = trim($group);
+                if ($name === '') {
+                    continue;
+                }
+                $map[mb_strtolower($name, 'UTF-8')] = '64748B';
+                continue;
+            }
+            if (! is_array($group)) {
+                continue;
+            }
+            $name = trim((string) ($group['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $map[mb_strtolower($name, 'UTF-8')] = $this->cssColorToHex((string) ($group['color'] ?? '#64748B'));
+        }
+
+        return $map;
     }
 
     private function getColumnBgColor(array $col, int $idx): string
@@ -1510,6 +1598,10 @@ class TemporaryModuleWordPdfService
     private function buildPdfImageDataByPath(Collection $entries, array $columns, array $fieldTypesByKey): array
     {
         $map = [];
+        $dataUriByOriginal = [];
+        $dataUriByUrl = [];
+        $dataUriByFullPath = [];
+        $resolvedLocalByUrl = [];
 
         foreach ($entries as $entry) {
             foreach ($columns as $column) {
@@ -1530,12 +1622,33 @@ class TemporaryModuleWordPdfService
                     if (filter_var($raw, FILTER_VALIDATE_URL)) {
                         if (!$this->isImageTypeOrValue($fieldType, $raw)) continue;
 
-                        $localFromUrl = $this->tryResolveLocalPathFromUrl($raw);
+                        if (array_key_exists($raw, $dataUriByUrl)) {
+                            $cached = $dataUriByUrl[$raw];
+                            foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
+                                $map[$lookupKey] = $cached;
+                            }
+                            continue;
+                        }
+
+                        $localFromUrl = $resolvedLocalByUrl[$raw] ?? null;
+                        if (!array_key_exists($raw, $resolvedLocalByUrl)) {
+                            $localFromUrl = $this->tryResolveLocalPathFromUrl($raw);
+                            $resolvedLocalByUrl[$raw] = $localFromUrl;
+                        }
+
                         if ($localFromUrl !== null) {
-                            $binary = @file_get_contents($localFromUrl);
-                            if ($binary !== false && $binary !== '') {
-                                $mime = @mime_content_type($localFromUrl) ?: 'image/jpeg';
-                                $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
+                            $dataUri = $dataUriByFullPath[$localFromUrl] ?? null;
+                            if ($dataUri === null) {
+                                $binary = @file_get_contents($localFromUrl);
+                                if ($binary !== false && $binary !== '') {
+                                    $mime = @mime_content_type($localFromUrl) ?: 'image/jpeg';
+                                    $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
+                                    $dataUriByFullPath[$localFromUrl] = $dataUri;
+                                }
+                            }
+
+                            if (is_string($dataUri) && $dataUri !== '') {
+                                $dataUriByUrl[$raw] = $dataUri;
                                 foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
                                     $map[$lookupKey] = $dataUri;
                                 }
@@ -1554,11 +1667,19 @@ class TemporaryModuleWordPdfService
                     $fullPath = $this->entryDataService->resolveStoredFilePath($raw);
                     if (!is_string($fullPath) || !is_file($fullPath)) continue;
 
-                    $binary = @file_get_contents($fullPath);
-                    if ($binary === false || $binary === '') continue;
+                    if (array_key_exists($original, $dataUriByOriginal)) {
+                        $dataUri = $dataUriByOriginal[$original];
+                    } elseif (array_key_exists($fullPath, $dataUriByFullPath)) {
+                        $dataUri = $dataUriByFullPath[$fullPath];
+                    } else {
+                        $binary = @file_get_contents($fullPath);
+                        if ($binary === false || $binary === '') continue;
+                        $mime = @mime_content_type($fullPath) ?: 'image/jpeg';
+                        $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
+                        $dataUriByFullPath[$fullPath] = $dataUri;
+                    }
 
-                    $mime = @mime_content_type($fullPath) ?: 'image/jpeg';
-                    $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
+                    $dataUriByOriginal[$original] = $dataUri;
 
                     foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
                         $map[$lookupKey] = $dataUri;

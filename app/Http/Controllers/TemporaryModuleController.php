@@ -1797,7 +1797,11 @@ class TemporaryModuleController extends Controller
             'header_row' => ['nullable', 'integer', 'min:1', 'max:50'],
             'data_start_row' => ['nullable', 'integer', 'min:2', 'max:1000'],
             'mapping' => ['required', 'string'],
+            'matching_keys' => ['required', 'string'],
+            'update_keys' => ['required', 'string'],
             'selected_microrregion_id' => ['nullable', 'integer'],
+            'selected_municipio' => ['nullable', 'string', 'max:255'],
+            'auto_identify_municipio' => ['nullable', 'boolean'],
             'all_microrregions' => ['nullable', 'boolean'],
             'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
         ]);
@@ -1813,6 +1817,90 @@ class TemporaryModuleController extends Controller
             } elseif (is_numeric($idx)) {
                 $normalizedMap[(string) $key] = (int) $idx;
             }
+        }
+
+        $matchingKeys = json_decode((string) $request->input('matching_keys'), true);
+        if (! is_array($matchingKeys)) {
+            return response()->json(['success' => false, 'message' => 'Llaves de coincidencia inválidas.'], 422);
+        }
+
+        $importableFieldKeys = $this->excelImportService
+            ->importableFields($temporaryModule->fields)
+            ->pluck('key')
+            ->all();
+
+        $normalizedMatchingKeys = collect($matchingKeys)
+            ->filter(fn ($key) => is_string($key) || is_numeric($key))
+            ->map(fn ($key) => trim((string) $key))
+            ->filter(fn ($key) => $key !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($normalizedMatchingKeys)) {
+            return response()->json(['success' => false, 'message' => 'Selecciona al menos una columna base para identificar registros.'], 422);
+        }
+
+        $invalidMatchingKeys = array_values(array_diff($normalizedMatchingKeys, $importableFieldKeys));
+        if (! empty($invalidMatchingKeys)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Se detectaron columnas base no válidas para este módulo.',
+            ], 422);
+        }
+
+        $mappedKeys = collect($normalizedMap)
+            ->filter(fn ($col) => $col !== null)
+            ->keys()
+            ->all();
+
+        $missingMappedMatchingKeys = array_values(array_diff($normalizedMatchingKeys, $mappedKeys));
+        if (! empty($missingMappedMatchingKeys)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Todas las columnas base deben estar mapeadas a una columna del Excel.',
+            ], 422);
+        }
+
+        $updateKeys = json_decode((string) $request->input('update_keys'), true);
+        if (! is_array($updateKeys)) {
+            return response()->json(['success' => false, 'message' => 'Columnas a actualizar inválidas.'], 422);
+        }
+
+        $normalizedUpdateKeys = collect($updateKeys)
+            ->filter(fn ($key) => is_string($key) || is_numeric($key))
+            ->map(fn ($key) => trim((string) $key))
+            ->filter(fn ($key) => $key !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($normalizedUpdateKeys)) {
+            return response()->json(['success' => false, 'message' => 'Selecciona al menos una columna a actualizar.'], 422);
+        }
+
+        $invalidUpdateKeys = array_values(array_diff($normalizedUpdateKeys, $importableFieldKeys));
+        if (! empty($invalidUpdateKeys)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Se detectaron columnas de actualización no válidas para este módulo.',
+            ], 422);
+        }
+
+        $missingMappedUpdateKeys = array_values(array_diff($normalizedUpdateKeys, $mappedKeys));
+        if (! empty($missingMappedUpdateKeys)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Todas las columnas a actualizar deben estar mapeadas a una columna del Excel.',
+            ], 422);
+        }
+
+        $overlapKeys = array_values(array_intersect($normalizedUpdateKeys, $normalizedMatchingKeys));
+        if (! empty($overlapKeys)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Una columna no puede ser base y de actualización al mismo tiempo.',
+            ], 422);
         }
 
         $allMicrorregions = $request->boolean('all_microrregions', false);
@@ -1841,9 +1929,13 @@ class TemporaryModuleController extends Controller
                 $request->file('archivo_excel'),
                 [
                     'mapping' => $normalizedMap,
+                    'matching_keys' => $normalizedMatchingKeys,
+                    'update_keys' => $normalizedUpdateKeys,
                     'header_row' => $headerRow,
                     'data_start_row' => $dataStartRow,
                     'selected_microrregion_id' => $microrregionId,
+                    'selected_municipio' => trim((string) $request->input('selected_municipio', '')),
+                    'auto_identify_municipio' => $request->boolean('auto_identify_municipio', true),
                     'all_microrregions' => $allMicrorregions,
                     'sheet_index' => $sheetIndex,
                 ]
@@ -1858,11 +1950,12 @@ class TemporaryModuleController extends Controller
         return response()->json([
             'success' => true,
             'updated' => $result['updated'],
+            'created' => $result['created'] ?? 0,
             'skipped' => $result['skipped'],
             'row_errors' => $result['row_errors'],
-            'message' => $result['updated'] > 0
-                ? "Se actualizaron {$result['updated']} registro(s) existente(s)."
-                : 'No se actualizó ningún registro (no se encontraron coincidencias o todos están completos).',
+            'message' => (($result['updated'] ?? 0) > 0 || ($result['created'] ?? 0) > 0)
+                ? "Se actualizaron {$result['updated']} registro(s) y se crearon {$result['created']} registro(s) nuevo(s)."
+                : 'No se aplicaron cambios (sin coincidencias ni datos nuevos para guardar).',
         ]);
     }
 
@@ -2236,7 +2329,6 @@ class TemporaryModuleController extends Controller
                 'temporary_module_entries.submitted_at DESC'
             )
             ->select(['data', 'microrregion_id'])
-            ->limit(500)
             ->get();
         foreach ($exportColumns as $col) {
             if (($col['is_image'] ?? false)) {
