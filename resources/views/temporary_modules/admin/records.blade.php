@@ -429,15 +429,62 @@
                             <input type="number" id="tmExportTitleFontSize" class="tm-input tm-input--num-compact" min="10" max="36" value="18">
                         </div>
                         <div class="tm-export-personalize-field">
-                            <label for="tmExportCellFontSize" title="Tamaño de letra en celdas de datos">Celdas (px)</label>
+                            <label for="tmExportCellFontSize" title="Tamaño de letra en celdas de la tabla de registros">Registros: celdas (px)</label>
                             <input type="number" id="tmExportCellFontSize" class="tm-input tm-input--num-compact" min="9" max="24" value="12">
                         </div>
                         <div class="tm-export-personalize-field">
-                            <label for="tmExportHeaderFontSize" title="Tamaño de letra de encabezados de columnas">Encabezados (px)</label>
+                            <label for="tmExportHeaderFontSize" title="Tamaño de letra de encabezados de la tabla de registros">Registros: encabezados (px)</label>
                             <input type="number" id="tmExportHeaderFontSize" class="tm-input tm-input--num-compact" min="9" max="28" value="12">
                         </div>
                     </div>
-                    <p class="tm-analysis-hint tm-export-font-hint">Celdas: contenido de la tabla. Encabezados: fila de títulos de columnas.</p>
+                    <div class="tm-export-field-row tm-export-field-row--fonts">
+                        <div class="tm-export-personalize-field">
+                            <label for="tmExportSumCellFontSize" title="Tamaño de letra en celdas de la tabla de sumatoria">Sumatoria: celdas (px)</label>
+                            <input type="number" id="tmExportSumCellFontSize" class="tm-input tm-input--num-compact" min="9" max="24" value="12">
+                        </div>
+                        <div class="tm-export-personalize-field">
+                            <label for="tmExportSumHeaderFontSize" title="Tamaño de letra de encabezados de la tabla de sumatoria">Sumatoria: encabezados (px)</label>
+                            <input type="number" id="tmExportSumHeaderFontSize" class="tm-input tm-input--num-compact" min="9" max="28" value="12">
+                        </div>
+                    </div>
+                    <div class="tm-export-field-row tm-export-field-row--fonts">
+                        <div class="tm-export-personalize-field">
+                            <label for="tmExportTotalsCellFontSize" title="Tamaño de letra en celdas de la tabla independiente de totales">Totales: celdas (px)</label>
+                            <input type="number" id="tmExportTotalsCellFontSize" class="tm-input tm-input--num-compact" min="9" max="24" value="12">
+                        </div>
+                        <div class="tm-export-personalize-field">
+                            <label for="tmExportTotalsHeaderFontSize" title="Tamaño de letra de encabezados de la tabla independiente de totales">Totales: encabezados (px)</label>
+                            <input type="number" id="tmExportTotalsHeaderFontSize" class="tm-input tm-input--num-compact" min="9" max="28" value="12">
+                        </div>
+                    </div>
+                    <div class="tm-export-personalize-field-row tm-export-title-row-group" style="margin-top:8px;">
+                        <div class="tm-export-personalize-field tm-export-field-title-input">
+                            <label for="tmExportSumTitle">Título de sumatoria</label>
+                            <input type="text" id="tmExportSumTitle" class="tm-input" placeholder="Sumatoria">
+                        </div>
+                        <div class="tm-export-case-toggle-wrap">
+                            <label class="tm-export-case-toggle" title="Convertir el título de sumatoria a MAYÚSCULAS">
+                                <input type="checkbox" id="tmExportSumTitleUppercase" value="1">
+                                <span class="tm-export-case-icon">Az</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="tm-export-personalize-field" style="max-width: 220px;">
+                        <label for="tmExportSumTitleFontSize">Título de sumatoria (px)</label>
+                        <input type="number" id="tmExportSumTitleFontSize" class="tm-input tm-input--num-compact" min="10" max="36" value="14">
+                    </div>
+                    <div class="tm-export-personalize-field">
+                        <label for="tmExportTotalsTableTitle">Título de tabla de totales</label>
+                        <input type="text" id="tmExportTotalsTableTitle" class="tm-input" placeholder="Totales">
+                    </div>
+                    <div class="tm-export-case-toggle-row-sub">
+                        <label class="tm-export-case-toggle tm-export-case-toggle--sub" title="Convertir encabezados y títulos de tabla a MAYÚSCULAS">
+                            <input type="checkbox" id="tmExportHeadersUppercase" value="1">
+                            <span class="tm-export-case-icon">Az</span>
+                            <small>Convertir encabezados a MAYÚSCULAS</small>
+                        </label>
+                    </div>
+                    <p class="tm-analysis-hint tm-export-font-hint">Todos los tamaños de letra del documento se configuran aquí.</p>
                         </section>
                         <section id="tm-export-sec-layout" class="tm-export-side-section">
                             <h4 class="tm-export-side-section__title"><span class="tm-export-side-section__icon" aria-hidden="true"><i class="fa-solid fa-table"></i></span> Tabla principal y conteos</h4>
@@ -458,6 +505,22 @@
                             <option value="none">Sin margen</option>
                         </select>
                         <p class="tm-analysis-hint" style="margin-top:6px;">Aplica a Word/PDF y a la vista previa A4.</p>
+                    </div>
+                    <div class="tm-export-personalize-field">
+                        <label class="tm-export-count-table-toggle">
+                            <input type="checkbox" id="tmExportIncludeCalculatedColumns" value="1">
+                            Incluir columnas calculadas en la tabla de registros
+                        </label>
+                        <div id="tmExportCalculatedColumnsWrap" hidden style="margin-top:8px; display:grid; gap:8px;">
+                            <div class="tm-export-sum-block tm-export-calc-block">
+                                <div class="tm-export-groups-wrap__head tm-export-calc-head">
+                                    <span class="tm-export-label-inline">Columnas calculadas</span>
+                                    <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmExportAddCalculatedColumnBtn">+ Columna</button>
+                                </div>
+                                <div id="tmExportCalculatedColumnsList" class="tm-export-sum-list tm-export-calc-list"></div>
+                            </div>
+                            <p class="tm-analysis-hint" style="margin-top:4px;">Agrega 1 o más columnas calculadas. Define campos, peso por campo y columna de referencia para reglas de falta/sobra.</p>
+                        </div>
                     </div>
                     <div class="tm-export-personalize-field tm-export-count-table-section">
                         <label class="tm-export-count-table-toggle">
@@ -505,23 +568,6 @@
                                 <div class="tm-export-groups-wrap__head">
                                     <span class="tm-export-label-inline">Personalización de sumatoria</span>
                                 </div>
-                                <label class="tm-seed-label">
-                                    Título de sumatoria
-                                    <input type="text" id="tmExportSumTitle" class="tm-input" placeholder="Sumatoria">
-                                </label>
-                                <div class="tm-export-sum-row tm-export-sum-row--sum-config">
-                                    <div class="tm-export-case-toggle-row-sub" style="margin: 0;">
-                                        <label class="tm-export-case-toggle tm-export-case-toggle--sub" title="Alternar MAYÚSCULAS/minúsculas para el título de sumatoria">
-                                            <input type="checkbox" id="tmExportSumTitleUppercase" value="1">
-                                            <span class="tm-export-case-icon">Az</span>
-                                            <small>Título en MAYÚSCULAS</small>
-                                        </label>
-                                    </div>
-                                    <label class="tm-seed-label">
-                                        Tamaño título (px)
-                                        <input type="number" id="tmExportSumTitleFontSize" class="tm-input" min="10" max="36" value="14">
-                                    </label>
-                                </div>
                                 <div class="tm-export-personalize-field tm-export-count-table-align-group">
                                     <span class="tm-export-label-inline">Alineación del título de sumatoria</span>
                                     <div class="tm-export-align-btns" id="tmExportSumTitleAlignGroup" role="group" aria-label="Alineación del título de sumatoria">
@@ -567,10 +613,6 @@
                                 </label>
                             </div>
                             <div class="tm-export-sum-block" id="tmExportTotalsTableWrap" hidden>
-                                <label class="tm-seed-label">
-                                    Título de tabla de totales
-                                    <input type="text" id="tmExportTotalsTableTitle" class="tm-input" placeholder="Totales">
-                                </label>
                                 <div class="tm-export-personalize-field tm-export-count-table-align-group">
                                     <span class="tm-export-label-inline">Alineación de tabla de totales</span>
                                     <div class="tm-export-align-btns" id="tmExportTotalsTableAlignGroup" role="group" aria-label="Alineación de la tabla de totales">
@@ -633,13 +675,6 @@
                                     <button type="button" class="tm-export-align-btn" data-data-table-align="center">Centro</button>
                                     <button type="button" class="tm-export-align-btn" data-data-table-align="right">Derecha</button>
                                 </div>
-                            </div>
-                            <div class="tm-export-case-toggle-row-sub">
-                                <label class="tm-export-case-toggle tm-export-case-toggle--sub" title="Convertir encabezados y títulos de tabla a MAYÚSCULAS">
-                                    <input type="checkbox" id="tmExportHeadersUppercase" value="1">
-                                    <span class="tm-export-case-icon">Az</span>
-                                    <small>Convertir encabezados a MAYÚSCULAS</small>
-                                </label>
                             </div>
                             <div id="tmExportGroupsList" class="tm-export-groups-list">
                                 <p class="tm-analysis-hint" id="tmExportNoGroupsHint">No hay grupos creados. Define grupos para agrupar campos bajo un mismo título.</p>
@@ -2101,23 +2136,23 @@
             }
             if (personalizeModal && Array.isArray(personalizeModal._countableColumns)) {
                 tmExportRenderSumConfigurator(personalizeModal._countableColumns);
+                tmExportRenderCalculatedColumnsConfigurator(personalizeModal._countableColumns);
             }
         }
 
         function buildPersonalizeColumnsList(columns, container) {
             container.innerHTML = '';
             var groups = normalizeExportGroups((personalizeModal && personalizeModal._exportGroups) || []);
-            var colorMenuHtml = TEMPLATE_COLORS.map(function (c, i) {
-                return '<button type="button" class="tm-export-color-option' + (i === 0 ? ' is-active' : '') + '" data-color="' + escapeHtml(c.value) + '">' +
-                    '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c.value) + '"></span>' +
-                    '<span class="tm-export-color-name">' + escapeHtml(c.name) + '</span></button>';
-            }).join('');
             columns.forEach(function (col, index) {
                 var item = document.createElement('div');
                 item.className = 'tm-export-personalize-col' + (col.is_image ? ' is-image' : '');
                 item.setAttribute('role', 'listitem');
                 item.dataset.key = col.key;
                 item.dataset.index = String(index);
+                item.dataset.fillEmptyMode = String(col.fill_empty_mode || col.fillEmptyMode || 'none');
+                item.dataset.fillEmptyValue = String(col.fill_empty_value != null ? col.fill_empty_value : (col.fillEmptyValue || ''));
+                item.dataset.contentBold = (col.content_bold || col.contentBold) ? '1' : '0';
+                item.dataset.headerColor = String(col.color || TEMPLATE_COLORS[0].value);
                 item.draggable = true;
 
                 var groupSelect = '<select class="tm-input tm-export-col-group-select" data-key="' + escapeHtml(col.key) + '">' +
@@ -2129,6 +2164,8 @@
                     '</select>';
 
                 var secondaryRow = '';
+                var toolbarHtml =
+                    '<button type="button" class="tm-export-omit-btn tm-export-omit-btn--top" title="Omitir columna" aria-label="Omitir columna">&times;</button>';
                 if (col.is_image) {
                     secondaryRow =
                         '<div class="tm-export-col-row tm-export-col-row--secondary tm-export-col-row--image">' +
@@ -2150,10 +2187,12 @@
                         '<div class="tm-export-col-row tm-export-col-row--secondary">' +
                         '<label class="tm-export-col-field tm-export-col-field--stretch">' +
                         '<span class="tm-export-col-field__lab">Grupo</span>' + groupSelect + '</label>' +
-                        '<label class="tm-export-col-field tm-export-col-field--wch">' +
+                        '<div class="tm-export-col-inline-tools">' +
+                        '<label class="tm-export-col-field tm-export-col-field--wch tm-export-col-field--wch-compact">' +
                         '<span class="tm-export-col-field__lab">Ancho (ch)</span>' +
                         '<input type="number" class="tm-input tm-input--num-compact tm-export-col-width-input" min="2" max="60" value="' + String(approx) + '" data-key="' + escapeHtml(col.key) + '" data-width-hint="' + escapeHtml(String(approx)) + '">' +
-                        '</label></div>';
+                        '</label>' +
+                        '</div></div>';
                 }
                 var currentLabel = (col.label != null && String(col.label).trim() !== '') ? String(col.label) : String(col.key || '');
                 item.innerHTML =
@@ -2162,15 +2201,10 @@
                         '<div class="tm-export-col-row tm-export-col-row--primary">' +
                         '<label class="tm-export-col-field tm-export-col-field--grow">' +
                         '<span class="tm-export-col-field__lab">Columna</span>' +
-                        '<input type="text" class="tm-input tm-export-col-label-input" data-key="' + escapeHtml(col.key) + '" value="' + escapeHtml(currentLabel) + '" placeholder="Nombre en el export">' +
+                        '<textarea class="tm-input tm-export-col-label-input" data-key="' + escapeHtml(col.key) + '" rows="1" placeholder="Nombre en el export">' + escapeHtml(currentLabel) + '</textarea>' +
                         '</label>' +
-                        '<div class="tm-export-col-toolbar">' +
-                        '<div class="tm-export-col-color">' +
-                        '<button type="button" class="tm-export-color-trigger" data-color="' + escapeHtml(col.color || TEMPLATE_COLORS[0].value) + '" aria-haspopup="listbox" aria-expanded="false" title="Color del encabezado">' +
-                        '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(col.color || TEMPLATE_COLORS[0].value) + '"></span></button>' +
-                        '<div class="tm-export-color-menu" role="listbox" hidden>' + colorMenuHtml + '</div></div>' +
-                        '<button type="button" class="tm-export-omit-btn" title="Omitir columna" aria-label="Omitir columna">&times;</button>' +
-                        '</div></div>' +
+                        toolbarHtml +
+                        '</div>' +
                         secondaryRow +
                     '</div>';
                 container.appendChild(item);
@@ -2190,15 +2224,7 @@
                     if (el.dataset.key === sc.key) { item = el; }
                 });
                 if (!item) { return; }
-                var tr = item.querySelector('.tm-export-color-trigger');
-                if (tr && sc.color) {
-                    tr.setAttribute('data-color', sc.color);
-                    var sw = tr.querySelector('.tm-export-color-swatch');
-                    if (sw) { sw.style.backgroundColor = sc.color; }
-                    item.querySelectorAll('.tm-export-color-option').forEach(function (opt) {
-                        opt.classList.toggle('is-active', (opt.getAttribute('data-color') || '') === sc.color);
-                    });
-                }
+                if (sc.color) { item.dataset.headerColor = String(sc.color); }
                 var gSel = item.querySelector('.tm-export-col-group-select');
                 if (gSel && sc.group) { gSel.value = sc.group; }
                 var labelInput = item.querySelector('.tm-export-col-label-input');
@@ -2212,6 +2238,9 @@
                     var n = parseInt(sc.max_width_chars, 10);
                     if (!Number.isNaN(n)) { winp.value = String(Math.max(2, Math.min(60, n))); }
                 }
+                item.dataset.fillEmptyMode = String(sc.fill_empty_mode || 'none');
+                item.dataset.fillEmptyValue = String(sc.fill_empty_value != null ? sc.fill_empty_value : '');
+                item.dataset.contentBold = sc.content_bold ? '1' : '0';
             });
         }
 
@@ -2388,6 +2417,208 @@
                 if (val !== '') { return val; }
             }
             return '';
+        }
+
+        function tmExportEnsureCalculatedColumnsState(countableColumns, draftCfg) {
+            if (!personalizeModal) { return; }
+            if (!Array.isArray(personalizeModal._calculatedColumns)) {
+                personalizeModal._calculatedColumns = [];
+            }
+
+            var fromDraft = [];
+            if (draftCfg && Array.isArray(draftCfg.calculated_columns)) {
+                fromDraft = draftCfg.calculated_columns.map(function (c, idx) {
+                    var id = String(c.id || ('calc_' + idx + '_' + Date.now()));
+                    var opFields = Array.isArray(c.operation_fields)
+                        ? c.operation_fields.map(function (k) { return String(k || ''); }).filter(Boolean)
+                        : (Array.isArray(c.fields) ? c.fields.map(function (k) { return String(k || ''); }).filter(Boolean) : []);
+                    var op = String(c.operation || '').toLowerCase();
+                    if (['add', 'subtract', 'multiply', 'percent'].indexOf(op) === -1) { op = 'add'; }
+                    return {
+                        id: id,
+                        label: String(c.label || ('Calculada ' + (idx + 1))),
+                        group: String(c.group || ''),
+                        operation: op,
+                        baseField: String(c.base_field || c.baseField || c.reference_field || c.referenceField || ''),
+                        afterKey: String(c.position_after_key || c.after_key || c.afterKey || ''),
+                        operationFields: opFields,
+                        cellColor: String(c.cell_color || c.color || 'var(--clr-secondary)'),
+                        cellSizeCh: Math.max(8, Math.min(40, parseInt(String(c.cell_size_ch != null ? c.cell_size_ch : c.cellSizeCh), 10) || 18)),
+                        cellBold: !!(c.cell_bold || c.cellBold)
+                    };
+                });
+            } else if (draftCfg && draftCfg.include_operations_column) {
+                fromDraft = [{
+                    id: 'calc_legacy_1',
+                    label: String(draftCfg.operations_label || 'Operaciones'),
+                    group: String(draftCfg.operations_group || ''),
+                    operation: (!Object.prototype.hasOwnProperty.call(draftCfg, 'operations_include_percent') || !!draftCfg.operations_include_percent) ? 'percent' : 'add',
+                    baseField: String(draftCfg.operations_reference_field || ''),
+                    afterKey: String(draftCfg.operations_after_key || ''),
+                    operationFields: Array.isArray(draftCfg.operations_fields) ? draftCfg.operations_fields.map(function (k) { return String(k || ''); }).filter(Boolean) : [],
+                    cellColor: 'var(--clr-secondary)',
+                    cellSizeCh: 18,
+                    cellBold: !!draftCfg.operations_cell_bold
+                }];
+            }
+
+            personalizeModal._calculatedColumns = fromDraft;
+
+            if (personalizeModal._calculatedColumns.length === 0 && Array.isArray(countableColumns) && countableColumns.length > 0) {
+                personalizeModal._calculatedColumns.push({
+                    id: 'calc_1',
+                    label: 'Operaciones',
+                    group: '',
+                    operation: 'percent',
+                    baseField: String(countableColumns[0].key || ''),
+                    afterKey: '',
+                    operationFields: [String(countableColumns[0].key || '')],
+                    cellColor: 'var(--clr-secondary)',
+                    cellSizeCh: 18,
+                    cellBold: false
+                });
+            }
+        }
+
+        function tmExportRenderCalculatedColumnsConfigurator(countableColumns) {
+            if (!personalizeModal) { return; }
+            var wrap = document.getElementById('tmExportCalculatedColumnsList');
+            if (!wrap) { return; }
+            var list = Array.isArray(personalizeModal._calculatedColumns) ? personalizeModal._calculatedColumns : [];
+            wrap.innerHTML = '';
+
+            var optionsHtml = '<option value="">Sin referencia</option>' + (countableColumns || []).map(function (c) {
+                return '<option value="' + escapeHtml(String(c.key || '')) + '">' + escapeHtml(String(c.label || c.key || '')) + '</option>';
+            }).join('');
+            var opMultiOptionsHtml = (countableColumns || []).map(function (c) {
+                return '<option value="' + escapeHtml(String(c.key || '')) + '">' + escapeHtml(String(c.label || c.key || '')) + '</option>';
+            }).join('');
+
+            list.forEach(function (calc, idx) {
+                var row = document.createElement('div');
+                row.className = 'tm-export-sum-row tm-export-calc-row';
+                row.setAttribute('data-calc-col-id', String(calc.id || ''));
+                var operation = String(calc.operation || 'add').toLowerCase();
+                if (['add', 'subtract', 'multiply', 'percent'].indexOf(operation) === -1) { operation = 'add'; }
+                var baseField = String(calc.baseField || '');
+                var group = String(calc.group || '');
+                var groupOptions = tmExportBuildGroupOptionsHtml(group);
+                var opFields = Array.isArray(calc.operationFields) ? calc.operationFields : [];
+                var cellColor = String(calc.cellColor || 'var(--clr-secondary)');
+                var cellSizeCh = Math.max(8, Math.min(40, parseInt(String(calc.cellSizeCh || 18), 10) || 18));
+                var cellBold = !!calc.cellBold;
+                var calcBoldClass = cellBold ? 'tm-export-col-bold-btn is-active' : 'tm-export-col-bold-btn';
+
+                row.innerHTML = ''
+                    + '<div class="tm-export-sum-name-wrap">'
+                    + '  <span class="tm-export-sum-move-inline">'
+                    + '    <button type="button" class="tm-btn tm-btn-outline tm-export-sum-move-btn" data-move-calc-up title="Subir">&#8593;</button>'
+                    + '    <button type="button" class="tm-btn tm-btn-outline tm-export-sum-move-btn" data-move-calc-down title="Bajar">&#8595;</button>'
+                    + '  </span>'
+                    + '  <textarea class="tm-input tm-export-col-label-input" rows="2" data-calc-label placeholder="Nombre de columna">' + escapeHtml(String(calc.label || ('Calculada ' + (idx + 1)))) + '</textarea>'
+                    + '</div>'
+                    + '<select class="tm-input" data-calc-operation>'
+                    + '  <option value="add">Suma (+)</option>'
+                    + '  <option value="subtract">Resta (-)</option>'
+                    + '  <option value="multiply">Multiplicación (×)</option>'
+                    + '  <option value="percent">Porcentaje (%)</option>'
+                    + '</select>'
+                    + '<select class="tm-input" data-calc-group>' + groupOptions + '</select>'
+                    + '<select class="tm-input" data-calc-base>' + optionsHtml + '</select>'
+                    + '<select class="tm-input" data-calc-op-fields multiple size="4">' + opMultiOptionsHtml + '</select>'
+                    + '<div class="tm-export-col-color tm-export-calc-color-wrap">'
+                    + '  <button type="button" class="tm-export-color-trigger" data-calc-color-trigger data-color="' + escapeHtml(cellColor) + '" aria-haspopup="listbox" aria-expanded="false" title="Color de celda">'
+                    + '    <span class="tm-export-color-swatch" style="background-color:' + escapeHtml(cellColor) + '"></span>'
+                    + '  </button>'
+                    + '  <div class="tm-export-color-menu" role="listbox" hidden>' + TEMPLATE_COLORS.map(function (c, i) {
+                        return '<button type="button" class="tm-export-color-option' + (i === 0 ? ' is-active' : '') + '" data-color="' + escapeHtml(c.value) + '">' +
+                            '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c.value) + '"></span>' +
+                            '<span class="tm-export-color-name">' + escapeHtml(c.name) + '</span></button>';
+                    }).join('') + '</div>'
+                    + '</div>'
+                    + '<button type="button" class="tm-btn tm-btn-outline ' + calcBoldClass + '" data-calc-bold title="Negritas en celdas de contenido" aria-label="Negritas en celdas de contenido"><strong>B</strong></button>'
+                    + '<label class="tm-export-col-field tm-export-col-field--wch tm-export-col-field--wch-compact">'
+                    + '  <span class="tm-export-col-field__lab">Tamaño celda (ch)</span>'
+                    + '  <input type="number" class="tm-input tm-input--num-compact" data-calc-size min="8" max="40" value="' + escapeHtml(String(cellSizeCh)) + '">'
+                    + '</label>'
+                    + '<button type="button" class="tm-btn tm-btn-danger" data-remove-calc-col>&times;</button>';
+
+                wrap.appendChild(row);
+                var opSel = row.querySelector('[data-calc-operation]');
+                if (opSel) { opSel.value = operation; }
+                var groupSel = row.querySelector('[data-calc-group]');
+                if (groupSel) { groupSel.value = group; }
+                var baseSel = row.querySelector('[data-calc-base]');
+                if (baseSel) { baseSel.value = baseField; }
+                var opFieldsSel = row.querySelector('[data-calc-op-fields]');
+                if (opFieldsSel) {
+                    Array.from(opFieldsSel.options).forEach(function (opt) {
+                        opt.selected = opFields.indexOf(String(opt.value || '')) !== -1;
+                    });
+                }
+                var colorTrigger = row.querySelector('[data-calc-color-trigger]');
+                if (colorTrigger) {
+                    row.querySelectorAll('.tm-export-color-option').forEach(function (opt) {
+                        opt.classList.toggle('is-active', (opt.getAttribute('data-color') || '') === cellColor);
+                    });
+                }
+            });
+        }
+
+        function tmExportMoveCalculatedColumn(id, direction) {
+            if (!personalizeModal || !Array.isArray(personalizeModal._calculatedColumns)) { return false; }
+            var calcList = personalizeModal._calculatedColumns.slice();
+            var calcById = {};
+            calcList.forEach(function (c) { calcById[String(c && c.id || '')] = c; });
+            var baseColumns = Array.isArray(personalizeModal._personalizeColumns) ? personalizeModal._personalizeColumns : [];
+            var baseKeys = baseColumns
+                .map(function (c) { return String(c && c.key || ''); })
+                .filter(function (k) { return k !== '' && k.indexOf('__calc_') !== 0; });
+
+            var seq = [];
+            baseKeys.forEach(function (bk) {
+                seq.push({ type: 'base', key: bk });
+                calcList.forEach(function (calc) {
+                    if (String(calc && calc.afterKey || '') === bk) {
+                        seq.push({ type: 'calc', id: String(calc.id || '') });
+                    }
+                });
+            });
+            calcList.forEach(function (calc) {
+                var ak = String(calc && calc.afterKey || '');
+                if (!ak || baseKeys.indexOf(ak) === -1) {
+                    seq.push({ type: 'calc', id: String(calc.id || '') });
+                }
+            });
+
+            var from = seq.findIndex(function (x) {
+                return x && x.type === 'calc' && String(x.id || '') === String(id || '');
+            });
+            if (from < 0) { return false; }
+            var to = direction === 'up' ? from - 1 : from + 1;
+            if (to < 0 || to >= seq.length) { return false; }
+
+            var tmp = seq[from];
+            seq[from] = seq[to];
+            seq[to] = tmp;
+
+            var ordered = [];
+            var lastBaseKey = '';
+            seq.forEach(function (node) {
+                if (!node) { return; }
+                if (node.type === 'base') {
+                    lastBaseKey = String(node.key || '');
+                    return;
+                }
+                if (node.type !== 'calc') { return; }
+                var calc = calcById[String(node.id || '')];
+                if (!calc) { return; }
+                calc.afterKey = lastBaseKey;
+                ordered.push(calc);
+            });
+
+            personalizeModal._calculatedColumns = ordered;
+            return true;
         }
 
         function tmExportEnsureSumState(countableColumns, draftCfg) {
@@ -2864,7 +3095,7 @@
             return columns;
         }
 
-        function tmExportRenderTotalsStandalonePreviewTable(sumData, headersUppercase, totalsTableAlign, totalsTableTitle, totalsTableTitleAlign, totalsTableTitleFontSize, sumTotalsBold, sumTotalsTextColor, groups) {
+        function tmExportRenderTotalsStandalonePreviewTable(sumData, headersUppercase, totalsTableAlign, totalsTableTitle, totalsTableTitleAlign, totalsTableTitleFontSize, totalsHeaderFontPx, totalsCellFontPx, sumTotalsBold, sumTotalsTextColor, groups) {
             if (!sumData || !Array.isArray(sumData.groups) || sumData.groups.length === 0) { return ''; }
             var sumColumns = tmExportBuildOrderedSumColumns(sumData);
             if (!sumColumns.length) { return ''; }
@@ -2875,6 +3106,10 @@
             var titleAlign = (totalsTableTitleAlign === 'left' || totalsTableTitleAlign === 'right') ? totalsTableTitleAlign : 'left';
             var titleFont = parseInt(String(totalsTableTitleFontSize || '14'), 10);
             titleFont = Number.isNaN(titleFont) ? 14 : Math.max(10, Math.min(36, titleFont));
+            var headerFont = parseInt(String(totalsHeaderFontPx || '12'), 10);
+            headerFont = Number.isNaN(headerFont) ? 12 : Math.max(9, Math.min(28, headerFont));
+            var cellFont = parseInt(String(totalsCellFontPx || '12'), 10);
+            cellFont = Number.isNaN(cellFont) ? 12 : Math.max(9, Math.min(24, cellFont));
             var hasGroups = sumColumns.some(function (c) { return String(c.group || '').trim() !== ''; });
             var groupColorMap = buildGroupColorMap(Array.isArray(groups) ? groups : []);
             var spans = [];
@@ -2906,15 +3141,15 @@
                 html += '</tr>';
             }
             html += '<tr class="tm-export-preview-row tm-export-preview-header">';
-            html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:#475569;color:#fff;">' + escapeHtml(normalizeExportHeadingText('Total', !!headersUppercase)) + '</th>';
+            html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:#475569;color:#fff;font-size:' + headerFont + 'px;">' + escapeHtml(normalizeExportHeadingText('Total', !!headersUppercase)) + '</th>';
             sumColumns.forEach(function (c) {
                 var cGroup = String(c.group || '').trim();
                 var cColor = cGroup !== '' ? (groupColorMap[cGroup] || '#64748b') : '#475569';
-                html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(cColor) + ';color:#fff;">' + escapeHtml(normalizeExportHeadingText(c.label || c.id, !!headersUppercase)) + '</th>';
+                html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(cColor) + ';color:#fff;font-size:' + headerFont + 'px;">' + escapeHtml(normalizeExportHeadingText(c.label || c.id, !!headersUppercase)) + '</th>';
             });
             html += '</tr>';
             html += '<tr class="tm-export-preview-row tm-export-preview-data">';
-            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + totalsStyle + '">' + escapeHtml(normalizeExportHeadingText('Total', !!headersUppercase)) + '</td>';
+            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="font-size:' + cellFont + 'px;' + totalsStyle + '">' + escapeHtml(normalizeExportHeadingText('Total', !!headersUppercase)) + '</td>';
             sumColumns.forEach(function (c) {
                 var val = 0;
                 if (c.type === 'formula' && String((c.source && c.source.op) || '') === 'percent') {
@@ -2937,14 +3172,14 @@
                 }
                 var isPercent = c.type === 'formula' && String((c.source && c.source.op) || '') === 'percent';
                 var txt = String(Math.round((val + Number.EPSILON) * 100) / 100) + (isPercent ? '%' : '');
-                html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + totalsStyle + '">' + escapeHtml(txt) + '</td>';
+                html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="font-size:' + cellFont + 'px;' + totalsStyle + '">' + escapeHtml(txt) + '</td>';
             });
             html += '</tr>';
             html += '</table>';
             return html;
         }
 
-        function tmExportRenderSumPreviewTable(sumData, headersUppercase, sumTableAlign, sumTitle, sumTitleCase, sumTitleAlign, sumTitleFontSize, sumGroupColor, sumIncludeTotalsRow, sumTotalsBold, sumTotalsTextColor, groups) {
+        function tmExportRenderSumPreviewTable(sumData, headersUppercase, sumTableAlign, sumTitle, sumTitleCase, sumTitleAlign, sumTitleFontSize, sumHeaderFontPx, sumCellFontPx, sumGroupColor, sumIncludeTotalsRow, sumTotalsBold, sumTotalsTextColor, groups) {
             if (!sumData || !Array.isArray(sumData.groups) || sumData.groups.length === 0) { return ''; }
             var rawTitle = String(sumTitle || '').trim() !== '' ? String(sumTitle) : 'Sumatoria';
             var title = normalizeExportHeadingText(rawTitle, !!headersUppercase);
@@ -2974,6 +3209,10 @@
             var titleAlign = (sumTitleAlign === 'left' || sumTitleAlign === 'right') ? sumTitleAlign : 'center';
             var titleFont = parseInt(String(sumTitleFontSize || '14'), 10);
             titleFont = Number.isNaN(titleFont) ? 14 : Math.max(10, Math.min(36, titleFont));
+            var sumHeaderFont = parseInt(String(sumHeaderFontPx || '12'), 10);
+            sumHeaderFont = Number.isNaN(sumHeaderFont) ? 12 : Math.max(9, Math.min(28, sumHeaderFont));
+            var sumCellFont = parseInt(String(sumCellFontPx || '12'), 10);
+            sumCellFont = Number.isNaN(sumCellFont) ? 12 : Math.max(9, Math.min(24, sumCellFont));
             var firstColColor = String(sumGroupColor || 'var(--clr-primary)');
             var html = '<p class="tm-export-preview-desglose-label" style="font-weight:600;margin:10px 0 4px 0;text-align:' + titleAlign + ';font-size:' + titleFont + 'px;">' + escapeHtml(title) + '</p>';
             html += '<table class="tm-export-preview-table tm-export-preview-sum-table" style="table-layout:auto;border-collapse:collapse;width:auto;' + sumTableMargin + '">';
@@ -2991,26 +3230,22 @@
                 html += '</tr>';
             }
             html += '<tr class="tm-export-preview-row tm-export-preview-header">';
-            html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(firstColColor) + ';color:#fff;">' + escapeHtml(normalizeExportHeadingText(sumData.groupLabel, !!headersUppercase)) + '</th>';
+            html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(firstColColor) + ';color:#fff;font-size:' + sumHeaderFont + 'px;">' + escapeHtml(normalizeExportHeadingText(sumData.groupLabel, !!headersUppercase)) + '</th>';
             sumColumns.forEach(function (c) {
                 var cGroup = String(c.group || '').trim();
                 var cColor = cGroup !== ''
                     ? (groupColorMap[cGroup] || '#64748b')
                     : ((c.source && c.source.text_color) ? String(c.source.text_color) : '#0f172a');
-                var cSize = parseInt(String((c.source && c.source.font_size) || '12'), 10);
-                cSize = Number.isNaN(cSize) ? 12 : Math.max(9, Math.min(28, cSize));
-                html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(cColor) + ';color:#fff;font-size:' + cSize + 'px;">' + escapeHtml(normalizeExportHeadingText(c.label || c.id, !!headersUppercase)) + '</th>';
+                html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(cColor) + ';color:#fff;font-size:' + sumHeaderFont + 'px;">' + escapeHtml(normalizeExportHeadingText(c.label || c.id, !!headersUppercase)) + '</th>';
             });
             html += '</tr>';
             sumData.groups.forEach(function (g) {
                 html += '<tr class="tm-export-preview-row tm-export-preview-data">';
-                html += '<td class="tm-export-preview-cell tm-export-preview-data-cell">' + escapeHtml(g.label) + '</td>';
+                html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="font-size:' + sumCellFont + 'px;">' + escapeHtml(g.label) + '</td>';
                 sumColumns.forEach(function (c) {
-                    var cSize = parseInt(String((c.source && c.source.font_size) || '12'), 10);
-                    cSize = Number.isNaN(cSize) ? 12 : Math.max(9, Math.min(28, cSize));
                     var val = c.type === 'metric' ? Number(g.metrics[c.id] || 0) : Number(g.formulas[c.id] || 0);
                     var isPercent = c.type === 'formula' && String((c.source && c.source.op) || '') === 'percent';
-                    html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="font-size:' + cSize + 'px;">' + escapeHtml(String(Math.round((val + Number.EPSILON) * 100) / 100)) + (isPercent ? '%' : '') + '</td>';
+                    html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="font-size:' + sumCellFont + 'px;">' + escapeHtml(String(Math.round((val + Number.EPSILON) * 100) / 100)) + (isPercent ? '%' : '') + '</td>';
                 });
                 html += '</tr>';
             });
@@ -3023,11 +3258,9 @@
                 totalsStyle += 'color:' + escapeHtml(String(sumTotalsTextColor || 'var(--clr-primary)')) + ';';
 
                 html += '<tr class="tm-export-preview-row tm-export-preview-data">';
-                html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + totalsStyle + '">' + escapeHtml(normalizeExportHeadingText('Total', !!headersUppercase)) + '</td>';
+                html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="font-size:' + sumCellFont + 'px;' + totalsStyle + '">' + escapeHtml(normalizeExportHeadingText('Total', !!headersUppercase)) + '</td>';
                 sumColumns.forEach(function (c) {
                     var includeTotal = !(c.source && Object.prototype.hasOwnProperty.call(c.source, 'include_total')) || !!c.source.include_total;
-                    var cSize = parseInt(String((c.source && c.source.font_size) || '12'), 10);
-                    cSize = Number.isNaN(cSize) ? 12 : Math.max(9, Math.min(28, cSize));
                     var totalVal = 0;
                     if (includeTotal) {
                         var isPercentFormula = c.type === 'formula' && String((c.source && c.source.op) || '') === 'percent';
@@ -3055,7 +3288,7 @@
                     }
                     var isPercent = c.type === 'formula' && String((c.source && c.source.op) || '') === 'percent';
                     var txt = includeTotal ? String(Math.round((totalVal + Number.EPSILON) * 100) / 100) + (isPercent ? '%' : '') : '';
-                    html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="font-size:' + cSize + 'px;' + totalsStyle + '">' + escapeHtml(txt) + '</td>';
+                    html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="font-size:' + sumCellFont + 'px;' + totalsStyle + '">' + escapeHtml(txt) + '</td>';
                 });
                 html += '</tr>';
             }
@@ -3078,7 +3311,7 @@
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, cellFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', sumMetrics: [], sumFormulas: [] };
+                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, recordsCellFontPx: 12, recordsHeaderFontPx: 12, sumCellFontPx: 12, sumHeaderFontPx: 12, totalsCellFontPx: 12, totalsHeaderFontPx: 12, cellFontPx: 12, headerFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', includeCalculatedColumns: false, calculatedColumns: [], includeOperationsColumn: false, operationsLabel: 'Operaciones', operationsReferenceField: '', operationsIncludePercent: true, operationsFields: [], sumMetrics: [], sumFormulas: [] };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
             const titleUppercaseEl = modal ? modal.querySelector('#tmExportTitleUppercase') : document.getElementById('tmExportTitleUppercase');
@@ -3087,6 +3320,8 @@
             const titleFontEl = modal ? modal.querySelector('#tmExportTitleFontSize') : document.getElementById('tmExportTitleFontSize');
             const headerFontEl = modal ? modal.querySelector('#tmExportHeaderFontSize') : document.getElementById('tmExportHeaderFontSize');
             const microrregionSortEl = modal ? modal.querySelector('#tmExportMicrorregionSort') : document.getElementById('tmExportMicrorregionSort');
+            const includeCalculatedColumnsEl = modal ? modal.querySelector('#tmExportIncludeCalculatedColumns') : document.getElementById('tmExportIncludeCalculatedColumns');
+            const calculatedColumnsListEl = modal ? modal.querySelector('#tmExportCalculatedColumnsList') : document.getElementById('tmExportCalculatedColumnsList');
             const docMarginPresetEl = modal ? modal.querySelector('#tmExportDocMarginPreset') : document.getElementById('tmExportDocMarginPreset');
             const paperSizeEl = modal ? modal.querySelector('#tmExportPaperSize') : document.getElementById('tmExportPaperSize');
             const alignBtn = modal ? modal.querySelector('#tmExportTitleAlignGroup .tm-export-align-btn.is-active') : null;
@@ -3102,8 +3337,12 @@
             const sumTitleFontEl = modal ? modal.querySelector('#tmExportSumTitleFontSize') : document.getElementById('tmExportSumTitleFontSize');
             const sumGroupColorTrigger = modal ? modal.querySelector('#tmExportSumGroupColorTrigger') : document.getElementById('tmExportSumGroupColorTrigger');
             const sumIncludeTotalsRowEl = modal ? modal.querySelector('#tmExportSumIncludeTotalsRow') : document.getElementById('tmExportSumIncludeTotalsRow');
+            const sumCellFontEl = modal ? modal.querySelector('#tmExportSumCellFontSize') : document.getElementById('tmExportSumCellFontSize');
+            const sumHeaderFontEl = modal ? modal.querySelector('#tmExportSumHeaderFontSize') : document.getElementById('tmExportSumHeaderFontSize');
             const includeTotalsTableEl = modal ? modal.querySelector('#tmExportIncludeTotalsTable') : document.getElementById('tmExportIncludeTotalsTable');
             const totalsTableTitleEl = modal ? modal.querySelector('#tmExportTotalsTableTitle') : document.getElementById('tmExportTotalsTableTitle');
+            const totalsCellFontEl = modal ? modal.querySelector('#tmExportTotalsCellFontSize') : document.getElementById('tmExportTotalsCellFontSize');
+            const totalsHeaderFontEl = modal ? modal.querySelector('#tmExportTotalsHeaderFontSize') : document.getElementById('tmExportTotalsHeaderFontSize');
             const sumTotalsBoldEl = modal ? modal.querySelector('#tmExportSumTotalsBold') : document.getElementById('tmExportSumTotalsBold');
             const sumTotalsColorTrigger = modal ? modal.querySelector('#tmExportSumTotalsColorTrigger') : document.getElementById('tmExportSumTotalsColorTrigger');
             const sumTitleAlignBtn = modal ? modal.querySelector('#tmExportSumTitleAlignGroup .tm-export-align-btn.is-active') : null;
@@ -3113,9 +3352,13 @@
             const sumTitleFontPx = sumTitleFontEl && sumTitleFontEl.value ? Math.max(10, Math.min(36, parseInt(sumTitleFontEl.value, 10) || 14)) : 14;
             const sumGroupColor = (sumGroupColorTrigger && sumGroupColorTrigger.getAttribute('data-color')) ? sumGroupColorTrigger.getAttribute('data-color') : 'var(--clr-primary)';
             const sumTotalsTextColor = (sumTotalsColorTrigger && sumTotalsColorTrigger.getAttribute('data-color')) ? sumTotalsColorTrigger.getAttribute('data-color') : 'var(--clr-primary)';
-            const cellFontPx = cellFontEl && cellFontEl.value ? Math.max(9, Math.min(24, parseInt(cellFontEl.value, 10) || 12)) : 12;
+            const recordsCellFontPx = cellFontEl && cellFontEl.value ? Math.max(9, Math.min(24, parseInt(cellFontEl.value, 10) || 12)) : 12;
             const titleFontPx = titleFontEl && titleFontEl.value ? Math.max(10, Math.min(36, parseInt(titleFontEl.value, 10) || 18)) : 18;
-            const headerFontPx = headerFontEl && headerFontEl.value ? Math.max(9, Math.min(28, parseInt(headerFontEl.value, 10) || 12)) : 12;
+            const recordsHeaderFontPx = headerFontEl && headerFontEl.value ? Math.max(9, Math.min(28, parseInt(headerFontEl.value, 10) || 12)) : 12;
+            const sumCellFontPx = sumCellFontEl && sumCellFontEl.value ? Math.max(9, Math.min(24, parseInt(sumCellFontEl.value, 10) || 12)) : 12;
+            const sumHeaderFontPx = sumHeaderFontEl && sumHeaderFontEl.value ? Math.max(9, Math.min(28, parseInt(sumHeaderFontEl.value, 10) || 12)) : 12;
+            const totalsCellFontPx = totalsCellFontEl && totalsCellFontEl.value ? Math.max(9, Math.min(24, parseInt(totalsCellFontEl.value, 10) || 12)) : 12;
+            const totalsHeaderFontPx = totalsHeaderFontEl && totalsHeaderFontEl.value ? Math.max(9, Math.min(28, parseInt(totalsHeaderFontEl.value, 10) || 12)) : 12;
             const items = Array.from(container.children).filter(function (el) {
                 return el.classList && el.classList.contains('tm-export-personalize-col');
             });
@@ -3177,6 +3420,45 @@
             var includeSumTableEl = modal ? modal.querySelector('#tmExportIncludeSumTable') : document.getElementById('tmExportIncludeSumTable');
             var sumGroupByEl = modal ? modal.querySelector('#tmExportSumGroupBy') : document.getElementById('tmExportSumGroupBy');
             var sumCfg = tmExportReadSumConfigurator();
+            var calculatedColumns = [];
+            if (calculatedColumnsListEl) {
+                calculatedColumnsListEl.querySelectorAll('[data-calc-col-id]').forEach(function (row) {
+                    var id = String(row.getAttribute('data-calc-col-id') || '');
+                    if (!id) { return; }
+                    var labelEl = row.querySelector('[data-calc-label]');
+                    var opEl = row.querySelector('[data-calc-operation]');
+                    var groupEl = row.querySelector('[data-calc-group]');
+                    var baseEl = row.querySelector('[data-calc-base]');
+                    var opFieldsEl = row.querySelector('[data-calc-op-fields]');
+                    var colorTrigger = row.querySelector('[data-calc-color-trigger]');
+                    var sizeEl = row.querySelector('[data-calc-size]');
+                    var boldBtn = row.querySelector('[data-calc-bold]');
+                    var existingCalc = Array.isArray(personalizeModal._calculatedColumns)
+                        ? personalizeModal._calculatedColumns.find(function (x) { return String(x && x.id || '') === id; })
+                        : null;
+                    var opFields = [];
+                    if (opFieldsEl) {
+                        opFields = Array.from(opFieldsEl.selectedOptions || []).map(function (o) { return String(o.value || ''); }).filter(Boolean);
+                    }
+                    var op = opEl ? String(opEl.value || 'add') : 'add';
+                    if (['add', 'subtract', 'multiply', 'percent'].indexOf(op) === -1) { op = 'add'; }
+                    var size = parseInt(String(sizeEl ? sizeEl.value : '18'), 10);
+                    if (Number.isNaN(size)) { size = 18; }
+                    calculatedColumns.push({
+                        id: id,
+                        label: labelEl && String(labelEl.value || '').trim() !== '' ? String(labelEl.value).trim() : ('Calculada ' + (calculatedColumns.length + 1)),
+                        group: groupEl ? String(groupEl.value || '').trim() : '',
+                        operation: op,
+                        baseField: baseEl ? String(baseEl.value || '') : '',
+                        afterKey: existingCalc ? String(existingCalc.afterKey || '') : '',
+                        operationFields: opFields,
+                        cellColor: (colorTrigger && colorTrigger.getAttribute('data-color')) ? String(colorTrigger.getAttribute('data-color')) : 'var(--clr-secondary)',
+                        cellSizeCh: Math.max(8, Math.min(40, size)),
+                        cellBold: !!(boldBtn && boldBtn.classList.contains('is-active'))
+                    });
+                });
+            }
+            var firstCalculated = calculatedColumns.length ? calculatedColumns[0] : null;
             return {
                 title: titleEl ? titleEl.value : '',
                 titleAlign: titleAlign,
@@ -3199,15 +3481,28 @@
                 columns: columns,
                 countTableColors: countTableColors,
                 countTableCellWidth: countTableCellWidth,
-                cellFontPx: cellFontPx,
+                recordsCellFontPx: recordsCellFontPx,
+                recordsHeaderFontPx: recordsHeaderFontPx,
+                sumCellFontPx: sumCellFontPx,
+                sumHeaderFontPx: sumHeaderFontPx,
+                totalsCellFontPx: totalsCellFontPx,
+                totalsHeaderFontPx: totalsHeaderFontPx,
+                cellFontPx: recordsCellFontPx,
                 titleFontPx: titleFontPx,
-                headerFontPx: headerFontPx,
+                headerFontPx: recordsHeaderFontPx,
                 docMarginPreset: (docMarginPresetEl && ['normal', 'compact', 'none'].indexOf(docMarginPresetEl.value) !== -1) ? docMarginPresetEl.value : 'compact',
                 paperSize: (paperSizeEl && ['letter', 'legal'].indexOf(String(paperSizeEl.value || '').toLowerCase()) !== -1) ? String(paperSizeEl.value).toLowerCase() : 'letter',
                 groups: groups,
                 microrregionSort: (microrregionSortEl && microrregionSortEl.value === 'desc') ? 'desc' : 'asc',
                 includeSumTable: !!(includeSumTableEl && includeSumTableEl.checked),
                 sumGroupBy: (sumGroupByEl && sumGroupByEl.value === 'municipio') ? 'municipio' : 'microrregion',
+                includeCalculatedColumns: !!(includeCalculatedColumnsEl && includeCalculatedColumnsEl.checked),
+                calculatedColumns: calculatedColumns,
+                includeOperationsColumn: !!(includeCalculatedColumnsEl && includeCalculatedColumnsEl.checked) && !!firstCalculated,
+                operationsLabel: firstCalculated ? String(firstCalculated.label || 'Operaciones') : 'Operaciones',
+                operationsReferenceField: firstCalculated ? String(firstCalculated.baseField || '') : '',
+                operationsIncludePercent: firstCalculated ? (String(firstCalculated.operation || 'add') === 'percent') : true,
+                operationsFields: firstCalculated && Array.isArray(firstCalculated.operationFields) ? firstCalculated.operationFields.slice() : [],
                 sumMetrics: sumCfg.metrics,
                 sumFormulas: sumCfg.formulas
             };
@@ -3259,9 +3554,131 @@
             return String(val);
         }
 
+        function tmExportIsEmptyCellValue(val) {
+            if (val === null || val === undefined) { return true; }
+            if (Array.isArray(val)) {
+                if (!val.length) { return true; }
+                return val.every(function (v) { return tmExportIsEmptyCellValue(v); });
+            }
+            if (typeof val === 'object') {
+                if (Object.prototype.hasOwnProperty.call(val, 'primary')) {
+                    return tmExportIsEmptyCellValue(val.primary);
+                }
+                var keys = Object.keys(val);
+                if (!keys.length) { return true; }
+                return keys.every(function (k) { return tmExportIsEmptyCellValue(val[k]); });
+            }
+            return String(val).trim() === '';
+        }
+
+        function tmExportLooksNumericColumn(col, originalValue) {
+            if (typeof originalValue === 'number') { return true; }
+            var hints = [
+                String(col && col.type || ''),
+                String(col && col.field_type || ''),
+                String(col && col.data_type || ''),
+                String(col && col.key || ''),
+                String(col && col.label || '')
+            ].join(' ').toLowerCase();
+            return /(number|numeric|int|integer|decimal|float|double|cantidad|total|monto|importe|num)/.test(hints);
+        }
+
+        function tmExportApplyEmptyFillForColumn(col, rawValue) {
+            if (!col || col.is_image || String(col.key || '') === 'item' || String(col.key || '') === 'microrregion') {
+                return rawValue;
+            }
+            if (!tmExportIsEmptyCellValue(rawValue)) {
+                return rawValue;
+            }
+            var mode = String(col.fill_empty_mode || col.fillEmptyMode || 'none');
+            if (mode !== 'auto' && mode !== 'custom') {
+                return rawValue;
+            }
+            if (mode === 'custom') {
+                return String(col.fill_empty_value != null ? col.fill_empty_value : (col.fillEmptyValue || ''));
+            }
+            return tmExportLooksNumericColumn(col, rawValue) ? 0 : 'S/R';
+        }
+
+        function escapeHtmlWithBreaks(val) {
+            return escapeHtml(String(val == null ? '' : val)).replace(/\r?\n/g, '<br>');
+        }
+
         function normalizeExportHeadingText(text, uppercase) {
             var value = text == null ? '' : String(text);
             return uppercase ? value.toLocaleUpperCase() : value;
+        }
+
+        function tmExportOperationIsEmpty(val) {
+            if (val === null || val === undefined) { return true; }
+            if (Array.isArray(val)) {
+                return val.every(function (item) { return tmExportOperationIsEmpty(item); });
+            }
+            if (typeof val === 'object') {
+                if (Object.prototype.hasOwnProperty.call(val, 'primary')) {
+                    return tmExportOperationIsEmpty(val.primary);
+                }
+                var keys = Object.keys(val);
+                if (!keys.length) { return true; }
+                return keys.every(function (k) { return tmExportOperationIsEmpty(val[k]); });
+            }
+            return String(val).trim() === '';
+        }
+
+        function tmExportBuildCalculatedTextForEntry(entry, calculatedColumn, effectiveColumns, headersUppercase) {
+            var data = (entry && entry.data && typeof entry.data === 'object') ? entry.data : {};
+            var cfg = calculatedColumn && typeof calculatedColumn === 'object' ? calculatedColumn : {};
+            var op = String(cfg.operation || 'add').toLowerCase();
+            if (['add', 'subtract', 'multiply', 'percent'].indexOf(op) === -1) { op = 'add'; }
+            var baseKey = String(cfg.baseField || '');
+            var opKeys = Array.isArray(cfg.operationFields) ? cfg.operationFields.slice() : [];
+
+            var toNumber = function (raw) {
+                if (Array.isArray(raw)) {
+                    var sum = 0;
+                    var hasAny = false;
+                    raw.forEach(function (part) {
+                        var n = tmExportParseNumber(part);
+                        if (n != null) { hasAny = true; sum += n; }
+                    });
+                    return hasAny ? sum : null;
+                }
+                if (raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'primary')) {
+                    return tmExportParseNumber(raw.primary);
+                }
+                return tmExportParseNumber(raw);
+            };
+
+            var baseValRaw = baseKey ? toNumber(data[baseKey]) : null;
+            var baseVal = baseValRaw != null ? baseValRaw : 0;
+            var opVals = [];
+            opKeys.forEach(function (k) {
+                if (!k) { return; }
+                var n = toNumber(data[k]);
+                if (n != null) { opVals.push(n); }
+            });
+
+            var result = null;
+            if (op === 'add') {
+                var sumOps = opVals.reduce(function (acc, n) { return acc + n; }, 0);
+                result = baseVal + sumOps;
+            } else if (op === 'subtract') {
+                var subOps = opVals.reduce(function (acc, n) { return acc + n; }, 0);
+                result = baseVal - subOps;
+            } else if (op === 'multiply') {
+                var product = opVals.length ? opVals.reduce(function (acc, n) { return acc * n; }, 1) : 1;
+                result = baseVal * product;
+            } else if (op === 'percent') {
+                var numerator = opVals.reduce(function (acc, n) { return acc + n; }, 0);
+                result = baseVal !== 0 ? ((numerator / baseVal) * 100) : 0;
+            }
+
+            if (result == null || !Number.isFinite(result)) {
+                return '';
+            }
+
+            var rounded = Math.round((result + Number.EPSILON) * 100) / 100;
+            return op === 'percent' ? (String(rounded) + '%') : String(rounded);
         }
 
         function buildPersonalizePreview(columns, previewEl, sampleRow, previewEntries, microrregionMeta) {
@@ -3274,8 +3691,12 @@
             entries = sortPreviewEntriesByMicrorregion(entries, meta, state.microrregionSort);
             const colorMap = {};
             state.columns.forEach(function (c) { colorMap[c.key] = c.color; });
-            const cellFontPx = state.cellFontPx || 12;
-            const headerFontPx = state.headerFontPx || 12;
+            const recordsCellFontPx = state.recordsCellFontPx || state.cellFontPx || 12;
+            const recordsHeaderFontPx = state.recordsHeaderFontPx || state.headerFontPx || 12;
+            const sumCellFontPx = state.sumCellFontPx || recordsCellFontPx;
+            const sumHeaderFontPx = state.sumHeaderFontPx || recordsHeaderFontPx;
+            const totalsCellFontPx = state.totalsCellFontPx || sumCellFontPx;
+            const totalsHeaderFontPx = state.totalsHeaderFontPx || sumHeaderFontPx;
             const titleFontPx = state.titleFontPx || 18;
             const titleAlign = state.titleAlign || 'center';
             const countTableAlign = state.countTableAlign || 'left';
@@ -3283,10 +3704,55 @@
             const titleUppercase = !!state.titleUppercase;
             const headersUppercase = !!state.headersUppercase;
             const docMarginPreset = state.docMarginPreset || 'compact';
+            var includeCalculatedColumns = !!state.includeCalculatedColumns;
+            var calculatedColumns = Array.isArray(state.calculatedColumns) ? state.calculatedColumns.slice() : [];
+            var effectiveColumns = columns.slice();
+            if (includeCalculatedColumns) {
+                var insertCalculatedColumn = function (calc, index) {
+                    var cid = String(calc && calc.id ? calc.id : ('calc_' + index));
+                    var clabel = String(calc && calc.label ? calc.label : ('Calculada ' + (index + 1))).trim();
+                    if (clabel === '') { clabel = 'Calculada ' + (index + 1); }
+                    var calcColor = String(calc && calc.cellColor ? calc.cellColor : 'var(--clr-secondary)');
+                    var calcSizeCh = Math.max(8, Math.min(40, parseInt(String(calc && calc.cellSizeCh != null ? calc.cellSizeCh : 18), 10) || 18));
+                    var calcCol = {
+                        key: '__calc_' + cid,
+                        label: clabel,
+                        color: calcColor,
+                        group: String(calc && calc.group ? calc.group : ''),
+                        max_width_chars: calcSizeCh,
+                        content_bold: !!(calc && (calc.cellBold || calc.cell_bold)),
+                        _calc_cfg: calc || null,
+                    };
+                    var afterKey = String(calc && calc.afterKey ? calc.afterKey : '');
+                    if (afterKey === '') {
+                        effectiveColumns.push(calcCol);
+                        return;
+                    }
+                    var insertAt = -1;
+                    for (var i = 0; i < effectiveColumns.length; i++) {
+                        if (String(effectiveColumns[i] && effectiveColumns[i].key || '') === afterKey) {
+                            insertAt = i + 1;
+                            break;
+                        }
+                    }
+                    if (insertAt === -1) {
+                        effectiveColumns.push(calcCol);
+                    } else {
+                        effectiveColumns.splice(insertAt, 0, calcCol);
+                    }
+                };
+                calculatedColumns.forEach(function (calc, index) {
+                    insertCalculatedColumn(calc, index);
+                });
+            }
             const titleStyle = 'text-align:' + (titleAlign === 'left' ? 'left' : titleAlign === 'right' ? 'right' : 'center');
             var countTableMargin = countTableAlign === 'center' ? 'margin: 1.5rem auto;' : countTableAlign === 'right' ? 'margin: 1.5rem 0 1.5rem auto;' : 'margin: 1.5rem auto 1.5rem 0;';
             var estimateColumnUnits = function (col) {
                 if (!col) { return 8; }
+                if (String(col.key || '').indexOf('__calc_') === 0) {
+                    var calcW = parseInt(String(col.max_width_chars != null ? col.max_width_chars : 18), 10);
+                    return Math.max(8, Math.min(40, Number.isNaN(calcW) ? 18 : calcW));
+                }
                 if (col.is_image) {
                     var imageCfg = state.columns.find(function (x) { return x.key === col.key; }) || {};
                     var imageW = imageCfg.imageWidth || 120;
@@ -3306,7 +3772,7 @@
             };
             var totalUnits = 0;
             var colUnitsByKey = {};
-            columns.forEach(function (col) {
+            effectiveColumns.forEach(function (col) {
                 var units = estimateColumnUnits(col);
                 colUnitsByKey[col.key] = units;
                 totalUnits += units;
@@ -3318,7 +3784,7 @@
             });
 
             // Si hay muchas columnas o ancho total alto, usar todo el ancho de la hoja para evitar recortes.
-            var forceFullWidthDataTable = columns.length >= 6 || totalUnits > 110;
+            var forceFullWidthDataTable = effectiveColumns.length >= 6 || totalUnits > 110;
             var effectiveDataTableAlign = forceFullWidthDataTable ? 'left' : dataTableAlign;
             var dataTableMargin = effectiveDataTableAlign === 'center' ? 'margin: 1.5rem auto;' : effectiveDataTableAlign === 'right' ? 'margin: 1.5rem 0 1.5rem auto;' : 'margin: 1.5rem auto 1.5rem 0;';
             var dataTableStyle = (forceFullWidthDataTable || effectiveDataTableAlign === 'left') ? 'width:100%;' : 'width:auto;display:table;';
@@ -3519,7 +3985,7 @@
                     countTableHtml += '</tr></tbody></table>';
                 }
             }
-            const totalColSpan = columns.length;
+            const totalColSpan = effectiveColumns.length;
             var now = new Date();
             var dateStrFormatted = now.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
                                    now.getHours().toString().padStart(2, '0') + ':' +
@@ -3561,6 +4027,8 @@
                     state.totalsTableTitle || 'Totales',
                     state.totalsTableAlign || 'left',
                     state.sumTitleFontPx || 14,
+                    totalsHeaderFontPx,
+                    totalsCellFontPx,
                     !(state.sumTotalsBold === false),
                     state.sumTotalsTextColor || 'var(--clr-primary)',
                     state.groups || []
@@ -3579,6 +4047,8 @@
                 state.sumTitleCase || 'normal',
                 state.sumTitleAlign || 'center',
                 state.sumTitleFontPx || 14,
+                sumHeaderFontPx,
+                sumCellFontPx,
                 state.sumGroupColor || 'var(--clr-primary)',
                 !!state.sumIncludeTotalsRow,
                 !(state.sumTotalsBold === false),
@@ -3592,7 +4062,7 @@
 
             // Encabezados (con Grupos si aplica)
             var groupSpans = [];
-            columns.forEach(function (col) {
+            effectiveColumns.forEach(function (col) {
                 var g = col.group || '';
                 if (groupSpans.length > 0 && groupSpans[groupSpans.length - 1].label === g) {
                     groupSpans[groupSpans.length - 1].span++;
@@ -3608,31 +4078,31 @@
                 var gColIdx = 0;
                 groupSpans.forEach(function (gs) {
                     var groupColor = gs.label ? (groupColorMap[gs.label] || '#64748b') : 'transparent';
-                    var style = gs.label ? ('background-color:' + escapeHtml(groupColor) + '; color:white; border:1px solid #475569; font-weight:bold; border-bottom:none; font-size:' + headerFontPx + 'px;') : 'border:none;';
+                    var style = gs.label ? ('background-color:' + escapeHtml(groupColor) + '; color:white; border:1px solid #475569; font-weight:bold; border-bottom:none; font-size:' + recordsHeaderFontPx + 'px;') : 'border:none;';
                     if (forceFullWidthDataTable) {
                         var gPct = 0;
                         for (var gi = 0; gi < gs.span; gi++) {
-                            var gcol = columns[gColIdx + gi];
+                            var gcol = effectiveColumns[gColIdx + gi];
                             if (gcol && gcol.key) { gPct += (colPercentByKey[gcol.key] || 0); }
                         }
                         style += 'width:' + gPct.toFixed(2) + '%;';
                     }
                     gColIdx += gs.span;
-                    html += '<th class="tm-export-preview-cell" colspan="' + gs.span + '" style="' + style + '">' + (gs.label ? escapeHtml(normalizeExportHeadingText(gs.label, headersUppercase)) : '') + '</th>';
+                    html += '<th class="tm-export-preview-cell" colspan="' + gs.span + '" style="' + style + '">' + (gs.label ? escapeHtmlWithBreaks(normalizeExportHeadingText(gs.label, headersUppercase)) : '') + '</th>';
                 });
                 html += '</tr>';
             }
 
             html += '<tr class="tm-export-preview-row tm-export-preview-header">';
-            columns.forEach(function (col) {
+            effectiveColumns.forEach(function (col) {
                 const color = colorMap[col.key] || '#861e34';
                 var widthStyle = getDataColWidthStyle(col);
                 if (col.is_image) {
                     const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
                     const h = (c.imageHeight || 80) + 'px';
-                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell tm-export-preview-image-cell" style="background-color:' + escapeHtml(color) + ';' + widthStyle + 'height:' + h + ';min-height:' + h + ';font-size:' + headerFontPx + 'px;"><span class="tm-export-preview-image-placeholder">' + escapeHtml(normalizeExportHeadingText('Imagen', headersUppercase)) + '</span></th>';
+                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell tm-export-preview-image-cell" style="background-color:' + escapeHtml(color) + ';' + widthStyle + 'height:' + h + ';min-height:' + h + ';font-size:' + recordsHeaderFontPx + 'px;"><span class="tm-export-preview-image-placeholder">' + escapeHtmlWithBreaks(normalizeExportHeadingText('Imagen', headersUppercase)) + '</span></th>';
                 } else {
-                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(color) + ';' + widthStyle + 'font-size:' + headerFontPx + 'px;">' + escapeHtml(normalizeExportHeadingText(col.label, headersUppercase)) + '</th>';
+                    html += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(color) + ';' + widthStyle + 'font-size:' + recordsHeaderFontPx + 'px;">' + escapeHtmlWithBreaks(normalizeExportHeadingText(col.label, headersUppercase)) + '</th>';
                 }
             });
             html += '</tr>';
@@ -3642,33 +4112,55 @@
                 entries.forEach(function (entry) {
                     var mrLabel = (meta[entry.microrregion_id] && meta[entry.microrregion_id].label) ? meta[entry.microrregion_id].label : 'Sin microrregión';
                     html += '<tr class="tm-export-preview-row tm-export-preview-data">';
-                    columns.forEach(function (col) {
+                    effectiveColumns.forEach(function (col) {
                         const cellColor = '#f5f5f5';
                         var widthStyle = getDataColWidthStyle(col);
                         if (col.is_image) {
                             const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
                             const h = (c.imageHeight || 80) + 'px';
-                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" style="' + widthStyle + 'height:' + h + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">-</span></td>';
+                            var imageBold = col.content_bold ? 'font-weight:700;' : '';
+                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" style="' + widthStyle + 'height:' + h + ';min-height:' + h + ';background:#f0f0f0;' + imageBold + '"><span class="tm-export-preview-image-placeholder">-</span></td>';
                         } else {
                             var val = '';
-                            if (col.key === 'item') { val = String(itemNum++); } else if (col.key === 'microrregion') { val = mrLabel; } else { val = formatPreviewCellValue(entry.data && entry.data[col.key]); }
-                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + widthStyle + 'background:' + escapeHtml(cellColor) + ';font-size:' + cellFontPx + 'px;">' + escapeHtml(val) + '</td>';
+                            var valueHtml = '';
+                            if (col.key === 'item') {
+                                val = String(itemNum++);
+                                valueHtml = escapeHtml(val);
+                            } else if (col.key === 'microrregion') {
+                                val = mrLabel;
+                                valueHtml = escapeHtml(val);
+                            } else if (String(col.key || '').indexOf('__calc_') === 0) {
+                                val = tmExportBuildCalculatedTextForEntry(entry, col._calc_cfg || null, effectiveColumns, headersUppercase);
+                                valueHtml = escapeHtmlWithBreaks(val);
+                            } else {
+                                var rawVal = entry.data && entry.data[col.key];
+                                rawVal = tmExportApplyEmptyFillForColumn(col, rawVal);
+                                val = formatPreviewCellValue(rawVal);
+                                valueHtml = escapeHtml(val);
+                            }
+                            var weightStyle = col.content_bold ? 'font-weight:700;' : '';
+                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + widthStyle + 'background:' + escapeHtml(cellColor) + ';font-size:' + recordsCellFontPx + 'px;' + weightStyle + '">' + valueHtml + '</td>';
                         }
                     });
                     html += '</tr>';
                 });
             } else {
                 html += '<tr class="tm-export-preview-row tm-export-preview-data">';
-                columns.forEach(function (col) {
+                effectiveColumns.forEach(function (col) {
                     const cellColor = '#f5f5f5';
                     var widthStyle = getDataColWidthStyle(col);
                     if (col.is_image) {
                         const c = state.columns.find(function (x) { return x.key === col.key; }) || {};
                         const h = (c.imageHeight || 80) + 'px';
-                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" data-key="' + escapeHtml(col.key) + '" style="' + widthStyle + 'height:' + h + ';min-height:' + h + ';background:#f0f0f0"><span class="tm-export-preview-image-placeholder">-</span></td>';
+                        var emptyImageBold = col.content_bold ? 'font-weight:700;' : '';
+                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell tm-export-preview-image-cell" data-key="' + escapeHtml(col.key) + '" style="' + widthStyle + 'height:' + h + ';min-height:' + h + ';background:#f0f0f0;' + emptyImageBold + '"><span class="tm-export-preview-image-placeholder">-</span></td>';
+                    } else if (String(col.key || '').indexOf('__calc_') === 0) {
+                        var emptyCalcBold = col.content_bold ? 'font-weight:700;' : '';
+                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + widthStyle + 'background:' + escapeHtml(cellColor) + ';font-size:' + recordsCellFontPx + 'px;' + emptyCalcBold + '">OK</td>';
                     } else {
                         const val = (savedRow && savedRow[col.key] !== undefined) ? escapeHtml(savedRow[col.key]) : '';
-                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="' + widthStyle + 'background:' + escapeHtml(cellColor) + ';font-size:' + cellFontPx + 'px;" data-placeholder="Ejemplo">' + val + '</td>';
+                        var emptyTextBold = col.content_bold ? 'font-weight:700;' : '';
+                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="' + widthStyle + 'background:' + escapeHtml(cellColor) + ';font-size:' + recordsCellFontPx + 'px;' + emptyTextBold + '" data-placeholder="Ejemplo">' + val + '</td>';
                     }
                 });
                 html += '</tr>';
@@ -3695,6 +4187,9 @@
 
                 const groupSel = item.querySelector('.tm-export-col-group-select');
                 if (groupSel) { col.group = groupSel.value; }
+                col.fill_empty_mode = String(item.dataset.fillEmptyMode || 'none');
+                col.fill_empty_value = String(item.dataset.fillEmptyValue || '');
+                col.content_bold = String(item.dataset.contentBold || '0') === '1';
 
                 if (!col.is_image) {
                     const widthInput = item.querySelector('.tm-export-col-width-input');
@@ -3705,8 +4200,7 @@
                         }
                     }
                 }
-                const colorTrigger = item.querySelector('.tm-export-color-trigger');
-                if (colorTrigger) { col.color = colorTrigger.getAttribute('data-color') || 'var(--clr-primary)'; }
+                col.color = String(item.dataset.headerColor || 'var(--clr-primary)');
 
                 ordered.push(col);
             });
@@ -3876,6 +4370,10 @@
             const countByWrapEl = document.getElementById('tmExportCountByWrap');
             const countByFieldsEl = document.getElementById('tmExportCountByFields');
             const countTableColorListEl = document.getElementById('tmExportCountTableColorList');
+            const includeCalculatedColumnsEl = document.getElementById('tmExportIncludeCalculatedColumns');
+            const calculatedColumnsWrapEl = document.getElementById('tmExportCalculatedColumnsWrap');
+            const addCalculatedColumnBtn = document.getElementById('tmExportAddCalculatedColumnBtn');
+            const calculatedColumnsListEl = document.getElementById('tmExportCalculatedColumnsList');
             const includeSumTableEl = document.getElementById('tmExportIncludeSumTable');
             const sumWrapEl = document.getElementById('tmExportSumWrap');
             const sumGroupByEl = document.getElementById('tmExportSumGroupBy');
@@ -3886,9 +4384,13 @@
             const sumGroupColorTriggerEl = document.getElementById('tmExportSumGroupColorTrigger');
             const sumGroupColorMenuEl = document.getElementById('tmExportSumGroupColorMenu');
             const sumIncludeTotalsRowEl = document.getElementById('tmExportSumIncludeTotalsRow');
+            const sumCellFontEl = document.getElementById('tmExportSumCellFontSize');
+            const sumHeaderFontEl = document.getElementById('tmExportSumHeaderFontSize');
             const includeTotalsTableEl = document.getElementById('tmExportIncludeTotalsTable');
             const totalsTableWrapEl = document.getElementById('tmExportTotalsTableWrap');
             const totalsTableTitleEl = document.getElementById('tmExportTotalsTableTitle');
+            const totalsCellFontEl = document.getElementById('tmExportTotalsCellFontSize');
+            const totalsHeaderFontEl = document.getElementById('tmExportTotalsHeaderFontSize');
             const sumTotalsBoldEl = document.getElementById('tmExportSumTotalsBold');
             const sumTotalsColorWrapEl = document.getElementById('tmExportSumTotalsColorWrap');
             const sumTotalsColorTriggerEl = document.getElementById('tmExportSumTotalsColorTrigger');
@@ -4023,6 +4525,147 @@
                     var refreshSumPreview = function () {
                         buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
                     };
+
+                    tmExportEnsureCalculatedColumnsState(countableColumns, null);
+                    tmExportRenderCalculatedColumnsConfigurator(countableColumns);
+                    if (includeCalculatedColumnsEl && calculatedColumnsWrapEl) {
+                        calculatedColumnsWrapEl.hidden = !includeCalculatedColumnsEl.checked;
+                        includeCalculatedColumnsEl.onchange = function () {
+                            calculatedColumnsWrapEl.hidden = !includeCalculatedColumnsEl.checked;
+                            refreshSumPreview();
+                        };
+                    }
+                    if (addCalculatedColumnBtn) {
+                        addCalculatedColumnBtn.onclick = function () {
+                            if (!Array.isArray(personalizeModal._calculatedColumns)) {
+                                personalizeModal._calculatedColumns = [];
+                            }
+                            personalizeModal._calculatedColumns.push({
+                                id: 'calc_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                                label: 'Calculada ' + (personalizeModal._calculatedColumns.length + 1),
+                                group: '',
+                                operation: 'add',
+                                baseField: countableColumns.length ? String(countableColumns[0].key || '') : '',
+                                afterKey: '',
+                                operationFields: countableColumns.length ? [String(countableColumns[0].key || '')] : [],
+                                cellColor: 'var(--clr-secondary)',
+                                cellSizeCh: 18,
+                                cellBold: false
+                            });
+                            tmExportRenderCalculatedColumnsConfigurator(countableColumns);
+                            refreshSumPreview();
+                        };
+                    }
+                    if (calculatedColumnsListEl) {
+                        var syncCalculatedListToState = function (triggerEvent) {
+                            var next = [];
+                            calculatedColumnsListEl.querySelectorAll('[data-calc-col-id]').forEach(function (row) {
+                                var id = String(row.getAttribute('data-calc-col-id') || '');
+                                if (!id) { return; }
+                                var labelEl = row.querySelector('[data-calc-label]');
+                                var opEl = row.querySelector('[data-calc-operation]');
+                                var groupEl = row.querySelector('[data-calc-group]');
+                                var baseEl = row.querySelector('[data-calc-base]');
+                                var opFieldsEl = row.querySelector('[data-calc-op-fields]');
+                                var colorTrigger = row.querySelector('[data-calc-color-trigger]');
+                                var sizeEl = row.querySelector('[data-calc-size]');
+                                var boldBtn = row.querySelector('[data-calc-bold]');
+                                var existingCalc = Array.isArray(personalizeModal._calculatedColumns)
+                                    ? personalizeModal._calculatedColumns.find(function (x) { return String(x && x.id || '') === id; })
+                                    : null;
+                                var opFields = [];
+                                if (opFieldsEl) {
+                                    opFields = Array.from(opFieldsEl.selectedOptions || []).map(function (o) { return String(o.value || ''); }).filter(Boolean);
+                                }
+                                var op = opEl ? String(opEl.value || 'add') : 'add';
+                                if (['add', 'subtract', 'multiply', 'percent'].indexOf(op) === -1) { op = 'add'; }
+                                var size = parseInt(String(sizeEl ? sizeEl.value : '18'), 10);
+                                if (Number.isNaN(size)) { size = 18; }
+                                next.push({
+                                    id: id,
+                                    label: labelEl && String(labelEl.value || '').trim() !== '' ? String(labelEl.value).trim() : 'Calculada',
+                                    group: groupEl ? String(groupEl.value || '').trim() : '',
+                                    operation: op,
+                                    baseField: baseEl ? String(baseEl.value || '') : '',
+                                    afterKey: existingCalc ? String(existingCalc.afterKey || '') : '',
+                                    operationFields: opFields,
+                                    cellColor: (colorTrigger && colorTrigger.getAttribute('data-color')) ? String(colorTrigger.getAttribute('data-color')) : 'var(--clr-secondary)',
+                                    cellSizeCh: Math.max(8, Math.min(40, size)),
+                                    cellBold: !!(boldBtn && boldBtn.classList.contains('is-active'))
+                                });
+                            });
+                            personalizeModal._calculatedColumns = next;
+                            if (triggerEvent) { refreshSumPreview(); }
+                        };
+                        calculatedColumnsListEl.oninput = function () { syncCalculatedListToState(true); };
+                        calculatedColumnsListEl.onchange = function () { syncCalculatedListToState(true); };
+                        calculatedColumnsListEl.onclick = function (e) {
+                            var upBtn = e.target.closest('[data-move-calc-up]');
+                            if (upBtn) {
+                                var upRow = upBtn.closest('[data-calc-col-id]');
+                                if (!upRow) { return; }
+                                var upId = String(upRow.getAttribute('data-calc-col-id') || '');
+                                if (tmExportMoveCalculatedColumn(upId, 'up')) {
+                                    tmExportRenderCalculatedColumnsConfigurator(countableColumns);
+                                    refreshSumPreview();
+                                }
+                                return;
+                            }
+                            var downBtn = e.target.closest('[data-move-calc-down]');
+                            if (downBtn) {
+                                var downRow = downBtn.closest('[data-calc-col-id]');
+                                if (!downRow) { return; }
+                                var downId = String(downRow.getAttribute('data-calc-col-id') || '');
+                                if (tmExportMoveCalculatedColumn(downId, 'down')) {
+                                    tmExportRenderCalculatedColumnsConfigurator(countableColumns);
+                                    refreshSumPreview();
+                                }
+                                return;
+                            }
+                            var colorTrigger = e.target.closest('[data-calc-color-trigger]');
+                            if (colorTrigger) {
+                                var menu = colorTrigger.nextElementSibling;
+                                if (menu instanceof HTMLElement) {
+                                    var isOpen = !menu.hidden;
+                                    calculatedColumnsListEl.querySelectorAll('.tm-export-color-menu').forEach(function (m) { m.hidden = true; });
+                                    colorTrigger.setAttribute('aria-expanded', String(!isOpen));
+                                    menu.hidden = isOpen;
+                                }
+                                return;
+                            }
+                            var colorOption = e.target.closest('.tm-export-color-option');
+                            if (colorOption) {
+                                var color = colorOption.getAttribute('data-color') || 'var(--clr-secondary)';
+                                var menu = colorOption.closest('.tm-export-color-menu');
+                                var wrapColor = menu ? menu.closest('.tm-export-col-color') : null;
+                                var tr = wrapColor ? wrapColor.querySelector('[data-calc-color-trigger]') : null;
+                                if (wrapColor && tr) {
+                                    wrapColor.querySelectorAll('.tm-export-color-option').forEach(function (opt) { opt.classList.remove('is-active'); });
+                                    colorOption.classList.add('is-active');
+                                    tr.setAttribute('data-color', color);
+                                    var swatch = tr.querySelector('.tm-export-color-swatch');
+                                    if (swatch instanceof HTMLElement) { swatch.style.backgroundColor = color; }
+                                }
+                                if (menu) { menu.hidden = true; }
+                                syncCalculatedListToState(true);
+                                return;
+                            }
+                            var boldBtn = e.target.closest('[data-calc-bold]');
+                            if (boldBtn) {
+                                boldBtn.classList.toggle('is-active');
+                                syncCalculatedListToState(true);
+                                return;
+                            }
+                            var removeBtn = e.target.closest('[data-remove-calc-col]');
+                            if (!removeBtn) { return; }
+                            var row = removeBtn.closest('[data-calc-col-id]');
+                            if (!row) { return; }
+                            var id = String(row.getAttribute('data-calc-col-id') || '');
+                            personalizeModal._calculatedColumns = (personalizeModal._calculatedColumns || []).filter(function (x) { return String(x.id || '') !== id; });
+                            tmExportRenderCalculatedColumnsConfigurator(countableColumns);
+                            refreshSumPreview();
+                        };
+                    }
                     tmExportEnsureSumState(countableColumns, null);
                     tmExportRenderSumConfigurator(countableColumns);
 
@@ -4319,6 +4962,8 @@
                     }
 
                     if (draftCfg) {
+                        tmExportEnsureCalculatedColumnsState(countableColumns, draftCfg);
+                        tmExportRenderCalculatedColumnsConfigurator(countableColumns);
                         tmExportEnsureSumState(countableColumns, draftCfg);
                         tmExportRenderSumConfigurator(countableColumns);
                         if (titleEl) { titleEl.value = draftCfg.title != null ? String(draftCfg.title) : (data.title || ''); }
@@ -4355,6 +5000,11 @@
                             includeCountTableEl.checked = !!draftCfg.include_count_table;
                             if (countByWrapEl) { countByWrapEl.hidden = !includeCountTableEl.checked; }
                         }
+                        if (includeCalculatedColumnsEl) {
+                            var hasCalcDraft = !!draftCfg.include_calculated_columns || !!draftCfg.include_operations_column;
+                            includeCalculatedColumnsEl.checked = hasCalcDraft;
+                            if (calculatedColumnsWrapEl) { calculatedColumnsWrapEl.hidden = !hasCalcDraft; }
+                        }
                         if (includeSumTableEl) {
                             includeSumTableEl.checked = !!draftCfg.include_sum_table;
                             if (sumWrapEl) { sumWrapEl.hidden = !includeSumTableEl.checked; }
@@ -4372,10 +5022,26 @@
                         }
                         setSumGroupColor(draftCfg.sum_group_color || 'var(--clr-primary)');
                         if (sumIncludeTotalsRowEl) { sumIncludeTotalsRowEl.checked = !!draftCfg.include_sum_totals_row; }
+                        if (sumCellFontEl && draftCfg.sum_table_cell_font_size_px != null) {
+                            var ssf = parseInt(draftCfg.sum_table_cell_font_size_px, 10);
+                            if (!Number.isNaN(ssf)) { sumCellFontEl.value = String(Math.max(9, Math.min(24, ssf))); }
+                        }
+                        if (sumHeaderFontEl && draftCfg.sum_table_header_font_size_px != null) {
+                            var shf = parseInt(draftCfg.sum_table_header_font_size_px, 10);
+                            if (!Number.isNaN(shf)) { sumHeaderFontEl.value = String(Math.max(9, Math.min(28, shf))); }
+                        }
                         if (includeTotalsTableEl) { includeTotalsTableEl.checked = !!draftCfg.include_totals_table; }
                         if (totalsTableWrapEl) { totalsTableWrapEl.hidden = !(includeTotalsTableEl && includeTotalsTableEl.checked); }
                         if (totalsTableTitleEl) {
                             totalsTableTitleEl.value = (draftCfg.totals_table_title != null && String(draftCfg.totals_table_title).trim() !== '') ? String(draftCfg.totals_table_title) : 'Totales';
+                        }
+                        if (totalsCellFontEl && draftCfg.totals_table_cell_font_size_px != null) {
+                            var tcf = parseInt(draftCfg.totals_table_cell_font_size_px, 10);
+                            if (!Number.isNaN(tcf)) { totalsCellFontEl.value = String(Math.max(9, Math.min(24, tcf))); }
+                        }
+                        if (totalsHeaderFontEl && draftCfg.totals_table_header_font_size_px != null) {
+                            var thf = parseInt(draftCfg.totals_table_header_font_size_px, 10);
+                            if (!Number.isNaN(thf)) { totalsHeaderFontEl.value = String(Math.max(9, Math.min(28, thf))); }
                         }
                         personalizeModal.querySelectorAll('#tmExportTotalsTableAlignGroup .tm-export-align-btn').forEach(function (b) {
                             var current = String(draftCfg.totals_table_align || 'left');
@@ -4398,12 +5064,12 @@
                             var cwn = parseInt(draftCfg.count_table_cell_width, 10);
                             if (!Number.isNaN(cwn)) { cwEl.value = String(Math.max(6, Math.min(40, cwn))); }
                         }
-                        if (cellFontEl && draftCfg.cell_font_size_px != null) {
-                            var cfn = parseInt(draftCfg.cell_font_size_px, 10);
+                        if (cellFontEl && (draftCfg.records_cell_font_size_px != null || draftCfg.cell_font_size_px != null)) {
+                            var cfn = parseInt((draftCfg.records_cell_font_size_px != null ? draftCfg.records_cell_font_size_px : draftCfg.cell_font_size_px), 10);
                             if (!Number.isNaN(cfn)) { cellFontEl.value = String(Math.max(9, Math.min(24, cfn))); }
                         }
-                        if (headerFontEl && draftCfg.header_font_size_px != null) {
-                            var hfn = parseInt(draftCfg.header_font_size_px, 10);
+                        if (headerFontEl && (draftCfg.records_header_font_size_px != null || draftCfg.header_font_size_px != null)) {
+                            var hfn = parseInt((draftCfg.records_header_font_size_px != null ? draftCfg.records_header_font_size_px : draftCfg.header_font_size_px), 10);
                             if (!Number.isNaN(hfn)) { headerFontEl.value = String(Math.max(9, Math.min(28, hfn))); }
                         }
                         if (titleFontEl && draftCfg.title_font_size_px != null) {
@@ -4423,7 +5089,10 @@
                                     label: (sc.label != null && String(sc.label).trim() !== '') ? String(sc.label) : (b.label || b.key),
                                     max_width_chars: sc.max_width_chars != null ? sc.max_width_chars : b.max_width_chars,
                                     image_height: sc.image_height != null ? sc.image_height : b.image_height,
-                                    image_width: sc.image_width != null ? sc.image_width : b.image_width
+                                    image_width: sc.image_width != null ? sc.image_width : b.image_width,
+                                    fill_empty_mode: sc.fill_empty_mode || 'none',
+                                    fill_empty_value: sc.fill_empty_value != null ? sc.fill_empty_value : '',
+                                    content_bold: !!sc.content_bold
                                 }));
                             }
                         });
@@ -4434,13 +5103,18 @@
                             buildPersonalizeColumnsList(columns, columnsEl);
                         }
                     } else {
+                        tmExportEnsureCalculatedColumnsState(countableColumns, null);
+                        tmExportRenderCalculatedColumnsConfigurator(countableColumns);
                         tmExportEnsureSumState(countableColumns, null);
                         tmExportRenderSumConfigurator(countableColumns);
                         if (titleEl) { titleEl.value = data.title || ''; }
                         if (titleUppercaseEl) { titleUppercaseEl.checked = false; }
                         if (headersUppercaseEl) { headersUppercaseEl.checked = false; }
+                        if (cellFontEl) { cellFontEl.value = '12'; }
                         if (headerFontEl) { headerFontEl.value = '12'; }
                         if (docMarginPresetEl) { docMarginPresetEl.value = 'compact'; }
+                        if (includeCalculatedColumnsEl) { includeCalculatedColumnsEl.checked = false; }
+                        if (calculatedColumnsWrapEl) { calculatedColumnsWrapEl.hidden = true; }
                         var paperSizeElDefault = document.getElementById('tmExportPaperSize');
                         if (paperSizeElDefault) { paperSizeElDefault.value = 'letter'; }
                         personalizeModal.querySelectorAll('#tmExportSumAlignGroup .tm-export-align-btn').forEach(function (b) {
@@ -4455,11 +5129,15 @@
                         if (sumTitleEl) { sumTitleEl.value = 'Sumatoria'; }
                         if (sumTitleUppercaseEl) { sumTitleUppercaseEl.checked = false; }
                         if (sumTitleFontEl) { sumTitleFontEl.value = '14'; }
+                        if (sumCellFontEl) { sumCellFontEl.value = '12'; }
+                        if (sumHeaderFontEl) { sumHeaderFontEl.value = '12'; }
                         setSumGroupColor('var(--clr-primary)');
                         if (sumIncludeTotalsRowEl) { sumIncludeTotalsRowEl.checked = false; }
                         if (includeTotalsTableEl) { includeTotalsTableEl.checked = false; }
                         if (totalsTableWrapEl) { totalsTableWrapEl.hidden = true; }
                         if (totalsTableTitleEl) { totalsTableTitleEl.value = 'Totales'; }
+                        if (totalsCellFontEl) { totalsCellFontEl.value = '12'; }
+                        if (totalsHeaderFontEl) { totalsHeaderFontEl.value = '12'; }
                         personalizeModal.querySelectorAll('#tmExportTotalsTableAlignGroup .tm-export-align-btn').forEach(function (b) {
                             b.classList.toggle('is-active', (b.getAttribute('data-totals-table-align') || '') === 'left');
                         });
@@ -4550,8 +5228,191 @@
                     if (personalizeModal) { personalizeModal._previewZoom = 100; }
                     setupPreviewZoom();
 
+                    var tmExportColCtxMenuEl = null;
+
+                    var tmExportHideColumnCtxMenu = function () {
+                        if (tmExportColCtxMenuEl && tmExportColCtxMenuEl.parentNode) {
+                            tmExportColCtxMenuEl.parentNode.removeChild(tmExportColCtxMenuEl);
+                        }
+                        tmExportColCtxMenuEl = null;
+                    };
+
+                    var tmExportOpenReplaceDialog = function (row) {
+                        if (!row) { return; }
+                        var currentMode = String(row.dataset.fillEmptyMode || 'none');
+                        var currentValue = String(row.dataset.fillEmptyValue || '');
+
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                title: 'Reemplazar vacios',
+                                html: ''
+                                    + '<div style="display:grid;gap:8px;text-align:left;">'
+                                    + '  <label style="display:grid;gap:4px;">'
+                                    + '    <span>Modo</span>'
+                                    + '    <select id="tmFillMode" class="swal2-input" style="margin:0;">'
+                                    + '      <option value="none">Sin reemplazo</option>'
+                                    + '      <option value="auto">Automatico (numerico=0, texto=S/R)</option>'
+                                    + '      <option value="custom">Personalizado</option>'
+                                    + '    </select>'
+                                    + '  </label>'
+                                    + '  <label style="display:grid;gap:4px;">'
+                                    + '    <span>Valor personalizado</span>'
+                                    + '    <input id="tmFillValue" class="swal2-input" style="margin:0;" placeholder="Ej: S/R, 0, N/A">'
+                                    + '  </label>'
+                                    + '</div>',
+                                showCancelButton: true,
+                                confirmButtonText: 'Guardar',
+                                cancelButtonText: 'Cancelar',
+                                didOpen: function () {
+                                    var modeEl = document.getElementById('tmFillMode');
+                                    var valEl = document.getElementById('tmFillValue');
+                                    if (modeEl) { modeEl.value = currentMode; }
+                                    if (valEl) { valEl.value = currentValue; }
+                                },
+                                preConfirm: function () {
+                                    var modeEl = document.getElementById('tmFillMode');
+                                    var valEl = document.getElementById('tmFillValue');
+                                    return {
+                                        mode: modeEl ? String(modeEl.value || 'none') : 'none',
+                                        value: valEl ? String(valEl.value || '') : ''
+                                    };
+                                }
+                            }).then(function (res) {
+                                if (!res || !res.isConfirmed) { return; }
+                                row.dataset.fillEmptyMode = String(res.value && res.value.mode || 'none');
+                                row.dataset.fillEmptyValue = String(res.value && res.value.value || '');
+                                buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                            });
+                            return;
+                        }
+
+                        var modeRaw = prompt('Modo de vacio: none | auto | custom', currentMode);
+                        if (modeRaw == null) { return; }
+                        var mode = String(modeRaw || '').trim().toLowerCase();
+                        if (['none', 'auto', 'custom'].indexOf(mode) === -1) { mode = 'none'; }
+                        var value = currentValue;
+                        if (mode === 'custom') {
+                            var v = prompt('Valor personalizado', currentValue);
+                            if (v == null) { return; }
+                            value = String(v);
+                        }
+                        row.dataset.fillEmptyMode = mode;
+                        row.dataset.fillEmptyValue = value;
+                        buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                    };
+
+                    var tmExportOpenColorDialog = function (row) {
+                        if (!row) { return; }
+                        var currentColor = String(row.dataset.headerColor || 'var(--clr-primary)');
+
+                        if (typeof Swal !== 'undefined') {
+                            var colorOptionsHtml = TEMPLATE_COLORS.map(function (c) {
+                                return '<option value="' + escapeHtml(c.value) + '">' + escapeHtml(c.name) + '</option>';
+                            }).join('');
+                            Swal.fire({
+                                title: 'Color de columna',
+                                html: '<select id="tmColCtxColor" class="swal2-input" style="margin:0;">' + colorOptionsHtml + '</select>',
+                                showCancelButton: true,
+                                confirmButtonText: 'Guardar',
+                                cancelButtonText: 'Cancelar',
+                                didOpen: function () {
+                                    var colorEl = document.getElementById('tmColCtxColor');
+                                    if (colorEl) { colorEl.value = currentColor; }
+                                },
+                                preConfirm: function () {
+                                    var colorEl = document.getElementById('tmColCtxColor');
+                                    return colorEl ? String(colorEl.value || 'var(--clr-primary)') : 'var(--clr-primary)';
+                                }
+                            }).then(function (res) {
+                                if (!res || !res.isConfirmed) { return; }
+                                row.dataset.headerColor = String(res.value || 'var(--clr-primary)');
+                                buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                            });
+                            return;
+                        }
+
+                        var labels = TEMPLATE_COLORS.map(function (c, idx) { return (idx + 1) + '. ' + c.name; }).join('\n');
+                        var idxRaw = prompt('Selecciona color:\n' + labels, '1');
+                        if (idxRaw == null) { return; }
+                        var idx = parseInt(String(idxRaw), 10) - 1;
+                        if (Number.isNaN(idx) || idx < 0 || idx >= TEMPLATE_COLORS.length) { return; }
+                        row.dataset.headerColor = String(TEMPLATE_COLORS[idx].value || 'var(--clr-primary)');
+                        buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                    };
+
+                    var tmExportShowColumnCtxMenu = function (clientX, clientY, row) {
+                        tmExportHideColumnCtxMenu();
+                        if (!row) { return; }
+
+                        var menu = document.createElement('div');
+                        menu.className = 'tm-export-col-ctx-menu';
+                        menu.setAttribute('role', 'menu');
+
+                        var addItem = function (label, onActivate) {
+                            var b = document.createElement('button');
+                            b.type = 'button';
+                            b.className = 'tm-export-col-ctx-menu-item';
+                            b.textContent = label;
+                            b.setAttribute('role', 'menuitem');
+                            b.addEventListener('click', function (ev) {
+                                ev.stopPropagation();
+                                tmExportHideColumnCtxMenu();
+                                onActivate();
+                            });
+                            menu.appendChild(b);
+                        };
+
+                        var isBold = String(row.dataset.contentBold || '0') === '1';
+                        addItem(isBold ? 'Quitar negritas' : 'Aplicar negritas', function () {
+                            row.dataset.contentBold = isBold ? '0' : '1';
+                            buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                        });
+                        addItem('Reemplazar vacios...', function () {
+                            tmExportOpenReplaceDialog(row);
+                        });
+                        addItem('Color de columna...', function () {
+                            tmExportOpenColorDialog(row);
+                        });
+
+                        document.body.appendChild(menu);
+                        menu.style.position = 'fixed';
+                        menu.style.left = clientX + 'px';
+                        menu.style.top = clientY + 'px';
+                        menu.style.zIndex = '10020';
+                        tmExportColCtxMenuEl = menu;
+
+                        requestAnimationFrame(function () {
+                            var r = menu.getBoundingClientRect();
+                            var x = clientX;
+                            var y = clientY;
+                            if (r.right > window.innerWidth - 8) { x = Math.max(8, clientX - r.width); }
+                            if (r.bottom > window.innerHeight - 8) { y = Math.max(8, clientY - r.height); }
+                            menu.style.left = x + 'px';
+                            menu.style.top = y + 'px';
+                        });
+                    };
+
+                    if (personalizeModal && !personalizeModal.dataset.colCtxMenuBound) {
+                        personalizeModal.dataset.colCtxMenuBound = '1';
+                        document.addEventListener('click', function (e) {
+                            if (tmExportColCtxMenuEl && !e.target.closest('.tm-export-col-ctx-menu')) {
+                                tmExportHideColumnCtxMenu();
+                            }
+                        });
+                        document.addEventListener('keydown', function (e) {
+                            if (e.key === 'Escape') { tmExportHideColumnCtxMenu(); }
+                        });
+                        document.addEventListener('scroll', function () { tmExportHideColumnCtxMenu(); }, true);
+                    }
+
                     columnsEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     columnsEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    columnsEl.addEventListener('contextmenu', function (e) {
+                        var row = e.target.closest('.tm-export-personalize-col');
+                        if (!row || !columnsEl.contains(row)) { return; }
+                        e.preventDefault();
+                        tmExportShowColumnCtxMenu(e.clientX, e.clientY, row);
+                    });
                     columnsEl.addEventListener('click', function (e) {
                         const omitBtn = e.target.closest('.tm-export-omit-btn');
                         if (omitBtn) {
@@ -4599,6 +5460,14 @@
                     if (sumIncludeTotalsRowEl) {
                         sumIncludeTotalsRowEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
+                    if (sumCellFontEl) {
+                        sumCellFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        sumCellFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
+                    if (sumHeaderFontEl) {
+                        sumHeaderFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        sumHeaderFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
                     if (includeTotalsTableEl) {
                         includeTotalsTableEl.addEventListener('change', function () {
                             if (totalsTableWrapEl) { totalsTableWrapEl.hidden = !includeTotalsTableEl.checked; }
@@ -4608,6 +5477,14 @@
                     if (totalsTableTitleEl) {
                         totalsTableTitleEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                         totalsTableTitleEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
+                    if (totalsCellFontEl) {
+                        totalsCellFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        totalsCellFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
+                    if (totalsHeaderFontEl) {
+                        totalsHeaderFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        totalsHeaderFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
                     if (sumTotalsBoldEl) {
                         sumTotalsBoldEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
@@ -4641,6 +5518,8 @@
                     function collectPersonalizeCfgObject() {
                         const orderedCols = reorderColumnsList(columnsEl, columns);
                         const state = getPersonalizeState();
+                        var calcColumns = Array.isArray(state.calculatedColumns) ? state.calculatedColumns : [];
+                        var firstCalc = calcColumns.length ? calcColumns[0] : null;
                         const orientBtn = personalizeModal.querySelector('.tm-export-orient-btn.is-active');
                         const orientation = orientBtn ? (orientBtn.getAttribute('data-orientation') || 'portrait') : 'portrait';
                         var includeCountTable = !!(includeCountTableEl && includeCountTableEl.checked);
@@ -4656,10 +5535,12 @@
                             title_align: state.titleAlign || 'center',
                             title_uppercase: !!state.titleUppercase,
                             headers_uppercase: !!state.headersUppercase,
-                            cell_font_size_px: state.cellFontPx || 12,
-                            cellFontPx: state.cellFontPx || 12,
-                            header_font_size_px: state.headerFontPx || 12,
-                            headerFontPx: state.headerFontPx || 12,
+                            records_cell_font_size_px: state.recordsCellFontPx || state.cellFontPx || 12,
+                            records_header_font_size_px: state.recordsHeaderFontPx || state.headerFontPx || 12,
+                            cell_font_size_px: state.recordsCellFontPx || state.cellFontPx || 12,
+                            cellFontPx: state.recordsCellFontPx || state.cellFontPx || 12,
+                            header_font_size_px: state.recordsHeaderFontPx || state.headerFontPx || 12,
+                            headerFontPx: state.recordsHeaderFontPx || state.headerFontPx || 12,
                             title_font_size_px: state.titleFontPx || 18,
                             doc_margin_preset: state.docMarginPreset || 'compact',
                             orientation: orientation,
@@ -4671,11 +5552,15 @@
                             sum_title_case: state.sumTitleCase || 'normal',
                             sum_title_align: state.sumTitleAlign || 'center',
                             sum_title_font_size_px: state.sumTitleFontPx || 14,
+                            sum_table_cell_font_size_px: state.sumCellFontPx || 12,
+                            sum_table_header_font_size_px: state.sumHeaderFontPx || 12,
                             sum_group_color: state.sumGroupColor || 'var(--clr-primary)',
                             include_sum_totals_row: !!state.sumIncludeTotalsRow,
                             include_totals_table: !!state.includeTotalsTable,
                             totals_table_title: state.totalsTableTitle || 'Totales',
                             totals_table_align: state.totalsTableAlign || 'left',
+                            totals_table_cell_font_size_px: state.totalsCellFontPx || 12,
+                            totals_table_header_font_size_px: state.totalsHeaderFontPx || 12,
                             sum_totals_bold: !(state.sumTotalsBold === false),
                             sum_totals_text_color: state.sumTotalsTextColor || 'var(--clr-primary)',
                             include_count_table: includeCountTable,
@@ -4684,6 +5569,48 @@
                             count_table_cell_width: state.countTableCellWidth || 12,
                             include_sum_table: !!state.includeSumTable,
                             sum_group_by: state.sumGroupBy || 'microrregion',
+                            include_calculated_columns: !!state.includeCalculatedColumns,
+                            calculated_columns: calcColumns.map(function (c) {
+                                var op = String(c.operation || 'add').toLowerCase();
+                                if (['add', 'subtract', 'multiply', 'percent'].indexOf(op) === -1) { op = 'add'; }
+                                var baseField = String(c.baseField || c.referenceField || '');
+                                var afterKey = String(c.afterKey || c.position_after_key || c.after_key || '');
+                                var group = String(c.group || '');
+                                var opFields = Array.isArray(c.operationFields)
+                                    ? c.operationFields.slice()
+                                    : (Array.isArray(c.fields) ? c.fields.slice() : []);
+                                var cellColor = String(c.cellColor || c.color || 'var(--clr-secondary)');
+                                var cellSizeCh = Math.max(8, Math.min(40, parseInt(String(c.cellSizeCh != null ? c.cellSizeCh : c.cell_size_ch), 10) || 18));
+                                return {
+                                    id: String(c.id || ''),
+                                    label: String(c.label || ''),
+                                    group: group,
+                                    operation: op,
+                                    base_field: baseField,
+                                    position_after_key: afterKey,
+                                    after_key: afterKey,
+                                    operation_fields: opFields,
+                                    cell_color: cellColor,
+                                    cell_size_ch: cellSizeCh,
+                                    cell_bold: !!(c.cellBold || c.cell_bold),
+                                    reference_field: baseField,
+                                    include_percent: op === 'percent',
+                                    fields: opFields,
+                                    weights: {}
+                                };
+                            }),
+                            include_operations_column: !!state.includeCalculatedColumns && !!firstCalc,
+                            operations_label: firstCalc ? String(firstCalc.label || 'Operaciones') : 'Operaciones',
+                            operations_group: firstCalc ? String(firstCalc.group || '') : '',
+                            operations_reference_field: firstCalc ? String(firstCalc.baseField || firstCalc.referenceField || '') : '',
+                            operations_include_percent: firstCalc ? (String(firstCalc.operation || 'add') === 'percent') : true,
+                            operations_after_key: firstCalc ? String(firstCalc.afterKey || '') : '',
+                            operations_cell_bold: firstCalc ? !!(firstCalc.cellBold || firstCalc.cell_bold) : false,
+                            operations_fields: firstCalc
+                                ? (Array.isArray(firstCalc.operationFields)
+                                    ? firstCalc.operationFields.slice()
+                                    : (Array.isArray(firstCalc.fields) ? firstCalc.fields.slice() : []))
+                                : [],
                             sum_metrics: Array.isArray(state.sumMetrics) ? state.sumMetrics : [],
                             sum_formulas: Array.isArray(state.sumFormulas) ? state.sumFormulas : [],
                             microrregion_sort: state.microrregionSort || 'asc',
@@ -4697,7 +5624,10 @@
                                     image_width: colState.imageWidth || null,
                                     image_height: colState.imageHeight || null,
                                     max_width_chars: col.max_width_chars || null,
-                                    group: col.group || ''
+                                    group: col.group || '',
+                                    fill_empty_mode: col.fill_empty_mode || 'none',
+                                    fill_empty_value: col.fill_empty_value != null ? String(col.fill_empty_value) : '',
+                                    content_bold: !!col.content_bold
                                 };
                             })
                         };
@@ -4927,6 +5857,14 @@
                                     columnsEl.querySelectorAll('.tm-export-col-group-select').forEach(function(sel) {
                                         if (sel.value === removedName) sel.value = '';
                                     });
+                                    if (Array.isArray(personalizeModal._calculatedColumns)) {
+                                        personalizeModal._calculatedColumns = personalizeModal._calculatedColumns.map(function (c) {
+                                            if ((c.group || '') === removedName) {
+                                                c.group = '';
+                                            }
+                                            return c;
+                                        });
+                                    }
                                     if (Array.isArray(personalizeModal._sumMetrics)) {
                                         personalizeModal._sumMetrics = personalizeModal._sumMetrics.map(function (m) {
                                             if ((m.group || '') === removedName) {
@@ -4985,6 +5923,14 @@
                             columnsEl.querySelectorAll('.tm-export-col-group-select').forEach(function(sel) {
                                 if (sel.value === oldName) { sel.value = newName; }
                             });
+                            if (Array.isArray(personalizeModal._calculatedColumns)) {
+                                personalizeModal._calculatedColumns = personalizeModal._calculatedColumns.map(function (c) {
+                                    if ((c.group || '') === oldName) {
+                                        c.group = newName;
+                                    }
+                                    return c;
+                                });
+                            }
                             if (Array.isArray(personalizeModal._sumMetrics)) {
                                 personalizeModal._sumMetrics = personalizeModal._sumMetrics.map(function (m) {
                                     if ((m.group || '') === oldName) {

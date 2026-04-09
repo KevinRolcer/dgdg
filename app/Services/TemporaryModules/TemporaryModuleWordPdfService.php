@@ -80,7 +80,7 @@ class TemporaryModuleWordPdfService
     public function export(int $moduleId, string $format, ?array $exportConfig = null): array
     {
         // Tamaño de letra para encabezados de columnas
-        $headerFontRaw = $exportConfig['header_font_size_px'] ?? $exportConfig['headerFontPx'] ?? null;
+        $headerFontRaw = $exportConfig['records_header_font_size_px'] ?? $exportConfig['header_font_size_px'] ?? $exportConfig['headerFontPx'] ?? null;
         $headerFontSizePx = $headerFontRaw !== null ? max(9, min(28, (int) $headerFontRaw)) : 12;
         $headerFontSizePt = max(7, min(21, (int) round($headerFontSizePx * 0.75)));
     {
@@ -142,11 +142,134 @@ class TemporaryModuleWordPdfService
                 'color' => (string) ($col['color'] ?? ''),
                 'group' => (string) ($col['group'] ?? ''),
                 'max_width_chars' => ($mw !== null && is_numeric($mw)) ? (int) $mw : null,
+                'fill_empty_mode' => (string) ($col['fill_empty_mode'] ?? 'none'),
+                'fill_empty_value' => (string) ($col['fill_empty_value'] ?? ''),
+                'content_bold' => !empty($col['content_bold']),
             ];
         }
         $columns = array_values($columnMap);
         if ($columns === []) {
             throw new \Exception('No hay columnas seleccionadas para el reporte.');
+        }
+
+        $calculatedColumns = [];
+        if (!empty($exportConfig['include_calculated_columns']) && is_array($exportConfig['calculated_columns'] ?? null)) {
+            foreach ($exportConfig['calculated_columns'] as $idx => $calcRaw) {
+                if (!is_array($calcRaw)) {
+                    continue;
+                }
+                $id = trim((string) ($calcRaw['id'] ?? ('calc_'.$idx)));
+                if ($id === '') {
+                    $id = 'calc_'.$idx;
+                }
+                $label = trim((string) ($calcRaw['label'] ?? ''));
+                if ($label === '') {
+                    $label = 'Calculada '.($idx + 1);
+                }
+                $operation = strtolower(trim((string) ($calcRaw['operation'] ?? '')));
+                if (!in_array($operation, ['add', 'subtract', 'multiply', 'percent'], true)) {
+                    $operation = (!array_key_exists('include_percent', $calcRaw) || !empty($calcRaw['include_percent'])) ? 'percent' : 'add';
+                }
+                $group = trim((string) ($calcRaw['group'] ?? ''));
+                $baseField = trim((string) ($calcRaw['base_field'] ?? $calcRaw['baseField'] ?? $calcRaw['reference_field'] ?? $calcRaw['referenceField'] ?? ''));
+                $afterKey = trim((string) ($calcRaw['position_after_key'] ?? $calcRaw['after_key'] ?? $calcRaw['afterKey'] ?? ''));
+                $operationFields = is_array($calcRaw['operation_fields'] ?? null)
+                    ? array_values(array_filter(array_map('strval', $calcRaw['operation_fields']), static fn (string $k): bool => $k !== ''))
+                    : (is_array($calcRaw['fields'] ?? null)
+                        ? array_values(array_filter(array_map('strval', $calcRaw['fields']), static fn (string $k): bool => $k !== ''))
+                        : []);
+
+                $cellColor = trim((string) ($calcRaw['cell_color'] ?? $calcRaw['cellColor'] ?? $calcRaw['color'] ?? ''));
+                if ($cellColor === '') {
+                    $cellColor = 'var(--clr-secondary)';
+                }
+                $cellSizeRaw = $calcRaw['cell_size_ch'] ?? $calcRaw['cellSizeCh'] ?? null;
+                $cellSize = 18;
+                if ($cellSizeRaw !== null && is_numeric($cellSizeRaw)) {
+                    $cellSize = (int) $cellSizeRaw;
+                }
+                $cellSize = max(8, min(40, $cellSize));
+
+                $calculatedColumns[] = [
+                    'id' => $id,
+                    'label' => $label,
+                    'group' => $group,
+                    'operation' => $operation,
+                    'base_field' => $baseField,
+                    'position_after_key' => $afterKey,
+                    'operation_fields' => $operationFields,
+                    'cell_color' => $cellColor,
+                    'cell_size_ch' => $cellSize,
+                    'cell_bold' => !empty($calcRaw['cell_bold']) || !empty($calcRaw['cellBold']),
+                    // Compatibilidad con config legado.
+                    'reference_field' => $baseField,
+                    'include_percent' => $operation === 'percent',
+                    'fields' => $operationFields,
+                    'weights' => [],
+                ];
+            }
+        } elseif (!empty($exportConfig['include_operations_column'])) {
+            $legacyOp = !array_key_exists('operations_include_percent', (array) $exportConfig)
+                || !empty($exportConfig['operations_include_percent'])
+                ? 'percent'
+                : 'add';
+            $legacyFields = is_array($exportConfig['operations_fields'] ?? null)
+                ? array_values(array_filter(array_map('strval', $exportConfig['operations_fields']), static fn (string $k): bool => $k !== ''))
+                : [];
+            $calculatedColumns[] = [
+                'id' => 'legacy_ops_1',
+                'label' => trim((string) ($exportConfig['operations_label'] ?? 'Operaciones')) ?: 'Operaciones',
+                'group' => trim((string) ($exportConfig['operations_group'] ?? '')),
+                'operation' => $legacyOp,
+                'base_field' => trim((string) ($exportConfig['operations_reference_field'] ?? '')),
+                'position_after_key' => trim((string) ($exportConfig['operations_after_key'] ?? '')),
+                'operation_fields' => $legacyFields,
+                'cell_color' => (string) ($exportConfig['operations_color'] ?? 'var(--clr-secondary)'),
+                'cell_size_ch' => 18,
+                'cell_bold' => !empty($exportConfig['operations_cell_bold']),
+                'reference_field' => trim((string) ($exportConfig['operations_reference_field'] ?? '')),
+                'include_percent' => $legacyOp === 'percent',
+                'fields' => $legacyFields,
+                'weights' => [],
+            ];
+        }
+
+        foreach ($calculatedColumns as $calc) {
+            $calcColor = trim((string) ($calc['cell_color'] ?? ''));
+            if ($calcColor === '') {
+                $calcColor = (string) ($exportConfig['operations_color'] ?? 'var(--clr-secondary)');
+            }
+            $calcSize = (int) ($calc['cell_size_ch'] ?? 18);
+            $calcSize = max(8, min(40, $calcSize));
+            $calcColumn = [
+                'key' => '__calc_'.((string) ($calc['id'] ?? 'calc')),
+                'label' => (string) ($calc['label'] ?? 'Calculada'),
+                'color' => $calcColor,
+                'group' => (string) ($calc['group'] ?? ''),
+                'max_width_chars' => $calcSize,
+                'content_bold' => !empty($calc['cell_bold']),
+                '_calc_config' => $calc,
+            ];
+
+            $afterKey = trim((string) ($calc['position_after_key'] ?? ''));
+            if ($afterKey === '') {
+                $columns[] = $calcColumn;
+                continue;
+            }
+
+            $inserted = false;
+            $nextColumns = [];
+            foreach ($columns as $existingColumn) {
+                $nextColumns[] = $existingColumn;
+                if ((string) ($existingColumn['key'] ?? '') === $afterKey) {
+                    $nextColumns[] = $calcColumn;
+                    $inserted = true;
+                }
+            }
+            if (! $inserted) {
+                $nextColumns[] = $calcColumn;
+            }
+            $columns = $nextColumns;
         }
 
         $totalCols = count($columns);
@@ -253,8 +376,16 @@ class TemporaryModuleWordPdfService
         if (!in_array($dataTableAlign, ['left', 'center', 'right', 'stretch'], true)) {
             $dataTableAlign = 'left';
         }
-        $cellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['cell_font_size_px'] ?? $exportConfig['cellFontPx'] ?? null);
+        $cellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['records_cell_font_size_px'] ?? $exportConfig['cell_font_size_px'] ?? $exportConfig['cellFontPx'] ?? null);
         $cellFontSizePt = $this->cellPxToWordPt($cellFontSizePx);
+        $sumTableCellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['sum_table_cell_font_size_px'] ?? $cellFontSizePx);
+        $sumTableCellFontSizePt = $this->cellPxToWordPt($sumTableCellFontSizePx);
+        $sumHeaderFontSizePx = max(9, min(28, (int) ($exportConfig['sum_table_header_font_size_px'] ?? $headerFontSizePx)));
+        $sumHeaderFontSizePt = max(7, min(21, (int) round($sumHeaderFontSizePx * 0.75)));
+        $totalsTableCellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['totals_table_cell_font_size_px'] ?? $sumTableCellFontSizePx);
+        $totalsTableCellFontSizePt = $this->cellPxToWordPt($totalsTableCellFontSizePx);
+        $totalsHeaderFontSizePx = max(9, min(28, (int) ($exportConfig['totals_table_header_font_size_px'] ?? $sumHeaderFontSizePx)));
+        $totalsHeaderFontSizePt = max(7, min(21, (int) round($totalsHeaderFontSizePx * 0.75)));
         $titleFontSizePx = max(10, min(36, (int) ($exportConfig['title_font_size_px'] ?? 18)));
         $titleFontSizePt = max(8, min(27, (int) round($titleFontSizePx * 0.75)));
         $exportFontName = $this->resolveExportFontName();
@@ -438,7 +569,7 @@ class TemporaryModuleWordPdfService
                             $spanGroupKey = mb_strtolower(trim((string) $spanGroup), 'UTF-8');
                             $spanBg = trim((string) $spanGroup) !== '' ? ($groupHeaderColors[$spanGroupKey] ?? '64748B') : '334155';
                             $totalsTbl->addCell(1600 * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => $spanBg, 'valign' => 'center'])
-                                ->addText(trim($spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                                ->addText(trim($spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $totalsHeaderFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                             $spanGroup = $grp;
                             $spanCount = 1;
                         }
@@ -446,25 +577,25 @@ class TemporaryModuleWordPdfService
                             $spanGroupKey = mb_strtolower(trim((string) $spanGroup), 'UTF-8');
                             $spanBg = trim((string) $spanGroup) !== '' ? ($groupHeaderColors[$spanGroupKey] ?? '64748B') : '334155';
                             $totalsTbl->addCell(1600 * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => $spanBg, 'valign' => 'center'])
-                                ->addText(trim((string) $spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                                ->addText(trim((string) $spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $totalsHeaderFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                         }
                     }
                 }
 
                 $totalsTbl->addRow();
                 $totalsTbl->addCell(2200, ['bgColor' => $sumGroupColorHex, 'valign' => 'center'])
-                    ->addText($this->normalizeExportHeading('Total', $headersUppercase), ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                    ->addText($this->normalizeExportHeading('Total', $headersUppercase), ['name' => $exportFontName, 'bold' => true, 'size' => $totalsHeaderFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                 foreach ($totalsCols as $col) {
                     $totalsGroup = trim((string) ($col['group'] ?? ''));
                     $totalsGroupKey = mb_strtolower($totalsGroup, 'UTF-8');
                     $totalsBg = $totalsGroup !== '' ? ($groupHeaderColors[$totalsGroupKey] ?? '64748B') : '475569';
                     $totalsTbl->addCell(1600, ['bgColor' => $totalsBg, 'valign' => 'center'])
-                        ->addText((string) ($col['label'] ?? ''), ['name' => $exportFontName, 'bold' => true, 'size' => $cellFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                        ->addText((string) ($col['label'] ?? ''), ['name' => $exportFontName, 'bold' => true, 'size' => $totalsHeaderFontSizePt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                 }
 
                 $totalsTbl->addRow();
                 $totalsTbl->addCell(2200, ['valign' => 'center'])
-                    ->addText($this->normalizeExportHeading('Total', $headersUppercase), ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $sumTotalsBold, 'color' => $sumTotalsTextColorHex], ['alignment' => Jc::CENTER]);
+                    ->addText($this->normalizeExportHeading('Total', $headersUppercase), ['name' => $exportFontName, 'size' => $totalsTableCellFontSizePt, 'bold' => $sumTotalsBold, 'color' => $sumTotalsTextColorHex], ['alignment' => Jc::CENTER]);
                 foreach ($totalsCols as $col) {
                     $id = (string) ($col['id'] ?? '');
                     $val = (float) ($totalsValues[$id] ?? 0.0);
@@ -472,7 +603,7 @@ class TemporaryModuleWordPdfService
                     if ((string) ($col['op'] ?? '') === 'percent') {
                         $text .= '%';
                     }
-                    $totalsTbl->addCell(1600)->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $sumTotalsBold, 'color' => $sumTotalsTextColorHex], ['alignment' => Jc::CENTER]);
+                    $totalsTbl->addCell(1600)->addText($text, ['name' => $exportFontName, 'size' => $totalsTableCellFontSizePt, 'bold' => $sumTotalsBold, 'color' => $sumTotalsTextColorHex], ['alignment' => Jc::CENTER]);
                 }
 
                 $section->addTextBreak(1);
@@ -735,8 +866,8 @@ class TemporaryModuleWordPdfService
                 $sumCompactTitlePt = max(11, min($titleFontSizePt, $sumDensityScore >= 34 ? 13 : 14));
                 $sumCompactDatePt = $sumDensityScore >= 34 ? 8 : 9;
                 $sumHeadingPt = max(10, min($sumTitleFontSizePt, $sumDensityScore >= 34 ? 11 : 12));
-                $sumHeaderCellPt = max(7, $headerFontSizePt - ($sumDensityScore >= 34 ? 3 : 2));
-                $sumCellPt = max(7, $cellFontSizePt - ($sumDensityScore >= 34 ? 2 : 1));
+                $sumHeaderCellPt = max(7, $sumHeaderFontSizePt - ($sumDensityScore >= 34 ? 3 : 2));
+                $sumCellPt = max(7, $sumTableCellFontSizePt - ($sumDensityScore >= 34 ? 2 : 1));
                 $sumCellMarginTwips = $sumDensityScore >= 34 ? 30 : 50;
                 $sumFirstColTwips = max(1200, min(2600, (int) round($usableTableTwips * 0.24)));
                 $sumDataColTwips = max(620, (int) floor(max(1200, $usableTableTwips - $sumFirstColTwips) / max(1, count($sumCombinedCols))));
@@ -982,7 +1113,13 @@ class TemporaryModuleWordPdfService
                     $bgIdx = $this->getColumnBgColor($col, $idx);
                 }
                 $w = $columnTwips[$idx] ?? null;
-                $table->addCell($w, ['bgColor' => $bgIdx, 'valign' => 'center'])->addText((string) $col['label'], ['name' => $exportFontName, 'bold' => true, 'size' => $headerFontSizePt, 'color' => 'FFFFFF'], ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+                $headerCell = $table->addCell($w, ['bgColor' => $bgIdx, 'valign' => 'center']);
+                $this->addWordMultilineText(
+                    $headerCell,
+                    (string) ($col['label'] ?? ''),
+                    ['name' => $exportFontName, 'bold' => true, 'size' => $headerFontSizePt, 'color' => 'FFFFFF'],
+                    ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]
+                );
             }
 
             // Filas
@@ -1006,12 +1143,21 @@ class TemporaryModuleWordPdfService
                 $table->addRow($rowHeightTwips);
                 foreach ($columns as $idx => $col) {
                     $key = $col['key'];
+                    $isContentBold = !empty($col['content_bold']);
+                    if (str_starts_with((string) $key, '__calc_')) {
+                        $calcConfig = is_array($col['_calc_config'] ?? null) ? $col['_calc_config'] : [];
+                        $text = $this->buildOperationsCellText((array) ($entry->data ?? []), $columns, $calcConfig, $headersUppercase);
+                        $w = $columnTwips[$idx] ?? null;
+                        $opsCell = $table->addCell($w, ['valign' => 'center']);
+                        $this->addWordMultilineText($opsCell, $text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold], ['alignment' => Jc::CENTER]);
+                        continue;
+                    }
                     $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
                     if ($key === 'item') {
                         $text = (string) $itemNumber;
                         $itemNumber++;
                         $w = $columnTwips[$idx] ?? null;
-                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt], ['alignment' => Jc::CENTER]);
+                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold], ['alignment' => Jc::CENTER]);
                         continue;
                     }
 
@@ -1019,11 +1165,12 @@ class TemporaryModuleWordPdfService
                         $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                         $text = (string) ($meta['label'] ?? $meta->label ?? '');
                         $w = $columnTwips[$idx] ?? null;
-                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt], ['alignment' => Jc::CENTER]);
+                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold], ['alignment' => Jc::CENTER]);
                         continue;
                     }
 
                     $val = $entry->data[$key] ?? null;
+                    $val = $this->applyColumnEmptyFillValue($val, $col, $fieldType);
                     $imagePaths = $this->resolveImageAbsolutePaths($val, $fieldType);
                     if ($imagePaths !== []) {
                         $w = $columnTwips[$idx] ?? null;
@@ -1054,7 +1201,7 @@ class TemporaryModuleWordPdfService
                             $text = '';
                         }
                         $w = $columnTwips[$idx] ?? null;
-                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt], ['alignment' => Jc::CENTER]);
+                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold], ['alignment' => Jc::CENTER]);
                     }
                 }
             }
@@ -1104,6 +1251,10 @@ class TemporaryModuleWordPdfService
             'fontFamily' => $exportFontName,
             'cellFontSizePx' => $cellFontSizePx,
             'headerFontSizePx' => $headerFontSizePx,
+            'sumTableCellFontSizePx' => $sumTableCellFontSizePx,
+            'sumTableHeaderFontSizePx' => $sumHeaderFontSizePx,
+            'totalsTableCellFontSizePx' => $totalsTableCellFontSizePx,
+            'totalsTableHeaderFontSizePx' => $totalsHeaderFontSizePx,
             'titleFontSizePx' => $titleFontSizePx,
             'logoDataUri' => $this->buildLogoDataUri($logoPath),
             'fechaCorteStr' => $fechaCorteStr,
@@ -1635,6 +1786,235 @@ class TemporaryModuleWordPdfService
             'columns' => $columns,
             'values' => $values,
         ];
+    }
+
+    private function isOperationsValueEmpty(mixed $value): bool
+    {
+        if ($value === null) {
+            return true;
+        }
+
+        if (is_array($value)) {
+            if (array_key_exists('primary', $value)) {
+                return $this->isOperationsValueEmpty($value['primary']);
+            }
+
+            if ($value === []) {
+                return true;
+            }
+
+            foreach ($value as $item) {
+                if (! $this->isOperationsValueEmpty($item)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if (is_object($value)) {
+            return $this->isOperationsValueEmpty((array) $value);
+        }
+
+        return trim((string) $value) === '';
+    }
+
+    /**
+     * @param array<string,mixed> $entryData
+     * @param array<int,array<string,mixed>> $columns
+     * @param array<string,mixed> $operationsConfig
+     */
+    private function buildOperationsCellText(array $entryData, array $columns, array $operationsConfig, bool $headersUppercase = false): string
+    {
+        $selectedKeys = is_array($operationsConfig['operation_fields'] ?? null)
+            ? array_values(array_filter(array_map('strval', $operationsConfig['operation_fields']), static fn (string $key): bool => $key !== ''))
+            : array_values(array_filter(
+                array_map('strval', (array) ($operationsConfig['fields'] ?? [])),
+                static fn (string $key): bool => $key !== ''
+            ));
+
+        if ($selectedKeys === []) {
+            foreach ($columns as $column) {
+                $colKey = (string) ($column['key'] ?? '');
+                if ($colKey === '' || in_array($colKey, ['item', 'microrregion'], true) || str_starts_with($colKey, '__calc_')) {
+                    continue;
+                }
+                $selectedKeys[] = $colKey;
+            }
+        }
+
+        $operation = strtolower(trim((string) ($operationsConfig['operation'] ?? 'add')));
+        if (!in_array($operation, ['add', 'subtract', 'multiply', 'percent'], true)) {
+            $operation = !array_key_exists('include_percent', $operationsConfig) || !empty($operationsConfig['include_percent'])
+                ? 'percent'
+                : 'add';
+        }
+        $baseKey = trim((string) ($operationsConfig['base_field'] ?? $operationsConfig['reference_field'] ?? ''));
+        $baseNum = $baseKey !== '' ? $this->extractOperationsNumeric($entryData[$baseKey] ?? null) : null;
+        $baseValue = $baseNum ?? 0.0;
+
+        $operationValues = [];
+        foreach ($selectedKeys as $selectedKey) {
+            if ($selectedKey === '' || $selectedKey === $baseKey) {
+                continue;
+            }
+            $num = $this->extractOperationsNumeric($entryData[$selectedKey] ?? null);
+            if ($num !== null) {
+                $operationValues[] = $num;
+            }
+        }
+
+        $result = null;
+        if ($operation === 'add') {
+            $result = $baseValue + array_sum($operationValues);
+        } elseif ($operation === 'subtract') {
+            $result = $baseValue - array_sum($operationValues);
+        } elseif ($operation === 'multiply') {
+            $product = $operationValues === [] ? 1.0 : array_reduce($operationValues, static fn (float $acc, float $n): float => $acc * $n, 1.0);
+            $result = $baseValue * $product;
+        } elseif ($operation === 'percent') {
+            $numerator = array_sum($operationValues);
+            $result = $baseValue !== 0.0 ? (($numerator / $baseValue) * 100.0) : 0.0;
+        }
+
+        if ($result === null || !is_finite($result)) {
+            return '';
+        }
+
+        $rounded = round($result, 2);
+        $text = rtrim(rtrim(sprintf('%.2f', $rounded), '0'), '.');
+        if ($text === '-0') {
+            $text = '0';
+        }
+
+        return $operation === 'percent' ? ($text.'%') : $text;
+    }
+
+    private function extractOperationsNumeric(mixed $value): ?float
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_array($value)) {
+            if (array_key_exists('primary', $value)) {
+                return $this->parseSummaryNumber($value['primary']);
+            }
+
+            $sum = 0.0;
+            $hasAny = false;
+            foreach ($value as $item) {
+                $n = $this->parseSummaryNumber($item);
+                if ($n !== null) {
+                    $sum += $n;
+                    $hasAny = true;
+                }
+            }
+
+            return $hasAny ? $sum : null;
+        }
+
+        if (is_object($value)) {
+            $arr = (array) $value;
+            if (array_key_exists('primary', $arr)) {
+                return $this->parseSummaryNumber($arr['primary']);
+            }
+
+            return $this->extractOperationsNumeric($arr);
+        }
+
+        return $this->parseSummaryNumber($value);
+    }
+
+    private function isEmptyExportValue(mixed $value): bool
+    {
+        if ($value === null) {
+            return true;
+        }
+        if (is_array($value)) {
+            if ($value === []) {
+                return true;
+            }
+            foreach ($value as $item) {
+                if (! $this->isEmptyExportValue($item)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        if (is_object($value)) {
+            $arr = (array) $value;
+            if (array_key_exists('primary', $arr)) {
+                return $this->isEmptyExportValue($arr['primary']);
+            }
+
+            return $this->isEmptyExportValue($arr);
+        }
+
+        return trim((string) $value) === '';
+    }
+
+    private function isNumericExportFieldType(string $fieldType): bool
+    {
+        $t = strtolower(trim($fieldType));
+        if ($t === '') {
+            return false;
+        }
+
+        foreach (['number', 'numeric', 'int', 'integer', 'decimal', 'float', 'double'] as $token) {
+            if (str_contains($t, $token)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<string,mixed> $column
+     */
+    private function applyColumnEmptyFillValue(mixed $value, array $column, string $fieldType): mixed
+    {
+        $key = (string) ($column['key'] ?? '');
+        if ($key === 'item' || $key === 'microrregion') {
+            return $value;
+        }
+        if (in_array(strtolower(trim($fieldType)), ['image', 'file', 'foto'], true)) {
+            return $value;
+        }
+        if (! $this->isEmptyExportValue($value)) {
+            return $value;
+        }
+
+        $mode = strtolower(trim((string) ($column['fill_empty_mode'] ?? 'none')));
+        if (! in_array($mode, ['auto', 'custom'], true)) {
+            return $value;
+        }
+
+        if ($mode === 'custom') {
+            return (string) ($column['fill_empty_value'] ?? '');
+        }
+
+        return $this->isNumericExportFieldType($fieldType) ? 0 : 'S/R';
+    }
+
+    /**
+     * @param array<string,mixed> $fontStyle
+     * @param array<string,mixed> $paragraphStyle
+     */
+    private function addWordMultilineText($cell, string $text, array $fontStyle = [], array $paragraphStyle = []): void
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", $text);
+        $lines = explode("\n", $normalized);
+        $run = $cell->addTextRun($paragraphStyle);
+
+        foreach ($lines as $index => $line) {
+            if ($index > 0) {
+                $run->addTextBreak();
+            }
+            $run->addText($line, $fontStyle);
+        }
     }
 
     private function transformExportColumns(array $columns, bool $uppercase = false): array

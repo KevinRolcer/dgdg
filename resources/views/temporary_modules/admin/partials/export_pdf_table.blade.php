@@ -1,6 +1,94 @@
 @php
     $fieldTypesByKey = $fieldTypesByKey ?? [];
     $pdfImageDataByPath = $pdfImageDataByPath ?? [];
+    $operationsValueIsEmpty = function ($value) use (&$operationsValueIsEmpty): bool {
+        if ($value === null) {
+            return true;
+        }
+        if (is_array($value)) {
+            if (array_key_exists('primary', $value)) {
+                return $operationsValueIsEmpty($value['primary']);
+            }
+            if ($value === []) {
+                return true;
+            }
+            foreach ($value as $item) {
+                if (!$operationsValueIsEmpty($item)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (is_object($value)) {
+            return $operationsValueIsEmpty((array) $value);
+        }
+        return trim((string) $value) === '';
+    };
+    $operationsParseNumber = function ($value): ?float {
+        if ($value === null) {
+            return null;
+        }
+        if (is_int($value) || is_float($value)) {
+            return is_finite((float) $value) ? (float) $value : null;
+        }
+        $raw = preg_replace('/\s+/', '', trim((string) $value)) ?: '';
+        if ($raw === '') {
+            return null;
+        }
+        $commaPos = strrpos($raw, ',');
+        $dotPos = strrpos($raw, '.');
+        if ($commaPos !== false && $dotPos !== false) {
+            if ($commaPos > $dotPos) {
+                $raw = str_replace('.', '', $raw);
+                $raw = str_replace(',', '.', $raw);
+            } else {
+                $raw = str_replace(',', '', $raw);
+            }
+        } elseif ($commaPos !== false && $dotPos === false) {
+            $raw = str_replace(',', '.', $raw);
+        }
+
+        return is_numeric($raw) ? (float) $raw : null;
+    };
+    $operationsExtractNumber = function ($value) use (&$operationsExtractNumber, $operationsParseNumber): ?float {
+        if ($value === null) {
+            return null;
+        }
+        if (is_array($value)) {
+            if (array_key_exists('primary', $value)) {
+                return $operationsParseNumber($value['primary']);
+            }
+            $sum = 0.0;
+            $hasAny = false;
+            foreach ($value as $item) {
+                $n = $operationsParseNumber($item);
+                if ($n !== null) {
+                    $sum += $n;
+                    $hasAny = true;
+                }
+            }
+
+            return $hasAny ? $sum : null;
+        }
+        if (is_object($value)) {
+            return $operationsExtractNumber((array) $value);
+        }
+
+        return $operationsParseNumber($value);
+    };
+    $isNumericFieldType = function ($fieldType): bool {
+        $t = strtolower(trim((string) $fieldType));
+        if ($t === '') {
+            return false;
+        }
+        foreach (['number', 'numeric', 'int', 'integer', 'decimal', 'float', 'double'] as $token) {
+            if (str_contains($t, $token)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
     $fontFamily = $fontFamily ?? 'Gilroy';
     $docMarginPreset = strtolower((string) ($docMarginPreset ?? 'compact'));
     if (!in_array($docMarginPreset, ['normal', 'compact', 'none'], true)) {
@@ -11,7 +99,12 @@
         'normal' => '15mm 15mm 15mm 15mm',
         default => '12mm 12mm 10mm 12mm',
     };
-    $cellFontSizePx = max(9, min(24, (int) ($cellFontSizePx ?? 12)));
+    $recordsCellFontSizePx = max(9, min(24, (int) ($cellFontSizePx ?? 12)));
+    $recordsHeaderFontSizePx = isset($headerFontSizePx) ? max(9, min(28, (int) $headerFontSizePx)) : 12;
+    $sumTableCellFontSizePx = max(9, min(24, (int) ($sumTableCellFontSizePx ?? $recordsCellFontSizePx)));
+    $sumTableHeaderFontSizePx = max(9, min(28, (int) ($sumTableHeaderFontSizePx ?? $recordsHeaderFontSizePx)));
+    $totalsTableCellFontSizePx = max(9, min(24, (int) ($totalsTableCellFontSizePx ?? $sumTableCellFontSizePx)));
+    $totalsTableHeaderFontSizePx = max(9, min(28, (int) ($totalsTableHeaderFontSizePx ?? $sumTableHeaderFontSizePx)));
     $titleFontSizePx = max(10, min(36, (int) ($titleFontSizePx ?? 18)));
     $varsCss = ['var(--clr-primary)' => '#861E34', 'var(--clr-secondary)' => '#2d5a27', 'var(--clr-accent)' => '#c9a227'];
     $resolveCss = function ($css) use ($varsCss) {
@@ -141,10 +234,10 @@
             overflow-wrap: anywhere;
             word-break: break-word;
             overflow: visible;
-            font-size: {{ $cellFontSizePx }}px;
+            font-size: {{ $recordsCellFontSizePx }}px;
         }
         th {
-            font-size: {{ isset($headerFontSizePx) ? max(9, min(28, (int) $headerFontSizePx)) : 12 }}px !important;
+            font-size: {{ $recordsHeaderFontSizePx }}px !important;
         }
         /*
          * Evitar page-break-inside: avoid en todas las filas: con Dompdf provoca saltos
@@ -264,7 +357,7 @@
 @endphp
 <p style="font-weight: bold; margin: 6px 0 6px 0; text-align: {{ $totalsTableAlign }}; font-size: {{ $sumTitleFontSizePx ?? 14 }}px;">{{ $totalsTableTitle }}</p>
 <div style="{{ $totalsWrapStyle }}">
-    <table class="sum-table" style="{{ $totalsStyle }} {{ $countTableInlineStyle }}">
+    <table class="sum-table" style="{{ $totalsStyle }} {{ $countTableInlineStyle }} --sum-header-fs: {{ $totalsTableHeaderFontSizePx }}px; --sum-cell-fs: {{ $totalsTableCellFontSizePx }}px; --sum-cell-pad: 3px 4px;">
         <thead>
         @if($totalsHasGroups)
             <tr>
@@ -502,8 +595,8 @@
     $sumColumnCount = max(2, 1 + $sumRawMetricCols + $sumRawFormulaCols);
     $sumDensityScore = $sumRowCount + (int) ceil($sumColumnCount * 1.8) + (($orientation ?? 'portrait') === 'landscape' ? 4 : 0);
     $sumHeadingFontSizePx = max(10, min($sumTitleFontSizePx, $sumDensityScore >= 34 ? 11 : 12));
-    $sumHeaderFontPx = max(7, min(10, $cellFontSizePx - ($sumDensityScore >= 34 ? 3 : 2)));
-    $sumCellFontPx = max(7, min(10, $cellFontSizePx - ($sumDensityScore >= 34 ? 2 : 1)));
+    $sumHeaderFontPx = max(7, $sumTableHeaderFontSizePx - ($sumDensityScore >= 34 ? 3 : 2));
+    $sumCellFontPx = max(7, $sumTableCellFontSizePx - ($sumDensityScore >= 34 ? 2 : 1));
     $sumCellPadding = $sumDensityScore >= 34 ? '2px 3px' : '3px 4px';
 @endphp
 <p style="font-weight: bold; margin: 4px 0 4px 0; text-align: {{ $sumTitleAlign }}; font-size: {{ $sumHeadingFontSizePx }}px;">{{ $sumHeadingText }}</p>
@@ -750,7 +843,7 @@
                         $groupBg = $gs['label'] !== '' ? ($groupHeaderColors[$groupKey] ?? '#64748b') : 'transparent';
                     @endphp
                     <th colspan="{{ $gs['span'] }}" style="background-color: {{ $groupBg }}; color: #fff; border: {{ $gs['label'] !== '' ? '1px solid #000' : 'none' }};">
-                        {{ $gs['label'] }}
+                        {!! nl2br(e((string) ($gs['label'] ?? ''))) !!}
                     </th>
                 @endforeach
             </tr>
@@ -767,7 +860,7 @@
                     $wStyle = 'width: '.$pct.'%;';
                 @endphp
                 <th style="background-color: {{ $bg }}; color: #fff; text-align: center; vertical-align: middle; {{ $wStyle }}">
-                    {{ $col['label'] }}
+                    {!! nl2br(e((string) ($col['label'] ?? ''))) !!}
                 </th>
             @endforeach
         </tr>
@@ -780,9 +873,10 @@
                         $key = $col['key'];
                         $pct = (float) ($columnWidthPercents[$loop->index] ?? (100 / max(1, $nCols)));
                         $baseW = 'width: '.$pct.'%;';
+                        $cellBoldStyle = !empty($col['content_bold']) ? 'font-weight:700;' : '';
                     @endphp
                     @if ($key === 'item')
-                        <td style="{{ $baseW }} text-align: center;">{{ $itemNumber }}</td>
+                        <td style="{{ $baseW }} text-align: center; {{ $cellBoldStyle }}">{{ $itemNumber }}</td>
                         @php $itemNumber++; @endphp
                     @elseif ($key === 'microrregion')
                         @php
@@ -790,10 +884,83 @@
                             $lMrTxt = $lMeta['label'] ?? ($lMeta->label ?? 'Sin microrregión');
                         @endphp
                         {{-- Sin rowspan: Dompdf al partir la tabla entre páginas rompía columnas --}}
-                        <td style="vertical-align: middle; text-align: center; {{ $baseW }}">{{ $lMrTxt }}</td>
+                        <td style="vertical-align: middle; text-align: center; {{ $baseW }} {{ $cellBoldStyle }}">{{ $lMrTxt }}</td>
+                    @elseif (
+                        is_string($key)
+                        && str_starts_with($key, '__calc_')
+                    )
+                        @php
+                            $calcCfg = is_array($col['_calc_config'] ?? null) ? $col['_calc_config'] : [];
+                            $operationsOp = strtolower(trim((string) ($calcCfg['operation'] ?? 'add')));
+                            if (!in_array($operationsOp, ['add', 'subtract', 'multiply', 'percent'], true)) {
+                                $operationsOp = !array_key_exists('include_percent', $calcCfg) || !empty($calcCfg['include_percent']) ? 'percent' : 'add';
+                            }
+                            $operationsBaseKey = trim((string) ($calcCfg['base_field'] ?? $calcCfg['reference_field'] ?? ''));
+                            $operationsSelectedKeys = is_array($calcCfg['operation_fields'] ?? null)
+                                ? array_values(array_filter(array_map('strval', $calcCfg['operation_fields']), static fn (string $k): bool => $k !== ''))
+                                : (is_array($calcCfg['fields'] ?? null)
+                                    ? array_values(array_filter(array_map('strval', $calcCfg['fields']), static fn (string $k): bool => $k !== ''))
+                                    : []);
+                            $entryData = (array) ($entry->data ?? []);
+                            $effectiveSelected = $operationsSelectedKeys;
+                            if ($effectiveSelected === []) {
+                                foreach ($colHeaders as $opCol) {
+                                    $opKey = (string) ($opCol['key'] ?? '');
+                                    if ($opKey === '' || in_array($opKey, ['item', 'microrregion'], true) || str_starts_with($opKey, '__calc_')) {
+                                        continue;
+                                    }
+                                    $effectiveSelected[] = $opKey;
+                                }
+                            }
+                            $baseRaw = $operationsBaseKey !== '' ? ($entryData[$operationsBaseKey] ?? null) : null;
+                            $baseNum = $operationsExtractNumber($baseRaw);
+                            $baseVal = $baseNum !== null ? $baseNum : 0.0;
+                            $operationNums = [];
+                            foreach ($effectiveSelected as $selectedKey) {
+                                if ($selectedKey === '' || $selectedKey === $operationsBaseKey) {
+                                    continue;
+                                }
+                                $n = $operationsExtractNumber($entryData[$selectedKey] ?? null);
+                                if ($n !== null) {
+                                    $operationNums[] = $n;
+                                }
+                            }
+                            $operationsResult = null;
+                            if ($operationsOp === 'add') {
+                                $operationsResult = $baseVal + array_sum($operationNums);
+                            } elseif ($operationsOp === 'subtract') {
+                                $operationsResult = $baseVal - array_sum($operationNums);
+                            } elseif ($operationsOp === 'multiply') {
+                                $operationsResult = $baseVal * (empty($operationNums) ? 1.0 : array_reduce($operationNums, static fn (float $acc, float $n): float => $acc * $n, 1.0));
+                            } elseif ($operationsOp === 'percent') {
+                                $numerator = array_sum($operationNums);
+                                $operationsResult = $baseVal != 0.0 ? (($numerator / $baseVal) * 100.0) : 0.0;
+                            }
+
+                            if ($operationsResult === null || !is_finite($operationsResult)) {
+                                $operationsText = '';
+                            } else {
+                                $rounded = round($operationsResult, 2);
+                                $operationsText = rtrim(rtrim(number_format($rounded, 2, '.', ''), '0'), '.');
+                                if ($operationsText === '-0') { $operationsText = '0'; }
+                                if ($operationsOp === 'percent') { $operationsText .= '%'; }
+                            }
+                        @endphp
+                        <td style="{{ $baseW }} text-align: center; vertical-align: middle; {{ $cellBoldStyle }}">{!! nl2br(e($operationsText)) !!}</td>
                     @else
                         @php
                             $val = $entry->data[$key] ?? null;
+                            $fillMode = strtolower(trim((string) ($col['fill_empty_mode'] ?? 'none')));
+                            $fillValue = (string) ($col['fill_empty_value'] ?? '');
+                            $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
+                            $isImageType = $fieldType === 'image' || $fieldType === 'file' || $fieldType === 'foto';
+                            if (!$isImageType && !in_array((string) $key, ['item', 'microrregion'], true) && in_array($fillMode, ['auto', 'custom'], true) && $operationsValueIsEmpty($val)) {
+                                if ($fillMode === 'custom') {
+                                    $val = $fillValue;
+                                } else {
+                                    $val = $isNumericFieldType($fieldType) ? 0 : 'S/R';
+                                }
+                            }
                             if (is_bool($val)) {
                                 $cellText = $val ? 'Sí' : 'No';
                             } elseif (is_array($val)) {
@@ -805,8 +972,6 @@
                             } else {
                                 $cellText = '';
                             }
-                            $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
-                            $isImageType = $fieldType === 'image' || $fieldType === 'file' || $fieldType === 'foto';
                             $imageSources = [];
                             $rawMediaValues = is_array($val)
                                 ? array_values(array_filter($val, fn ($item) => is_string($item) && trim($item) !== ''))
@@ -853,7 +1018,7 @@
                             $thumbWidth = count($imageSources) > 1 ? 52 : 110;
                             $thumbHeight = count($imageSources) > 1 ? 52 : 85;
                         @endphp
-                        <td style="{{ $baseW }} {{ $tdAlign }}">
+                        <td style="{{ $baseW }} {{ $tdAlign }} {{ $cellBoldStyle }}">
                             @if(!empty($imageSources))
                                 <div style="display:block; text-align:center; white-space:nowrap;">
                                     @foreach ($imageSources as $imageSource)
