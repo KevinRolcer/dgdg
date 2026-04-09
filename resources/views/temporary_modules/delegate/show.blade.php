@@ -88,6 +88,10 @@
                         $name = 'values['.$field->key.']';
                         $id = 'field_'.$field->key;
                         $value = old('values.'.$field->key, $editingEntry->data[$field->key] ?? null);
+                        $existingImagePaths = is_array($value)
+                            ? array_values(array_filter($value, fn ($path) => is_string($path) && trim($path) !== ''))
+                            : ((is_string($value) && trim($value) !== '') ? [trim($value)] : []);
+                        $hasExistingImages = count($existingImagePaths) > 0;
                         if ($field->type === 'boolean' && $value !== null && $value !== '') {
                             $value = $value === true || $value === 1 || $value === '1' ? '1' : '0';
                         }
@@ -198,7 +202,7 @@
                                     </button>
                                 </div>
                                 <small class="tm-upload-evidence-hint">Arrastra aquí o usa los botones.</smal                                 <div class="tm-upload-evidence-dropzone" data-paste-upload-wrap>
-                                    <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}[]" class="d-none" {{ $field->is_required ? 'required' : '' }} multiple data-max-files="2">
+                                    <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}[]" class="d-none" {{ ($field->is_required && !$hasExistingImages) ? 'required' : '' }} multiple data-max-files="2">
                                     <div class="tm-upload-evidence-placeholder">
                                         <i class="fa-solid fa-images" aria-hidden="true"></i>
                                         <p>Suelta las imágenes aquí (Máx. 2)</p>
@@ -206,9 +210,9 @@
                                     <div class="tm-inline-image-preview-container" data-inline-image-preview-container style="display:flex; flex-wrap:wrap; gap:8px; width:100%; justify-content:center;">
                                         {{-- El JS insertara las previsualizaciones aqui --}}
                                     </div>
-                                    @if (!empty($value))
+                                    @if ($hasExistingImages)
                                         <div class="tm-existing-images-note" style="margin-top:8px; font-size:12px; color:var(--clr-text-light); text-align:center;">
-                                            <p><i class="fa-solid fa-circle-info"></i> Ya existen imágenes. Si subes nuevas, las anteriores se borrarán.</p>
+                                            <p><i class="fa-solid fa-circle-info"></i> Ya existen imágenes. Puedes agregar nuevas hasta un máximo de 2 en total.</p>
                                             <label style="display:inline-flex; align-items:center; gap:6px; color:var(--clr-primary); cursor:pointer;">
                                                 <input type="checkbox" name="remove_images[{{ $field->key }}]" value="1">
                                                 <span>Eliminar imágenes actuales</span>

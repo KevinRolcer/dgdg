@@ -1392,6 +1392,9 @@ class TemporaryModuleController extends Controller
             $removeRequested = filter_var(Arr::get($validated, 'remove_images.'.$field->key), FILTER_VALIDATE_BOOLEAN);
 
             if (in_array($field->type, ['file', 'image'], true)) {
+                $existingPaths = is_array($existingValue)
+                    ? array_values(array_filter($existingValue, fn ($path) => is_string($path) && trim($path) !== ''))
+                    : ((is_string($existingValue) && trim($existingValue) !== '') ? [trim($existingValue)] : []);
                 $uploadedFiles = $request->file('values.'.$field->key);
                 if ($uploadedFiles) {
                     if (!is_array($uploadedFiles)) { $uploadedFiles = [$uploadedFiles]; }
@@ -1402,15 +1405,22 @@ class TemporaryModuleController extends Controller
                             $storedPaths[] = $this->compressAndStoreImage($uploadedFile, $directory);
                         } else { $storedPaths[] = $uploadedFile->store($directory, 'secure_shared'); }
                     }
-                    // Limpieza opcional de previos no incluidos (reemplace total)
-                    $oldPaths = is_array($existingValue) ? $existingValue : ($existingValue ? [(string)$existingValue] : []);
-                    foreach ($oldPaths as $oldPath) {
-                        if (!in_array($oldPath, $storedPaths, true)) { $this->entryDataService->deleteStoredPath($oldPath); }
+
+                    if ($removeRequested) {
+                        foreach ($existingPaths as $oldPath) {
+                            $this->entryDataService->deleteStoredPath($oldPath);
+                        }
+                        $value = array_slice(array_values(array_unique($storedPaths)), 0, 2);
+                    } else {
+                        if (count($existingPaths) + count($storedPaths) > 2) {
+                            throw ValidationException::withMessages([
+                                'values.'.$field->key => 'Solo se permiten hasta 2 imagenes por campo. Elimina una existente o sube menos archivos.',
+                            ]);
+                        }
+                        $value = array_slice(array_values(array_unique(array_merge($existingPaths, $storedPaths))), 0, 2);
                     }
-                    $value = $storedPaths;
                 } elseif ($removeRequested) {
-                    $oldPaths = is_array($existingValue) ? $existingValue : ($existingValue ? [(string)$existingValue] : []);
-                    foreach ($oldPaths as $oldPath) { $this->entryDataService->deleteStoredPath($oldPath); }
+                    foreach ($existingPaths as $oldPath) { $this->entryDataService->deleteStoredPath($oldPath); }
                     $value = null;
                 } else {
                     $value = $existingValue;

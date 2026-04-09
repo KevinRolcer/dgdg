@@ -769,11 +769,20 @@ class TemporaryModuleWordPdfService
                     if ($imagePaths !== []) {
                         $w = $columnTwips[$idx] ?? null;
                         $imgCell = $table->addCell($w, ['valign' => 'center']);
-                        foreach ($imagePaths as $imagePath) {
-                            $imgCell->addImage($imagePath, [
+                        if (count($imagePaths) === 1) {
+                            $imgCell->addImage($imagePaths[0], [
                                 'height' => 72,
                                 'alignment' => Jc::CENTER,
                             ]);
+                        } else {
+                            // Keep both images in a single visual block inside the same cell.
+                            $imageRun = $imgCell->addTextRun(['alignment' => Jc::CENTER]);
+                            foreach ($imagePaths as $imageIndex => $imagePath) {
+                                $imageRun->addImage($imagePath, ['height' => 52]);
+                                if ($imageIndex < count($imagePaths) - 1) {
+                                    $imageRun->addText('  ');
+                                }
+                            }
                         }
                     } else {
                         if (is_bool($val)) {

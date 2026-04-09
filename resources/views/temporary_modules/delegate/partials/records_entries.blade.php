@@ -25,10 +25,23 @@
                         <div class="tm-record-item">
                             <strong>{{ $field->label }}</strong>
                             <div>
-                                @if (in_array($field->type, ['file', 'image'], true) && is_string($cell) && $cell !== '')
-                                    <button type="button" class="tm-thumb-link" data-open-image-preview
-                                        data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) }}"
-                                        data-image-title="{{ $field->label }}"><i class="fa fa-image"></i> Ver imagen</button>
+                                @php
+                                    $mediaPaths = in_array($field->type, ['file', 'image'], true)
+                                        ? (is_array($cell)
+                                            ? array_values(array_filter($cell, fn ($path) => is_string($path) && trim($path) !== ''))
+                                            : ((is_string($cell) && trim($cell) !== '') ? [trim($cell)] : []))
+                                        : [];
+                                @endphp
+                                @if (count($mediaPaths) > 0)
+                                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                                        @foreach ($mediaPaths as $imageIndex => $imagePath)
+                                            <button type="button" class="tm-thumb-link" data-open-image-preview
+                                                data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key, 'i' => $imageIndex]) }}"
+                                                data-image-title="{{ $field->label }}{{ count($mediaPaths) > 1 ? ' ('.($imageIndex + 1).')' : '' }}">
+                                                <i class="fa fa-image"></i> {{ count($mediaPaths) > 1 ? 'Imagen '.($imageIndex + 1) : 'Ver imagen' }}
+                                            </button>
+                                        @endforeach
+                                    </div>
                                 @elseif (is_bool($cell))
                                     {{ $cell ? 'Si' : 'No' }}
                                 @elseif ($field->type === 'semaforo' && is_string($cell) && $cell !== '')
@@ -90,10 +103,23 @@
                         @foreach ($module->fields as $field)
                             @php $cell = $entry->data[$field->key] ?? null; @endphp
                             <td>
-                                @if (in_array($field->type, ['file', 'image'], true) && is_string($cell) && $cell !== '')
-                                    <button type="button" class="tm-thumb-link" data-open-image-preview
-                                        data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) }}"
-                                        data-image-title="{{ $field->label }}"><i class="fa fa-image"></i> Ver imagen</button>
+                                @php
+                                    $mediaPaths = in_array($field->type, ['file', 'image'], true)
+                                        ? (is_array($cell)
+                                            ? array_values(array_filter($cell, fn ($path) => is_string($path) && trim($path) !== ''))
+                                            : ((is_string($cell) && trim($cell) !== '') ? [trim($cell)] : []))
+                                        : [];
+                                @endphp
+                                @if (count($mediaPaths) > 0)
+                                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                                        @foreach ($mediaPaths as $imageIndex => $imagePath)
+                                            <button type="button" class="tm-thumb-link" data-open-image-preview
+                                                data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key, 'i' => $imageIndex]) }}"
+                                                data-image-title="{{ $field->label }}{{ count($mediaPaths) > 1 ? ' ('.($imageIndex + 1).')' : '' }}">
+                                                <i class="fa fa-image"></i> {{ count($mediaPaths) > 1 ? 'Imagen '.($imageIndex + 1) : 'Ver imagen' }}
+                                            </button>
+                                        @endforeach
+                                    </div>
                                 @elseif (is_bool($cell))
                                     {{ $cell ? 'Si' : 'No' }}
                                 @elseif ($field->type === 'semaforo' && is_string($cell) && $cell !== '')
@@ -147,7 +173,7 @@
             $mostrarSelectorMicrorregion = $microsAsignadas->count() > 1;
             $entryMicrorregion = $microsAsignadas->firstWhere('id', $entry->microrregion_id);
             $entryMunicipios = $entryMicrorregion && isset($entryMicrorregion->municipios) ? array_values($entryMicrorregion->municipios) : ($municipios ?? []);
-            
+
             $orderedFields = $module->fields
                 ->sortBy(function ($field) {
                     return in_array($field->type, ['image', 'file'], true) ? 1 : 0;
@@ -205,7 +231,11 @@
                                     $id = 'edit_'.$entry->id.'_'.$field->key;
                                     $value = old('values.'.$field->key, $entry->data[$field->key] ?? null);
                                     $isMediaField = in_array($field->type, ['image', 'file'], true);
-                                    $hasExistingImage = is_string($entry->data[$field->key] ?? null) && trim((string) ($entry->data[$field->key] ?? '')) !== '';
+                                    $existingImageValue = $entry->data[$field->key] ?? null;
+                                    $existingImagePaths = is_array($existingImageValue)
+                                        ? array_values(array_filter($existingImageValue, fn ($path) => is_string($path) && trim($path) !== ''))
+                                        : ((is_string($existingImageValue) && trim($existingImageValue) !== '') ? [trim($existingImageValue)] : []);
+                                    $hasExistingImage = count($existingImagePaths) > 0;
                                 @endphp
                                 @if ($field->type === 'seccion')
                                     @php
@@ -362,13 +392,13 @@
                                             </div>
                                             <small class="tm-upload-evidence-hint">Arrastra aqui o usa los botones.</small>
                                             <div class="tm-upload-evidence-dropzone" data-paste-upload-wrap>
-                                                <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" class="d-none" {{ ($field->is_required && !$hasExistingImage) ? 'required' : '' }}>
+                                                <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}[]" class="d-none" {{ ($field->is_required && !$hasExistingImage) ? 'required' : '' }} multiple data-max-files="2">
                                                 <div class="tm-upload-evidence-placeholder" {{ $hasExistingImage ? 'hidden' : '' }}>
                                                     <i class="fa-solid fa-images" aria-hidden="true"></i>
-                                                    <p>Suelta la imagen aqui</p>
+                                                    <p>Suelta las imagenes aqui (Max. 2)</p>
                                                 </div>
                                                 <div class="tm-image-preview" data-image-preview {{ $hasExistingImage ? '' : 'hidden' }}>
-                                                    <img src="{{ $hasExistingImage ? route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) : '' }}" data-image-preview-img>
+                                                    <img src="{{ $hasExistingImage ? route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key, 'i' => 0]) : '' }}" data-image-preview-img>
                                                     <button type="button" class="tm-image-clear" data-image-remove>&times;</button>
                                                 </div>
                                             </div>

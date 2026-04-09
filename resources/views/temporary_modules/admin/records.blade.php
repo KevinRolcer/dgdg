@@ -289,17 +289,28 @@
                                                                     <div class="tm-record-field">
                                                                         <div class="tm-record-label">{{ $field->label }}</div>
                                                                         <div class="tm-record-value">
-                                                                            @if (in_array($field->type, ['file', 'image'], true) && is_string($cell) && $cell !== '')
-                                                                                <button
-                                                                                    type="button"
-                                                                                    class="tm-thumb-link"
-                                                                                    data-open-image-preview
-                                                                                    data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key]) }}"
-                                                                                    data-image-title="{{ $field->label }}"
-                                                                                    title="Ver imagen"
-                                                                                >
-                                                                                    <i class="fa fa-image" aria-hidden="true"></i> Ver imagen
-                                                                                </button>
+                                                                            @php
+                                                                                $mediaPaths = in_array($field->type, ['file', 'image'], true)
+                                                                                    ? (is_array($cell)
+                                                                                        ? array_values(array_filter($cell, fn ($path) => is_string($path) && trim($path) !== ''))
+                                                                                        : ((is_string($cell) && trim($cell) !== '') ? [trim($cell)] : []))
+                                                                                    : [];
+                                                                            @endphp
+                                                                            @if (count($mediaPaths) > 0)
+                                                                                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                                                                                    @foreach ($mediaPaths as $imageIndex => $imagePath)
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            class="tm-thumb-link"
+                                                                                            data-open-image-preview
+                                                                                            data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key, 'i' => $imageIndex]) }}"
+                                                                                            data-image-title="{{ $field->label }}{{ count($mediaPaths) > 1 ? ' ('.($imageIndex + 1).')' : '' }}"
+                                                                                            title="{{ count($mediaPaths) > 1 ? 'Ver imagen '.($imageIndex + 1) : 'Ver imagen' }}"
+                                                                                        >
+                                                                                            <i class="fa fa-image" aria-hidden="true"></i> {{ count($mediaPaths) > 1 ? 'Imagen '.($imageIndex + 1) : 'Ver imagen' }}
+                                                                                        </button>
+                                                                                    @endforeach
+                                                                                </div>
                                                                             @elseif (is_bool($cell))
                                                                                 {{ $cell ? 'Sí' : 'No' }}
                                                                             @elseif ($field->type === 'semaforo' && is_string($cell) && $cell !== '')

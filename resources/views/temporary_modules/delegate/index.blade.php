@@ -440,14 +440,13 @@
                                             </div>
                                             <small class="tm-upload-evidence-hint">Arrastra aquí o usa los botones.</small>
                                             <div class="tm-upload-evidence-dropzone" data-paste-upload-wrap>
-                                                <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}" class="d-none" {{ $field->is_required ? 'required' : '' }}>
+                                                <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}[]" class="d-none" {{ $field->is_required ? 'required' : '' }} multiple data-max-files="2">
                                                 <div class="tm-upload-evidence-placeholder">
                                                     <i class="fa-solid fa-images" aria-hidden="true"></i>
-                                                    <p>Suelta la imagen aquí</p>
+                                                    <p>Suelta las imágenes aquí (Máx. 2)</p>
                                                 </div>
-                                                <div class="tm-image-preview" data-image-preview hidden>
-                                                    <img src="" alt="Vista previa" data-image-preview-img>
-                                                    <button type="button" class="tm-image-clear" data-image-remove aria-label="Quitar imagen">&times;</button>
+                                                <div class="tm-inline-image-preview-container" data-inline-image-preview-container style="display:flex; flex-wrap:wrap; gap:8px; width:100%; justify-content:center;">
+                                                    {{-- El JS insertara las previsualizaciones aqui --}}
                                                 </div>
                                             </div>
                                         </div>
@@ -1831,6 +1830,79 @@
             });
         };
 
+        const setPreview = function (input) {
+            if (!(input instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const wrap = input.closest('[data-paste-upload-wrap]');
+            if (!wrap) {
+                return;
+            }
+
+            const container = wrap.querySelector('[data-inline-image-preview-container]');
+            if (!container) {
+                return;
+            }
+
+            container.innerHTML = '';
+
+            const files = Array.from(input.files || []);
+            if (files.length === 0) {
+                return;
+            }
+
+            files.forEach(function (file, index) {
+                if (!String(file.type || '').startsWith('image/')) {
+                    return;
+                }
+
+                const previewDiv = document.createElement('div');
+                previewDiv.className = 'tm-inline-image-preview tm-image-preview';
+                previewDiv.style.position = 'relative';
+
+                const img = document.createElement('img');
+                img.style.maxWidth = '120px';
+                img.style.maxHeight = '120px';
+                img.style.borderRadius = '8px';
+                img.style.objectFit = 'cover';
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'tm-image-clear';
+                removeBtn.innerHTML = '&times;';
+                removeBtn.style.position = 'absolute';
+                removeBtn.style.top = '-8px';
+                removeBtn.style.right = '-8px';
+
+                removeBtn.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                    if (typeof DataTransfer === 'undefined') {
+                        input.value = '';
+                        setPreview(input);
+                        return;
+                    }
+                    const dt = new DataTransfer();
+                    Array.from(input.files || []).forEach(function (f, i) {
+                        if (i !== index) {
+                            dt.items.add(f);
+                        }
+                    });
+                    input.files = dt.files;
+                    setPreview(input);
+                });
+
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    img.src = String(event.target && event.target.result ? event.target.result : '');
+                    previewDiv.appendChild(img);
+                    previewDiv.appendChild(removeBtn);
+                    container.appendChild(previewDiv);
+                };
+                reader.readAsDataURL(file);
+            });
+        };
+
         const initializeImagePreview = function (input) {
             const wrapper = input.closest('label');
             if (!wrapper) {
@@ -1849,6 +1921,17 @@
             const previewImg = wrapper.querySelector('[data-image-preview-img]');
             const removeButton = wrapper.querySelector('[data-image-remove]');
             const removeFlag = wrapper.querySelector('[data-remove-flag]');
+            const inlineContainer = wrapper.querySelector('[data-inline-image-preview-container]');
+
+            if (inlineContainer) {
+                input.addEventListener('change', function () {
+                    setPreview(input);
+                    if (removeFlag) {
+                        removeFlag.value = '0';
+                    }
+                });
+                return;
+            }
 
             if (!preview || !previewImg) {
                 return;
@@ -2086,7 +2169,17 @@
                 return false;
             }
 
+            const maxFiles = parseInt(input.dataset.maxFiles || (input.multiple ? '2' : '1'), 10) || 1;
+            const existingFiles = Array.from(input.files || []);
+            if (existingFiles.length >= maxFiles) {
+                notify('Aviso', 'Solo puedes adjuntar hasta ' + maxFiles + ' imagen(es).', 'warning');
+                return false;
+            }
+
             const transfer = new DataTransfer();
+            existingFiles.forEach(function (existingFile) {
+                transfer.items.add(existingFile);
+            });
             transfer.items.add(file);
             input.files = transfer.files;
             input.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2288,6 +2381,10 @@
 
                     Array.from(form.querySelectorAll('[data-image-preview-img]')).forEach(function (img) {
                         img.removeAttribute('src');
+                    });
+
+                    Array.from(form.querySelectorAll('[data-inline-image-preview-container]')).forEach(function (container) {
+                        container.innerHTML = '';
                     });
 
                     Array.from(form.querySelectorAll('[data-remove-flag]')).forEach(function (flag) {

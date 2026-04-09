@@ -583,40 +583,61 @@
                             }
                             $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
                             $isImageType = $fieldType === 'image' || $fieldType === 'file' || $fieldType === 'foto';
-                            $lookupRaw = (string) $cellText;
-                            $lookupTrimmed = trim($lookupRaw);
-                            $lookupNormalized = preg_replace('/[\x00-\x1F\x7F]+/u', '', $lookupTrimmed);
-                            $lookupNormalized = is_string($lookupNormalized) ? $lookupNormalized : $lookupTrimmed;
-                            $lookupNormalized = preg_replace('/\s*\/\s*/u', '/', $lookupNormalized);
-                            $lookupNormalized = is_string($lookupNormalized) ? $lookupNormalized : $lookupTrimmed;
-                            $lookupCompact = preg_replace('/\s+/u', '', $lookupNormalized);
-                            $lookupCompact = is_string($lookupCompact) ? $lookupCompact : $lookupNormalized;
-                            if (preg_match('~^temporary[\s_-]*modules/~iu', $lookupCompact)) {
-                                $lookupCompact = preg_replace('~^temporary[\s_-]*modules/~iu', 'temporary-modules/', $lookupCompact) ?? $lookupCompact;
-                            }
-                            $lookupAltA = str_replace('temporary_modules/', 'temporary-modules/', $lookupNormalized);
-                            $lookupAltB = str_replace('temporary-modules/', 'temporary_modules/', $lookupNormalized);
-                            $lookupAltC = str_replace('temporary_modules/', 'temporary-modules/', $lookupCompact);
-                            $lookupAltD = str_replace('temporary-modules/', 'temporary_modules/', $lookupCompact);
-                            $imageSrc = null;
-                            if ($isImageType && $lookupTrimmed !== '') {
-                                $imageSrc = $pdfImageDataByPath[$lookupRaw]
-                                    ?? $pdfImageDataByPath[$lookupTrimmed]
-                                    ?? $pdfImageDataByPath[$lookupNormalized]
-                                    ?? $pdfImageDataByPath[$lookupCompact]
-                                    ?? $pdfImageDataByPath[$lookupAltA]
-                                    ?? $pdfImageDataByPath[$lookupAltB]
-                                    ?? $pdfImageDataByPath[$lookupAltC]
-                                    ?? $pdfImageDataByPath[$lookupAltD]
-                                    ?? null;
+                            $imageSources = [];
+                            $rawMediaValues = is_array($val)
+                                ? array_values(array_filter($val, fn ($item) => is_string($item) && trim($item) !== ''))
+                                : ((is_string($val) && trim($val) !== '') ? [trim($val)] : []);
+
+                            if ($isImageType) {
+                                foreach ($rawMediaValues as $rawMediaValue) {
+                                    $lookupRaw = (string) $rawMediaValue;
+                                    $lookupTrimmed = trim($lookupRaw);
+                                    if ($lookupTrimmed === '') {
+                                        continue;
+                                    }
+
+                                    $lookupNormalized = preg_replace('/[\x00-\x1F\x7F]+/u', '', $lookupTrimmed);
+                                    $lookupNormalized = is_string($lookupNormalized) ? $lookupNormalized : $lookupTrimmed;
+                                    $lookupNormalized = preg_replace('/\s*\/\s*/u', '/', $lookupNormalized);
+                                    $lookupNormalized = is_string($lookupNormalized) ? $lookupNormalized : $lookupTrimmed;
+                                    $lookupCompact = preg_replace('/\s+/u', '', $lookupNormalized);
+                                    $lookupCompact = is_string($lookupCompact) ? $lookupCompact : $lookupNormalized;
+                                    if (preg_match('~^temporary[\s_-]*modules/~iu', $lookupCompact)) {
+                                        $lookupCompact = preg_replace('~^temporary[\s_-]*modules/~iu', 'temporary-modules/', $lookupCompact) ?? $lookupCompact;
+                                    }
+                                    $lookupAltA = str_replace('temporary_modules/', 'temporary-modules/', $lookupNormalized);
+                                    $lookupAltB = str_replace('temporary-modules/', 'temporary_modules/', $lookupNormalized);
+                                    $lookupAltC = str_replace('temporary_modules/', 'temporary-modules/', $lookupCompact);
+                                    $lookupAltD = str_replace('temporary-modules/', 'temporary_modules/', $lookupCompact);
+
+                                    $resolvedSource = $pdfImageDataByPath[$lookupRaw]
+                                        ?? $pdfImageDataByPath[$lookupTrimmed]
+                                        ?? $pdfImageDataByPath[$lookupNormalized]
+                                        ?? $pdfImageDataByPath[$lookupCompact]
+                                        ?? $pdfImageDataByPath[$lookupAltA]
+                                        ?? $pdfImageDataByPath[$lookupAltB]
+                                        ?? $pdfImageDataByPath[$lookupAltC]
+                                        ?? $pdfImageDataByPath[$lookupAltD]
+                                        ?? null;
+
+                                    if (is_string($resolvedSource) && $resolvedSource !== '' && !in_array($resolvedSource, $imageSources, true)) {
+                                        $imageSources[] = $resolvedSource;
+                                    }
+                                }
                             }
                             $tdAlign = '';
                             if ($key === 'municipio') $tdAlign = 'text-align: left;';
                             if ($key === 'estatus')   $tdAlign = 'text-align: center;';
+                            $thumbWidth = count($imageSources) > 1 ? 52 : 110;
+                            $thumbHeight = count($imageSources) > 1 ? 52 : 85;
                         @endphp
                         <td style="{{ $baseW }} {{ $tdAlign }}">
-                            @if($imageSrc)
-                                <img src="{{ $imageSrc }}" alt="Imagen" style="max-width: 110px; max-height: 85px; display: block; margin: 0 auto;">
+                            @if(!empty($imageSources))
+                                <div style="display:block; text-align:center; white-space:nowrap;">
+                                    @foreach ($imageSources as $imageSource)
+                                        <img src="{{ $imageSource }}" alt="Imagen" style="max-width: {{ $thumbWidth }}px; max-height: {{ $thumbHeight }}px; display:inline-block; margin:2px; vertical-align:middle;">
+                                    @endforeach
+                                </div>
                             @else
                                 {{ $cellText }}
                             @endif
