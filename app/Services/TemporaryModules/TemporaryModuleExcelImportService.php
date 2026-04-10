@@ -1263,9 +1263,9 @@ class TemporaryModuleExcelImportService
                 $col = (int) $colIndex;
                 $raw = $rowData[$col] ?? null;
 
-                if (in_array($field->type, ['image', 'file'], true) && is_string($raw) && str_starts_with($raw, 'temporary-modules/')) {
+                if (in_array($field->type, ['image', 'file', 'document'], true) && is_string($raw) && str_starts_with($raw, 'temporary-modules/')) {
                     $values[$fieldKey] = $raw;
-                    $rawValues[$fieldKey] = '[Imagen]';
+                    $rawValues[$fieldKey] = '[Archivo]';
                     if ($raw !== '') $hasAnyMappedData = true;
                     continue;
                 }
@@ -1671,7 +1671,7 @@ class TemporaryModuleExcelImportService
                 $col = (int) $colIndex;
                 $raw = $rowData[$col] ?? null;
 
-                if (in_array($field->type, ['image', 'file'], true) && is_string($raw) && str_starts_with($raw, 'temporary-modules/')) {
+                if (in_array($field->type, ['image', 'file', 'document'], true) && is_string($raw) && str_starts_with($raw, 'temporary-modules/')) {
                     $values[$fieldKey] = $raw;
                     if ($raw !== '') {
                         $hasAnyMappedData = true;

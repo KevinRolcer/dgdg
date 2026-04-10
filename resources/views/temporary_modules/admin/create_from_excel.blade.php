@@ -252,7 +252,8 @@ document.addEventListener('DOMContentLoaded', function () {
         multiselect: 'Selección múltiple',
         municipio: 'Municipio (catálogo)',
         boolean: 'Sí / No',
-        semaforo: 'Semáforo'
+        semaforo: 'Semáforo',
+        document: 'Documento (PDF / DOCX)'
     };
 
     let currentSheetIndex = 0;

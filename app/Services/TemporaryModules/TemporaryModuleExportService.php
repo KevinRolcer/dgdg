@@ -151,6 +151,7 @@ class TemporaryModuleExportService
                 return [(int) $row->id => [
                     'number' => $number,
                     'name' => $name,
+                    'cabecera' => $name,
                     'label' => $this->buildMicrorregionLabel($number, $name),
                 ]];
             });
@@ -369,7 +370,7 @@ class TemporaryModuleExportService
             if ($type === 'select') {
                 $opts = is_array($field->options) ? $field->options : [];
                 $placeholder = '('.implode(', ', $opts).')';
-            } elseif ($type === 'image' || $type === 'file') {
+            } elseif ($type === 'image' || $type === 'file' || $type === 'document') {
                 $comment = trim((string) ($field->comment ?? ''));
                 $placeholder = $comment !== '' ? $comment : '';
             } elseif ($type === 'geopoint') {
@@ -973,7 +974,7 @@ class TemporaryModuleExportService
      * @param  array<int,array{id:string,label:string,group?:string,field_key:string,agg:string,match_value?:string}>  $sumMetrics
      * @param  array<int,array{id:string,label:string,group?:string,op:string,metric_ids:array<int,string>,base_metric_id?:string}>  $sumFormulas
      * @param  array<string,string>  $fieldLabels
-    * @return array{group_label:string,metric_columns:array<int,array{id:string,label:string,group:string,include_total:bool}>,formula_columns:array<int,array{id:string,label:string,group:string,op:string,base_metric_id:string,include_total:bool}>,metric_labels:array<string,string>,formula_labels:array<string,string>,rows:array<int,array{group:string,metrics:array<string,float>,formulas:array<string,float>}>}
+    * @return array{group_by:string,group_label:string,metric_columns:array<int,array{id:string,label:string,group:string,include_total:bool}>,formula_columns:array<int,array{id:string,label:string,group:string,op:string,base_metric_id:string,include_total:bool}>,metric_labels:array<string,string>,formula_labels:array<string,string>,rows:array<int,array{group:string,mr_number:string,mr_cabecera:string,metrics:array<string,float>,formulas:array<string,float>}>}
      */
     private function buildSumTableData(
         Collection $entries,
@@ -1020,19 +1021,27 @@ class TemporaryModuleExportService
         $orderedKeys = [];
         foreach ($entries as $entry) {
             $entryData = (array) ($entry->data ?? []);
+            $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+            $mrNumber = (string) ($meta['number'] ?? $meta->number ?? '');
+            $mrCabecera = (string) ($meta['cabecera'] ?? $meta->cabecera ?? $meta['name'] ?? $meta->name ?? '');
             if ($groupBy === 'municipio') {
                 $groupLabel = $this->resolveMunicipioGroupLabel($entryData, $fieldLabels);
             } else {
-                $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                 $groupLabel = (string) (($meta['label'] ?? null) ?: 'Sin microrregión');
             }
             $groupKey = $groupBy.':'.$groupLabel;
             if (! isset($rowsByKey[$groupKey])) {
                 $orderedKeys[] = $groupKey;
-                $rowsByKey[$groupKey] = ['group' => $groupLabel, 'metrics' => [], 'formulas' => []];
+                $rowsByKey[$groupKey] = ['group' => $groupLabel, 'mr_number' => $mrNumber, 'mr_cabecera' => $mrCabecera, 'metrics' => [], 'formulas' => []];
                 foreach ($sumMetrics as $metric) {
                     $rowsByKey[$groupKey]['metrics'][(string) $metric['id']] = 0.0;
                 }
+            }
+            if (($rowsByKey[$groupKey]['mr_number'] ?? '') === '' && $mrNumber !== '') {
+                $rowsByKey[$groupKey]['mr_number'] = $mrNumber;
+            }
+            if (($rowsByKey[$groupKey]['mr_cabecera'] ?? '') === '' && $mrCabecera !== '') {
+                $rowsByKey[$groupKey]['mr_cabecera'] = $mrCabecera;
             }
 
             foreach ($sumMetrics as $metric) {
@@ -1189,6 +1198,7 @@ class TemporaryModuleExportService
         }
 
         return [
+            'group_by' => $groupBy,
             'group_label' => $groupBy === 'municipio' ? 'Municipio' : 'Microrregión',
             'metric_columns' => $metricColumns,
             'formula_columns' => $formulaColumns,
@@ -1213,8 +1223,9 @@ class TemporaryModuleExportService
         $headersUppercase = $this->shouldUppercaseHeaders();
         $titleUppercase = $this->shouldUppercaseTitle();
         $fixedHeaders = [
-            $this->normalizeExportHeading($this->configuredColumnLabel('item', 'Ítem'), $headersUppercase),
-            $this->normalizeExportHeading($this->configuredColumnLabel('microrregion', 'Microrregión'), $headersUppercase),
+            $this->normalizeExportHeading($this->configuredColumnLabel('item', '#'), $headersUppercase),
+            $this->normalizeExportHeading($this->configuredColumnLabel('delegacion_numero', 'Delegación'), $headersUppercase),
+            $this->normalizeExportHeading($this->configuredColumnLabel('cabecera_microrregion', 'Cabecera'), $headersUppercase),
         ];
         $numFixed = count($fixedHeaders);
         $fechaCorteStr = $fechaCorte->format('d/m/Y H:i');
@@ -1249,6 +1260,21 @@ class TemporaryModuleExportService
             : [];
         $sumIncludeTotalsRow = $includeSumTable && !empty($this->exportConfig['include_sum_totals_row']);
         $sumTableAlign = strtolower((string) ($this->exportConfig['sum_table_align'] ?? 'left'));
+        $sumShowItem = !array_key_exists('sum_show_item', $this->exportConfig) || !empty($this->exportConfig['sum_show_item']);
+        $sumItemLabel = trim((string) ($this->exportConfig['sum_item_label'] ?? '#'));
+        if ($sumItemLabel === '') {
+            $sumItemLabel = '#';
+        }
+        $sumShowDelegacion = !array_key_exists('sum_show_delegacion', $this->exportConfig) || !empty($this->exportConfig['sum_show_delegacion']);
+        $sumDelegacionLabel = trim((string) ($this->exportConfig['sum_delegacion_label'] ?? 'Delegación'));
+        if ($sumDelegacionLabel === '') {
+            $sumDelegacionLabel = 'Delegación';
+        }
+        $sumShowCabecera = !array_key_exists('sum_show_cabecera', $this->exportConfig) || !empty($this->exportConfig['sum_show_cabecera']);
+        $sumCabeceraLabel = trim((string) ($this->exportConfig['sum_cabecera_label'] ?? 'Cabecera'));
+        if ($sumCabeceraLabel === '') {
+            $sumCabeceraLabel = 'Cabecera';
+        }
         $sumTotalsBold = !array_key_exists('sum_totals_bold', $this->exportConfig ?? []) || !empty($this->exportConfig['sum_totals_bold']);
         $sumTotalsTextColorArgb = $this->mapCssColorToArgb((string) ($this->exportConfig['sum_totals_text_color'] ?? '')) ?: self::HEADER_FILL_COLOR;
         $fieldLabels = [];
@@ -1372,7 +1398,7 @@ class TemporaryModuleExportService
             if ($sumRows !== []) {
                 $sumGroupColorArgb = $this->mapCssColorToArgb((string) ($this->exportConfig['sum_group_color'] ?? '')) ?: 'FF475569';
                 $sumStartRow = 4 + $countTableRows;
-                $sumStartCol = $sumTableAlign === 'left' ? 2 : 1;
+                $sumStartCol = 1;
                 $sumFirstLetter = Coordinate::stringFromColumnIndex($sumStartCol);
                 $sumTitleRow = $sumStartRow;
                 $sumHeaderRow = $sumStartRow + 1;
@@ -1394,8 +1420,33 @@ class TemporaryModuleExportService
                 if ($sumFormulaLabels === []) {
                     $sumFormulaLabels = is_array($sumData['formula_labels'] ?? null) ? $sumData['formula_labels'] : [];
                 }
+                $sumGroupByCurrent = (string) ($sumData['group_by'] ?? $sumGroupBy);
                 $sumGroupLabel = (string) ($sumData['group_label'] ?? 'Grupo');
-                $sumCols = 1 + count($sumMetricLabels) + count($sumFormulaLabels);
+                $sumLeadCols = [];
+                if ($sumShowItem) {
+                    $sumLeadCols[] = ['key' => 'item', 'label' => $this->normalizeExportHeading($sumItemLabel, $headersUppercase)];
+                }
+                if ($sumGroupByCurrent === 'microrregion') {
+                    if ($sumShowDelegacion) {
+                        $sumLeadCols[] = ['key' => 'delegacion_numero', 'label' => $this->normalizeExportHeading($sumDelegacionLabel, $headersUppercase)];
+                    }
+                    if ($sumShowCabecera) {
+                        $sumLeadCols[] = ['key' => 'cabecera_microrregion', 'label' => $this->normalizeExportHeading($sumCabeceraLabel, $headersUppercase)];
+                    }
+                } else {
+                    $sumLeadCols[] = ['key' => 'group', 'label' => $sumGroupLabel];
+                    if ($sumShowDelegacion) {
+                        $sumLeadCols[] = ['key' => 'delegacion_numero', 'label' => $this->normalizeExportHeading($sumDelegacionLabel, $headersUppercase)];
+                    }
+                    if ($sumShowCabecera) {
+                        $sumLeadCols[] = ['key' => 'cabecera_microrregion', 'label' => $this->normalizeExportHeading($sumCabeceraLabel, $headersUppercase)];
+                    }
+                }
+                if ($sumLeadCols === []) {
+                    $sumLeadCols[] = ['key' => 'group', 'label' => $sumGroupLabel];
+                }
+                $sumLeadCount = count($sumLeadCols);
+                $sumCols = $sumLeadCount + count($sumMetricLabels) + count($sumFormulaLabels);
                 $sumLastCol = max($sumStartCol, $sumStartCol + $sumCols - 1);
                 $sumLastLetter = Coordinate::stringFromColumnIndex($sumLastCol);
                 $sumCombinedCols = [];
@@ -1471,10 +1522,18 @@ class TemporaryModuleExportService
                     $sumHeaderRow = $sumStartRow + 2;
                     $sumDataStartRow = $sumStartRow + 3;
                     $sumGroupHeaderRow = $sumStartRow + 1;
-                    $sheet->setCellValue($sumFirstLetter.$sumGroupHeaderRow, '');
-                    $sheet->mergeCells($sumFirstLetter.$sumGroupHeaderRow.':'.$sumFirstLetter.$sumHeaderRow);
-                    $colIdx = $sumStartCol + 1;
-                    $startCol = $sumStartCol + 1;
+                    for ($leadIdx = 0; $leadIdx < $sumLeadCount; $leadIdx++) {
+                        $leadCol = $sumStartCol + $leadIdx;
+                        $leadLetter = Coordinate::stringFromColumnIndex($leadCol);
+                        $sheet->setCellValue($leadLetter.$sumGroupHeaderRow, '');
+                    }
+                    $colIdx = $sumStartCol + $sumLeadCount;
+                    // Mantener vacías las celdas superiores de columnas sin grupo.
+                    foreach ($sumCombinedCols as $idx => $col) {
+                        $upperLetter = Coordinate::stringFromColumnIndex($sumStartCol + $sumLeadCount + $idx);
+                        $sheet->setCellValue($upperLetter.$sumGroupHeaderRow, '');
+                    }
+                    $startCol = $sumStartCol + $sumLeadCount;
                     $lastGroup = null;
                     foreach ($sumCombinedCols as $col) {
                         $groupLabel = (string) ($col['group'] ?? '');
@@ -1507,7 +1566,8 @@ class TemporaryModuleExportService
                         $sheet->getStyle(Coordinate::stringFromColumnIndex($startCol).$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($endCol).$sumGroupHeaderRow)
                             ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($groupArgb);
                     }
-                    $sheet->getStyle($sumFirstLetter.$sumGroupHeaderRow)
+                    $sumLeadLastCol = $sumStartCol + $sumLeadCount - 1;
+                    $sheet->getStyle($sumFirstLetter.$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($sumLeadLastCol).$sumGroupHeaderRow)
                         ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($sumGroupColorArgb);
                     $sheet->getStyle($sumFirstLetter.$sumGroupHeaderRow.':'.$sumLastLetter.$sumGroupHeaderRow)
                         ->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
@@ -1515,8 +1575,11 @@ class TemporaryModuleExportService
                         ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
                 }
 
-                $sheet->setCellValue($sumFirstLetter.$sumHeaderRow, $this->normalizeExportHeading($sumGroupLabel, $headersUppercase));
-                $colIdx = $sumStartCol + 1;
+                $colIdx = $sumStartCol;
+                foreach ($sumLeadCols as $leadCol) {
+                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$sumHeaderRow, (string) ($leadCol['label'] ?? ''));
+                    $colIdx++;
+                }
                 foreach ($sumCombinedCols as $col) {
                     $sheet->setCellValue(
                         Coordinate::stringFromColumnIndex($colIdx).$sumHeaderRow,
@@ -1526,9 +1589,23 @@ class TemporaryModuleExportService
                 }
 
                 $rowPtr = $sumDataStartRow;
-                foreach ($sumRows as $row) {
-                    $sheet->setCellValue($sumFirstLetter.$rowPtr, (string) ($row['group'] ?? ''));
-                    $colIdx = $sumStartCol + 1;
+                foreach ($sumRows as $rowIndex => $row) {
+                    $colIdx = $sumStartCol;
+                    foreach ($sumLeadCols as $leadCol) {
+                        $leadKey = (string) ($leadCol['key'] ?? 'group');
+                        $leadText = '';
+                        if ($leadKey === 'item') {
+                            $leadText = (string) ($rowIndex + 1);
+                        } elseif ($leadKey === 'delegacion_numero') {
+                            $leadText = (string) ($row['mr_number'] ?? '');
+                        } elseif ($leadKey === 'cabecera_microrregion') {
+                            $leadText = (string) ($row['mr_cabecera'] ?? '');
+                        } else {
+                            $leadText = (string) ($row['group'] ?? '');
+                        }
+                        $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx).$rowPtr, $leadText);
+                        $colIdx++;
+                    }
                     foreach ($sumCombinedCols as $col) {
                         $id = (string) ($col['id'] ?? '');
                         if ((string) ($col['op'] ?? 'metric') === 'metric') {
@@ -1549,8 +1626,14 @@ class TemporaryModuleExportService
                 }
 
                 if ($sumIncludeTotalsRow) {
-                    $sheet->setCellValue($sumFirstLetter.$rowPtr, $this->normalizeExportHeading('Total', $headersUppercase));
-                    $colIdx = $sumStartCol + 1;
+                    $colIdx = $sumStartCol;
+                    foreach ($sumLeadCols as $leadIdx => $leadCol) {
+                        $sheet->setCellValue(
+                            Coordinate::stringFromColumnIndex($colIdx).$rowPtr,
+                            $leadIdx === 0 ? $this->normalizeExportHeading('Total', $headersUppercase) : ''
+                        );
+                        $colIdx++;
+                    }
                     foreach ($sumCombinedCols as $col) {
                         $includeTotal = !array_key_exists('include_total', $col) || !empty($col['include_total']);
                         if (!$includeTotal) {
@@ -1604,7 +1687,8 @@ class TemporaryModuleExportService
                 $sumLastDataRow = $rowPtr - 1;
                 $sheet->getStyle($sumFirstLetter.$sumHeaderRow.':'.$sumLastLetter.$sumHeaderRow)
                     ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF475569');
-                $sheet->getStyle($sumFirstLetter.$sumHeaderRow)
+                $sumLeadLastCol = $sumStartCol + $sumLeadCount - 1;
+                $sheet->getStyle($sumFirstLetter.$sumHeaderRow.':'.Coordinate::stringFromColumnIndex($sumLeadLastCol).$sumHeaderRow)
                     ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($sumGroupColorArgb);
                 foreach ($sumCombinedCols as $idx => $col) {
                     $groupLabel = trim((string) ($col['group'] ?? ''));
@@ -1613,7 +1697,7 @@ class TemporaryModuleExportService
                     }
                     $groupKey = mb_strtolower($groupLabel, 'UTF-8');
                     $groupArgb = $this->groupHeaderColorByName[$groupKey] ?? 'FF64748B';
-                    $colIndex = $sumStartCol + 1 + $idx;
+                    $colIndex = $sumStartCol + $sumLeadCount + $idx;
                     $letter = Coordinate::stringFromColumnIndex($colIndex);
                     $sheet->getStyle($letter.$sumHeaderRow)
                         ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($groupArgb);
@@ -1629,8 +1713,20 @@ class TemporaryModuleExportService
                 $sheet->getStyle($sumFirstLetter.$sumDataStartRow.':'.$sumFirstLetter.$sumLastDataRow)
                     ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-                $sheet->getColumnDimension($sumFirstLetter)->setWidth(max(20, (float) $sheet->getColumnDimension($sumFirstLetter)->getWidth()));
-                for ($c = $sumStartCol + 1; $c <= $sumLastCol; $c++) {
+                for ($leadIdx = 0; $leadIdx < $sumLeadCount; $leadIdx++) {
+                    $leadCol = $sumStartCol + $leadIdx;
+                    $leadKey = (string) ($sumLeadCols[$leadIdx]['key'] ?? 'group');
+                    $leadWidth = 20;
+                    if ($leadKey === 'item') {
+                        $leadWidth = 6;
+                    } elseif ($leadKey === 'delegacion_numero') {
+                        $leadWidth = 12;
+                    } elseif ($leadKey === 'cabecera_microrregion') {
+                        $leadWidth = 22;
+                    }
+                    $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($leadCol))->setWidth(max($leadWidth, (float) $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($leadCol))->getWidth()));
+                }
+                for ($c = $sumStartCol + $sumLeadCount; $c <= $sumLastCol; $c++) {
                     $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth(14);
                 }
 
@@ -1678,15 +1774,21 @@ class TemporaryModuleExportService
             $r2 = $headerStartRow + 1;
             $sheet->setCellValue('A'.$r1, $fixedHeaders[0]);
             $sheet->setCellValue('B'.$r1, $fixedHeaders[1]);
+            $sheet->setCellValue('C'.$r1, $fixedHeaders[2]);
             $sheet->mergeCells('A'.$r1.':A'.$r2);
             $sheet->mergeCells('B'.$r1.':B'.$r2);
+            $sheet->mergeCells('C'.$r1.':C'.$r2);
             $colIdx = $numFixed + 1;
             $mergeStart = null;
             $mergeHeader1 = null;
             foreach ($exportColumns as $col) {
                 $colLetter = Coordinate::stringFromColumnIndex($colIdx);
-                $header1 = $this->normalizeExportHeading((string) ($col['header1'] ?? ''), $headersUppercase);
+                $rawHeader1 = (string) ($col['header1'] ?? '');
                 $header2 = $this->normalizeExportHeading((string) $col['header2'], $headersUppercase);
+                $header1 = $this->normalizeExportHeading($rawHeader1, $headersUppercase);
+                if ($header1 === $header2) {
+                    $header1 = '';
+                }
                 $sheet->setCellValue($colLetter.$r1, $header1);
                 $sheet->setCellValue($colLetter.$r2, $header2);
                 $h1 = $header1;
@@ -1749,7 +1851,8 @@ class TemporaryModuleExportService
             // 1) Fijos: Ítem y Microrregión
             $fixedKeys = [
                 1 => 'item',
-                2 => 'microrregion',
+                2 => 'delegacion_numero',
+                3 => 'cabecera_microrregion',
             ];
             foreach ($fixedKeys as $colIndex => $key) {
                 $cfg = $this->columnConfigByKey[$key] ?? null;
@@ -1816,38 +1919,50 @@ class TemporaryModuleExportService
         } else {
             $itemNumber = 1;
 
-            // Tracking for row spanning/merging (microrregion column is usually B [index 2])
-            $lastMicrorregionValue = null;
+            // Tracking for row spanning/merging in Delegación y Cabecera.
+            $lastMicrorregionKey = null;
             $mergingStartRow = null;
 
-            $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule, $exportColumns, $headerRowCount, &$lastMicrorregionValue, &$mergingStartRow) {
+            $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule, $exportColumns, $headerRowCount, &$lastMicrorregionKey, &$mergingStartRow) {
                 foreach ($entries as $entry) {
                     $sheet->setCellValue('A'.$rowIndex, $itemNumber);
                     $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
-                    $currentMicrorregionValue = (string) ($meta->label ?? $meta['label'] ?? 'Sin microrregión');
+                    $currentMicrorregionKey = (string) ($entry->microrregion_id ?? '__none__');
+                    $mrNumber = (string) ($meta->number ?? $meta['number'] ?? '');
+                    $mrCabecera = (string) ($meta->cabecera ?? $meta['cabecera'] ?? $meta->name ?? $meta['name'] ?? '');
+                    if ($mrNumber === '' && $mrCabecera === '') {
+                        $mrCabecera = 'Sin microrregión';
+                    }
 
-                    // Handling Microrregion merging (Column B)
-                    if ($lastMicrorregionValue === null) {
-                        $lastMicrorregionValue = $currentMicrorregionValue;
+                    // Handling Microrregion merging (Columnas B y C)
+                    if ($lastMicrorregionKey === null) {
+                        $lastMicrorregionKey = $currentMicrorregionKey;
                         $mergingStartRow = $rowIndex;
-                        $sheet->setCellValue('B'.$rowIndex, $currentMicrorregionValue);
-                    } elseif ($lastMicrorregionValue !== $currentMicrorregionValue) {
+                        $sheet->setCellValue('B'.$rowIndex, $mrNumber);
+                        $sheet->setCellValue('C'.$rowIndex, $mrCabecera);
+                    } elseif ($lastMicrorregionKey !== $currentMicrorregionKey) {
                         // Merge previous group
                         if ($mergingStartRow !== null && $mergingStartRow < ($rowIndex - 1)) {
                             $sheet->mergeCells('B'.$mergingStartRow.':B'.($rowIndex - 1));
                             $sheet->getStyle('B'.$mergingStartRow.':B'.($rowIndex - 1))->getAlignment()
                                 ->setVertical(Alignment::VERTICAL_CENTER)
                                 ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                            $sheet->mergeCells('C'.$mergingStartRow.':C'.($rowIndex - 1));
+                            $sheet->getStyle('C'.$mergingStartRow.':C'.($rowIndex - 1))->getAlignment()
+                                ->setVertical(Alignment::VERTICAL_CENTER)
+                                ->setHorizontal(Alignment::HORIZONTAL_CENTER);
                         }
-                        $lastMicrorregionValue = $currentMicrorregionValue;
+                        $lastMicrorregionKey = $currentMicrorregionKey;
                         $mergingStartRow = $rowIndex;
-                        $sheet->setCellValue('B'.$rowIndex, $currentMicrorregionValue);
+                        $sheet->setCellValue('B'.$rowIndex, $mrNumber);
+                        $sheet->setCellValue('C'.$rowIndex, $mrCabecera);
                     } else {
                         // Same as before, don't set value yet (PhpSpreadsheet requirement for merging later)
                         $sheet->setCellValue('B'.$rowIndex, '');
+                        $sheet->setCellValue('C'.$rowIndex, '');
                     }
 
-                    $columnIndex = 3;
+                    $columnIndex = 4;
                     foreach ($exportColumns as $col) {
                         $field = $col['field'];
                         $cell = $entry->data[$field->key] ?? null;
@@ -1964,6 +2079,10 @@ class TemporaryModuleExportService
                 $sheet->getStyle('B'.$mergingStartRow.':B'.($rowIndex - 1))->getAlignment()
                     ->setVertical(Alignment::VERTICAL_CENTER)
                     ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->mergeCells('C'.$mergingStartRow.':C'.($rowIndex - 1));
+                $sheet->getStyle('C'.$mergingStartRow.':C'.($rowIndex - 1))->getAlignment()
+                    ->setVertical(Alignment::VERTICAL_CENTER)
+                    ->setHorizontal(Alignment::HORIZONTAL_CENTER);
             }
         }
 
@@ -1996,10 +2115,13 @@ class TemporaryModuleExportService
                 $fieldKey = 'item';
                 $defaultWidth = 4;
             } elseif ($colIdx === 2) {
-                $fieldKey = 'microrregion';
+                $fieldKey = 'delegacion_numero';
+                $defaultWidth = 10;
+            } elseif ($colIdx === 3) {
+                $fieldKey = 'cabecera_microrregion';
                 $defaultWidth = 18;
             } else {
-                $exportColIndex = $colIdx - 3;
+                $exportColIndex = $colIdx - 4;
                 if (isset($exportColumns[$exportColIndex])) {
                     $fieldKey = (string) $exportColumns[$exportColIndex]['field']->key;
                 }
@@ -2109,7 +2231,7 @@ class TemporaryModuleExportService
             return true;
         }
 
-        if ($fieldType !== 'file') {
+        if (! in_array($fieldType, ['file', 'document'], true)) {
             return false;
         }
 

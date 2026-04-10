@@ -107,6 +107,7 @@ class TemporaryModuleController extends Controller
         'seccion' => 'Sección',
         'geopoint' => 'Georreferencia',
         'image' => 'Imagen',
+        'document' => 'Documento (PDF / DOCX)',
         'delegado' => 'Lista de Delegados (Personal activo)',
     ];
 
@@ -840,7 +841,7 @@ class TemporaryModuleController extends Controller
                 $this->entryDataService->clearModuleEntriesData($temporaryModule);
             } else {
                 $imageLikeKeys = $temporaryModule->fields
-                    ->whereIn('type', ['image', 'file'])
+                    ->whereIn('type', ['image', 'file', 'document'])
                     ->pluck('key')
                     ->intersect($destructiveKeys)
                     ->values()
@@ -1337,7 +1338,8 @@ class TemporaryModuleController extends Controller
             $key = 'values.'.$field->key;
             $attributes[$key] = $field->label;
 
-            if (in_array($field->type, ['file', 'image'], true)) {
+            if (in_array($field->type, ['file', 'image', 'document'], true)) {
+                $maxFilesPerField = $field->type === 'image' ? 2 : 1;
                 $existingValue = $existingEntry?->data[$field->key] ?? null;
                 $existingPaths = is_array($existingValue)
                     ? array_values(array_filter($existingValue, fn ($path) => is_string($path) && trim($path) !== ''))
@@ -1352,8 +1354,12 @@ class TemporaryModuleController extends Controller
                 $rules[$key] = $isRequiredNow ? ['required'] : ['nullable'];
                 if ($request->hasFile($key)) {
                     $rules[$key][] = 'array';
-                    $rules[$key][] = 'max:2';
-                    $rules[$key.'.*'] = ['file', $field->type === 'image' ? 'image' : 'nullable', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,txt,csv', 'max:20480'];
+                    $rules[$key][] = 'max:'.$maxFilesPerField;
+                    $rules[$key.'.*'] = $field->type === 'image'
+                        ? ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:20480']
+                        : ($field->type === 'document'
+                            ? ['file', 'mimes:pdf,docx', 'max:20480']
+                            : ['file', 'nullable', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,txt,csv', 'max:20480']);
                 }
                 $rules['remove_images.'.$field->key] = ['nullable', 'boolean'];
                 $rules['remove_existing_images.'.$field->key] = ['nullable', 'array'];
@@ -1400,7 +1406,8 @@ class TemporaryModuleController extends Controller
             $existingValue = $existingEntry?->data[$field->key] ?? null;
             $removeRequested = filter_var(Arr::get($validated, 'remove_images.'.$field->key), FILTER_VALIDATE_BOOLEAN);
 
-            if (in_array($field->type, ['file', 'image'], true)) {
+            if (in_array($field->type, ['file', 'image', 'document'], true)) {
+                $maxFilesPerField = $field->type === 'image' ? 2 : 1;
                 $existingPaths = is_array($existingValue)
                     ? array_values(array_filter($existingValue, fn ($path) => is_string($path) && trim($path) !== ''))
                     : ((is_string($existingValue) && trim($existingValue) !== '') ? [trim($existingValue)] : []);
@@ -1425,14 +1432,14 @@ class TemporaryModuleController extends Controller
 
                     if ($removeRequested) {
                         $pathsPendingDeletion = array_merge($pathsPendingDeletion, $remainingExistingPaths);
-                        $value = array_slice(array_values(array_unique($storedPaths)), 0, 2);
+                        $value = array_slice(array_values(array_unique($storedPaths)), 0, $maxFilesPerField);
                     } else {
-                        if (count($remainingExistingPaths) + count($storedPaths) > 2) {
+                        if (count($remainingExistingPaths) + count($storedPaths) > $maxFilesPerField) {
                             throw ValidationException::withMessages([
-                                'values.'.$field->key => 'Solo se permiten hasta 2 imagenes por campo. Elimina una existente o sube menos archivos.',
+                                'values.'.$field->key => 'Solo se permiten hasta '.$maxFilesPerField.' archivo(s) por campo. Elimina uno existente o sube menos archivos.',
                             ]);
                         }
-                        $value = array_slice(array_values(array_unique(array_merge($remainingExistingPaths, $storedPaths))), 0, 2);
+                        $value = array_slice(array_values(array_unique(array_merge($remainingExistingPaths, $storedPaths))), 0, $maxFilesPerField);
                     }
                 } elseif ($removeRequested) {
                     $pathsPendingDeletion = array_merge($pathsPendingDeletion, $remainingExistingPaths);
@@ -1617,7 +1624,7 @@ class TemporaryModuleController extends Controller
         }
 
         $importable = $this->excelImportService->importableFields($temporaryModule->fields);
-        $hasMediaImportFields = $importable->contains(fn ($f) => in_array((string) $f->type, ['image', 'file'], true));
+        $hasMediaImportFields = $importable->contains(fn ($f) => in_array((string) $f->type, ['image', 'file', 'document'], true));
         if ($importable->isEmpty()) {
             return response()->json([
                 'success' => false,
@@ -1791,7 +1798,7 @@ class TemporaryModuleController extends Controller
         }
 
         $importable = $this->excelImportService->importableFields($temporaryModule->fields);
-        $hasMediaImportFields = $importable->contains(fn ($f) => in_array((string) $f->type, ['image', 'file'], true));
+        $hasMediaImportFields = $importable->contains(fn ($f) => in_array((string) $f->type, ['image', 'file', 'document'], true));
 
         $payload = [
             'success' => true,
@@ -2269,8 +2276,16 @@ class TemporaryModuleController extends Controller
 
         $exportConfig = $this->decodeTemporaryModuleExportConfig($request);
 
-        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+        $temporaryModule = TemporaryModule::query()->withCount('entries')->findOrFail($module);
         $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$module;
+        $entriesCount = (int) ($temporaryModule->entries_count ?? 0);
+        $approxMinutes = $this->estimateTemporaryModuleExportMinutes($format, $mode, $exportConfig, $entriesCount);
+        $formatLabel = match ($format) {
+            'pdf' => 'PDF',
+            'word' => 'Word',
+            default => 'Excel',
+        };
+        $queueToast = 'Generando archivo '.$formatLabel.' tiempo aproximado: '.$approxMinutes.' min. Revisa tus notificaciones para descargar.';
 
         if (in_array($format, ['word', 'pdf'], true)) {
             $exportRequestId = Str::uuid()->toString();
@@ -2284,9 +2299,7 @@ class TemporaryModuleController extends Controller
                 $exportConfig
             );
 
-            $docType = $format === 'word' ? 'Word' : 'PDF';
-
-            return redirect()->back()->with('toast', 'La generación del archivo '.$docType.' se ha enviado a segundo plano. Revisa tus notificaciones para ver el estado.');
+            return redirect()->back()->with('toast', $queueToast);
         }
 
         $exportRequestId = Str::uuid()->toString();
@@ -2301,7 +2314,67 @@ class TemporaryModuleController extends Controller
             $exportConfig
         );
 
-        return redirect()->back()->with('toast', 'La generación del archivo Excel se ha enviado a segundo plano. Revisa tus notificaciones para ver el estado.');
+        return redirect()->back()->with('toast', $queueToast);
+    }
+
+    private function estimateTemporaryModuleExportMinutes(string $format, string $mode, array $cfg, int $entriesCount): int
+    {
+        $rows = max(0, $entriesCount);
+        $columns = is_array($cfg['columns'] ?? null) ? count($cfg['columns']) : 0;
+        $calcColumns = is_array($cfg['calculated_columns'] ?? null) ? count($cfg['calculated_columns']) : 0;
+        $sumMetrics = is_array($cfg['sum_metrics'] ?? null) ? count($cfg['sum_metrics']) : 0;
+        $sumFormulas = is_array($cfg['sum_formulas'] ?? null) ? count($cfg['sum_formulas']) : 0;
+
+        $imageColumns = 0;
+        if (is_array($cfg['columns'] ?? null)) {
+            foreach ($cfg['columns'] as $column) {
+                if (!is_array($column)) {
+                    continue;
+                }
+                $key = strtolower((string) ($column['key'] ?? ''));
+                $iw = (int) ($column['image_width'] ?? 0);
+                $ih = (int) ($column['image_height'] ?? 0);
+                if (str_contains($key, 'image') || str_contains($key, 'foto') || $iw > 0 || $ih > 0) {
+                    $imageColumns++;
+                }
+            }
+        }
+
+        $seconds = 18.0;
+        $seconds += $rows * 0.06;
+        $seconds += $columns * 3.0;
+        $seconds += $calcColumns * 7.0;
+        $seconds += ($sumMetrics + $sumFormulas) * 4.0;
+        if (!empty($cfg['include_count_table'])) {
+            $seconds += 6.0;
+        }
+        if (!empty($cfg['include_sum_table'])) {
+            $seconds += 8.0;
+        }
+        if (!empty($cfg['include_totals_table'])) {
+            $seconds += 4.0;
+        }
+        if (!empty($cfg['include_calculated_columns'])) {
+            $seconds += 3.0;
+        }
+        if ($imageColumns > 0) {
+            $seconds += 12.0;
+            $seconds += $rows * min(2, $imageColumns) * 0.025;
+        }
+
+        $multiplier = 1.0;
+        if ($format === 'pdf') {
+            $multiplier *= 1.3;
+        } elseif ($format === 'word') {
+            $multiplier *= 1.15;
+        }
+        if ($mode === 'single') {
+            $multiplier *= 1.05;
+        }
+
+        $minutes = (int) ceil(($seconds * $multiplier) / 60.0);
+
+        return max(1, min(8, $minutes));
     }
 
     public function exportStatus(Request $request, string $exportRequest): \Illuminate\Http\JsonResponse
@@ -2449,7 +2522,7 @@ class TemporaryModuleController extends Controller
                 'key' => $field->key,
                 'label' => $label,
                 'type' => $field->type,
-                'is_image' => in_array($field->type, ['image', 'file'], true),
+                'is_image' => in_array($field->type, ['image', 'file', 'document'], true),
             ];
             $currentSection = null;
         }

@@ -628,7 +628,7 @@ class TemporaryModuleAnalysisWordService
         if ($type === 'bool' || $t === 'bool') {
             return $value ? 'Sí' : 'No';
         }
-        if (in_array($t, ['image', 'file'], true)) {
+        if (in_array($t, ['image', 'file', 'document'], true)) {
             $files = is_array($value) ? array_filter($value) : ($value ? [(string) $value] : []);
             if (empty($files)) {
                 return '—';

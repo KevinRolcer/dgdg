@@ -78,6 +78,7 @@
                                     class="tm-btn tm-btn-success"
                                     data-open-export-options
                                     data-export-url="{{ route('temporary-modules.admin.export', $module->id) }}"
+                                    data-export-entries="{{ (int) $module->entries_count }}"
                                     data-structure-url="{{ route('temporary-modules.admin.export-preview-structure', $module->id) }}"
                                     data-analysis-preview-url="{{ route('temporary-modules.admin.analysis-preview', $module->id) }}"
                                     data-analysis-word-url="{{ route('temporary-modules.admin.export-analysis-word', $module->id) }}"
@@ -290,7 +291,7 @@
                                                                         <div class="tm-record-label">{{ $field->label }}</div>
                                                                         <div class="tm-record-value">
                                                                             @php
-                                                                                $mediaPaths = in_array($field->type, ['file', 'image'], true)
+                                                                                $mediaPaths = in_array($field->type, ['file', 'image', 'document'], true)
                                                                                     ? (is_array($cell)
                                                                                         ? array_values(array_filter($cell, fn ($path) => is_string($path) && trim($path) !== ''))
                                                                                         : ((is_string($cell) && trim($cell) !== '') ? [trim($cell)] : []))
@@ -1984,12 +1985,14 @@
             var hasPendingChanges = false;
             try {
                 var currentJson = JSON.stringify(currentCfg || {});
-                if (savedDraft) {
+                var openSnapshot = personalizeModal._openCfgSnapshot || '';
+                var openChoice = personalizeModal._openSwalChoice || 'single';
+                if (openSnapshot !== '') {
+                    hasPendingChanges = (currentJson !== openSnapshot) || (openChoice !== swalChoiceNow);
+                } else if (savedDraft) {
                     hasPendingChanges = (currentJson !== JSON.stringify(savedDraft.cfg || {})) || ((savedDraft.swal_choice || 'single') !== swalChoiceNow);
                 } else {
-                    var openSnapshot = personalizeModal._openCfgSnapshot || '';
-                    var openChoice = personalizeModal._openSwalChoice || 'single';
-                    hasPendingChanges = (openSnapshot !== '' && currentJson !== openSnapshot) || (openChoice !== swalChoiceNow);
+                    hasPendingChanges = false;
                 }
             } catch (eCmp) {
                 hasPendingChanges = false;

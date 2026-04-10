@@ -90,7 +90,7 @@ class TemporaryModuleWordPdfService
         // PDF/Word export can be expensive with many rows/images; relax runtime constraints.
         set_time_limit(0);
         ini_set('max_execution_time', '0');
-        ini_set('memory_limit', '1024M');
+        ini_set('memory_limit', '1536M');
         $columnsCfg = is_array($exportConfig) && isset($exportConfig['columns']) && is_array($exportConfig['columns'])
             ? $exportConfig['columns']
             : [];
@@ -1322,7 +1322,11 @@ class TemporaryModuleWordPdfService
         $countTableColors = is_array($exportConfig['count_table_colors'] ?? null) ? $exportConfig['count_table_colors'] : [];
         $countTableCellWidth = max(6, min(40, (int) ($exportConfig['count_table_cell_width'] ?? 12)));
         $columnWidthPercents = $this->fractionsToPercents($columnWidthFractions);
-        $pdfImageDataByPath = $this->buildPdfImageDataByPath($entries, $columns, $fieldTypesByKey);
+        $imageColumnsCount = $this->countPdfImageColumns($columns, $fieldTypesByKey);
+        $shouldPreloadPdfImages = $this->shouldPreloadPdfImageData($entries->count(), $imageColumnsCount);
+        $pdfImageDataByPath = $shouldPreloadPdfImages
+            ? $this->buildPdfImageDataByPath($entries, $columns, $fieldTypesByKey)
+            : [];
 
         $html = view('temporary_modules.admin.partials.export_pdf_table', [
             'title' => $title,
@@ -2095,7 +2099,7 @@ class TemporaryModuleWordPdfService
         if (in_array($key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true)) {
             return $value;
         }
-        if (in_array(strtolower(trim($fieldType)), ['image', 'file', 'foto'], true)) {
+        if (in_array(strtolower(trim($fieldType)), ['image', 'file', 'document', 'foto'], true)) {
             return $value;
         }
         if (! $this->isEmptyExportValue($value)) {
@@ -2505,15 +2509,20 @@ class TemporaryModuleWordPdfService
                 $value = $entry->data[$key] ?? null;
                 $rawPaths = is_array($value) ? array_filter($value) : ($value ? [(string) $value] : []);
                 $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
+                $fieldTypeLower = strtolower(trim($fieldType));
+                $fieldTypeIsImage = in_array($fieldTypeLower, ['image', 'file_image', 'image_upload', 'foto'], true);
 
                 foreach ($rawPaths as $original) {
                     $original = (string)$original;
                     $raw = trim($original);
                     if ($raw === '') continue;
 
-                    if (filter_var($raw, FILTER_VALIDATE_URL)) {
-                        if (!$this->isImageTypeOrValue($fieldType, $raw)) continue;
+                    // Filtro rápido: evita resolver rutas/mime en valores que no parecen imágenes.
+                    if (!$fieldTypeIsImage && !$this->isLikelyImageReference($raw)) {
+                        continue;
+                    }
 
+                    if (filter_var($raw, FILTER_VALIDATE_URL)) {
                         if (array_key_exists($raw, $dataUriByUrl)) {
                             $cached = $dataUriByUrl[$raw];
                             foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
@@ -2554,8 +2563,6 @@ class TemporaryModuleWordPdfService
                         continue;
                     }
 
-                    if (!$this->isImageTypeOrValue($fieldType, $raw)) continue;
-
                     $fullPath = $this->entryDataService->resolveStoredFilePath($raw);
                     if (!is_string($fullPath) || !is_file($fullPath)) continue;
 
@@ -2581,6 +2588,69 @@ class TemporaryModuleWordPdfService
         }
 
         return $map;
+    }
+
+    private function countPdfImageColumns(array $columns, array $fieldTypesByKey): int
+    {
+        $count = 0;
+        foreach ($columns as $column) {
+            if (!is_array($column)) {
+                continue;
+            }
+            $key = (string) ($column['key'] ?? '');
+            if ($key === '' || in_array($key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true)) {
+                continue;
+            }
+
+            $type = strtolower(trim((string) ($fieldTypesByKey[$key] ?? '')));
+            if (in_array($type, ['image', 'file', 'document', 'foto', 'file_image', 'image_upload'], true)) {
+                $count++;
+                continue;
+            }
+
+            $keyLower = strtolower($key);
+            if (str_contains($keyLower, 'image') || str_contains($keyLower, 'foto')) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    private function shouldPreloadPdfImageData(int $entryCount, int $imageColumnsCount): bool
+    {
+        if ($entryCount <= 0 || $imageColumnsCount <= 0) {
+            return false;
+        }
+
+        $imageCells = $entryCount * $imageColumnsCount;
+
+        // En documentos grandes, los data-uri de imágenes disparan el uso de RAM de Dompdf.
+        if ($entryCount > 700 || $imageCells > 1200) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function isLikelyImageReference(string $value): bool
+    {
+        $candidate = trim($value);
+        if ($candidate === '') {
+            return false;
+        }
+
+        $lower = strtolower($candidate);
+        if (str_starts_with($lower, 'data:image/')) {
+            return true;
+        }
+
+        $path = strtolower((string) (parse_url($candidate, PHP_URL_PATH) ?? $candidate));
+        if ($path !== '' && preg_match('/\.(png|jpe?g|gif|webp|bmp|svg)$/i', $path) === 1) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

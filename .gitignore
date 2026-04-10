@@ -18,3 +18,6 @@ Thumbs.db
 /bootstrap/cache/
 # .phpunit.result.cache is also common
 .phpunit.result.cache
+
+# Artefactos temporales locales (debug/validaciones)
+/tools/_*

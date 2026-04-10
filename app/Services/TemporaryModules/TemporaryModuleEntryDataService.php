@@ -65,7 +65,7 @@ class TemporaryModuleEntryDataService
     public function deleteEntryAndFiles(TemporaryModuleEntry $entry, TemporaryModule $module): void
     {
         $fileFieldKeys = $module->fields
-            ->whereIn('type', ['image', 'file'])
+            ->whereIn('type', ['image', 'file', 'document'])
             ->pluck('key')
             ->all();
 
@@ -85,7 +85,7 @@ class TemporaryModuleEntryDataService
     public function clearModuleEntriesData(TemporaryModule $temporaryModule): void
     {
         $fileFieldKeys = $temporaryModule->fields
-            ->whereIn('type', ['image', 'file'])
+            ->whereIn('type', ['image', 'file', 'document'])
             ->pluck('key')
             ->all();
 

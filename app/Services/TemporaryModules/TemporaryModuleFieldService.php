@@ -317,6 +317,7 @@ class TemporaryModuleFieldService
             'geopoint' => [...$rules, 'string', 'max:120'],
             'file' => [...$rules, 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
             'image' => [...$rules, 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'document' => [...$rules, 'file', 'mimes:pdf,docx', 'max:20480'],
             default => [...$rules, 'string', 'max:255'],
         };
     }

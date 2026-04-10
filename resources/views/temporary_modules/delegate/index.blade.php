@@ -223,7 +223,7 @@
                         $savedData = [];
                         $orderedFields = $module->fields
                             ->sortBy(function ($field) {
-                                return in_array($field->type, ['image', 'file'], true) ? 1 : 0;
+                                return in_array($field->type, ['image', 'file', 'document'], true) ? 1 : 0;
                             })
                             ->values();
                         $mediaDividerPrinted = false;
@@ -254,7 +254,7 @@
                                     $name = 'values['.$field->key.']';
                                     $id = 'field_'.$module->id.'_'.$field->key;
                                     $value = old('values.'.$field->key, $savedData[$field->key] ?? null);
-                                    $isMediaField = in_array($field->type, ['image', 'file'], true);
+                                    $isMediaField = in_array($field->type, ['image', 'file', 'document'], true);
                                 @endphp
                                 @if ($field->type === 'seccion')
                                     @php
@@ -469,22 +469,36 @@
                                                 <option value="{{ $semVal }}" @selected($value === $semVal)>{{ $semLabel }}</option>
                                             @endforeach
                                         </select>
-                                    @elseif (in_array($field->type, ['image', 'file'], true))
+                                    @elseif (in_array($field->type, ['image', 'file', 'document'], true))
+                                        @php
+                                            $isSingleFileField = in_array($field->type, ['file', 'document'], true);
+                                            $isDocumentField = $field->type === 'document';
+                                            $uploadAccept = $isDocumentField ? '.pdf,.docx' : 'image/*';
+                                            $dropIcon = $isDocumentField ? 'fa-file-arrow-up' : 'fa-images';
+                                            $maxFilesAllowed = $isSingleFileField ? 1 : 2;
+                                            $dropText = $isDocumentField
+                                                ? 'Suelta tu documento aquí (PDF/DOCX, Máx. 1)'
+                                                : 'Suelta las imágenes aquí (Máx. 2)';
+                                        @endphp
                                         <div class="tm-upload-evidence">
                                             <div class="tm-upload-evidence-toolbar">
-                                                <button type="button" class="tm-btn tm-btn-outline" data-upload-trigger data-target-input="{{ $id }}" aria-label="Cargar imagen">
+                                                <button type="button" class="tm-btn tm-btn-outline" data-upload-trigger data-target-input="{{ $id }}" aria-label="Cargar archivo">
                                                     <i class="fa-solid fa-upload" aria-hidden="true"></i> Cargar
                                                 </button>
-                                                <button type="button" class="tm-btn tm-btn-outline" data-paste-image-button data-target-input="{{ $id }}" aria-label="Pegar imagen" title="Pegar imagen">
-                                                    <i class="fa-solid fa-paste" aria-hidden="true"></i> Pegar
-                                                </button>
+                                                @unless ($isDocumentField)
+                                                    <button type="button" class="tm-btn tm-btn-outline" data-paste-image-button data-target-input="{{ $id }}" aria-label="Pegar imagen" title="Pegar imagen">
+                                                        <i class="fa-solid fa-paste" aria-hidden="true"></i> Pegar
+                                                    </button>
+                                                @endunless
                                             </div>
-                                            <small class="tm-upload-evidence-hint">Arrastra aquí o usa los botones.</small>
+                                            <small class="tm-upload-evidence-hint">
+                                                {{ $isDocumentField ? 'Arrastra aquí tu PDF/DOCX o usa el botón cargar.' : 'Arrastra aquí o usa los botones.' }}
+                                            </small>
                                             <div class="tm-upload-evidence-dropzone" data-paste-upload-wrap>
-                                                <input id="{{ $id }}" type="file" accept="image/*" name="{{ $name }}[]" class="d-none" {{ $field->is_required ? 'required' : '' }} multiple data-max-files="2">
+                                                <input id="{{ $id }}" type="file" accept="{{ $uploadAccept }}" name="{{ $name }}[]" class="d-none" {{ $field->is_required ? 'required' : '' }} {{ $isSingleFileField ? '' : 'multiple' }} data-max-files="{{ $maxFilesAllowed }}" data-upload-kind="{{ $isDocumentField ? 'document' : 'image' }}">
                                                 <div class="tm-upload-evidence-placeholder">
-                                                    <i class="fa-solid fa-images" aria-hidden="true"></i>
-                                                    <p>Suelta las imágenes aquí (Máx. 2)</p>
+                                                    <i class="fa-solid {{ $dropIcon }}" aria-hidden="true"></i>
+                                                    <p>{{ $dropText }}</p>
                                                 </div>
                                                 <div class="tm-inline-image-preview-container" data-inline-image-preview-container style="display:flex; flex-wrap:wrap; gap:8px; width:100%; justify-content:center;">
                                                     {{-- El JS insertara las previsualizaciones aqui --}}
@@ -847,7 +861,7 @@
                                 </label>
                                 <label class="tm-records-filter-field">
                                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                                        <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-tm-bulk-toggle title="Selección masiva">Seleccionar</button>
+                                        <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-tm-bulk-toggle title="Selección masiva">Eliminar varios</button>
                                         <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" data-tm-bulk-edit-open data-module-id="{{ $module->id }}" title="Editar varios registros">
                                             <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Edición múltiple
                                         </button>
@@ -969,6 +983,22 @@
 
             <div class="tm-modal-body">
                 <img src="" alt="Vista previa" id="tmImagePreviewImg" class="tm-image-modal-preview">
+            </div>
+        </div>
+    </div>
+
+    <div class="tm-modal" id="tmFilePreviewModal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="tm-modal-backdrop" data-close-file-preview></div>
+        <div class="tm-modal-dialog tm-image-modal-dialog">
+            <div class="tm-modal-head">
+                <h3 id="tmFilePreviewTitle">Vista previa de documento</h3>
+                <button type="button" class="tm-modal-close" data-close-file-preview aria-label="Cerrar">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <div class="tm-modal-body">
+                <iframe id="tmFilePreviewFrame" title="Vista previa de documento" style="width:100%; min-height:70vh; border:0; border-radius:10px;"></iframe>
             </div>
         </div>
     </div>
@@ -1703,7 +1733,11 @@
         const imageModal = document.getElementById('tmImagePreviewModal');
         const imageModalImg = document.getElementById('tmImagePreviewImg');
         const imageModalTitle = document.getElementById('tmImagePreviewTitle');
+        const fileModal = document.getElementById('tmFilePreviewModal');
+        const fileModalFrame = document.getElementById('tmFilePreviewFrame');
+        const fileModalTitle = document.getElementById('tmFilePreviewTitle');
         const imageInputSelector = 'input[type="file"][accept="image/*"]';
+        const mediaInputSelector = 'input[type="file"][data-max-files]';
         const recordsViewPanel = document.getElementById('tmRecordsView');
         const uploadViewPanel = document.getElementById('tmUploadView');
         const recordsUrl = recordsViewPanel ? String(recordsViewPanel.getAttribute('data-records-url') || '') : '';
@@ -1897,21 +1931,13 @@
             let renderedCount = 0;
 
             files.forEach(function (file, index) {
-                if (!String(file.type || '').startsWith('image/')) {
-                    return;
-                }
+                const uploadKind = String(input.dataset.uploadKind || 'image').toLowerCase();
                 renderedCount += 1;
 
                 const previewDiv = document.createElement('div');
                 previewDiv.className = 'tm-inline-image-preview tm-image-preview';
                 previewDiv.setAttribute('data-new-preview', '1');
                 previewDiv.style.position = 'relative';
-
-                const img = document.createElement('img');
-                img.style.maxWidth = '120px';
-                img.style.maxHeight = '120px';
-                img.style.borderRadius = '8px';
-                img.style.objectFit = 'cover';
 
                 const removeBtn = document.createElement('button');
                 removeBtn.type = 'button';
@@ -1938,14 +1964,54 @@
                     setPreview(input);
                 });
 
-                const reader = new FileReader();
-                reader.onload = function (event) {
-                    img.src = String(event.target && event.target.result ? event.target.result : '');
-                    previewDiv.appendChild(img);
+                if (uploadKind === 'document') {
+                    const docPreview = document.createElement('button');
+                    docPreview.type = 'button';
+                    docPreview.className = 'tm-thumb-link';
+                    docPreview.style.display = 'inline-flex';
+                    docPreview.style.alignItems = 'center';
+                    docPreview.style.gap = '6px';
+                    docPreview.style.maxWidth = '100%';
+                    docPreview.style.width = '100%';
+                    docPreview.style.justifyContent = 'flex-start';
+                    previewDiv.style.width = 'min(100%, 360px)';
+                    previewDiv.style.maxWidth = '100%';
+                    const docUrl = (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function')
+                        ? URL.createObjectURL(file)
+                        : '';
+                    const displayName = String(file.name || ('Documento ' + (index + 1)));
+                    if (docUrl) {
+                        docPreview.setAttribute('data-open-file-preview', '1');
+                        docPreview.setAttribute('data-file-src', docUrl);
+                        docPreview.setAttribute('data-file-title', displayName);
+                    }
+                    docPreview.innerHTML = '<i class="fa-solid fa-file-lines" aria-hidden="true"></i><span>'
+                        + displayName + '</span>';
+                    const nameSpan = docPreview.querySelector('span');
+                    if (nameSpan) {
+                        nameSpan.style.whiteSpace = 'normal';
+                        nameSpan.style.wordBreak = 'break-word';
+                        nameSpan.style.lineHeight = '1.25';
+                        nameSpan.title = displayName;
+                    }
+                    previewDiv.appendChild(docPreview);
                     previewDiv.appendChild(removeBtn);
                     container.appendChild(previewDiv);
-                };
-                reader.readAsDataURL(file);
+                } else {
+                    const img = document.createElement('img');
+                    img.style.maxWidth = '120px';
+                    img.style.maxHeight = '120px';
+                    img.style.borderRadius = '8px';
+                    img.style.objectFit = 'cover';
+                    const reader = new FileReader();
+                    reader.onload = function (event) {
+                        img.src = String(event.target && event.target.result ? event.target.result : '');
+                        previewDiv.appendChild(img);
+                        previewDiv.appendChild(removeBtn);
+                        container.appendChild(previewDiv);
+                    };
+                    reader.readAsDataURL(file);
+                }
             });
 
             if (placeholder) {
@@ -2052,7 +2118,7 @@
             }
         };
 
-        Array.from(document.querySelectorAll(imageInputSelector)).forEach(function (input) {
+        Array.from(document.querySelectorAll(mediaInputSelector)).forEach(function (input) {
             initializeImagePreview(input);
         });
 
@@ -2062,7 +2128,8 @@
             Array.from(scope.querySelectorAll('[data-paste-image-button]')).forEach(function (button) {
                 if (button.dataset.tmBoundPaste === '1') return;
                 button.dataset.tmBoundPaste = '1';
-                button.addEventListener('click', function () {
+                button.addEventListener('click', function (event) {
+                    event.stopPropagation();
                     const targetId = button.getAttribute('data-target-input') || '';
                     const input = targetId ? document.getElementById(targetId) : null;
                     if (!(input instanceof HTMLInputElement)) {
@@ -2076,7 +2143,7 @@
                 if (area.dataset.tmBoundDrop === '1') return;
                 area.dataset.tmBoundDrop = '1';
 
-                const input = area.querySelector(imageInputSelector);
+                const input = area.querySelector(mediaInputSelector);
                 if (!(input instanceof HTMLInputElement)) {
                     return;
                 }
@@ -2089,7 +2156,15 @@
                     if (event.target.closest('[data-image-remove]') || event.target.closest('.tm-image-preview img')) {
                         return;
                     }
-                    input.click();
+
+                    // If the dropzone is inside a <label> that already contains the input,
+                    // the browser opens the picker natively. Calling input.click() again causes
+                    // a second open after cancel in some browsers.
+                    const ownerLabel = area.closest('label');
+                    const labelHandlesClick = ownerLabel instanceof HTMLElement && ownerLabel.contains(input);
+                    if (!labelHandlesClick) {
+                        input.click();
+                    }
                 });
 
                 area.addEventListener('dragenter', function (event) {
@@ -2110,15 +2185,16 @@
                     event.preventDefault();
                     area.classList.remove('is-dragover');
 
-                    const imageFile = getImageFileFromFileList(event.dataTransfer ? event.dataTransfer.files : []);
-                    if (!imageFile) {
-                        notify('Aviso', 'Solo se permiten imagenes al arrastrar.', 'warning');
+                    const selectedFile = getAllowedFileFromFileList(event.dataTransfer ? event.dataTransfer.files : [], input);
+                    if (!selectedFile) {
+                        const kind = String(input.dataset.uploadKind || 'image').toLowerCase();
+                        notify('Aviso', kind === 'document' ? 'Solo se permiten archivos PDF o DOCX.' : 'Solo se permiten imagenes al arrastrar.', 'warning');
                         return;
                     }
 
-                    const wasAssigned = setSelectedFileOnInput(input, imageFile);
+                    const wasAssigned = setSelectedFileOnInput(input, selectedFile);
                     if (!wasAssigned) {
-                        notify('Aviso', 'No se pudo adjuntar la imagen arrastrada.', 'warning');
+                        notify('Aviso', 'No se pudo adjuntar el archivo arrastrado.', 'warning');
                     }
                 });
             });
@@ -2126,7 +2202,8 @@
             Array.from(scope.querySelectorAll('[data-upload-trigger]')).forEach(function (button) {
                 if (button.dataset.tmBoundUpload === '1') return;
                 button.dataset.tmBoundUpload = '1';
-                button.addEventListener('click', function () {
+                button.addEventListener('click', function (event) {
+                    event.stopPropagation();
                     const targetId = button.getAttribute('data-target-input') || '';
                     const input = targetId ? document.getElementById(targetId) : null;
                     if (input instanceof HTMLInputElement) {
@@ -2312,11 +2389,21 @@
             return 'png';
         };
 
-        const getImageFileFromFileList = function (files) {
+        const getAllowedFileFromFileList = function (files, input) {
+            const kind = String(input?.dataset?.uploadKind || 'image').toLowerCase();
             const list = Array.from(files || []);
             for (let index = 0; index < list.length; index += 1) {
                 const file = list[index];
-                if (file && String(file.type || '').indexOf('image/') === 0) {
+                if (!file) {
+                    continue;
+                }
+                const fileType = String(file.type || '').toLowerCase();
+                const fileName = String(file.name || '').toLowerCase();
+                if (kind === 'document') {
+                    if (fileType === 'application/pdf' || fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileName.endsWith('.pdf') || fileName.endsWith('.docx')) {
+                        return file;
+                    }
+                } else if (fileType.indexOf('image/') === 0) {
                     return file;
                 }
             }
@@ -2333,7 +2420,7 @@
             const existingFiles = Array.from(input.files || []);
             const existingServerImages = getActiveExistingImageCount(input);
             if ((existingFiles.length + existingServerImages) >= maxFiles) {
-                notify('Aviso', 'Solo puedes adjuntar hasta ' + maxFiles + ' imagen(es).', 'warning');
+                notify('Aviso', 'Solo puedes adjuntar hasta ' + maxFiles + ' archivo(s).', 'warning');
                 return false;
             }
 
@@ -2692,7 +2779,7 @@
                     panel.querySelectorAll('.tm-record-bulk-check, .tm-bulk-col').forEach(el => el.classList.remove('tm-hidden'));
                 }
                 if (typeof updateBulkUI === 'function') updateBulkUI(panel);
-                Array.from(host.querySelectorAll(imageInputSelector)).forEach(function (inp) {
+                Array.from(host.querySelectorAll(mediaInputSelector)).forEach(function (inp) {
                     initializeImagePreview(inp);
                 });
                 bindImageUploadInteractions(host);
@@ -3100,7 +3187,7 @@
 
         document.addEventListener('click', function (event) {
             const imgBtn = event.target.closest('[data-open-image-preview]');
-            if (imgBtn && recordsViewPanel && recordsViewPanel.contains(imgBtn)) {
+            if (imgBtn) {
                 if (!imageModal || !imageModalImg) {
                     return;
                 }
@@ -3116,6 +3203,24 @@
                     imageModalTitle.textContent = title;
                 }
                 openModal(imageModal, imgBtn);
+                return;
+            }
+            const fileBtn = event.target.closest('[data-open-file-preview]');
+            if (fileBtn) {
+                if (!fileModal || !fileModalFrame) {
+                    return;
+                }
+                const src = fileBtn.getAttribute('data-file-src') || '';
+                const title = fileBtn.getAttribute('data-file-title') || 'Vista previa de documento';
+                if (src === '') {
+                    return;
+                }
+                event.preventDefault();
+                fileModalFrame.src = src;
+                if (fileModalTitle) {
+                    fileModalTitle.textContent = title;
+                }
+                openModal(fileModal, fileBtn);
                 return;
             }
             const textBtn = event.target.closest('[data-text-toggle]');
@@ -3181,7 +3286,7 @@
         /* Cerrar modales por backdrop/botón X: delegación global (los modales de “Editar” se inyectan por AJAX
            y no existían en el DOM en el forEach inicial). */
         document.addEventListener('click', function (event) {
-            const closeEl = event.target.closest('[data-close-module-preview], [data-close-image-preview]');
+            const closeEl = event.target.closest('[data-close-module-preview], [data-close-image-preview], [data-close-file-preview]');
             if (!closeEl) {
                 return;
             }
@@ -3193,6 +3298,9 @@
             closeModal(modal);
             if (modal.id === 'tmImagePreviewModal' && imageModalImg) {
                 imageModalImg.removeAttribute('src');
+            }
+            if (modal.id === 'tmFilePreviewModal' && fileModalFrame) {
+                fileModalFrame.src = 'about:blank';
             }
         });
 
@@ -4455,6 +4563,19 @@
                 }
                 return String(a ?? '') === String(b ?? '');
             }
+            function entryHasPendingFileChanges(state, eid) {
+                const entryPending = state.pendingFiles[eid] || {};
+                const hasFiles = Object.keys(entryPending).some(function (key) {
+                    return Array.isArray(entryPending[key]) && entryPending[key].length > 0;
+                });
+                if (hasFiles) {
+                    return true;
+                }
+                const removeMap = state.removeExisting[eid] || {};
+                return Object.keys(removeMap).some(function (key) {
+                    return Array.isArray(removeMap[key]) && removeMap[key].length > 0;
+                });
+            }
             function entryIsDirty(state, eid) {
                 const orig = state.originals[eid];
                 const draft = state.drafts[eid];
@@ -4462,7 +4583,7 @@
                     return false;
                 }
                 for (const f of state.fields) {
-                    if (f.type === 'image' || f.type === 'file') {
+                    if (f.type === 'image' || f.type === 'file' || f.type === 'document') {
                         continue;
                     }
                     if (!valEqual(draft[f.key], orig[f.key])) {
@@ -4475,6 +4596,9 @@
                     if (mr !== mrOrig) {
                         return true;
                     }
+                }
+                if (entryHasPendingFileChanges(state, eid)) {
+                    return true;
                 }
                 return false;
             }
@@ -4489,7 +4613,7 @@
                         continue;
                     }
                     for (const f of state.fields) {
-                        if (f.type === 'image' || f.type === 'file') {
+                        if (f.type === 'image' || f.type === 'file' || f.type === 'document') {
                             continue;
                         }
                         if (!valEqual(draft[f.key], orig[f.key])) {
@@ -4504,6 +4628,10 @@
                             fieldCount++;
                             entryIds.add(eid);
                         }
+                    }
+                    if (entryHasPendingFileChanges(state, eid)) {
+                        fieldCount++;
+                        entryIds.add(eid);
                     }
                 }
                 return { fieldCount, entryCount: entryIds.size };
@@ -4532,7 +4660,7 @@
                     badge.classList.toggle('tm-hidden', !entryIsDirty(st, id));
                 });
             }
-            function buildFieldHtml(field, val, entryId, previewTpl) {
+            function buildFieldHtml(field, val, entryId, previewTpl, fileMeta) {
                 function isScalar(x) {
                     return x === null || typeof x === 'string' || typeof x === 'number' || typeof x === 'boolean';
                 }
@@ -4668,17 +4796,51 @@
                         '<div class="tm-linked-secondary-wrap" data-linked-secondary-wrap' + (showSec ? '' : ' hidden') + '>' +
                         '<label class="tm-linked-secondary-label">' + tmBulkEsc(slab) + '</label>' + secondaryHtml + '</div></div>';
                 }
-                if (field.type === 'image' || field.type === 'file') {
-                    const path = typeof v === 'string' && v.trim() !== '' ? v : '';
-                    const prev = path && previewTpl
-                        ? previewTpl.replace('__EID__', String(entryId)).replace('__FKEY__', String(k))
-                        : '';
-                    if (previewTpl && path) {
-                        return '<div class="tm-entry-field tm-col-full"><strong>' + lab + '</strong>' + comment +
-                            '<p class="tm-muted" style="font-size:0.78rem; margin:6px 0;">No se puede cambiar el archivo aquí. Usa <strong>Editar</strong> en el listado.</p>' +
-                            '<img src="' + tmBulkEsc(prev) + '" alt="" style="max-height:80px;border-radius:6px;border:1px solid var(--clr-border);"></div>';
-                    }
-                    return '<div class="tm-entry-field tm-col-full"><strong>' + lab + '</strong><p class="tm-muted" style="font-size:0.78rem;">Sin archivo o edita desde el listado.</p></div>';
+                if (field.type === 'image' || field.type === 'file' || field.type === 'document') {
+                    const removedSet = new Set((fileMeta && Array.isArray(fileMeta.removedPaths)) ? fileMeta.removedPaths : []);
+                    const pendingCount = fileMeta && typeof fileMeta.pendingCount === 'number' ? fileMeta.pendingCount : 0;
+                    const paths = Array.isArray(v)
+                        ? v.filter(function (p) { return typeof p === 'string' && p.trim() !== ''; })
+                        : (typeof v === 'string' && v.trim() !== '' ? [v.trim()] : []);
+                    const maxFiles = field.type === 'image' ? 2 : 1;
+                    const accept = field.type === 'image'
+                        ? 'image/jpeg,image/png,image/webp'
+                        : (field.type === 'document' ? '.pdf,.docx' : '.jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv');
+                    const rowHtml = paths.map(function (path, idx) {
+                        const base = previewTpl ? previewTpl.replace('__EID__', String(entryId)).replace('__FKEY__', String(k)) : '';
+                        const sep = base.indexOf('?') >= 0 ? '&' : '?';
+                        const previewUrl = base ? (base + sep + 'i=' + idx) : '';
+                        if (field.type === 'image' && previewUrl) {
+                            return '<div class="tm-bulk-existing-file-row">'
+                                + '<button type="button" class="tm-thumb-link" data-open-image-preview data-image-src="' + tmBulkEsc(previewUrl) + '" data-image-title="' + lab + ' (' + (idx + 1) + ')" title="Ver imagen ' + (idx + 1) + '">'
+                                + '<i class="fa fa-image" aria-hidden="true"></i> Imagen ' + (idx + 1) + '</button>'
+                                + '<label style="margin-left:8px;"><input type="checkbox" data-bulk-remove-existing data-entry-id="' + entryId + '" data-field-key="' + tmBulkEsc(k) + '" data-existing-path="' + tmBulkEsc(path) + '"' + (removedSet.has(path) ? ' checked' : '') + '> Quitar</label>'
+                                + '</div>';
+                        }
+                        if (previewUrl) {
+                            return '<div class="tm-bulk-existing-file-row">'
+                                + '<button type="button" class="tm-thumb-link" data-open-file-preview="1" data-file-src="' + tmBulkEsc(previewUrl) + '" data-file-title="' + tmBulkEsc(String(lab).replace(/<[^>]*>/g, '')) + '" style="max-width:420px; width:min(100%,420px); text-align:left;">'
+                                + '<i class="fa-solid fa-file" aria-hidden="true"></i> Ver documento</button>'
+                                + '<label style="margin-left:8px;"><input type="checkbox" data-bulk-remove-existing data-entry-id="' + entryId + '" data-field-key="' + tmBulkEsc(k) + '" data-existing-path="' + tmBulkEsc(path) + '"' + (removedSet.has(path) ? ' checked' : '') + '> Quitar</label>'
+                                + '</div>';
+                        }
+                        return '<div class="tm-bulk-existing-file-row">'
+                            + '<span class="tm-muted">Archivo ' + (idx + 1) + '</span>'
+                            + '<label style="margin-left:8px;"><input type="checkbox" data-bulk-remove-existing data-entry-id="' + entryId + '" data-field-key="' + tmBulkEsc(k) + '" data-existing-path="' + tmBulkEsc(path) + '"' + (removedSet.has(path) ? ' checked' : '') + '> Quitar</label>'
+                            + '</div>';
+                    }).join('');
+                    return '<div class="tm-entry-field tm-col-full">'
+                        + '<strong>' + lab + '</strong>' + comment
+                        + '<div class="tm-bulk-existing-files" style="display:grid; gap:6px; margin:8px 0;">'
+                        + (rowHtml || '<span class="tm-muted" style="font-size:0.78rem;">Sin archivo actual.</span>')
+                        + '</div>'
+                        + '<label style="display:block; margin:4px 0 8px;">'
+                        + '<input type="checkbox" data-bulk-remove-all data-entry-id="' + entryId + '" data-field-key="' + tmBulkEsc(k) + '"' + ((paths.length > 0 && removedSet.size >= paths.length) ? ' checked' : '') + '> Quitar todos los archivos actuales'
+                        + '</label>'
+                        + '<input type="file" data-bulk-file-input data-entry-id="' + entryId + '" data-field-key="' + tmBulkEsc(k) + '" accept="' + tmBulkEsc(accept) + '"' + (maxFiles > 1 ? ' multiple' : '') + ' data-max-files="' + maxFiles + '">'
+                        + (pendingCount > 0 ? '<small class="tm-field-help">Hay ' + pendingCount + ' archivo(s) listo(s) para subir al guardar.</small>' : '')
+                        + '<small class="tm-field-help">Puedes subir hasta ' + maxFiles + ' archivo(s) por campo.</small>'
+                        + '</div>';
                 }
                 if (field.type === 'geopoint') {
                     const gr = tmBulkTextareaRows(v);
@@ -4701,7 +4863,28 @@
                     return;
                 }
                 st.fields.forEach(function (f) {
-                    if (f.type === 'seccion' || f.type === 'image' || f.type === 'file') {
+                    if (f.type === 'seccion') {
+                        return;
+                    }
+                    if (f.type === 'image' || f.type === 'file' || f.type === 'document') {
+                        const removeChecks = Array.from(form.querySelectorAll('[data-bulk-remove-existing][data-entry-id="' + eid + '"][data-field-key="' + f.key + '"]:checked'));
+                        const removeAll = form.querySelector('[data-bulk-remove-all][data-entry-id="' + eid + '"][data-field-key="' + f.key + '"]');
+                        if (!st.removeExisting[eid]) {
+                            st.removeExisting[eid] = {};
+                        }
+                        st.removeExisting[eid][f.key] = removeChecks.map(function (el) {
+                            return String(el.getAttribute('data-existing-path') || '').trim();
+                        }).filter(function (path) {
+                            return path !== '';
+                        });
+                        if (removeAll && removeAll.checked) {
+                            const allPaths = form.querySelectorAll('[data-bulk-remove-existing][data-entry-id="' + eid + '"][data-field-key="' + f.key + '"]');
+                            st.removeExisting[eid][f.key] = Array.from(allPaths).map(function (el) {
+                                return String(el.getAttribute('data-existing-path') || '').trim();
+                            }).filter(function (path) {
+                                return path !== '';
+                            });
+                        }
                         return;
                     }
                     if (f.type === 'multiselect') {
@@ -4747,6 +4930,44 @@
                 });
                 form.querySelectorAll('input[type="checkbox"][data-field-key-multi]').forEach(function (el) {
                     el.addEventListener('change', function () { syncDraftFromForm(modal); refreshBulkCounter(modal); });
+                });
+                form.querySelectorAll('[data-bulk-file-input]').forEach(function (input) {
+                    input.addEventListener('change', function () {
+                        const entryId = parseInt(input.getAttribute('data-entry-id'), 10);
+                        const key = String(input.getAttribute('data-field-key') || '');
+                        if (!entryId || !key || !st) {
+                            return;
+                        }
+                        if (!st.pendingFiles[entryId]) {
+                            st.pendingFiles[entryId] = {};
+                        }
+                        const maxFiles = parseInt(input.getAttribute('data-max-files') || '1', 10) || 1;
+                        const selected = Array.from(input.files || []);
+                        st.pendingFiles[entryId][key] = selected.slice(0, maxFiles);
+                        if (selected.length > maxFiles) {
+                            input.value = '';
+                            Swal.fire('Aviso', 'Solo puedes seleccionar hasta ' + maxFiles + ' archivo(s).', 'warning');
+                            st.pendingFiles[entryId][key] = [];
+                        }
+                        syncDraftFromForm(modal);
+                        refreshBulkCounter(modal);
+                    });
+                });
+                form.querySelectorAll('[data-bulk-remove-existing], [data-bulk-remove-all]').forEach(function (el) {
+                    el.addEventListener('change', function () {
+                        const removeAll = el.matches('[data-bulk-remove-all]');
+                        if (removeAll) {
+                            const entryId = el.getAttribute('data-entry-id');
+                            const key = el.getAttribute('data-field-key');
+                            if (entryId && key) {
+                                form.querySelectorAll('[data-bulk-remove-existing][data-entry-id="' + entryId + '"][data-field-key="' + key + '"]').forEach(function (chk) {
+                                    chk.checked = el.checked;
+                                });
+                            }
+                        }
+                        syncDraftFromForm(modal);
+                        refreshBulkCounter(modal);
+                    });
                 });
                 form.querySelectorAll('[data-linked-primary]').forEach(function (prim) {
                     function onLinkedPrimaryToggle() {
@@ -4818,7 +5039,9 @@
                     if (f.type === 'seccion') {
                         return;
                     }
-                    html += buildFieldHtml(f, st.drafts[entryId][f.key], entryId, previewTpl);
+                    const removedPaths = (((st.removeExisting || {})[entryId] || {})[f.key] || []);
+                    const pendingCount = (((st.pendingFiles || {})[entryId] || {})[f.key] || []).length;
+                    html += buildFieldHtml(f, st.drafts[entryId][f.key], entryId, previewTpl, { removedPaths: removedPaths, pendingCount: pendingCount });
                 });
                 if (fieldsEl) {
                     fieldsEl.innerHTML = html;
@@ -4859,10 +5082,28 @@
                 const mr = state.draftMicrorregion[entryId] !== undefined ? state.draftMicrorregion[entryId] : entry.microrregion_id;
                 fd.append('selected_microrregion_id', String(mr));
                 state.fields.forEach(function (f) {
-                    if (f.type === 'seccion' || f.type === 'image' || f.type === 'file') {
+                    if (f.type === 'seccion') {
                         return;
                     }
                     const k = f.key;
+                    if (f.type === 'image' || f.type === 'file' || f.type === 'document') {
+                        const removePaths = (((state.removeExisting || {})[entryId] || {})[k] || []).filter(function (path) {
+                            return typeof path === 'string' && path.trim() !== '';
+                        });
+                        removePaths.forEach(function (path) {
+                            fd.append('remove_existing_images[' + k + '][]', path);
+                        });
+                        const files = (((state.pendingFiles || {})[entryId] || {})[k] || []).filter(function (file) {
+                            return file instanceof File;
+                        });
+                        files.forEach(function (file) {
+                            fd.append('values[' + k + '][]', file, file.name);
+                        });
+                        if (removePaths.length > 0 && files.length === 0) {
+                            fd.append('remove_images[' + k + ']', '1');
+                        }
+                        return;
+                    }
                     const v = draft[k];
                     if (f.type === 'multiselect') {
                         const arr = Array.isArray(v) ? v : [];
@@ -4926,6 +5167,12 @@
                         const ent = st.entryById[entryId];
                         if (ent && st.draftMicrorregion[entryId] !== undefined) {
                             ent.microrregion_id = st.draftMicrorregion[entryId];
+                        }
+                        if (st.pendingFiles[entryId]) {
+                            delete st.pendingFiles[entryId];
+                        }
+                        if (st.removeExisting[entryId]) {
+                            delete st.removeExisting[entryId];
                         }
                         delete st.draftMicrorregion[entryId];
                         refreshBulkCounter(modal);
@@ -5036,6 +5283,8 @@
                                 originals: {},
                                 drafts: {},
                                 draftMicrorregion: {},
+                                pendingFiles: {},
+                                removeExisting: {},
                                 selectedId: null,
                                 entryById: {},
                                 showMrSelect: modal.getAttribute('data-show-mr-select') === '1',

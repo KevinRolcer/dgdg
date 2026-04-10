@@ -30,7 +30,7 @@ class SecurityHeaders
             $response->headers->set('Content-Type', 'text/html; charset=UTF-8');
         }
 
-        $allowSameOriginFrame = $request->routeIs('ppt.preview-pdf');
+        $allowSameOriginFrame = $request->routeIs('ppt.preview-pdf', 'temporary-modules.entry-file.preview');
         $response->headers->set('X-Frame-Options', $allowSameOriginFrame ? 'SAMEORIGIN' : 'DENY');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -183,8 +183,13 @@ class SecurityHeaders
             (array) ($csp['connect_src'] ?? []),
             ['allowHttpScheme' => $isLocal]
         );
+        $frameSrc = $this->buildSourceList(
+            ["'self'", 'blob:'],
+            [],
+            ['allowHttpScheme' => $isLocal]
+        );
 
-        $frameAncestors = $request->routeIs('ppt.preview-pdf')
+        $frameAncestors = $request->routeIs('ppt.preview-pdf', 'temporary-modules.entry-file.preview')
             ? "frame-ancestors 'self'"
             : "frame-ancestors 'none'";
 
@@ -200,6 +205,7 @@ class SecurityHeaders
             'media-src '.$mediaSrc,
             'font-src '.$fontSrc,
             'connect-src '.$connectSrc,
+            'frame-src '.$frameSrc,
         ];
 
         if ($request->isSecure()) {

@@ -381,7 +381,12 @@
             <tr>
                 <th style="background:{{ $sumGroupColor }};color:#fff;">{{ !empty($headersUppercase) ? mb_strtoupper('Total') : 'Total' }}</th>
                 @foreach ($totalsCols as $col)
-                    <th>{{ $col['label'] }}</th>
+                    @php
+                        $totalsHeadGroup = trim((string) ($col['group'] ?? ''));
+                        $totalsHeadGroupKey = mb_strtolower($totalsHeadGroup);
+                        $totalsHeadBg = $totalsHeadGroup !== '' ? ($groupHeaderColors[$totalsHeadGroupKey] ?? '#64748b') : '#475569';
+                    @endphp
+                    <th style="background:{{ $totalsHeadBg }};color:#fff;">{{ $col['label'] }}</th>
                 @endforeach
             </tr>
         </thead>
@@ -738,7 +743,12 @@
             <th style="background:{{ $sumGroupColor }};color:#fff;">{{ $lead['label'] }}</th>
         @endforeach
         @foreach ($sumCombinedColumns as $col)
-            <th>{{ $col['label'] }}</th>
+            @php
+                $sumHeadGroup = trim((string) ($col['group'] ?? ''));
+                $sumHeadGroupKey = mb_strtolower($sumHeadGroup);
+                $sumHeadBg = $sumHeadGroup !== '' ? ($sumGroupHeaderColors[$sumHeadGroupKey] ?? '#64748b') : '#475569';
+            @endphp
+            <th style="background:{{ $sumHeadBg }};color:#fff;">{{ $col['label'] }}</th>
         @endforeach
     </tr>
     </thead>
@@ -1097,6 +1107,10 @@
                                     }
                                 }
                             }
+                            $imageFallbackLabel = '';
+                            if ($isImageType && empty($imageSources) && !empty($rawMediaValues)) {
+                                $imageFallbackLabel = count($rawMediaValues) > 1 ? 'Imágenes adjuntas' : 'Imagen adjunta';
+                            }
                             $tdAlign = 'text-align: center; vertical-align: middle;';
                             $thumbWidth = count($imageSources) > 1 ? 52 : 110;
                             $thumbHeight = count($imageSources) > 1 ? 52 : 85;
@@ -1108,6 +1122,8 @@
                                         <img src="{{ $imageSource }}" alt="Imagen" style="max-width: {{ $thumbWidth }}px; max-height: {{ $thumbHeight }}px; display:inline-block; margin:2px; vertical-align:middle;">
                                     @endforeach
                                 </div>
+                            @elseif($imageFallbackLabel !== '')
+                                <span style="font-size:8px; color:#6b7280;">{{ $imageFallbackLabel }}</span>
                             @else
                                 {{ $cellText }}
                             @endif

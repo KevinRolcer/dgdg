@@ -191,7 +191,7 @@
                                     <option value="{{ $semVal }}" @selected($value === $semVal)>{{ $semLabel }}</option>
                                 @endforeach
                             </select>
-                        @elseif (in_array($field->type, ['image', 'file'], true))
+                        @elseif (in_array($field->type, ['image', 'file', 'document'], true))
                             <div class="tm-upload-evidence">
                                 <div class="tm-upload-evidence-toolbar">
                                     <button type="button" class="tm-btn tm-btn-outline" data-upload-trigger data-target-input="{{ $id }}" aria-label="Cargar imagen">
@@ -418,7 +418,7 @@ iv>
                                     $cell = $entry->data[$field->key] ?? null;
                                                           <td>
                                     @php
-                                        $isImageField = in_array($field->type, ['file', 'image'], true);
+                                        $isImageField = in_array($field->type, ['file', 'image', 'document'], true);
                                         $images = is_array($cell) ? $cell : ($cell ? [(string)$cell] : []);
                                     @endphp
 

@@ -38,9 +38,7 @@ class MicroregionesController extends Controller
         ]);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+
     protected function buildMapDataResponse(): array
     {
         $out = $this->buildMicrorregionesPayload();
@@ -67,9 +65,6 @@ class MicroregionesController extends Controller
         ];
     }
 
-    /**
-     * @return array{municipios: array<int, array{id: int, micro_id: int, nombre: string, geometry: array<string, mixed>}>, meta: array{geometry_count: int}}
-     */
     protected function buildBoundariesPayload(): array
     {
         $rows = [];
@@ -110,9 +105,7 @@ class MicroregionesController extends Controller
         ];
     }
 
-    /**
-     * Datos para mapa y panel lateral (municipios del estado de Puebla en BD).
-     */
+
     public function data(): JsonResponse
     {
         return response()->json($this->buildMapDataResponse());
@@ -127,10 +120,7 @@ class MicroregionesController extends Controller
         ]);
     }
 
-    /**
-     * Misma lógica que {@see search} vía POST + JSON (cuerpo o formulario).
-     * Útil cuando el hosting/WAF devuelve 404 a todos los GET con ?q= en rutas de microrregiones.
-     */
+
     public function searchPost(Request $request): JsonResponse
     {
         $query = trim((string) $request->input('q', ''));
@@ -140,9 +130,6 @@ class MicroregionesController extends Controller
         ]);
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
     protected function buildSearchResults(string $query): array
     {
         if (mb_strlen($query) < 3) {
@@ -202,9 +189,7 @@ class MicroregionesController extends Controller
         return $results;
     }
 
-    /**
-     * PolÃ­gonos de municipios (Puebla) ya resueltos y guardados en cachÃ© (Nominatim).
-     */
+
     public function boundaries(): JsonResponse
     {
         return response()->json($this->buildBoundariesPayload());
@@ -212,7 +197,6 @@ class MicroregionesController extends Controller
 
     private function resolveSeccionPngUrl(string $num): ?string
     {
-        // Try both padded (MR01) and unpadded (MR1) naming, and both .png/.jpg extensions
         $variants = ['MR'.$num, 'MR'.ltrim($num, '0')];
         $extensions = ['png', 'jpg'];
 
@@ -230,9 +214,6 @@ class MicroregionesController extends Controller
         return null;
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
     private function buildMicrorregionesPayload(): array
     {
         $micros = Microrregione::query()
