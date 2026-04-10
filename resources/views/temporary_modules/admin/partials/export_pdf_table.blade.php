@@ -121,6 +121,10 @@
     if (!in_array($sumTableAlign, ['left', 'center', 'right'], true)) {
         $sumTableAlign = $countTableAlign;
     }
+    $sectionLabelAlign = strtolower((string) ($sectionLabelAlign ?? 'left'));
+    if (!in_array($sectionLabelAlign, ['left', 'center', 'right'], true)) {
+        $sectionLabelAlign = 'left';
+    }
     $dataTableAlign = strtolower((string) ($tableAlign ?? 'left'));
     if (!in_array($dataTableAlign, ['left', 'center', 'right', 'stretch'], true)) {
         $dataTableAlign = 'left';
@@ -797,7 +801,7 @@
     @endif
     @endif
 </table>
-<p style="font-weight: bold; margin: 8px 0 4px 0;">{{ $sectionLabel ?? 'Desglose' }}</p>
+<p style="font-weight: bold; margin: 8px 0 4px 0; text-align: {{ $sectionLabelAlign }};">{{ $sectionLabel ?? 'Desglose' }}</p>
 @endif
 
 @php

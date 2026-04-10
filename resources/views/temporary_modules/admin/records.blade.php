@@ -491,6 +491,18 @@
                         <label for="tmExportTotalsTableTitle">Título de tabla de totales</label>
                         <input type="text" id="tmExportTotalsTableTitle" class="tm-input" placeholder="Totales">
                     </div>
+                    <div class="tm-export-personalize-field">
+                        <label for="tmExportSectionLabel">Título de tabla de desglose</label>
+                        <input type="text" id="tmExportSectionLabel" class="tm-input" placeholder="Desglose">
+                    </div>
+                    <div class="tm-export-personalize-field tm-export-count-table-align-group">
+                        <span class="tm-export-label-inline">Alineación del título de desglose</span>
+                        <div class="tm-export-align-btns" id="tmExportSectionLabelAlignGroup" role="group" aria-label="Alineación del título de desglose">
+                            <button type="button" class="tm-export-align-btn is-active" data-section-label-align="left">Izquierda</button>
+                            <button type="button" class="tm-export-align-btn" data-section-label-align="center">Centro</button>
+                            <button type="button" class="tm-export-align-btn" data-section-label-align="right">Derecha</button>
+                        </div>
+                    </div>
                     <div class="tm-export-case-toggle-row-sub">
                         <label class="tm-export-case-toggle tm-export-case-toggle--sub" title="Convertir encabezados y títulos de tabla a MAYÚSCULAS">
                             <input type="checkbox" id="tmExportHeadersUppercase" value="1">
@@ -3332,7 +3344,7 @@
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, recordsCellFontPx: 12, recordsHeaderFontPx: 12, recordsGroupHeaderFontPx: 12, sumCellFontPx: 12, sumHeaderFontPx: 12, sumGroupHeaderFontPx: 12, totalsCellFontPx: 12, totalsHeaderFontPx: 12, totalsGroupHeaderFontPx: 12, cellFontPx: 12, headerFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', includeCalculatedColumns: false, calculatedColumns: [], includeOperationsColumn: false, operationsLabel: 'Operaciones', operationsReferenceField: '', operationsIncludePercent: true, operationsFields: [], sumMetrics: [], sumFormulas: [] };
+                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sectionLabel: 'Desglose', sectionLabelAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, recordsCellFontPx: 12, recordsHeaderFontPx: 12, recordsGroupHeaderFontPx: 12, sumCellFontPx: 12, sumHeaderFontPx: 12, sumGroupHeaderFontPx: 12, totalsCellFontPx: 12, totalsHeaderFontPx: 12, totalsGroupHeaderFontPx: 12, cellFontPx: 12, headerFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', includeCalculatedColumns: false, calculatedColumns: [], includeOperationsColumn: false, operationsLabel: 'Operaciones', operationsReferenceField: '', operationsIncludePercent: true, operationsFields: [], sumMetrics: [], sumFormulas: [] };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
             const titleUppercaseEl = modal ? modal.querySelector('#tmExportTitleUppercase') : document.getElementById('tmExportTitleUppercase');
@@ -3356,6 +3368,7 @@
             const sumTitleEl = modal ? modal.querySelector('#tmExportSumTitle') : document.getElementById('tmExportSumTitle');
             const sumTitleUppercaseEl = modal ? modal.querySelector('#tmExportSumTitleUppercase') : document.getElementById('tmExportSumTitleUppercase');
             const sumTitleFontEl = modal ? modal.querySelector('#tmExportSumTitleFontSize') : document.getElementById('tmExportSumTitleFontSize');
+            const sectionLabelEl = modal ? modal.querySelector('#tmExportSectionLabel') : document.getElementById('tmExportSectionLabel');
             const sumGroupColorTrigger = modal ? modal.querySelector('#tmExportSumGroupColorTrigger') : document.getElementById('tmExportSumGroupColorTrigger');
             const sumIncludeTotalsRowEl = modal ? modal.querySelector('#tmExportSumIncludeTotalsRow') : document.getElementById('tmExportSumIncludeTotalsRow');
             const sumCellFontEl = modal ? modal.querySelector('#tmExportSumCellFontSize') : document.getElementById('tmExportSumCellFontSize');
@@ -3370,8 +3383,10 @@
             const sumTotalsBoldEl = modal ? modal.querySelector('#tmExportSumTotalsBold') : document.getElementById('tmExportSumTotalsBold');
             const sumTotalsColorTrigger = modal ? modal.querySelector('#tmExportSumTotalsColorTrigger') : document.getElementById('tmExportSumTotalsColorTrigger');
             const sumTitleAlignBtn = modal ? modal.querySelector('#tmExportSumTitleAlignGroup .tm-export-align-btn.is-active') : null;
+            const sectionLabelAlignBtn = modal ? modal.querySelector('#tmExportSectionLabelAlignGroup .tm-export-align-btn.is-active') : null;
             const totalsTableAlignBtn = modal ? modal.querySelector('#tmExportTotalsTableAlignGroup .tm-export-align-btn.is-active') : null;
             const sumTitleAlign = (sumTitleAlignBtn && sumTitleAlignBtn.getAttribute('data-sum-title-align')) || 'center';
+            const sectionLabelAlign = (sectionLabelAlignBtn && sectionLabelAlignBtn.getAttribute('data-section-label-align')) || 'left';
             const totalsTableAlign = (totalsTableAlignBtn && totalsTableAlignBtn.getAttribute('data-totals-table-align')) || 'left';
             const sumTitleFontPx = sumTitleFontEl && sumTitleFontEl.value ? Math.max(10, Math.min(36, parseInt(sumTitleFontEl.value, 10) || 14)) : 14;
             const sumGroupColor = (sumGroupColorTrigger && sumGroupColorTrigger.getAttribute('data-color')) ? sumGroupColorTrigger.getAttribute('data-color') : 'var(--clr-primary)';
@@ -3494,6 +3509,8 @@
                 sumTableAlign: sumTableAlign,
                 sumTitle: sumTitleEl ? String(sumTitleEl.value || '').trim() : 'Sumatoria',
                 sumTitleCase: (sumTitleUppercaseEl && sumTitleUppercaseEl.checked) ? 'upper' : 'lower',
+                sectionLabel: sectionLabelEl && String(sectionLabelEl.value || '').trim() !== '' ? String(sectionLabelEl.value).trim() : 'Desglose',
+                sectionLabelAlign: ['left', 'center', 'right'].indexOf(sectionLabelAlign) !== -1 ? sectionLabelAlign : 'left',
                 sumTitleAlign: sumTitleAlign,
                 sumTitleFontPx: sumTitleFontPx,
                 sumGroupColor: sumGroupColor,
@@ -4092,7 +4109,9 @@
             );
 
             // Tabla de Datos (Desglose)
-            html += '<p class="tm-export-preview-desglose-label" style="font-weight:600;margin:10px 0 4px 0;">' + escapeHtml(normalizeExportHeadingText('Desglose', headersUppercase)) + '</p>';
+            var sectionLabelText = normalizeExportHeadingText((state.sectionLabel && String(state.sectionLabel).trim() !== '') ? String(state.sectionLabel) : 'Desglose', headersUppercase);
+            var sectionLabelAlign = (state.sectionLabelAlign === 'center' || state.sectionLabelAlign === 'right') ? state.sectionLabelAlign : 'left';
+            html += '<p class="tm-export-preview-desglose-label" style="font-weight:600;margin:10px 0 4px 0;text-align:' + sectionLabelAlign + ';">' + escapeHtml(sectionLabelText) + '</p>';
             html += '<table class="tm-export-preview-table" style="table-layout:fixed;border-collapse:collapse;' + dataTableStyle + dataTableMargin + '">';
 
             // Encabezados (con Grupos si aplica)
@@ -4415,6 +4434,7 @@
             const sumTitleEl = document.getElementById('tmExportSumTitle');
             const sumTitleUppercaseEl = document.getElementById('tmExportSumTitleUppercase');
             const sumTitleFontEl = document.getElementById('tmExportSumTitleFontSize');
+            const sectionLabelEl = document.getElementById('tmExportSectionLabel');
             const sumGroupColorWrapEl = document.getElementById('tmExportSumGroupColorWrap');
             const sumGroupColorTriggerEl = document.getElementById('tmExportSumGroupColorTrigger');
             const sumGroupColorMenuEl = document.getElementById('tmExportSumGroupColorMenu');
@@ -5024,6 +5044,9 @@
                         personalizeModal.querySelectorAll('#tmExportSumTitleAlignGroup .tm-export-align-btn').forEach(function (b) {
                             b.classList.toggle('is-active', (b.getAttribute('data-sum-title-align') || '') === (draftCfg.sum_title_align || 'center'));
                         });
+                        personalizeModal.querySelectorAll('#tmExportSectionLabelAlignGroup .tm-export-align-btn').forEach(function (b) {
+                            b.classList.toggle('is-active', (b.getAttribute('data-section-label-align') || '') === (draftCfg.section_label_align || 'left'));
+                        });
                         var dOrient = draftCfg.orientation || 'portrait';
                         personalizeModal.querySelectorAll('.tm-export-orient-btn').forEach(function (b) {
                             b.classList.toggle('is-active', (b.getAttribute('data-orientation') || '') === dOrient);
@@ -5080,6 +5103,9 @@
                         if (totalsTableWrapEl) { totalsTableWrapEl.hidden = !(includeTotalsTableEl && includeTotalsTableEl.checked); }
                         if (totalsTableTitleEl) {
                             totalsTableTitleEl.value = (draftCfg.totals_table_title != null && String(draftCfg.totals_table_title).trim() !== '') ? String(draftCfg.totals_table_title) : 'Totales';
+                        }
+                        if (sectionLabelEl) {
+                            sectionLabelEl.value = (draftCfg.section_label != null && String(draftCfg.section_label).trim() !== '') ? String(draftCfg.section_label) : 'Desglose';
                         }
                         if (totalsCellFontEl && draftCfg.totals_table_cell_font_size_px != null) {
                             var tcf = parseInt(draftCfg.totals_table_cell_font_size_px, 10);
@@ -5179,6 +5205,7 @@
                         if (sumTitleEl) { sumTitleEl.value = 'Sumatoria'; }
                         if (sumTitleUppercaseEl) { sumTitleUppercaseEl.checked = false; }
                         if (sumTitleFontEl) { sumTitleFontEl.value = '14'; }
+                        if (sectionLabelEl) { sectionLabelEl.value = 'Desglose'; }
                         if (sumCellFontEl) { sumCellFontEl.value = '12'; }
                         if (sumHeaderFontEl) { sumHeaderFontEl.value = '12'; }
                         if (recordsGroupHeaderFontEl) { recordsGroupHeaderFontEl.value = '12'; }
@@ -5193,6 +5220,9 @@
                         if (totalsGroupHeaderFontEl) { totalsGroupHeaderFontEl.value = '12'; }
                         personalizeModal.querySelectorAll('#tmExportTotalsTableAlignGroup .tm-export-align-btn').forEach(function (b) {
                             b.classList.toggle('is-active', (b.getAttribute('data-totals-table-align') || '') === 'left');
+                        });
+                        personalizeModal.querySelectorAll('#tmExportSectionLabelAlignGroup .tm-export-align-btn').forEach(function (b) {
+                            b.classList.toggle('is-active', (b.getAttribute('data-section-label-align') || '') === 'left');
                         });
                         if (sumTotalsBoldEl) { sumTotalsBoldEl.checked = true; }
                         setSumTotalsColor('var(--clr-primary)');
@@ -5537,6 +5567,10 @@
                     if (sumTitleEl) {
                         sumTitleEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
+                    if (sectionLabelEl) {
+                        sectionLabelEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        sectionLabelEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                    }
                     if (sumTitleUppercaseEl) {
                         sumTitleUppercaseEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
@@ -5655,6 +5689,8 @@
                             include_sum_totals_row: !!state.sumIncludeTotalsRow,
                             include_totals_table: !!state.includeTotalsTable,
                             totals_table_title: state.totalsTableTitle || 'Totales',
+                            section_label: state.sectionLabel || 'Desglose',
+                            section_label_align: state.sectionLabelAlign || 'left',
                             totals_table_align: state.totalsTableAlign || 'left',
                             totals_table_cell_font_size_px: state.totalsCellFontPx || 12,
                             totals_table_header_font_size_px: state.totalsHeaderFontPx || 12,

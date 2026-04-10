@@ -376,6 +376,20 @@ class TemporaryModuleWordPdfService
         if (!in_array($dataTableAlign, ['left', 'center', 'right', 'stretch'], true)) {
             $dataTableAlign = 'left';
         }
+        $sectionLabelRaw = trim((string) ($exportConfig['section_label'] ?? 'Desglose'));
+        if ($sectionLabelRaw === '') {
+            $sectionLabelRaw = 'Desglose';
+        }
+        $sectionLabelAlign = strtolower((string) ($exportConfig['section_label_align'] ?? 'left'));
+        if (!in_array($sectionLabelAlign, ['left', 'center', 'right'], true)) {
+            $sectionLabelAlign = 'left';
+        }
+        $sectionLabelJc = match ($sectionLabelAlign) {
+            'center' => Jc::CENTER,
+            'right' => Jc::END,
+            default => Jc::START,
+        };
+        $sectionLabel = $this->normalizeExportHeading($sectionLabelRaw, $headersUppercase);
         $cellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['records_cell_font_size_px'] ?? $exportConfig['cell_font_size_px'] ?? $exportConfig['cellFontPx'] ?? null);
         $cellFontSizePt = $this->cellPxToWordPt($cellFontSizePx);
         $sumTableCellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['sum_table_cell_font_size_px'] ?? $cellFontSizePx);
@@ -1053,7 +1067,7 @@ class TemporaryModuleWordPdfService
                 $hdrDateCell->addText('Fecha y hora de corte: '.$fechaCorteStr, ['name' => $exportFontName, 'size' => 9], ['alignment' => Jc::END, 'spaceAfter' => 120]);
 
                 $section->addTextBreak(1);
-                $section->addText($this->normalizeExportHeading('Desglose', $headersUppercase), ['name' => $exportFontName, 'bold' => true, 'size' => 11], ['spaceAfter' => 120]);
+                $section->addText($sectionLabel, ['name' => $exportFontName, 'bold' => true, 'size' => 11], ['spaceAfter' => 120, 'alignment' => $sectionLabelJc]);
             }
 
             $tblStyle = [
@@ -1254,7 +1268,8 @@ class TemporaryModuleWordPdfService
             'totalsTableAlign' => $totalsTableAlign,
             'totalsTable' => $totalsTable,
             'tableAlign' => $dataTableAlign,
-            'sectionLabel' => $this->normalizeExportHeading('Desglose', $headersUppercase),
+            'sectionLabel' => $sectionLabel,
+            'sectionLabelAlign' => $sectionLabelAlign,
             'fontFamily' => $exportFontName,
             'cellFontSizePx' => $cellFontSizePx,
             'headerFontSizePx' => $headerFontSizePx,
