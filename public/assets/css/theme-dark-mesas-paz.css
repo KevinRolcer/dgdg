@@ -570,17 +570,18 @@ html.theme-dark span.flatpickr-weekday {
 
 html.theme-dark .flatpickr-premium .flatpickr-weekdays {
     width: 100% !important;
-    display: flex !important;
-    justify-content: space-between !important;
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 2px !important;
 }
 
 html.theme-dark .flatpickr-premium span.flatpickr-weekday {
     background: transparent !important;
     color: var(--clr-text-light) !important;
     font-size: 13px !important;
-    flex: 1 !important;
     max-width: none !important;
     font-weight: 700 !important;
+    text-align: center;
 }
 
 html.theme-dark .flatpickr-day {
@@ -595,21 +596,27 @@ html.theme-dark .flatpickr-premium .flatpickr-day {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    max-width: calc(14.28% - 2px) !important;
-    flex-basis: calc(14.28% - 2px) !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
     height: 48px !important;
     line-height: 46px !important;
 }
 
-html.theme-dark .flatpickr-premium .flatpickr-days,
-html.theme-dark .flatpickr-premium .dayContainer {
+html.theme-dark .flatpickr-premium .flatpickr-days {
     width: 100% !important;
-    min-width: 100% !important;
+    min-width: 0 !important;
     max-width: 100% !important;
-    display: flex !important;
-    flex-wrap: wrap !important;
-    justify-content: flex-start !important;
+}
+
+html.theme-dark .flatpickr-premium .dayContainer {
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
     gap: 2px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
 }
 
 html.theme-dark .flatpickr-day:hover,

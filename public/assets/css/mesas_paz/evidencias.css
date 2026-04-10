@@ -89,10 +89,11 @@
     background: transparent !important;
     height: auto !important;
     padding: 0 !important;
-    display: flex !important;
-    justify-content: center !important;
-    gap: 4px !important;
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 2px !important;
     margin-bottom: 0.75rem !important;
+    width: 100% !important;
 }
 
 .flatpickr-premium span.flatpickr-weekday {
@@ -100,7 +101,6 @@
     font-weight: 700 !important;
     font-size: 0.8rem !important;
     text-transform: capitalize;
-    flex: 1;
     max-width: none !important;
     text-align: center;
     padding: 0.25rem 0;
@@ -123,8 +123,10 @@
 }
 
 .flatpickr-premium .flatpickr-day {
-    max-width: calc(14.28% - 2px) !important;
-    width: calc(14.28% - 2px) !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
     height: 48px !important;
     line-height: normal !important;
     background: transparent !important;
@@ -143,15 +145,20 @@
     cursor: pointer;
 }
 
-.flatpickr-premium .flatpickr-days,
-.flatpickr-premium .dayContainer {
+.flatpickr-premium .flatpickr-days {
     width: 100% !important;
-    min-width: 100% !important;
+    min-width: 0 !important;
     max-width: 100% !important;
-    display: flex !important;
-    flex-wrap: wrap !important;
-    justify-content: flex-start !important;
+    padding: 0 !important;
+}
+
+.flatpickr-premium .dayContainer {
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
     gap: 2px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
     padding: 0 !important;
 }
 
@@ -416,10 +423,6 @@ html.theme-dark #rangoFechasPresentacionModal .mp-ppt-modal-dialog .btn-close {
     width: 100% !important;
     min-width: 100% !important;
     max-width: 100% !important;
-}
-
-#rangoFechasPresentacionModal .mp-ppt-controls-side .flatpickr-day {
-    max-width: 14.28% !important;
 }
 
 #rangoFechasPresentacionModal .mp-ppt-preview-side {

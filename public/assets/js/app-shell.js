@@ -793,11 +793,12 @@ document.addEventListener('DOMContentLoaded', function () {
         var rect = dayCell.getBoundingClientRect();
         var tw = el.offsetWidth;
         var th = el.offsetHeight;
+        var edgeGap = 2;
         var left = rect.left + rect.width / 2 - tw / 2;
-        var top = rect.top - th - 8;
+        var top = rect.top - th - edgeGap;
         if (left < 8) left = 8;
         if (left + tw > window.innerWidth - 8) left = window.innerWidth - tw - 8;
-        if (top < 8) top = rect.bottom + 8;
+        if (top < 8) top = rect.bottom + edgeGap;
         el.style.left = left + 'px';
         el.style.top = top + 'px';
     }

@@ -2380,8 +2380,9 @@ class TemporaryModuleController extends Controller
         }
 
         $columns = [];
-        $columns[] = ['key' => 'item', 'label' => 'Ítem', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 4];
-        $columns[] = ['key' => 'microrregion', 'label' => 'Microrregión', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 18];
+        $columns[] = ['key' => 'item', 'label' => '#', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 4];
+        $columns[] = ['key' => 'delegacion_numero', 'label' => 'Delegación', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 10];
+        $columns[] = ['key' => 'cabecera_microrregion', 'label' => 'Cabecera', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 18];
         foreach ($exportColumns as $col) {
             $info = $maxWidths[$col['key']] ?? ['chars' => 15];
             $columns[] = [
@@ -2410,6 +2411,7 @@ class TemporaryModuleController extends Controller
                 $microrregionMeta[(int) $row->id] = [
                     'label' => $label,
                     'number' => $number,
+                    'cabecera' => $name,
                 ];
             }
         }

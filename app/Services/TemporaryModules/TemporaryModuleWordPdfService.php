@@ -100,10 +100,10 @@ class TemporaryModuleWordPdfService
 
         if ($columnsCfg === []) {
              $cols = [];
-             // Agregar columna virtual de Ítem
-             $cols[] = ['key' => 'item', 'label' => 'Ítem', 'color' => ''];
-             // Agregar columna virtual de Microrregión
-             $cols[] = ['key' => 'microrregion', 'label' => 'Microrregión', 'color' => ''];
+             // Agregar columnas virtuales fijas al inicio
+             $cols[] = ['key' => 'item', 'label' => '#', 'color' => ''];
+             $cols[] = ['key' => 'delegacion_numero', 'label' => 'Delegación', 'color' => ''];
+             $cols[] = ['key' => 'cabecera_microrregion', 'label' => 'Cabecera', 'color' => ''];
              foreach ($temporaryModule->fields as $field) {
                  $cols[] = [
                      'key' => $field->key,
@@ -302,6 +302,7 @@ class TemporaryModuleWordPdfService
                 return [(int) $row->id => [
                     'number' => $number,
                     'name' => $name,
+                    'cabecera' => $name,
                     'label' => $label,
                 ]];
             });
@@ -359,6 +360,21 @@ class TemporaryModuleWordPdfService
         }
         $sumTitleFontSizePx = max(10, min(36, (int) ($exportConfig['sum_title_font_size_px'] ?? 14)));
         $sumTitleFontSizePt = max(8, min(27, (int) round($sumTitleFontSizePx * 0.75)));
+        $sumShowItem = !array_key_exists('sum_show_item', $exportConfig) || !empty($exportConfig['sum_show_item']);
+        $sumItemLabel = trim((string) ($exportConfig['sum_item_label'] ?? '#'));
+        if ($sumItemLabel === '') {
+            $sumItemLabel = '#';
+        }
+        $sumShowDelegacion = !array_key_exists('sum_show_delegacion', $exportConfig) || !empty($exportConfig['sum_show_delegacion']);
+        $sumDelegacionLabel = trim((string) ($exportConfig['sum_delegacion_label'] ?? 'Delegación'));
+        if ($sumDelegacionLabel === '') {
+            $sumDelegacionLabel = 'Delegación';
+        }
+        $sumShowCabecera = !array_key_exists('sum_show_cabecera', $exportConfig) || !empty($exportConfig['sum_show_cabecera']);
+        $sumCabeceraLabel = trim((string) ($exportConfig['sum_cabecera_label'] ?? 'Cabecera'));
+        if ($sumCabeceraLabel === '') {
+            $sumCabeceraLabel = 'Cabecera';
+        }
         $sumGroupColorHex = $this->cssColorToHex((string) ($exportConfig['sum_group_color'] ?? 'var(--clr-primary)'));
         $sumIncludeTotalsRow = !empty($exportConfig['include_sum_totals_row']);
         $includeTotalsTable = !empty($exportConfig['include_totals_table']);
@@ -879,8 +895,33 @@ class TemporaryModuleWordPdfService
                 }
                 $hasSumGroupHeaders = collect($sumCombinedCols)->contains(fn ($col) => ((string) ($col['group'] ?? '')) !== '');
                 $sumRows = $sumTable['rows'];
+                $sumGroupByCurrent = (string) ($sumTable['group_by'] ?? $sumGroupBy);
+                $sumLeadCols = [];
+                if ($sumShowItem) {
+                    $sumLeadCols[] = ['key' => 'item', 'label' => $this->normalizeExportHeading($sumItemLabel, $headersUppercase)];
+                }
+                if ($sumGroupByCurrent === 'microrregion') {
+                    if ($sumShowDelegacion) {
+                        $sumLeadCols[] = ['key' => 'delegacion_numero', 'label' => $this->normalizeExportHeading($sumDelegacionLabel, $headersUppercase)];
+                    }
+                    if ($sumShowCabecera) {
+                        $sumLeadCols[] = ['key' => 'cabecera_microrregion', 'label' => $this->normalizeExportHeading($sumCabeceraLabel, $headersUppercase)];
+                    }
+                } else {
+                    $sumLeadCols[] = ['key' => 'group', 'label' => $sumGroupLabel];
+                    if ($sumShowDelegacion) {
+                        $sumLeadCols[] = ['key' => 'delegacion_numero', 'label' => $this->normalizeExportHeading($sumDelegacionLabel, $headersUppercase)];
+                    }
+                    if ($sumShowCabecera) {
+                        $sumLeadCols[] = ['key' => 'cabecera_microrregion', 'label' => $this->normalizeExportHeading($sumCabeceraLabel, $headersUppercase)];
+                    }
+                }
+                if ($sumLeadCols === []) {
+                    $sumLeadCols[] = ['key' => 'group', 'label' => $sumGroupLabel];
+                }
                 $sumRowCount = count($sumRows);
-                $sumColumnCount = max(2, count($sumCombinedCols) + 1);
+                $sumLeadCount = count($sumLeadCols);
+                $sumColumnCount = max(2, count($sumCombinedCols) + $sumLeadCount);
                 $sumDensityScore = $sumRowCount + (int) ceil($sumColumnCount * 1.8) + ($orientationConfig === 'landscape' ? 4 : 0);
                 $sumCompactLogoHeight = $sumDensityScore >= 34 ? 28 : 34;
                 $sumCompactTitlePt = max(11, min($titleFontSizePt, $sumDensityScore >= 34 ? 13 : 14));
@@ -890,8 +931,9 @@ class TemporaryModuleWordPdfService
                 $sumGroupHeaderCellPt = max(7, $sumGroupHeaderFontSizePt - ($sumDensityScore >= 34 ? 3 : 2));
                 $sumCellPt = max(7, $sumTableCellFontSizePt - ($sumDensityScore >= 34 ? 2 : 1));
                 $sumCellMarginTwips = $sumDensityScore >= 34 ? 30 : 50;
-                $sumFirstColTwips = max(1200, min(2600, (int) round($usableTableTwips * 0.24)));
-                $sumDataColTwips = max(620, (int) floor(max(1200, $usableTableTwips - $sumFirstColTwips) / max(1, count($sumCombinedCols))));
+                $sumLeadColTwips = max(900, min(2200, (int) round($usableTableTwips * 0.16)));
+                $sumLeadColsTwipsTotal = $sumLeadColTwips * max(1, $sumLeadCount);
+                $sumDataColTwips = max(620, (int) floor(max(1200, $usableTableTwips - $sumLeadColsTwipsTotal) / max(1, count($sumCombinedCols))));
 
                 $sumTitleText = $this->normalizeExportHeading($sumTitle, $headersUppercase);
                 if ($sumTitleCase === 'upper') {
@@ -922,7 +964,9 @@ class TemporaryModuleWordPdfService
                 ]);
                 if ($hasSumGroupHeaders) {
                     $sumTbl->addRow();
-                    $sumTbl->addCell($sumFirstColTwips, ['bgColor' => $sumGroupColorHex, 'valign' => 'center']);
+                    for ($leadIdx = 0; $leadIdx < $sumLeadCount; $leadIdx++) {
+                        $sumTbl->addCell($sumLeadColTwips, ['bgColor' => $sumGroupColorHex, 'valign' => 'center']);
+                    }
                     $spanCount = 0;
                     $spanGroup = null;
                     foreach ($sumCombinedCols as $idx => $col) {
@@ -950,8 +994,10 @@ class TemporaryModuleWordPdfService
                 }
 
                 $sumTbl->addRow();
-                $sumTbl->addCell($sumFirstColTwips, ['bgColor' => $sumGroupColorHex, 'valign' => 'center'])
-                    ->addText((string) $sumGroupLabel, ['name' => $exportFontName, 'bold' => true, 'size' => $sumHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                foreach ($sumLeadCols as $leadCol) {
+                    $sumTbl->addCell($sumLeadColTwips, ['bgColor' => $sumGroupColorHex, 'valign' => 'center'])
+                        ->addText((string) ($leadCol['label'] ?? ''), ['name' => $exportFontName, 'bold' => true, 'size' => $sumHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                }
                 foreach ($sumCombinedCols as $col) {
                     $sumColGroup = trim((string) ($col['group'] ?? ''));
                     $sumColGroupKey = mb_strtolower($sumColGroup, 'UTF-8');
@@ -960,9 +1006,22 @@ class TemporaryModuleWordPdfService
                         ->addText((string) ($col['label'] ?? ''), ['name' => $exportFontName, 'bold' => true, 'size' => $sumHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                 }
 
-                foreach ($sumRows as $row) {
+                foreach ($sumRows as $rowIndex => $row) {
                     $sumTbl->addRow();
-                    $sumTbl->addCell($sumFirstColTwips, ['valign' => 'center'])->addText((string) ($row['group'] ?? ''), ['name' => $exportFontName, 'size' => $sumCellPt], ['alignment' => Jc::CENTER]);
+                    foreach ($sumLeadCols as $leadCol) {
+                        $leadKey = (string) ($leadCol['key'] ?? 'group');
+                        $leadText = '';
+                        if ($leadKey === 'item') {
+                            $leadText = (string) ($rowIndex + 1);
+                        } elseif ($leadKey === 'delegacion_numero') {
+                            $leadText = (string) ($row['mr_number'] ?? '');
+                        } elseif ($leadKey === 'cabecera_microrregion') {
+                            $leadText = (string) ($row['mr_cabecera'] ?? '');
+                        } else {
+                            $leadText = (string) ($row['group'] ?? '');
+                        }
+                        $sumTbl->addCell($sumLeadColTwips, ['valign' => 'center'])->addText($leadText, ['name' => $exportFontName, 'size' => $sumCellPt], ['alignment' => Jc::CENTER]);
+                    }
 
                     foreach ($sumCombinedCols as $col) {
                         $id = (string) ($col['id'] ?? '');
@@ -984,11 +1043,13 @@ class TemporaryModuleWordPdfService
                     $sumTotalsBoldCfg = !array_key_exists('totals_bold', $sumTable) || !empty($sumTable['totals_bold']);
                     $sumTotalsTextColorCfg = (string) ($sumTable['totals_text_color'] ?? '861E34');
                     $sumTbl->addRow();
-                    $sumTbl->addCell($sumFirstColTwips, ['valign' => 'center'])->addText(
-                        $this->normalizeExportHeading('Total', $headersUppercase),
-                        ['name' => $exportFontName, 'size' => $sumCellPt, 'bold' => $sumTotalsBoldCfg, 'color' => $sumTotalsTextColorCfg],
-                        ['alignment' => Jc::CENTER]
-                    );
+                    foreach ($sumLeadCols as $leadIdx => $leadCol) {
+                        $sumTbl->addCell($sumLeadColTwips, ['valign' => 'center'])->addText(
+                            $leadIdx === 0 ? $this->normalizeExportHeading('Total', $headersUppercase) : '',
+                            ['name' => $exportFontName, 'size' => $sumCellPt, 'bold' => $sumTotalsBoldCfg, 'color' => $sumTotalsTextColorCfg],
+                            ['alignment' => Jc::CENTER]
+                        );
+                    }
 
                     foreach ($sumCombinedCols as $col) {
                         $includeTotal = !array_key_exists('include_total', $col) || !empty($col['include_total']);
@@ -1150,7 +1211,7 @@ class TemporaryModuleWordPdfService
                 $hasImageInRow = false;
                 foreach ($columns as $c) {
                     $k = (string) ($c['key'] ?? '');
-                    if ($k === '' || $k === 'item' || $k === 'microrregion') {
+                    if ($k === '' || in_array($k, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true)) {
                         continue;
                     }
                     $v = $entry->data[$k] ?? null;
@@ -1185,6 +1246,20 @@ class TemporaryModuleWordPdfService
                     if ($key === 'microrregion') {
                         $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                         $text = (string) ($meta['label'] ?? $meta->label ?? '');
+                        $w = $columnTwips[$idx] ?? null;
+                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold], ['alignment' => Jc::CENTER]);
+                        continue;
+                    }
+                    if ($key === 'delegacion_numero') {
+                        $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+                        $text = (string) ($meta['number'] ?? $meta->number ?? '');
+                        $w = $columnTwips[$idx] ?? null;
+                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold], ['alignment' => Jc::CENTER]);
+                        continue;
+                    }
+                    if ($key === 'cabecera_microrregion') {
+                        $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+                        $text = (string) ($meta['cabecera'] ?? $meta->cabecera ?? '');
                         $w = $columnTwips[$idx] ?? null;
                         $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold], ['alignment' => Jc::CENTER]);
                         continue;
@@ -1259,6 +1334,12 @@ class TemporaryModuleWordPdfService
             'sumTitleCase' => $sumTitleCase,
             'sumTitleAlign' => $sumTitleAlign,
             'sumTitleFontSizePx' => $sumTitleFontSizePx,
+            'sumShowItem' => $sumShowItem,
+            'sumItemLabel' => $this->normalizeExportHeading($sumItemLabel, $headersUppercase),
+            'sumShowDelegacion' => $sumShowDelegacion,
+            'sumDelegacionLabel' => $this->normalizeExportHeading($sumDelegacionLabel, $headersUppercase),
+            'sumShowCabecera' => $sumShowCabecera,
+            'sumCabeceraLabel' => $this->normalizeExportHeading($sumCabeceraLabel, $headersUppercase),
             'sumGroupColor' => '#'.$sumGroupColorHex,
             'sumIncludeTotalsRow' => $sumIncludeTotalsRow,
             'sumTotalsBold' => $sumTotalsBold,
@@ -1479,7 +1560,7 @@ class TemporaryModuleWordPdfService
      * @param  array<int,array{id:string,label:string,group?:string,field_key:string,agg:string,match_value?:string}>  $sumMetrics
      * @param  array<int,array{id:string,label:string,group?:string,op:string,metric_ids:array<int,string>,base_metric_id?:string}>  $sumFormulas
      * @param  array<string,string>  $fieldLabels
-    * @return array{group_label:string,metric_columns:array<int,array{id:string,label:string,group:string,include_total:bool}>,formula_columns:array<int,array{id:string,label:string,group:string,op:string,base_metric_id:string,include_total:bool}>,metric_labels:array<string,string>,formula_labels:array<string,string>,rows:array<int,array{group:string,metrics:array<string,float>,formulas:array<string,float>}>}
+    * @return array{group_by:string,group_label:string,metric_columns:array<int,array{id:string,label:string,group:string,include_total:bool}>,formula_columns:array<int,array{id:string,label:string,group:string,op:string,base_metric_id:string,include_total:bool}>,metric_labels:array<string,string>,formula_labels:array<string,string>,rows:array<int,array{group:string,mr_number:string,mr_cabecera:string,metrics:array<string,float>,formulas:array<string,float>}>}
      */
     private function buildSumTableData(
         Collection $entries,
@@ -1526,19 +1607,27 @@ class TemporaryModuleWordPdfService
         $orderedKeys = [];
         foreach ($entries as $entry) {
             $entryData = (array) ($entry->data ?? []);
+            $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+            $mrNumber = (string) ($meta['number'] ?? $meta->number ?? '');
+            $mrCabecera = (string) ($meta['cabecera'] ?? $meta->cabecera ?? '');
             if ($groupBy === 'municipio') {
                 $groupLabel = $this->resolveMunicipioGroupLabel($entryData, $fieldLabels);
             } else {
-                $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                 $groupLabel = (string) (($meta['label'] ?? null) ?: 'Sin microrregión');
             }
             $groupKey = $groupBy.':'.$groupLabel;
             if (!isset($rowsByKey[$groupKey])) {
                 $orderedKeys[] = $groupKey;
-                $rowsByKey[$groupKey] = ['group' => $groupLabel, 'metrics' => [], 'formulas' => []];
+                $rowsByKey[$groupKey] = ['group' => $groupLabel, 'mr_number' => $mrNumber, 'mr_cabecera' => $mrCabecera, 'metrics' => [], 'formulas' => []];
                 foreach ($sumMetrics as $metric) {
                     $rowsByKey[$groupKey]['metrics'][(string) $metric['id']] = 0.0;
                 }
+            }
+            if (($rowsByKey[$groupKey]['mr_number'] ?? '') === '' && $mrNumber !== '') {
+                $rowsByKey[$groupKey]['mr_number'] = $mrNumber;
+            }
+            if (($rowsByKey[$groupKey]['mr_cabecera'] ?? '') === '' && $mrCabecera !== '') {
+                $rowsByKey[$groupKey]['mr_cabecera'] = $mrCabecera;
             }
 
             foreach ($sumMetrics as $metric) {
@@ -1695,6 +1784,7 @@ class TemporaryModuleWordPdfService
         }
 
         return [
+            'group_by' => $groupBy,
             'group_label' => $groupBy === 'municipio' ? 'Municipio' : 'Microrregión',
             'metric_columns' => $metricColumns,
             'formula_columns' => $formulaColumns,
@@ -1861,7 +1951,7 @@ class TemporaryModuleWordPdfService
         if ($selectedKeys === []) {
             foreach ($columns as $column) {
                 $colKey = (string) ($column['key'] ?? '');
-                if ($colKey === '' || in_array($colKey, ['item', 'microrregion'], true) || str_starts_with($colKey, '__calc_')) {
+                if ($colKey === '' || in_array($colKey, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true) || str_starts_with($colKey, '__calc_')) {
                     continue;
                 }
                 $selectedKeys[] = $colKey;
@@ -2002,7 +2092,7 @@ class TemporaryModuleWordPdfService
     private function applyColumnEmptyFillValue(mixed $value, array $column, string $fieldType): mixed
     {
         $key = (string) ($column['key'] ?? '');
-        if ($key === 'item' || $key === 'microrregion') {
+        if (in_array($key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true)) {
             return $value;
         }
         if (in_array(strtolower(trim($fieldType)), ['image', 'file', 'foto'], true)) {
@@ -2408,7 +2498,7 @@ class TemporaryModuleWordPdfService
         foreach ($entries as $entry) {
             foreach ($columns as $column) {
                 $key = (string) ($column['key'] ?? '');
-                if ($key === '' || $key === 'item' || $key === 'microrregion') {
+                if ($key === '' || in_array($key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true)) {
                     continue;
                 }
 

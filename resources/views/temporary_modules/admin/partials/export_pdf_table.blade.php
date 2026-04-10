@@ -582,6 +582,15 @@
     $sumTitleAlign = strtolower((string) ($sumTitleAlign ?? 'center'));
     if (!in_array($sumTitleAlign, ['left', 'center', 'right'], true)) { $sumTitleAlign = 'center'; }
     $sumTitleFontSizePx = max(10, min(36, (int) ($sumTitleFontSizePx ?? 14)));
+    $sumShowItem = !array_key_exists('sumShowItem', get_defined_vars()) ? true : !empty($sumShowItem);
+    $sumItemLabel = trim((string) ($sumItemLabel ?? '#'));
+    if ($sumItemLabel === '') { $sumItemLabel = '#'; }
+    $sumShowDelegacion = !array_key_exists('sumShowDelegacion', get_defined_vars()) ? true : !empty($sumShowDelegacion);
+    $sumDelegacionLabel = trim((string) ($sumDelegacionLabel ?? 'Delegación'));
+    if ($sumDelegacionLabel === '') { $sumDelegacionLabel = 'Delegación'; }
+    $sumShowCabecera = !array_key_exists('sumShowCabecera', get_defined_vars()) ? true : !empty($sumShowCabecera);
+    $sumCabeceraLabel = trim((string) ($sumCabeceraLabel ?? 'Cabecera'));
+    if ($sumCabeceraLabel === '') { $sumCabeceraLabel = 'Cabecera'; }
     $sumHeadingText = $sumTitle.' por '.($sumTable['group_label'] ?? 'Grupo');
     if (!empty($headersUppercase)) {
         $sumHeadingText = mb_strtoupper($sumHeadingText);
@@ -599,7 +608,19 @@
         $sumRawFormulaCols = count((array) ($sumTable['formula_labels'] ?? []));
     }
     $sumRowCount = count($sumTable['rows'] ?? []);
-    $sumColumnCount = max(2, 1 + $sumRawMetricCols + $sumRawFormulaCols);
+    $sumBy = (string) ($sumTable['group_by'] ?? 'microrregion');
+    $sumLeadCount = 0;
+    if ($sumShowItem) { $sumLeadCount++; }
+    if ($sumBy === 'microrregion') {
+        if ($sumShowDelegacion) { $sumLeadCount++; }
+        if ($sumShowCabecera) { $sumLeadCount++; }
+    } else {
+        $sumLeadCount++;
+        if ($sumShowDelegacion) { $sumLeadCount++; }
+        if ($sumShowCabecera) { $sumLeadCount++; }
+    }
+    $sumLeadCount = max(1, $sumLeadCount);
+    $sumColumnCount = max(2, $sumLeadCount + $sumRawMetricCols + $sumRawFormulaCols);
     $sumDensityScore = $sumRowCount + (int) ceil($sumColumnCount * 1.8) + (($orientation ?? 'portrait') === 'landscape' ? 4 : 0);
     $sumHeadingFontSizePx = max(10, min($sumTitleFontSizePx, $sumDensityScore >= 34 ? 11 : 12));
     $sumHeaderFontPx = max(7, $sumTableHeaderFontSizePx - ($sumDensityScore >= 34 ? 3 : 2));
@@ -661,6 +682,29 @@
     $sumTotalsBold = !array_key_exists('sumTotalsBold', get_defined_vars()) ? (!array_key_exists('totals_bold', $sumTable) || !empty($sumTable['totals_bold'])) : !empty($sumTotalsBold);
     $sumTotalsTextColor = (string) ($sumTotalsTextColor ?? ('#'.((string) ($sumTable['totals_text_color'] ?? '861E34'))));
     $sumGroupHeaderColors = is_array($groupHeaderColors ?? null) ? $groupHeaderColors : [];
+    $sumLeadColumns = [];
+    if ($sumShowItem) {
+        $sumLeadColumns[] = ['key' => 'item', 'label' => $sumItemLabel];
+    }
+    if (($sumTable['group_by'] ?? 'microrregion') === 'microrregion') {
+        if ($sumShowDelegacion) {
+            $sumLeadColumns[] = ['key' => 'delegacion_numero', 'label' => $sumDelegacionLabel];
+        }
+        if ($sumShowCabecera) {
+            $sumLeadColumns[] = ['key' => 'cabecera_microrregion', 'label' => $sumCabeceraLabel];
+        }
+    } else {
+        $sumLeadColumns[] = ['key' => 'group', 'label' => (string) ($sumTable['group_label'] ?? 'Grupo')];
+        if ($sumShowDelegacion) {
+            $sumLeadColumns[] = ['key' => 'delegacion_numero', 'label' => $sumDelegacionLabel];
+        }
+        if ($sumShowCabecera) {
+            $sumLeadColumns[] = ['key' => 'cabecera_microrregion', 'label' => $sumCabeceraLabel];
+        }
+    }
+    if ($sumLeadColumns === []) {
+        $sumLeadColumns[] = ['key' => 'group', 'label' => (string) ($sumTable['group_label'] ?? 'Grupo')];
+    }
     $sumGroupSpans = [];
     if ($sumHasGroups) {
         foreach ($sumCombinedColumns as $col) {
@@ -677,7 +721,9 @@
     <thead>
     @if($sumHasGroups)
     <tr>
-        <th style="background:{{ $sumGroupColor }};color:#fff;"></th>
+        @foreach($sumLeadColumns as $lead)
+            <th style="background:{{ $sumGroupColor }};color:#fff;"></th>
+        @endforeach
         @foreach($sumGroupSpans as $gs)
             @php
                 $sumGroupKey = mb_strtolower(trim((string) ($gs['label'] ?? '')));
@@ -688,7 +734,9 @@
     </tr>
     @endif
     <tr>
-        <th style="background:{{ $sumGroupColor }};color:#fff;">{{ $sumTable['group_label'] ?? 'Grupo' }}</th>
+        @foreach($sumLeadColumns as $lead)
+            <th style="background:{{ $sumGroupColor }};color:#fff;">{{ $lead['label'] }}</th>
+        @endforeach
         @foreach ($sumCombinedColumns as $col)
             <th>{{ $col['label'] }}</th>
         @endforeach
@@ -697,7 +745,21 @@
     <tbody>
     @foreach (($sumTable['rows'] ?? []) as $row)
         <tr>
-            <td>{{ $row['group'] ?? '' }}</td>
+            @foreach($sumLeadColumns as $leadIndex => $lead)
+                @php
+                    $leadKey = (string) ($lead['key'] ?? 'group');
+                    if ($leadKey === 'item') {
+                        $leadVal = (string) ($loop->parent->index + 1);
+                    } elseif ($leadKey === 'delegacion_numero') {
+                        $leadVal = (string) ($row['mr_number'] ?? '');
+                    } elseif ($leadKey === 'cabecera_microrregion') {
+                        $leadVal = (string) ($row['mr_cabecera'] ?? '');
+                    } else {
+                        $leadVal = (string) ($row['group'] ?? '');
+                    }
+                @endphp
+                <td>{{ $leadVal }}</td>
+            @endforeach
             @foreach ($sumCombinedColumns as $col)
                 @php
                     $id = (string) ($col['id'] ?? '');
@@ -719,7 +781,9 @@
             $totalsLabel = !empty($headersUppercase) ? mb_strtoupper('Total') : 'Total';
         @endphp
         <tr>
-            <td style="color: {{ $sumTotalsTextColor }}; {{ $sumTotalsBold ? 'font-weight:700;' : '' }}">{{ $totalsLabel }}</td>
+            @foreach($sumLeadColumns as $leadIndex => $lead)
+                <td style="color: {{ $sumTotalsTextColor }}; {{ $sumTotalsBold ? 'font-weight:700;' : '' }}">{{ $leadIndex === 0 ? $totalsLabel : '' }}</td>
+            @endforeach
             @foreach ($sumCombinedColumns as $col)
                 @php
                     $includeTotal = !array_key_exists('include_total', $col) || !empty($col['include_total']);
@@ -892,6 +956,18 @@
                         @endphp
                         {{-- Sin rowspan: Dompdf al partir la tabla entre páginas rompía columnas --}}
                         <td style="vertical-align: middle; text-align: center; {{ $baseW }} {{ $cellBoldStyle }}">{{ $lMrTxt }}</td>
+                    @elseif ($key === 'delegacion_numero')
+                        @php
+                            $lMeta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+                            $lMrNumber = (string) ($lMeta['number'] ?? ($lMeta->number ?? ''));
+                        @endphp
+                        <td style="vertical-align: middle; text-align: center; {{ $baseW }} {{ $cellBoldStyle }}">{{ $lMrNumber }}</td>
+                    @elseif ($key === 'cabecera_microrregion')
+                        @php
+                            $lMeta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+                            $lMrCabecera = (string) ($lMeta['cabecera'] ?? ($lMeta->cabecera ?? ''));
+                        @endphp
+                        <td style="vertical-align: middle; text-align: center; {{ $baseW }} {{ $cellBoldStyle }}">{{ $lMrCabecera }}</td>
                     @elseif (
                         is_string($key)
                         && str_starts_with($key, '__calc_')
@@ -913,7 +989,7 @@
                             if ($effectiveSelected === []) {
                                 foreach ($colHeaders as $opCol) {
                                     $opKey = (string) ($opCol['key'] ?? '');
-                                    if ($opKey === '' || in_array($opKey, ['item', 'microrregion'], true) || str_starts_with($opKey, '__calc_')) {
+                                    if ($opKey === '' || in_array($opKey, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true) || str_starts_with($opKey, '__calc_')) {
                                         continue;
                                     }
                                     $effectiveSelected[] = $opKey;
@@ -961,7 +1037,7 @@
                             $fillValue = (string) ($col['fill_empty_value'] ?? '');
                             $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
                             $isImageType = $fieldType === 'image' || $fieldType === 'file' || $fieldType === 'foto';
-                            if (!$isImageType && !in_array((string) $key, ['item', 'microrregion'], true) && in_array($fillMode, ['auto', 'custom'], true) && $operationsValueIsEmpty($val)) {
+                            if (!$isImageType && !in_array((string) $key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true) && in_array($fillMode, ['auto', 'custom'], true) && $operationsValueIsEmpty($val)) {
                                 if ($fillMode === 'custom') {
                                     $val = $fillValue;
                                 } else {
