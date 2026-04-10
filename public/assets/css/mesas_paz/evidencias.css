@@ -85,25 +85,35 @@
     display: block;
 }
 
+/* Flatpickr 4.x: los 7 nombres van dentro de .flatpickr-weekdaycontainer, no como hijos directos */
 .flatpickr-premium .flatpickr-weekdays {
     background: transparent !important;
     height: auto !important;
     padding: 0 !important;
+    display: block !important;
+    margin-bottom: 0.75rem !important;
+    width: 100% !important;
+    overflow: visible !important;
+}
+
+.flatpickr-premium .flatpickr-weekdays .flatpickr-weekdaycontainer {
     display: grid !important;
     grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
     gap: 2px !important;
-    margin-bottom: 0.75rem !important;
     width: 100% !important;
+    min-width: 0 !important;
 }
 
 .flatpickr-premium span.flatpickr-weekday {
     color: var(--cal-weekday-text, var(--clr-text-light)) !important;
     font-weight: 700 !important;
-    font-size: 0.8rem !important;
+    font-size: 0.72rem !important;
     text-transform: capitalize;
     max-width: none !important;
     text-align: center;
-    padding: 0.25rem 0;
+    padding: 0.3rem 0.1rem;
+    line-height: 1.2 !important;
+    min-width: 0 !important;
 }
 
 .flatpickr-innerContainer {
@@ -141,7 +151,7 @@
     box-shadow: none !important;
     margin: 0 !important;
     padding: 0 !important;
-    transition: all 0.2s ease;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     cursor: pointer;
 }
 
@@ -191,6 +201,20 @@
     font-weight: 700 !important;
 }
 
+.flatpickr-premium .flatpickr-day.today.inRange:not(.startRange):not(.endRange) {
+    border: 1px solid rgba(199, 155, 102, 0.55) !important;
+    background: rgba(199, 155, 102, 0.14) !important;
+    color: var(--cal-cell-text, var(--clr-text-main)) !important;
+    box-shadow: -3px 0 0 rgba(199, 155, 102, 0.1), 3px 0 0 rgba(199, 155, 102, 0.1) !important;
+}
+
+.flatpickr-premium .flatpickr-day.today.startRange,
+.flatpickr-premium .flatpickr-day.today.endRange {
+    border: 2px solid var(--clr-accent, var(--clr-primary)) !important;
+    color: var(--clr-accent, var(--clr-primary)) !important;
+    box-shadow: none !important;
+}
+
 .flatpickr-day.selected,
 .flatpickr-day.startRange,
 .flatpickr-day.endRange {
@@ -205,10 +229,27 @@
     border: 1px solid transparent !important;
 }
 
+.flatpickr-premium .flatpickr-day.inRange:not(.startRange):not(.endRange) {
+    background: rgba(199, 155, 102, 0.16) !important;
+    border: 1px solid rgba(199, 155, 102, 0.28) !important;
+    color: var(--cal-cell-text, var(--clr-text-main)) !important;
+    box-shadow: -4px 0 0 rgba(199, 155, 102, 0.12), 4px 0 0 rgba(199, 155, 102, 0.12) !important;
+}
+
+.flatpickr-premium .flatpickr-day.startRange.inRange,
+.flatpickr-premium .flatpickr-day.endRange.inRange {
+    box-shadow: none !important;
+}
+
 .flatpickr-day.inRange:hover {
     background: rgba(200, 200, 200, 0.15) !important;
     border: 1px solid transparent !important;
     box-shadow: none !important;
+}
+
+.flatpickr-premium .flatpickr-day.inRange:not(.startRange):not(.endRange):hover:not(.flatpickr-disabled):not(.prevMonthDay):not(.nextMonthDay) {
+    background: rgba(199, 155, 102, 0.22) !important;
+    border-color: rgba(199, 155, 102, 0.35) !important;
 }
 
 .flatpickr-day.is-weekend-disabled {
@@ -408,6 +449,8 @@ html.theme-dark #rangoFechasPresentacionModal .mp-ppt-modal-dialog .btn-close {
     border: 1px solid var(--mp-ppt-calendar-border) !important;
     border-radius: 12px;
     box-shadow: none;
+    padding: 0.5rem 0.45rem 0.65rem !important;
+    box-sizing: border-box !important;
 }
 
 #rangoFechasPresentacionModal .mp-ppt-controls-side .flatpickr-innerContainer,
@@ -747,8 +790,8 @@ html.theme-dark #rangoFechasPresentacionModal .mp-ppt-modal-dialog .btn-close {
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     background: #fff;
-    padding: 0.45rem;
-    min-height: 180px;
+    padding: 0.5rem 0.55rem;
+    min-height: 200px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -757,14 +800,14 @@ html.theme-dark #rangoFechasPresentacionModal .mp-ppt-modal-dialog .btn-close {
 #rangoFechasPresentacionModal .mp-ppt-donut-wrap {
     width: 100%;
     display: grid;
-    grid-template-columns: 180px 1fr;
-    gap: 0.8rem;
+    grid-template-columns: minmax(210px, 40%) 1fr;
+    gap: 0.85rem 1.15rem;
     align-items: center;
 }
 
 #rangoFechasPresentacionModal .mp-ppt-donut {
-    width: 160px;
-    height: 160px;
+    width: 176px;
+    height: 176px;
     border-radius: 50%;
     background: conic-gradient(
         #b89b6a 0 var(--a),
@@ -773,12 +816,14 @@ html.theme-dark #rangoFechasPresentacionModal .mp-ppt-modal-dialog .btn-close {
     );
     display: grid;
     place-items: center;
-    margin: 0 auto;
+    margin: 0;
+    justify-self: end;
+    flex-shrink: 0;
 }
 
 #rangoFechasPresentacionModal .mp-ppt-donut-center {
-    width: 88px;
-    height: 88px;
+    width: 96px;
+    height: 96px;
     border-radius: 50%;
     background: #fff;
     border: 1px solid #e5e7eb;
@@ -874,6 +919,11 @@ html.theme-dark #rangoFechasPresentacionModal .mp-ppt-modal-dialog .btn-close {
 
     #rangoFechasPresentacionModal .mp-ppt-donut-wrap {
         grid-template-columns: 1fr;
+        justify-items: center;
+    }
+
+    #rangoFechasPresentacionModal .mp-ppt-donut {
+        justify-self: center;
     }
 }
 

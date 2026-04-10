@@ -570,9 +570,16 @@ html.theme-dark span.flatpickr-weekday {
 
 html.theme-dark .flatpickr-premium .flatpickr-weekdays {
     width: 100% !important;
+    display: block !important;
+    overflow: visible !important;
+}
+
+html.theme-dark .flatpickr-premium .flatpickr-weekdays .flatpickr-weekdaycontainer {
     display: grid !important;
     grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
     gap: 2px !important;
+    width: 100% !important;
+    min-width: 0 !important;
 }
 
 html.theme-dark .flatpickr-premium span.flatpickr-weekday {
@@ -582,6 +589,9 @@ html.theme-dark .flatpickr-premium span.flatpickr-weekday {
     max-width: none !important;
     font-weight: 700 !important;
     text-align: center;
+    line-height: 1.2 !important;
+    min-width: 0 !important;
+    padding: 0.3rem 0.1rem;
 }
 
 html.theme-dark .flatpickr-day {

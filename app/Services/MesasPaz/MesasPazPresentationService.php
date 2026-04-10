@@ -21,6 +21,15 @@ class MesasPazPresentationService
 
     private const OFFICE_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
+    /** Posición y tamaño de la gráfica circular en PPTX (slides 3 y 4), en EMU (914400 EMU = 1 pulgada). */
+    private const PPT_CIRCULAR_PIC_X = 5650000;
+
+    private const PPT_CIRCULAR_PIC_Y = 3280000;
+
+    private const PPT_CIRCULAR_PIC_CX = 7050000;
+
+    private const PPT_CIRCULAR_PIC_CY = 4406250;
+
     /**
      * Datos para reporte y vista previa
      * @return array{
@@ -176,10 +185,10 @@ class MesasPazPresentationService
                 $metaMesas,
                 $stats,
                 'Grafica circular semana anterior',
-                5000000,
-                3300000,
-                6400000,
-                4000000,
+                self::PPT_CIRCULAR_PIC_X,
+                self::PPT_CIRCULAR_PIC_Y,
+                self::PPT_CIRCULAR_PIC_CX,
+                self::PPT_CIRCULAR_PIC_CY,
             );
 
             $zip->addFromString('ppt/slides/slide3.xml', $slide3);
@@ -217,10 +226,10 @@ class MesasPazPresentationService
                 $metaSemanaMarcada,
                 $statsSemanaMarcada,
                 'Grafica circular semana marcada',
-                5000000,
-                3300000,
-                6400000,
-                4000000,
+                self::PPT_CIRCULAR_PIC_X,
+                self::PPT_CIRCULAR_PIC_Y,
+                self::PPT_CIRCULAR_PIC_CX,
+                self::PPT_CIRCULAR_PIC_CY,
             );
 
             $zip->addFromString('ppt/slides/slide4.xml', $slide4);
@@ -744,10 +753,11 @@ class MesasPazPresentationService
         $sinRegistro = max(0, $meta - $totalRegistrado);
         $total = max(1, $asistencias + $inasistencias + $sinRegistro);
 
-        $cx = 1600;
-        $cy = 560;
-        $diam = 1080;
-        $inner = 660;
+        /* Centrar dona respecto al bloque de porcentajes inferior. */
+        $cx = 1520;
+        $cy = 575;
+        $diam = 1120;
+        $inner = 685;
 
         $start = -90.0;
         $segmentos = [
@@ -787,13 +797,21 @@ class MesasPazPresentationService
         if (! is_file($font)) {
             $font = public_path('fonts/agenda-pdf/Montserrat-Regular.ttf');
         }
+        $fontPercent = public_path('fonts/agenda-pdf/Gilroy-Medium.ttf');
+        if (! is_file($fontPercent)) {
+            $fontPercent = public_path('fonts/agenda-pdf/Gilroy-Regular.ttf');
+        }
+        if (! is_file($fontPercent)) {
+            $fontPercent = $font;
+        }
+
         $totalConSinRegistro = $asistencias + $inasistencias + $sinRegistro;
         $textoCentro = (string) $totalConSinRegistro;
         $pctAsistencia = ($total > 0) ? round(($asistencias / $total) * 100, 1) : 0.0;
         $pctInasistencia = ($total > 0) ? round(($inasistencias / $total) * 100, 1) : 0.0;
         $pctSinRegistro = ($total > 0) ? round(($sinRegistro / $total) * 100, 1) : 0.0;
 
-        if (is_file($font) && function_exists('imagettftext')) {
+        if (is_file($font) && is_file($fontPercent) && function_exists('imagettftext')) {
             $bbox = imagettfbbox(148, 0, $font, $textoCentro);
             $textW = $bbox ? abs($bbox[2] - $bbox[0]) : 0;
             $textH = $bbox ? abs($bbox[7] - $bbox[1]) : 0;
@@ -810,34 +828,34 @@ class MesasPazPresentationService
             @imagettftext($im, 58, 0, $txTotal, $tyTotal, $texto, $font, $totalText);
             @imagettftext($im, 58, 0, $txTotal + 1, $tyTotal, $texto, $font, $totalText);
 
-            $sizeLabel = 72;
-            $sizePct = 74;
+            $sizeLabel = 28;
+            $sizePct = 28;
             $baseY = 1340;
 
-            $drawRow = function (string $label, float $pct, int $color, int $centerX) use ($im, $font, $sizeLabel, $sizePct, $baseY, $texto) {
+            $drawRow = function (string $label, float $pct, int $color, int $centerX) use ($im, $fontPercent, $sizeLabel, $sizePct, $baseY, $texto) {
                 $labelTxt = $label.': ';
                 $pctTxt = number_format($pct, 1).'%';
 
-                $bboxL = imagettfbbox($sizeLabel, 0, $font, $labelTxt);
-                $bboxP = imagettfbbox($sizePct, 0, $font, $pctTxt);
+                $bboxL = imagettfbbox($sizeLabel, 0, $fontPercent, $labelTxt);
+                $bboxP = imagettfbbox($sizePct, 0, $fontPercent, $pctTxt);
                 $wL = $bboxL ? abs($bboxL[2] - $bboxL[0]) : 0;
                 $wP = $bboxP ? abs($bboxP[2] - $bboxP[0]) : 0;
                 $startX = (int) round($centerX - (($wL + $wP) / 2));
 
-                @imagettftext($im, $sizeLabel, 0, $startX, $baseY, $texto, $font, $labelTxt);
-                @imagettftext($im, $sizeLabel, 0, $startX + 1, $baseY, $texto, $font, $labelTxt);
-                @imagettftext($im, $sizePct, 0, $startX + $wL, $baseY, $color, $font, $pctTxt);
-                @imagettftext($im, $sizePct, 0, $startX + $wL + 1, $baseY, $color, $font, $pctTxt);
+                @imagettftext($im, $sizeLabel, 0, $startX, $baseY, $texto, $fontPercent, $labelTxt);
+                @imagettftext($im, $sizeLabel, 0, $startX + 1, $baseY, $texto, $fontPercent, $labelTxt);
+                @imagettftext($im, $sizePct, 0, $startX + $wL, $baseY, $color, $fontPercent, $pctTxt);
+                @imagettftext($im, $sizePct, 0, $startX + $wL + 1, $baseY, $color, $fontPercent, $pctTxt);
             };
 
-            $drawRow('Asistencias', $pctAsistencia, $verde, 430);
-            $drawRow('Inasistencias', $pctInasistencia, $guinda, 1420);
-            $drawRow('Sin registro', $pctSinRegistro, $dorado, 2360);
+            $drawRow('Asistencias', $pctAsistencia, $verde, 520);
+            $drawRow('Inasistencias', $pctInasistencia, $guinda, 1520);
+            $drawRow('Sin registro', $pctSinRegistro, $dorado, 2520);
         } else {
             imagestring($im, 5, $cx - 90, $cy - 16, $textoCentro, $texto);
-            imagestring($im, 5, 120, 1390, 'Asistencias: '.number_format($pctAsistencia, 1).'%', $verde);
-            imagestring($im, 5, 980, 1390, 'Inasistencias: '.number_format($pctInasistencia, 1).'%', $guinda);
-            imagestring($im, 5, 1880, 1390, 'Sin registro: '.number_format($pctSinRegistro, 1).'%', $dorado);
+            imagestring($im, 5, 200, 1390, 'Asistencias: '.number_format($pctAsistencia, 1).'%', $verde);
+            imagestring($im, 5, 1060, 1390, 'Inasistencias: '.number_format($pctInasistencia, 1).'%', $guinda);
+            imagestring($im, 5, 1980, 1390, 'Sin registro: '.number_format($pctSinRegistro, 1).'%', $dorado);
             imagestring($im, 5, $cx - 60, $cy + 80, 'TOTAL', $texto);
         }
 

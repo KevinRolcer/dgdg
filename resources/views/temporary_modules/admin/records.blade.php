@@ -741,6 +741,10 @@
                         <p class="tm-export-restore-wrap" id="tmExportRestoreWrap" hidden>
                             <button type="button" class="tm-export-restore-btn" id="tmExportRestoreBtn">Restaurar todas las columnas</button>
                         </p>
+                        <div class="tm-export-restore-wrap" id="tmExportOmittedWrap" hidden>
+                            <button type="button" class="tm-export-restore-btn" id="tmExportOmittedToggle" aria-expanded="false" aria-controls="tmExportOmittedList">Ver columnas eliminadas (0)</button>
+                            <div id="tmExportOmittedList" hidden style="margin-top:8px; display:grid; gap:6px;"></div>
+                        </div>
                         </section>
                         <section id="tm-export-sec-export" class="tm-export-side-section">
                             <h4 class="tm-export-side-section__title"><span class="tm-export-side-section__icon" aria-hidden="true"><i class="fa-solid fa-file-export"></i></span> Descargar</h4>
@@ -4368,12 +4372,64 @@
             return ordered.length ? ordered : columns.slice();
         }
 
-        function updateRestoreVisibility(columnsEl, originalColumns, restoreWrap) {
-            if (!restoreWrap) { return; }
+        function getOmittedColumns(columnsEl, originalColumns) {
+            var currentKeys = {};
+            Array.from(columnsEl.children).forEach(function (el) {
+                if (!el.classList || !el.classList.contains('tm-export-personalize-col')) { return; }
+                var k = String(el.dataset.key || '');
+                if (k) { currentKeys[k] = true; }
+            });
+            return (originalColumns || []).filter(function (c) {
+                var k = String(c && c.key || '');
+                return k !== '' && !currentKeys[k];
+            });
+        }
+
+        function renderOmittedColumnsList(columnsEl, originalColumns, omittedListEl, restoreWrap, omittedWrap, omittedToggle) {
+            if (!omittedListEl || !columnsEl) { return; }
+            var omitted = getOmittedColumns(columnsEl, originalColumns || []);
+            if (omitted.length === 0) {
+                omittedListEl.innerHTML = '';
+                omittedListEl.hidden = true;
+                if (omittedToggle) {
+                    omittedToggle.textContent = 'Ver columnas eliminadas (0)';
+                    omittedToggle.setAttribute('aria-expanded', 'false');
+                }
+                if (omittedWrap) { omittedWrap.hidden = true; }
+                updateRestoreVisibility(columnsEl, originalColumns, restoreWrap, omittedWrap, omittedToggle);
+                return;
+            }
+
+            omittedListEl.innerHTML = omitted.map(function (col) {
+                var label = String(col && col.label || col && col.key || 'Columna');
+                var key = String(col && col.key || '');
+                return '<div class="tm-export-personalize-col" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;">'
+                    + '<span style="font-size:.85rem;">' + escapeHtml(label) + '</span>'
+                    + '<button type="button" class="tm-btn tm-btn-sm tm-btn-outline" data-restore-omitted-col="' + escapeHtml(key) + '">Restaurar</button>'
+                    + '</div>';
+            }).join('');
+
+            if (omittedToggle) {
+                omittedToggle.textContent = 'Ver columnas eliminadas (' + omitted.length + ')';
+            }
+            if (omittedWrap) { omittedWrap.hidden = false; }
+            updateRestoreVisibility(columnsEl, originalColumns, restoreWrap, omittedWrap, omittedToggle);
+        }
+
+        function updateRestoreVisibility(columnsEl, originalColumns, restoreWrap, omittedWrap, omittedToggle) {
+            if (!restoreWrap || !columnsEl) { return; }
             const current = Array.from(columnsEl.children).filter(function (el) {
                 return el.classList && el.classList.contains('tm-export-personalize-col');
             }).length;
-            restoreWrap.hidden = current >= originalColumns.length;
+            var total = (originalColumns || []).length;
+            var hasOmitted = current < total;
+            restoreWrap.hidden = !hasOmitted;
+            if (!hasOmitted && omittedWrap) {
+                omittedWrap.hidden = true;
+            }
+            if (!hasOmitted && omittedToggle) {
+                omittedToggle.setAttribute('aria-expanded', 'false');
+            }
         }
 
         var PREVIEW_ZOOM_STEPS = [50, 75, 100, 125, 150, 175, 200];
@@ -4527,6 +4583,9 @@
             const applyPdfTableBtn = document.getElementById('tmExportApplyPdfTable');
             const restoreWrap = document.getElementById('tmExportRestoreWrap');
             const restoreBtn = document.getElementById('tmExportRestoreBtn');
+            const omittedWrap = document.getElementById('tmExportOmittedWrap');
+            const omittedToggle = document.getElementById('tmExportOmittedToggle');
+            const omittedListEl = document.getElementById('tmExportOmittedList');
             const includeCountTableEl = document.getElementById('tmExportIncludeCountTable');
             const countByWrapEl = document.getElementById('tmExportCountByWrap');
             const countByFieldsEl = document.getElementById('tmExportCountByFields');
@@ -5356,6 +5415,7 @@
                         if (mrSortDefaultEl) { mrSortDefaultEl.value = data.microrregion_sort || 'asc'; }
                         buildPersonalizeColumnsList(columns, columnsEl);
                     }
+                    renderOmittedColumnsList(columnsEl, columns, omittedListEl, restoreWrap, omittedWrap, omittedToggle);
                     buildCountTableColorList(countTableColorListEl, countByFieldsEl, personalizeModal._previewEntries, draftCfg ? draftCfg.count_table_colors : null);
                     if (personalizeModal && !personalizeModal._personalizeGeneralListenersBound) {
                         personalizeModal._personalizeGeneralListenersBound = true;
@@ -5659,10 +5719,12 @@
                                 row.remove();
                                 buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
                                 updateRestoreVisibility(columnsEl, columns, restoreWrap);
+                                renderOmittedColumnsList(columnsEl, columns, omittedListEl, restoreWrap, omittedWrap, omittedToggle);
                             }
                         }
                     });
                     attachPersonalizeColumnListeners(columnsEl, columns, previewEl, restoreWrap);
+                    renderOmittedColumnsList(columnsEl, columns, omittedListEl, restoreWrap, omittedWrap, omittedToggle);
 
                     if (titleEl) {
                         titleEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
@@ -5771,6 +5833,46 @@
                             buildPersonalizePreview(columns, previewEl);
                             restoreWrap.hidden = true;
                             attachPersonalizeColumnListeners(columnsEl, columns, previewEl, restoreWrap);
+                            renderOmittedColumnsList(columnsEl, columns, omittedListEl, restoreWrap, omittedWrap, omittedToggle);
+                        };
+                    }
+                    if (omittedToggle && omittedListEl) {
+                        omittedToggle.onclick = function () {
+                            var isExpanded = omittedToggle.getAttribute('aria-expanded') === 'true';
+                            omittedToggle.setAttribute('aria-expanded', String(!isExpanded));
+                            omittedListEl.hidden = isExpanded;
+                        };
+                    }
+                    if (omittedListEl) {
+                        omittedListEl.onclick = function (e) {
+                            var btn = e.target && e.target.closest ? e.target.closest('[data-restore-omitted-col]') : null;
+                            if (!btn) { return; }
+                            var restoreKey = String(btn.getAttribute('data-restore-omitted-col') || '');
+                            if (!restoreKey) { return; }
+                            var currentCols = reorderColumnsList(columnsEl, columns);
+                            var exists = currentCols.some(function (c) { return String(c && c.key || '') === restoreKey; });
+                            if (!exists) {
+                                var original = (columns || []).find(function (c) { return String(c && c.key || '') === restoreKey; });
+                                if (original) {
+                                    var originalIndex = (columns || []).findIndex(function (c) { return String(c && c.key || '') === restoreKey; });
+                                    if (originalIndex < 0) { originalIndex = (columns || []).length; }
+                                    var insertAt = currentCols.findIndex(function (c) {
+                                        var key = String(c && c.key || '');
+                                        var idx = (columns || []).findIndex(function (oc) { return String(oc && oc.key || '') === key; });
+                                        if (idx < 0) { idx = Number.MAX_SAFE_INTEGER; }
+                                        return idx > originalIndex;
+                                    });
+                                    if (insertAt < 0) {
+                                        currentCols.push(Object.assign({}, original));
+                                    } else {
+                                        currentCols.splice(insertAt, 0, Object.assign({}, original));
+                                    }
+                                    buildPersonalizeColumnsList(currentCols, columnsEl);
+                                    attachPersonalizeColumnListeners(columnsEl, columns, previewEl, restoreWrap);
+                                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                                }
+                            }
+                            renderOmittedColumnsList(columnsEl, columns, omittedListEl, restoreWrap, omittedWrap, omittedToggle);
                         };
                     }
 
