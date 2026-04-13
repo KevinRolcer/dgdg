@@ -2482,6 +2482,14 @@
                 .replace(/[\u0300-\u036f]/g, '');
         }
 
+        /** Alineado con normalizeSummaryText en export (Sí/No para booleanos). */
+        function tmExportNormalizeForSumMatch(val) {
+            if (typeof val === 'boolean') {
+                return tmExportNormalizeText(val ? 'Sí' : 'No');
+            }
+            return tmExportNormalizeText(val);
+        }
+
         function tmExportParseNumber(value) {
             if (value == null) { return null; }
             if (typeof value === 'number') { return Number.isFinite(value) ? value : null; }
@@ -3197,15 +3205,17 @@
                         if (m.agg === 'count_equals' && target !== '') {
                             var matched = false;
                             if (Array.isArray(raw)) {
-                                matched = raw.some(function (x) { return tmExportNormalizeText(x) === target; });
+                                matched = raw.some(function (x) { return tmExportNormalizeForSumMatch(x) === target; });
+                            } else if (raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'primary')) {
+                                matched = tmExportNormalizeForSumMatch(raw.primary) === target;
                             } else {
-                                matched = tmExportNormalizeText(raw) === target;
+                                matched = tmExportNormalizeForSumMatch(raw) === target;
                             }
                             if (matched) { g.metrics[m.id] = (g.metrics[m.id] || 0) + 1; }
                         } else {
                             if (!g._uniqueSets[m.id]) { g._uniqueSets[m.id] = {}; }
                             var pushUnique = function (val) {
-                                var key = tmExportNormalizeText(val);
+                                var key = tmExportNormalizeForSumMatch(val);
                                 if (key !== '') { g._uniqueSets[m.id][key] = true; }
                             };
                             if (Array.isArray(raw)) {

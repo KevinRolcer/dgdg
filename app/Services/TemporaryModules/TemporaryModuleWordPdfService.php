@@ -1531,9 +1531,27 @@ class TemporaryModuleWordPdfService
         if ($value === null) {
             return '';
         }
-        $txt = trim((string) $value);
+        if (is_bool($value)) {
+            return $value ? 'si' : 'no';
+        }
+        $txt = mb_strtolower(trim((string) $value), 'UTF-8');
 
-        return mb_strtolower($txt, 'UTF-8');
+        return $this->foldSummaryMatchAccents($txt);
+    }
+
+    private function foldSummaryMatchAccents(string $text): string
+    {
+        if ($text === '') {
+            return '';
+        }
+        if (class_exists(\Normalizer::class)) {
+            $n = \Normalizer::normalize($text, \Normalizer::FORM_D);
+            if (is_string($n)) {
+                $text = $n;
+            }
+        }
+
+        return preg_replace('/\p{M}/u', '', $text) ?? $text;
     }
 
     private function parseSummaryNumber(mixed $value): ?float
@@ -1723,6 +1741,8 @@ class TemporaryModuleWordPdfService
                                     break;
                                 }
                             }
+                        } elseif (is_array($raw) && isset($raw['primary'])) {
+                            $matched = $this->normalizeSummaryText($raw['primary'] ?? null) === $target;
                         } else {
                             $matched = $this->normalizeSummaryText($raw) === $target;
                         }
