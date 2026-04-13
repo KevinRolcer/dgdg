@@ -1670,6 +1670,18 @@ class TemporaryModuleWordPdfService
                     if ($hasValue) {
                         $rowsByKey[$groupKey]['metrics'][$metricId] += 1;
                     }
+                } elseif ($agg === 'count_empty') {
+                    $isEmpty = false;
+                    if (is_array($raw) && !isset($raw['primary'])) {
+                        $isEmpty = !collect($raw)->contains(fn ($item) => trim((string) $item) !== '');
+                    } elseif (is_array($raw) && isset($raw['primary'])) {
+                        $isEmpty = trim((string) ($raw['primary'] ?? '')) === '';
+                    } else {
+                        $isEmpty = trim((string) ($raw ?? '')) === '';
+                    }
+                    if ($isEmpty) {
+                        $rowsByKey[$groupKey]['metrics'][$metricId] += 1;
+                    }
                 } elseif ($agg === 'count_unique' || $agg === 'count_equals') {
                     $target = $this->normalizeSummaryText((string) ($metric['match_value'] ?? ''));
                     if ($agg === 'count_equals' && $target !== '') {

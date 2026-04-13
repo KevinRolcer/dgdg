@@ -2701,7 +2701,7 @@
                         label: String(m.label || ('Métrica ' + (idx + 1))),
                         group: String(m.group || ''),
                         field_key: String(m.field_key || ''),
-                        agg: ['sum', 'count_non_empty', 'count_unique', 'count_equals'].indexOf(String(m.agg || 'sum')) !== -1 ? String(m.agg) : 'sum',
+                        agg: ['sum', 'count_non_empty', 'count_empty', 'count_unique', 'count_equals'].indexOf(String(m.agg || 'sum')) !== -1 ? String(m.agg) : 'sum',
                         match_value: String(m.match_value || ''),
                         text_color: String(m.text_color || 'var(--clr-primary)'),
                         include_total: !Object.prototype.hasOwnProperty.call(m || {}, 'include_total') ? true : !!m.include_total,
@@ -2824,6 +2824,7 @@
                     + '<select class="tm-input" data-sum-metric-agg>'
                     + '  <option value="sum">Suma numérica</option>'
                     + '  <option value="count_non_empty">Conteo con dato</option>'
+                    + '  <option value="count_empty">Conteo vacío</option>'
                     + '  <option value="count_unique">Conteo por dato único</option>'
                     + '</select>'
                     + '<div class="tm-export-col-color">'
@@ -3077,6 +3078,16 @@
                             hasValue = String(raw == null ? '' : raw).trim() !== '';
                         }
                         if (hasValue) { g.metrics[m.id] = (g.metrics[m.id] || 0) + 1; }
+                    } else if (m.agg === 'count_empty') {
+                        var isEmpty = false;
+                        if (Array.isArray(raw)) {
+                            isEmpty = !raw.some(function (x) { return String(x == null ? '' : x).trim() !== ''; });
+                        } else if (raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'primary')) {
+                            isEmpty = String(raw.primary == null ? '' : raw.primary).trim() === '';
+                        } else {
+                            isEmpty = String(raw == null ? '' : raw).trim() === '';
+                        }
+                        if (isEmpty) { g.metrics[m.id] = (g.metrics[m.id] || 0) + 1; }
                     } else if (m.agg === 'count_unique' || m.agg === 'count_equals') {
                         var target = tmExportNormalizeText(m.match_value || '');
                         if (m.agg === 'count_equals' && target !== '') {

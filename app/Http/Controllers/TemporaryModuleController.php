@@ -625,7 +625,7 @@ class TemporaryModuleController extends Controller
             'applies_to' => ['required', Rule::in(['all', 'selected'])],
             'delegate_ids' => ['nullable', 'array'],
             'delegate_ids.*' => ['integer', Rule::exists('users', 'id')],
-            'conflict_action' => ['nullable', Rule::in(['none', 'clear_module', 'clear_field_data', 'normalize_municipio', 'migrate_to_multiselect'])],
+            'conflict_action' => ['nullable', Rule::in(['none', 'clear_module', 'clear_field_data', 'normalize_municipio', 'migrate_to_multiselect', 'normalize_boolean_select'])],
             'existing_fields' => ['nullable', 'array'],
             'existing_fields.*.id' => ['required_with:existing_fields', 'integer'],
             'existing_fields.*.label' => ['nullable', 'required_unless:existing_fields.*.delete,1', 'string', 'max:120'],
@@ -679,6 +679,7 @@ class TemporaryModuleController extends Controller
         $deletedFieldIds = [];
         $destructiveKeys = [];
         $invalidMainImageKeys = [];
+        $booleanToSelectMigrations = [];
         $usedKeys = [];
         $nextSortOrder = 1;
         $fieldUsage = $this->fieldService->countFieldDataUsage((int) $temporaryModule->id);
@@ -748,16 +749,39 @@ class TemporaryModuleController extends Controller
                 'existing_fields'
             );
 
-            if ($hasData && ($normalized['key'] !== $oldKey || $this->fieldService->canonicalFieldType((string) $normalized['type']) !== $oldType)) {
+            $newType = $this->fieldService->canonicalFieldType((string) $normalized['type']);
+            $isBooleanToSelect = $oldType === 'boolean'
+                && $newType === 'select'
+                && $normalized['key'] === $oldKey;
+            $siNoLabels = null;
+
+            if ($isBooleanToSelect) {
+                $siNoLabels = $this->resolveSiNoLabelsFromSelectOptions((array) ($normalized['options'] ?? []));
+                if ($siNoLabels === null) {
+                    throw ValidationException::withMessages([
+                        'existing_fields' => 'Para convertir el campo "'.$field->label.'" de Sí/No a lista de opciones, la lista debe incluir claramente Sí (o Si) y No.',
+                    ]);
+                }
+
+                $booleanToSelectMigrations[] = [
+                    'key' => $oldKey,
+                    'yes' => $siNoLabels['yes'],
+                    'no' => $siNoLabels['no'],
+                ];
+            }
+
+            if ($hasData && ($normalized['key'] !== $oldKey || $newType !== $oldType)) {
                 // select → multiselect is a safe migration, not a destructive change
                 $isSelectToMultiselect = $oldType === 'select'
-                    && $this->fieldService->canonicalFieldType((string) $normalized['type']) === 'multiselect'
+                    && $newType === 'multiselect'
                     && $normalized['key'] === $oldKey;
                 // text → textarea: mismo valor en JSON (string); solo cambia límite de validación (255 → 5000)
                 $isTextToTextarea = $oldType === 'text'
-                    && $this->fieldService->canonicalFieldType((string) $normalized['type']) === 'textarea'
+                    && $newType === 'textarea'
                     && $normalized['key'] === $oldKey;
-                if (! $isSelectToMultiselect && ! $isTextToTextarea) {
+                // boolean → select: migración segura si conserva key e incluye opciones Sí/No
+                $isBooleanToSelectSafe = $isBooleanToSelect && $siNoLabels !== null;
+                if (! $isSelectToMultiselect && ! $isTextToTextarea && ! $isBooleanToSelectSafe) {
                     $destructiveKeys[] = $oldKey;
                 }
             }
@@ -828,6 +852,36 @@ class TemporaryModuleController extends Controller
             // Después de normalizar, ese campo ya no debe contarse como “destructivo”
             $destructiveKeys = array_values(array_diff($destructiveKeys, ['municipio']));
             $conflictAction = 'none';
+        }
+
+        if ($conflictAction === 'normalize_boolean_select') {
+            $conflictAction = 'none';
+        }
+
+        if (! empty($booleanToSelectMigrations)) {
+            $temporaryModule->entries()->select(['id', 'data'])->chunkById(200, function ($entries) use ($booleanToSelectMigrations): void {
+                foreach ($entries as $entry) {
+                    $data = is_array($entry->data) ? $entry->data : [];
+                    $changed = false;
+
+                    foreach ($booleanToSelectMigrations as $migration) {
+                        $fieldKey = (string) ($migration['key'] ?? '');
+                        if ($fieldKey === '' || ! array_key_exists($fieldKey, $data)) {
+                            continue;
+                        }
+
+                        $mapped = $this->mapBooleanLikeValueToSelectOption($data[$fieldKey], (string) $migration['yes'], (string) $migration['no']);
+                        if ($mapped !== $data[$fieldKey]) {
+                            $data[$fieldKey] = $mapped;
+                            $changed = true;
+                        }
+                    }
+
+                    if ($changed) {
+                        $entry->update(['data' => $data]);
+                    }
+                }
+            });
         }
 
         if (! empty($destructiveKeys)) {
@@ -930,6 +984,84 @@ class TemporaryModuleController extends Controller
         }
 
         return Carbon::parse($date)->endOfDay();
+    }
+
+    private function normalizeSiNoToken(string $value): string
+    {
+        $normalized = mb_strtolower(trim($value), 'UTF-8');
+        $normalized = str_replace(['á', 'é', 'í', 'ó', 'ú', 'ü'], ['a', 'e', 'i', 'o', 'u', 'u'], $normalized);
+        $normalized = preg_replace('/[^a-z0-9]+/u', '', $normalized) ?? $normalized;
+
+        return $normalized;
+    }
+
+    /**
+     * @param  array<int, string>  $options
+     * @return array{yes:string,no:string}|null
+     */
+    private function resolveSiNoLabelsFromSelectOptions(array $options): ?array
+    {
+        $yesLabel = null;
+        $noLabel = null;
+
+        foreach ($options as $option) {
+            $label = trim((string) $option);
+            if ($label === '') {
+                continue;
+            }
+
+            $token = $this->normalizeSiNoToken($label);
+            if ($token === 'si' && $yesLabel === null) {
+                $yesLabel = $label;
+                continue;
+            }
+
+            if ($token === 'no' && $noLabel === null) {
+                $noLabel = $label;
+            }
+        }
+
+        if ($yesLabel === null || $noLabel === null) {
+            return null;
+        }
+
+        return ['yes' => $yesLabel, 'no' => $noLabel];
+    }
+
+    private function mapBooleanLikeValueToSelectOption(mixed $value, string $yesLabel, string $noLabel): mixed
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_string($value) && trim($value) === '') {
+            return null;
+        }
+
+        if (is_bool($value)) {
+            return $value ? $yesLabel : $noLabel;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            if ((float) $value === 1.0) {
+                return $yesLabel;
+            }
+            if ((float) $value === 0.0) {
+                return $noLabel;
+            }
+        }
+
+        if (is_string($value)) {
+            $token = $this->normalizeSiNoToken($value);
+            if (in_array($token, ['1', 'true', 'si'], true)) {
+                return $yesLabel;
+            }
+            if (in_array($token, ['0', 'false', 'no'], true)) {
+                return $noLabel;
+            }
+        }
+
+        return $value;
     }
 
     /**

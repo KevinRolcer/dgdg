@@ -844,9 +844,41 @@
                     return value === 'file' ? 'image' : value;
                 };
 
+                const normalizeSiNoToken = function (value) {
+                    return String(value || '')
+                        .toLowerCase()
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/[^a-z0-9]+/g, '');
+                };
+
+                const parseSelectOptions = function (raw) {
+                    return String(raw || '')
+                        .split(/\r?\n|,/)
+                        .map(function (item) { return item.trim(); })
+                        .filter(function (item) { return item !== ''; });
+                };
+
+                const hasSiNoInOptions = function (options) {
+                    let hasSi = false;
+                    let hasNo = false;
+                    options.forEach(function (opt) {
+                        const token = normalizeSiNoToken(opt);
+                        if (token === 'si') {
+                            hasSi = true;
+                        } else if (token === 'no') {
+                            hasNo = true;
+                        }
+                    });
+
+                    return hasSi && hasNo;
+                };
+
                 let hasConflict = false;
                 let hasMunicipioConflict = false;
                 let hasSelectToMultiselect = false;
+                let hasBooleanToSelect = false;
+                let hasInvalidBooleanToSelectOptions = false;
 
                 existingRows.forEach(function (row) {
                     const hasData = row.getAttribute('data-has-data') === '1';
@@ -871,6 +903,18 @@
                     // text → texto largo: mismo string en JSON; sin migración de datos
                     if (!isDeleted && newKey === oldKey && oldType === 'text' && newType === 'textarea') {
                         return;
+                    }
+
+                    // boolean → select with same key: safe migration if select options include Si/Sí and No
+                    if (!isDeleted && newKey === oldKey && oldType === 'boolean' && newType === 'select') {
+                        const selectOptionsInput = row.querySelector('[data-existing-options-wrap] textarea[name$="[options]"]');
+                        const options = parseSelectOptions(selectOptionsInput ? selectOptionsInput.value : '');
+                        if (hasSiNoInOptions(options)) {
+                            hasBooleanToSelect = true;
+                            return; // not a destructive conflict
+                        }
+
+                        hasInvalidBooleanToSelectOptions = true;
                     }
 
                     const rowHasConflict = isDeleted || newKey !== oldKey || newType !== oldType;
@@ -900,6 +944,43 @@
                     }).then(function (result) {
                         if (result.isConfirmed) {
                             submitWithAction('migrate_to_multiselect');
+                        }
+                    });
+                    return;
+                }
+
+                if (hasInvalidBooleanToSelectOptions) {
+                    event.preventDefault();
+                    if (!templateSwal) {
+                        return;
+                    }
+                    templateSwal.fire({
+                        title: 'Opciones incompletas para normalizar',
+                        text: 'Para convertir un campo de Sí/No a Lista de opciones y conservar respuestas, debes incluir claramente Si (o Sí) y No en las opciones.',
+                        icon: 'error',
+                        confirmButtonText: 'Entendido'
+                    });
+                    return;
+                }
+
+                // Only pure migration (no other conflicts)
+                if (hasBooleanToSelect && !hasConflict) {
+                    event.preventDefault();
+                    if (!templateSwal) {
+                        submitWithAction('normalize_boolean_select');
+                        return;
+                    }
+                    templateSwal.fire({
+                        title: 'Normalizar datos existentes',
+                        html: 'Se conservarán tus respuestas ya capturadas del campo <b>Sí/No</b> y se convertirán a las etiquetas de la nueva <b>Lista de opciones</b>.<br><br>¿Deseas continuar?',
+                        icon: 'info',
+                        showCancelButton: true,
+                        confirmButtonText: 'Normalizar y guardar',
+                        cancelButtonText: 'Cancelar',
+                        reverseButtons: true
+                    }).then(function (result) {
+                        if (result.isConfirmed) {
+                            submitWithAction('normalize_boolean_select');
                         }
                     });
                     return;
