@@ -951,6 +951,40 @@ class TemporaryModuleExportService
         return preg_replace('/\p{M}/u', '', $text) ?? $text;
     }
 
+    /**
+     * Alinear claves de personalización (p. ej. row2Values) con etiquetas ya transformadas (mayúsculas en encabezados).
+     *
+     * @param  array<string|int, mixed>  $map
+     */
+    private function resolveCountTableRow2MapValue(array $map, ?string $valueLabel): mixed
+    {
+        if ($valueLabel === null) {
+            return null;
+        }
+        $trimmed = trim($valueLabel);
+        if ($trimmed === '') {
+            return null;
+        }
+        if (array_key_exists($trimmed, $map)) {
+            return $map[$trimmed];
+        }
+        $needle = $this->foldSummaryMatchAccents(mb_strtolower($trimmed, 'UTF-8'));
+        foreach ($map as $k => $v) {
+            if (! is_string($k) && ! is_int($k)) {
+                continue;
+            }
+            $kStr = trim((string) $k);
+            if ($kStr === '') {
+                continue;
+            }
+            if ($this->foldSummaryMatchAccents(mb_strtolower($kStr, 'UTF-8')) === $needle) {
+                return $v;
+            }
+        }
+
+        return null;
+    }
+
     private function parseSummaryNumber(mixed $value): ?float
     {
         if ($value === null) {
@@ -1412,7 +1446,12 @@ class TemporaryModuleExportService
                 $c = $countTableColors[$key] ?? null;
                 if (!is_array($c)) return $rowNum === 1 ? self::HEADER_FILL_COLOR : 'FF2d5a27';
                 if ($rowNum === 1) return $this->mapCssColorToArgb((string)($c['row1'] ?? '')) ?: self::HEADER_FILL_COLOR;
-                if ($valueLabel !== null && isset($c['row2Values'][$valueLabel])) return $this->mapCssColorToArgb((string)$c['row2Values'][$valueLabel]) ?: 'FF2d5a27';
+                if ($valueLabel !== null && ! empty($c['row2Values']) && is_array($c['row2Values'])) {
+                    $hit = $this->resolveCountTableRow2MapValue($c['row2Values'], $valueLabel);
+                    if ($hit !== null && $hit !== '') {
+                        return $this->mapCssColorToArgb((string) $hit) ?: 'FF2d5a27';
+                    }
+                }
                 return $this->mapCssColorToArgb((string)($c['row2'] ?? '')) ?: 'FF2d5a27';
             };
             $colIdx = 1;

@@ -563,7 +563,7 @@
                                 </label>
                                 <label class="tm-export-count-cell-width-label">
                                     Encabezados PDF (px):
-                                    <input type="number" id="tmExportCountTableHeaderFontSize" class="tm-input tm-input--large" style="width: 70px;" min="7" max="24" value="8" aria-label="Tamaño de letra de encabezados de la tabla de conteo en PDF">
+                                    <input type="number" id="tmExportCountTableHeaderFontSize" class="tm-input tm-input--large" style="width: 70px;" min="7" max="36" value="8" aria-label="Tamaño de letra de encabezados de la tabla de conteo en PDF">
                                 </label>
                                 <label class="tm-export-count-cell-width-label">
                                     Registros PDF (px):
@@ -3681,7 +3681,7 @@
             var countTableCellWidth = (countTableCellWidthEl && countTableCellWidthEl.value) ? (parseInt(countTableCellWidthEl.value, 10) || 12) : 12;
             var countTableHeaderFontEl = modal ? modal.querySelector('#tmExportCountTableHeaderFontSize') : document.getElementById('tmExportCountTableHeaderFontSize');
             var countTableCellFontEl = modal ? modal.querySelector('#tmExportCountTableCellFontSize') : document.getElementById('tmExportCountTableCellFontSize');
-            var countTableHeaderFontPx = (countTableHeaderFontEl && countTableHeaderFontEl.value) ? Math.max(7, Math.min(24, parseInt(countTableHeaderFontEl.value, 10) || 8)) : 8;
+            var countTableHeaderFontPx = (countTableHeaderFontEl && countTableHeaderFontEl.value) ? Math.max(7, Math.min(36, parseInt(countTableHeaderFontEl.value, 10) || 8)) : 8;
             var countTableCellFontPx = (countTableCellFontEl && countTableCellFontEl.value) ? Math.max(7, Math.min(24, parseInt(countTableCellFontEl.value, 10) || 10)) : 10;
             var groups = normalizeExportGroups((personalizeModal && personalizeModal._exportGroups) || []);
             var includeSumTableEl = modal ? modal.querySelector('#tmExportIncludeSumTable') : document.getElementById('tmExportIncludeSumTable');
@@ -3887,6 +3887,32 @@
         function normalizeExportHeadingText(text, uppercase) {
             var value = text == null ? '' : String(text);
             return uppercase ? value.toLocaleUpperCase() : value;
+        }
+
+        /** Coincide row2Values / row2Widths con etiquetas ya en mayúsculas (p. ej. SÍ vs Sí). */
+        function tmExportResolveCountRow2MapValue(map, valueLabel) {
+            if (!map || valueLabel == null) { return null; }
+            var s = String(valueLabel).trim();
+            if (s === '') { return null; }
+            if (Object.prototype.hasOwnProperty.call(map, s)) { return map[s]; }
+            var sl = s.toLowerCase();
+            var keys = Object.keys(map);
+            var i;
+            for (i = 0; i < keys.length; i++) {
+                var k = keys[i];
+                if (String(k).trim().toLowerCase() === sl) { return map[k]; }
+            }
+            try {
+                var fold = function (t) {
+                    return String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                };
+                var nf = fold(s);
+                for (i = 0; i < keys.length; i++) {
+                    var k2 = keys[i];
+                    if (fold(k2) === nf) { return map[k2]; }
+                }
+            } catch (e2) { /* ignore */ }
+            return null;
         }
 
         function tmExportOperationIsEmpty(val) {
@@ -4190,8 +4216,9 @@
                         var c = countTableColors[colorKey];
                         if (typeof c === 'string') { return c; }
                         if (rowNum === 1) { return (c && c.row1) ? c.row1 : '#861e34'; }
-                        if (valueLabel && c && c.row2Values && (c.row2Values[valueLabel] || c.row2Values[valueLabel.toLowerCase()])) {
-                            return c.row2Values[valueLabel] || c.row2Values[valueLabel.toLowerCase()];
+                        if (valueLabel && c && c.row2Values) {
+                            var hitColor = tmExportResolveCountRow2MapValue(c.row2Values, valueLabel);
+                            if (hitColor != null && hitColor !== '') { return hitColor; }
                         }
                         return (c && c.row2) ? c.row2 : '#2d5a27';
                     };
@@ -4202,8 +4229,7 @@
                         if (!colorKey) { return fallback; }
                         var c = countTableColors[colorKey];
                         if (!c || !c.row2Widths) { return fallback; }
-                        var direct = c.row2Widths[valueLabel];
-                        if (direct == null && valueLabel != null) { direct = c.row2Widths[String(valueLabel).toLowerCase()]; }
+                        var direct = valueLabel != null ? tmExportResolveCountRow2MapValue(c.row2Widths, valueLabel) : null;
                         var parsed = parseInt(direct, 10);
                         if (Number.isNaN(parsed)) { return fallback; }
                         return Math.max(6, Math.min(40, parsed));
@@ -5470,7 +5496,7 @@
                         if (cthEl) {
                             var h = draftCfg.count_table_header_font_size_px != null ? parseInt(draftCfg.count_table_header_font_size_px, 10) : (draftCfg.countTableHeaderFontPx != null ? parseInt(draftCfg.countTableHeaderFontPx, 10) : NaN);
                             if (Number.isNaN(h)) { h = legacyCt != null ? legacyCt : 8; }
-                            cthEl.value = String(Math.max(7, Math.min(24, h)));
+                            cthEl.value = String(Math.max(7, Math.min(36, h)));
                         }
                         if (ctcEl) {
                             var ctf = draftCfg.count_table_cell_font_size_px != null ? parseInt(draftCfg.count_table_cell_font_size_px, 10) : (draftCfg.countTableCellFontPx != null ? parseInt(draftCfg.countTableCellFontPx, 10) : NaN);

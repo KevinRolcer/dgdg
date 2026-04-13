@@ -584,6 +584,31 @@
             d.textContent = s;
             return d.innerHTML;
         }
+
+        function tmExportResolveCountRow2MapValue(map, valueLabel) {
+            if (!map || valueLabel == null) { return null; }
+            var s = String(valueLabel).trim();
+            if (s === '') { return null; }
+            if (Object.prototype.hasOwnProperty.call(map, s)) { return map[s]; }
+            var sl = s.toLowerCase();
+            var keys = Object.keys(map);
+            var i;
+            for (i = 0; i < keys.length; i++) {
+                var k = keys[i];
+                if (String(k).trim().toLowerCase() === sl) { return map[k]; }
+            }
+            try {
+                var fold = function (t) {
+                    return String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                };
+                var nf = fold(s);
+                for (i = 0; i < keys.length; i++) {
+                    var k2 = keys[i];
+                    if (fold(k2) === nf) { return map[k2]; }
+                }
+            } catch (e2) { /* ignore */ }
+            return null;
+        }
         if (analysisModal) {
             analysisModal.querySelectorAll('[data-close-analysis-word]').forEach(function (el) {
                 el.addEventListener('click', closeAnalysisWordModal);
@@ -1178,8 +1203,9 @@
                         var c = countTableColors[colorKey];
                         if (typeof c === 'string') { return c; }
                         if (rowNum === 1) { return (c && c.row1) ? c.row1 : '#861e34'; }
-                        if (valueLabel && c && c.row2Values && (c.row2Values[valueLabel] || c.row2Values[valueLabel.toLowerCase()])) {
-                            return c.row2Values[valueLabel] || c.row2Values[valueLabel.toLowerCase()];
+                        if (valueLabel && c && c.row2Values) {
+                            var hitCol = tmExportResolveCountRow2MapValue(c.row2Values, valueLabel);
+                            if (hitCol != null && hitCol !== '') { return hitCol; }
                         }
                         return (c && c.row2) ? c.row2 : '#2d5a27';
                     };

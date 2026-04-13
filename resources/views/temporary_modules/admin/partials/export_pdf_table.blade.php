@@ -138,7 +138,7 @@
         $dataTableAlign = 'left';
     }
 
-    $countTableHeaderFontSizePx = max(7, min(24, (int) ($countTableHeaderFontSizePx ?? 8)));
+    $countTableHeaderFontSizePx = max(7, min(36, (int) ($countTableHeaderFontSizePx ?? 8)));
     $countTableCellFontSizePx = max(7, min(24, (int) ($countTableCellFontSizePx ?? 10)));
     $countTablePctFontSizePx = max(6, min(22, (int) round($countTableCellFontSizePx * 0.9)));
 
@@ -284,8 +284,22 @@
         .count-table tr {
             page-break-inside: avoid;
         }
-        .count-table th { background: #861E34; color: #fff; text-align: center; font-size: var(--count-header-fs, 8px); }
-        .count-table td { text-align: center; color: #c00; font-weight: bold; font-size: var(--count-cell-fs, 10px); }
+        /*
+         * Dompdf y la regla global `th { font-size: … !important }` ignoraban var(--count-header-fs).
+         * Tamaños explícitos + !important para que respeten la personalización.
+         */
+        .count-table th {
+            background: #861E34;
+            color: #fff;
+            text-align: center;
+            font-size: {{ $countTableHeaderFontSizePx }}px !important;
+        }
+        .count-table td {
+            text-align: center;
+            color: #c00;
+            font-weight: bold;
+            font-size: {{ $countTableCellFontSizePx }}px !important;
+        }
         .count-table th,
         .count-table td {
             white-space: normal;
@@ -462,7 +476,18 @@
 @php
     $countTableColorKeys = $countTableColorKeys ?? [];
     $countTableColors = $countTableColors ?? [];
-    $countTableResolveColor = function (string $colorKey, $rowNum, $valueLabel = null) use ($countTableColors, $resolveCss) {
+    $countTableFoldLabel = function ($s): string {
+        $s = mb_strtolower(trim((string) $s), 'UTF-8');
+        if (class_exists(\Normalizer::class)) {
+            $n = \Normalizer::normalize($s, \Normalizer::FORM_D);
+            if (is_string($n)) {
+                $s = $n;
+            }
+        }
+
+        return preg_replace('/\p{M}/u', '', $s) ?? $s;
+    };
+    $countTableResolveColor = function (string $colorKey, $rowNum, $valueLabel = null) use ($countTableColors, $resolveCss, $countTableFoldLabel) {
         $key = trim($colorKey);
         if ($key === '') {
             return $rowNum === 1 ? '#861E34' : '#2d5a27';
@@ -470,17 +495,23 @@
         $c = $countTableColors[$key] ?? null;
         if (is_array($c)) {
             if ($rowNum === 1) return $resolveCss($c['row1'] ?? '#861E34');
-            if ($valueLabel !== null && isset($c['row2Values'][$valueLabel])) return $resolveCss($c['row2Values'][$valueLabel]);
             if ($valueLabel !== null && isset($c['row2Values']) && is_array($c['row2Values'])) {
-                $lower = mb_strtolower($valueLabel);
-                foreach ($c['row2Values'] as $k => $v) { if (mb_strtolower($k) === $lower) return $resolveCss($v); }
+                if (isset($c['row2Values'][$valueLabel])) {
+                    return $resolveCss($c['row2Values'][$valueLabel]);
+                }
+                $needle = $countTableFoldLabel($valueLabel);
+                foreach ($c['row2Values'] as $mapKey => $v) {
+                    if ($countTableFoldLabel($mapKey) === $needle) {
+                        return $resolveCss($v);
+                    }
+                }
             }
             return $resolveCss($c['row2'] ?? '#2d5a27');
         }
         if (is_string($c) && $c !== '') return $resolveCss($c);
         return $rowNum === 1 ? '#861E34' : '#2d5a27';
     };
-    $countTableResolveWidth = function (string $colorKey, $valueLabel) use ($countTableColors, $countTableCellWidth) {
+    $countTableResolveWidth = function (string $colorKey, $valueLabel) use ($countTableColors, $countTableCellWidth, $countTableFoldLabel) {
         $key = trim($colorKey);
         if ($key === '') {
             return $countTableCellWidth;
@@ -489,7 +520,16 @@
         if (!is_array($c) || !isset($c['row2Widths']) || !is_array($c['row2Widths'])) {
             return $countTableCellWidth;
         }
-        $raw = $c['row2Widths'][$valueLabel] ?? $c['row2Widths'][mb_strtolower((string) $valueLabel)] ?? null;
+        $raw = $c['row2Widths'][$valueLabel] ?? null;
+        if ($raw === null && $valueLabel !== null) {
+            $needle = $countTableFoldLabel($valueLabel);
+            foreach ($c['row2Widths'] as $wk => $wv) {
+                if ($countTableFoldLabel($wk) === $needle) {
+                    $raw = $wv;
+                    break;
+                }
+            }
+        }
         if ($raw === null) {
             return $countTableCellWidth;
         }

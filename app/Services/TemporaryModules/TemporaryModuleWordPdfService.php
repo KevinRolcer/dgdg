@@ -419,7 +419,7 @@ class TemporaryModuleWordPdfService
         $pdfCountCellPx = $pdfCountCellRaw !== null && $pdfCountCellRaw !== ''
             ? (int) $pdfCountCellRaw
             : ($legacyCountTableFont !== null && $legacyCountTableFont !== '' ? (int) $legacyCountTableFont : 10);
-        $pdfCountHeaderPx = max(7, min(24, $pdfCountHeaderPx));
+        $pdfCountHeaderPx = max(7, min(36, $pdfCountHeaderPx));
         $pdfCountCellPx = max(7, min(24, $pdfCountCellPx));
         $sumTableCellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['sum_table_cell_font_size_px'] ?? $cellFontSizePx);
         $sumTableCellFontSizePt = $this->cellPxToWordPt($sumTableCellFontSizePx);
@@ -707,10 +707,10 @@ class TemporaryModuleWordPdfService
                         if ($rowNum === 1) {
                             return $this->cssColorToHex($c['row1'] ?? '#861e34');
                         }
-                        if ($valueLabel !== null && isset($c['row2Values']) && is_array($c['row2Values'])) {
-                            $css = $c['row2Values'][$valueLabel] ?? $c['row2Values'][mb_strtolower($valueLabel)] ?? null;
-                            if ($css !== null && $css !== '') {
-                                return $this->cssColorToHex($css);
+                        if ($valueLabel !== null && ! empty($c['row2Values']) && is_array($c['row2Values'])) {
+                            $hit = $this->resolveCountTableRow2MapValue($c['row2Values'], $valueLabel);
+                            if ($hit !== null && $hit !== '') {
+                                return $this->cssColorToHex((string) $hit);
                             }
                         }
                         return $this->cssColorToHex($c['row2'] ?? '#2d5a27');
@@ -720,8 +720,8 @@ class TemporaryModuleWordPdfService
                 $resolveCountWidth = function (string $key, ?string $valueLabel, bool $forPct = false) use ($countTableColors, $baseCountCellWidthCh, $chToTwips): int {
                     $widthCh = $baseCountCellWidthCh;
                     $cfg = $countTableColors[$key] ?? null;
-                    if (is_array($cfg) && $valueLabel !== null && isset($cfg['row2Widths']) && is_array($cfg['row2Widths'])) {
-                        $raw = $cfg['row2Widths'][$valueLabel] ?? $cfg['row2Widths'][mb_strtolower($valueLabel)] ?? null;
+                    if (is_array($cfg) && $valueLabel !== null && ! empty($cfg['row2Widths']) && is_array($cfg['row2Widths'])) {
+                        $raw = $this->resolveCountTableRow2MapValue($cfg['row2Widths'], $valueLabel);
                         if ($raw !== null) {
                             $parsed = (int) $raw;
                             $widthCh = max(6, min(40, $parsed));
@@ -1552,6 +1552,38 @@ class TemporaryModuleWordPdfService
         }
 
         return preg_replace('/\p{M}/u', '', $text) ?? $text;
+    }
+
+    /**
+     * @param  array<string|int, mixed>  $map
+     */
+    private function resolveCountTableRow2MapValue(array $map, ?string $valueLabel): mixed
+    {
+        if ($valueLabel === null) {
+            return null;
+        }
+        $trimmed = trim($valueLabel);
+        if ($trimmed === '') {
+            return null;
+        }
+        if (array_key_exists($trimmed, $map)) {
+            return $map[$trimmed];
+        }
+        $needle = $this->foldSummaryMatchAccents(mb_strtolower($trimmed, 'UTF-8'));
+        foreach ($map as $k => $v) {
+            if (! is_string($k) && ! is_int($k)) {
+                continue;
+            }
+            $kStr = trim((string) $k);
+            if ($kStr === '') {
+                continue;
+            }
+            if ($this->foldSummaryMatchAccents(mb_strtolower($kStr, 'UTF-8')) === $needle) {
+                return $v;
+            }
+        }
+
+        return null;
     }
 
     private function parseSummaryNumber(mixed $value): ?float
