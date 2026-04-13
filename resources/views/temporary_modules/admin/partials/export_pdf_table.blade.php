@@ -175,21 +175,26 @@
         return null;
     };
     /** @param  array<string, mixed>  $col */
-    $breakdownCellInlineStyle = static function (array $col, string $displayText, bool $apply) use ($resolveCss, $breakdownResolveFillMap): string {
+    $breakdownCellInlineStyle = static function (array $col, string $displayText, bool $apply, $precomputedFillHit = null) use ($resolveCss, $breakdownResolveFillMap): string {
         if (! $apply) {
             return '';
         }
-        $parts = [];
+        $hit = $precomputedFillHit;
+        if ($hit === null) {
+            $fills = is_array($col['breakdown_answer_fills'] ?? null) ? $col['breakdown_answer_fills'] : [];
+            $hit = $breakdownResolveFillMap($fills, $displayText);
+        }
+        if ($hit === null || trim((string) $hit) === '') {
+            return '';
+        }
+        $parts = [
+            // `background` en lugar de solo background-color gana al shorthand de filas pares (#fdfdfd)
+            'background: '.$resolveCss((string) $hit).' !important;',
+        ];
         $tc = trim((string) ($col['breakdown_data_text_color'] ?? ''));
         if ($tc !== '') {
-            // !important: Dompdf/herencia y reglas de tabla no deben anular el color elegido
+            // Solo con fondo de desglose: si no, el color (p. ej. blanco) oculta "S/R" y rellenos vacíos en zebra claro
             $parts[] = 'color: '.$resolveCss($tc).' !important;';
-        }
-        $fills = is_array($col['breakdown_answer_fills'] ?? null) ? $col['breakdown_answer_fills'] : [];
-        $hit = $breakdownResolveFillMap($fills, $displayText);
-        if ($hit !== null && trim((string) $hit) !== '') {
-            // `background` en lugar de solo background-color gana al shorthand de filas pares (#fdfdfd)
-            $parts[] = 'background: '.$resolveCss((string) $hit).' !important;';
         }
 
         return implode(' ', $parts);
@@ -1283,9 +1288,12 @@
                             $thumbWidth = count($imageSources) > 1 ? 52 : 110;
                             $thumbHeight = count($imageSources) > 1 ? 52 : 85;
                             $applyBreakdownPdf = ! $isImageType && empty($imageSources) && $imageFallbackLabel === '';
-                            $breakdownExtraStyle = $breakdownCellInlineStyle($col, (string) $cellText, $applyBreakdownPdf);
+                            $fillsBd = is_array($col['breakdown_answer_fills'] ?? null) ? $col['breakdown_answer_fills'] : [];
+                            $bdFillHit = $applyBreakdownPdf ? $breakdownResolveFillMap($fillsBd, (string) $cellText) : null;
+                            $breakdownExtraStyle = $breakdownCellInlineStyle($col, (string) $cellText, $applyBreakdownPdf, $bdFillHit);
                             $bdTcRaw = trim((string) ($col['breakdown_data_text_color'] ?? ''));
-                            $breakdownTextColorResolved = ($applyBreakdownPdf && $bdTcRaw !== '') ? $resolveCss($bdTcRaw) : '';
+                            $hasBreakdownBg = $applyBreakdownPdf && $bdFillHit !== null && trim((string) $bdFillHit) !== '';
+                            $breakdownTextColorResolved = ($hasBreakdownBg && $bdTcRaw !== '') ? $resolveCss($bdTcRaw) : '';
                         @endphp
                         <td style="{{ $baseW }} {{ $tdAlign }} {{ $cellBoldStyle }} {{ $breakdownExtraStyle }}">
                             @if(!empty($imageSources))
