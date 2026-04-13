@@ -121,6 +121,65 @@
     $resolveCss = function ($css) use ($varsCss) {
         return isset($varsCss[$css]) ? $varsCss[$css] : (str_starts_with($css ?? '', '#') ? $css : '#861E34');
     };
+    $breakdownFoldAccents = static function (string $text): string {
+        if ($text === '') {
+            return '';
+        }
+        if (class_exists(\Normalizer::class)) {
+            $n = \Normalizer::normalize($text, \Normalizer::FORM_D);
+            if (is_string($n)) {
+                $text = $n;
+            }
+        }
+
+        return preg_replace('/\p{M}/u', '', $text) ?? $text;
+    };
+    /** @param  array<string|int, mixed>  $map */
+    $breakdownResolveFillMap = static function (array $map, ?string $valueLabel) use ($breakdownFoldAccents): mixed {
+        if ($valueLabel === null) {
+            return null;
+        }
+        $trimmed = trim($valueLabel);
+        if ($trimmed === '') {
+            return null;
+        }
+        if (array_key_exists($trimmed, $map)) {
+            return $map[$trimmed];
+        }
+        $needle = $breakdownFoldAccents(mb_strtolower($trimmed, 'UTF-8'));
+        foreach ($map as $k => $v) {
+            if (! is_string($k) && ! is_int($k)) {
+                continue;
+            }
+            $kStr = trim((string) $k);
+            if ($kStr === '') {
+                continue;
+            }
+            if ($breakdownFoldAccents(mb_strtolower($kStr, 'UTF-8')) === $needle) {
+                return $v;
+            }
+        }
+
+        return null;
+    };
+    /** @param  array<string, mixed>  $col */
+    $breakdownCellInlineStyle = static function (array $col, string $displayText, bool $apply) use ($resolveCss, $breakdownResolveFillMap): string {
+        if (! $apply) {
+            return '';
+        }
+        $parts = [];
+        $tc = trim((string) ($col['breakdown_data_text_color'] ?? ''));
+        if ($tc !== '') {
+            $parts[] = 'color: '.$resolveCss($tc).';';
+        }
+        $fills = is_array($col['breakdown_answer_fills'] ?? null) ? $col['breakdown_answer_fills'] : [];
+        $hit = $breakdownResolveFillMap($fills, $displayText);
+        if ($hit !== null && trim((string) $hit) !== '') {
+            $parts[] = 'background-color: '.$resolveCss((string) $hit).';';
+        }
+
+        return implode(' ', $parts);
+    };
     $countTableAlign = strtolower((string) ($countTableAlign ?? 'left'));
     if (!in_array($countTableAlign, ['left', 'center', 'right'], true)) {
         $countTableAlign = 'left';
@@ -1146,7 +1205,12 @@
                             if (is_bool($val)) {
                                 $cellText = $val ? 'Sí' : 'No';
                             } elseif (is_array($val)) {
-                                $cellText = implode(', ', array_map(static fn ($v) => is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE), $val));
+                                if (array_key_exists('primary', $val) || array_key_exists('secondary', $val)) {
+                                    $prim = $val['primary'] ?? '';
+                                    $cellText = is_scalar($prim) ? (string) $prim : '';
+                                } else {
+                                    $cellText = implode(', ', array_map(static fn ($v) => is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE), $val));
+                                }
                             } elseif (is_scalar($val)) {
                                 $cellText = (($fieldTypesByKey[$key] ?? '') === 'semaforo')
                                     ? (\App\Services\TemporaryModules\TemporaryModuleFieldService::labelForSemaforo((string) $val) ?: (string) $val)
@@ -1155,7 +1219,7 @@
                                 $cellText = '';
                             }
                             $imageSources = [];
-                            $rawMediaValues = is_array($val)
+                            $rawMediaValues = is_array($val) && ! array_key_exists('primary', $val) && ! array_key_exists('secondary', $val)
                                 ? array_values(array_filter($val, fn ($item) => is_string($item) && trim($item) !== ''))
                                 : ((is_string($val) && trim($val) !== '') ? [trim($val)] : []);
 
@@ -1203,8 +1267,10 @@
                             $tdAlign = 'text-align: center; vertical-align: middle;';
                             $thumbWidth = count($imageSources) > 1 ? 52 : 110;
                             $thumbHeight = count($imageSources) > 1 ? 52 : 85;
+                            $applyBreakdownPdf = ! $isImageType && empty($imageSources) && $imageFallbackLabel === '';
+                            $breakdownExtraStyle = $breakdownCellInlineStyle($col, (string) $cellText, $applyBreakdownPdf);
                         @endphp
-                        <td style="{{ $baseW }} {{ $tdAlign }} {{ $cellBoldStyle }}">
+                        <td style="{{ $baseW }} {{ $tdAlign }} {{ $cellBoldStyle }} {{ $breakdownExtraStyle }}">
                             @if(!empty($imageSources))
                                 <div style="display:block; text-align:center; white-space:nowrap;">
                                     @foreach ($imageSources as $imageSource)

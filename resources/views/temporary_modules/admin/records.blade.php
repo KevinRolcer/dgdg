@@ -745,6 +745,14 @@
                             </div>
                         </div>
 
+                        <div class="tm-export-breakdown-panel" style="margin:10px 0;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+                            <div class="tm-export-groups-wrap__head" style="margin-bottom:6px;">
+                                <span class="tm-export-label-inline">Tabla de desglose — sombreado por respuesta</span>
+                            </div>
+                            <p class="tm-analysis-hint" style="margin:0;font-size:0.82rem;line-height:1.45;">
+                                Clic derecho en una columna de datos y elige <strong>Sombrear respuestas…</strong> para asignar color de fondo por cada valor (lista del campo o valores fijos como Sí/No o semáforo) y el color de letra de las celdas de esa columna. Se aplica en la vista previa, Excel, Word y PDF.
+                            </p>
+                        </div>
                         <p class="tm-export-personalize-hint">Arrastra columnas para reordenar. Usa &times; para omitir. Asigna un grupo a cada columna si aplica.</p>
                         <div class="tm-export-personalize-columns" id="tmExportPersonalizeColumns" role="list"></div>
                         <p class="tm-export-restore-wrap" id="tmExportRestoreWrap" hidden>
@@ -2281,6 +2289,11 @@
                         secondaryRow +
                     '</div>';
                 container.appendChild(item);
+                var optArr = Array.isArray(col.option_values) ? col.option_values : [];
+                item.dataset.optionValuesJson = JSON.stringify(optArr);
+                var fillsInit = (col.breakdown_answer_fills && typeof col.breakdown_answer_fills === 'object') ? col.breakdown_answer_fills : {};
+                item.dataset.breakdownFills = JSON.stringify(fillsInit);
+                item.dataset.breakdownTextColor = String(col.breakdown_data_text_color || '');
             });
         }
 
@@ -2314,6 +2327,12 @@
                 item.dataset.fillEmptyMode = String(sc.fill_empty_mode || 'none');
                 item.dataset.fillEmptyValue = String(sc.fill_empty_value != null ? sc.fill_empty_value : '');
                 item.dataset.contentBold = sc.content_bold ? '1' : '0';
+                if (sc.breakdown_answer_fills && typeof sc.breakdown_answer_fills === 'object') {
+                    item.dataset.breakdownFills = JSON.stringify(sc.breakdown_answer_fills);
+                }
+                if (sc.breakdown_data_text_color != null) {
+                    item.dataset.breakdownTextColor = String(sc.breakdown_data_text_color);
+                }
             });
         }
 
@@ -3638,7 +3657,25 @@
                     imageWidth = parseInt(w.value, 10) || 120;
                     imageHeight = parseInt(h.value, 10) || 80;
                 }
-                return { key, label, color, imageWidth, imageHeight, group };
+                var fillsObj = {};
+                try {
+                    fillsObj = JSON.parse(item.dataset.breakdownFills || '{}');
+                } catch (eBf) {
+                    fillsObj = {};
+                }
+                if (!fillsObj || typeof fillsObj !== 'object') {
+                    fillsObj = {};
+                }
+                return {
+                    key: key,
+                    label: label,
+                    color: color,
+                    imageWidth: imageWidth,
+                    imageHeight: imageHeight,
+                    group: group,
+                    breakdown_answer_fills: fillsObj,
+                    breakdown_data_text_color: String(item.dataset.breakdownTextColor || '').trim()
+                };
             });
             var countTableColors = {};
             var countColorList = modal ? modal.querySelector('#tmExportCountTableColorList') : document.getElementById('tmExportCountTableColorList');
@@ -3913,6 +3950,61 @@
                 }
             } catch (e2) { /* ignore */ }
             return null;
+        }
+
+        /** Fondo y color de texto para celdas de datos según respuesta (tabla de desglose). */
+        function tmExportBreakdownDataCellStyle(col, displayText) {
+            if (!col) {
+                return { extraStyle: '', cellBg: '#f5f5f5' };
+            }
+            var parts = [];
+            var cellBg = '#f5f5f5';
+            var tc = String(col.breakdown_data_text_color || '').trim();
+            if (tc) {
+                parts.push('color:' + tc + ';');
+            }
+            var fills = col.breakdown_answer_fills;
+            if (fills && typeof fills === 'object' && displayText != null) {
+                var hit = tmExportResolveCountRow2MapValue(fills, String(displayText));
+                if (hit != null && String(hit).trim() !== '') {
+                    cellBg = String(hit).trim();
+                }
+            }
+            return { extraStyle: parts.join(''), cellBg: cellBg };
+        }
+
+        function tmExportBreakdownOptionListForRow(row) {
+            if (!row || !personalizeModal) {
+                return [];
+            }
+            var key = String(row.dataset.key || '');
+            var base = (personalizeModal._personalizeColumns || []).find(function (c) { return String(c && c.key || '') === key; }) || {};
+            var out = [];
+            var seen = {};
+            function pushVal(v) {
+                var s = String(v == null ? '' : v).trim();
+                if (s === '') {
+                    return;
+                }
+                var low = s.toLowerCase();
+                if (seen[low]) {
+                    return;
+                }
+                seen[low] = true;
+                out.push(s);
+            }
+            if (Array.isArray(base.option_values)) {
+                base.option_values.forEach(pushVal);
+            }
+            var t = String(base.type || '').toLowerCase();
+            if (t === 'boolean') {
+                pushVal('Sí');
+                pushVal('No');
+            }
+            if (t === 'semaforo') {
+                ['verde', 'amarillo', 'rojo'].forEach(pushVal);
+            }
+            return out;
         }
 
         function tmExportOperationIsEmpty(val) {
@@ -4472,7 +4564,10 @@
                                 valueHtml = escapeHtml(val);
                             }
                             var weightStyle = col.content_bold ? 'font-weight:700;' : '';
-                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + widthStyle + 'background:' + escapeHtml(cellColor) + ';font-size:' + recordsCellFontPx + 'px;' + weightStyle + '">' + valueHtml + '</td>';
+                            var skipBd = ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'].indexOf(String(col.key || '')) !== -1
+                                || String(col.key || '').indexOf('__calc_') === 0;
+                            var bd = skipBd ? { extraStyle: '', cellBg: cellColor } : tmExportBreakdownDataCellStyle(col, val);
+                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + widthStyle + 'background:' + escapeHtml(bd.cellBg) + ';font-size:' + recordsCellFontPx + 'px;' + weightStyle + bd.extraStyle + '">' + valueHtml + '</td>';
                         }
                     });
                     html += '</tr>';
@@ -4491,9 +4586,13 @@
                         var emptyCalcBold = col.content_bold ? 'font-weight:700;' : '';
                         html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + widthStyle + 'background:' + escapeHtml(cellColor) + ';font-size:' + recordsCellFontPx + 'px;' + emptyCalcBold + '">OK</td>';
                     } else {
-                        const val = (savedRow && savedRow[col.key] !== undefined) ? escapeHtml(savedRow[col.key]) : '';
+                        const rawSample = (savedRow && savedRow[col.key] !== undefined) ? savedRow[col.key] : '';
+                        const val = rawSample !== undefined && rawSample !== null ? escapeHtml(rawSample) : '';
                         var emptyTextBold = col.content_bold ? 'font-weight:700;' : '';
-                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="' + widthStyle + 'background:' + escapeHtml(cellColor) + ';font-size:' + recordsCellFontPx + 'px;' + emptyTextBold + '" data-placeholder="Ejemplo">' + val + '</td>';
+                        var skipBdE = ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'].indexOf(String(col.key || '')) !== -1
+                            || String(col.key || '').indexOf('__calc_') === 0;
+                        var bdE = skipBdE ? { extraStyle: '', cellBg: cellColor } : tmExportBreakdownDataCellStyle(col, rawSample);
+                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="' + widthStyle + 'background:' + escapeHtml(bdE.cellBg) + ';font-size:' + recordsCellFontPx + 'px;' + emptyTextBold + bdE.extraStyle + '" data-placeholder="Ejemplo">' + val + '</td>';
                     }
                 });
                 html += '</tr>';
@@ -4534,6 +4633,18 @@
                     }
                 }
                 col.color = String(item.dataset.headerColor || 'var(--clr-primary)');
+
+                var fillsObj = {};
+                try {
+                    fillsObj = JSON.parse(item.dataset.breakdownFills || '{}');
+                } catch (eB) {
+                    fillsObj = {};
+                }
+                if (!fillsObj || typeof fillsObj !== 'object') {
+                    fillsObj = {};
+                }
+                col.breakdown_answer_fills = fillsObj;
+                col.breakdown_data_text_color = String(item.dataset.breakdownTextColor || '').trim();
 
                 ordered.push(col);
             });
@@ -5531,7 +5642,9 @@
                                     image_width: sc.image_width != null ? sc.image_width : b.image_width,
                                     fill_empty_mode: sc.fill_empty_mode || 'none',
                                     fill_empty_value: sc.fill_empty_value != null ? sc.fill_empty_value : '',
-                                    content_bold: !!sc.content_bold
+                                    content_bold: !!sc.content_bold,
+                                    breakdown_answer_fills: (sc.breakdown_answer_fills && typeof sc.breakdown_answer_fills === 'object') ? sc.breakdown_answer_fills : {},
+                                    breakdown_data_text_color: sc.breakdown_data_text_color != null ? String(sc.breakdown_data_text_color) : ''
                                 }));
                             }
                         });
@@ -5801,6 +5914,97 @@
                         buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
                     };
 
+                    var tmExportOpenBreakdownDialog = function (row) {
+                        if (!row || row.classList.contains('is-image')) {
+                            return;
+                        }
+                        var k = String(row.dataset.key || '');
+                        if (['item', 'delegacion_numero', 'cabecera_microrregion'].indexOf(k) !== -1) {
+                            return;
+                        }
+                        var opts = tmExportBreakdownOptionListForRow(row);
+                        var currentFills = {};
+                        try {
+                            currentFills = JSON.parse(row.dataset.breakdownFills || '{}');
+                        } catch (eFill) {
+                            currentFills = {};
+                        }
+                        if (!currentFills || typeof currentFills !== 'object') {
+                            currentFills = {};
+                        }
+                        var currentTextColor = String(row.dataset.breakdownTextColor || '').trim() || '';
+                        var buildFillSelectForRow = function (selectedVal) {
+                            var o = '<option value="">Sin sombrear</option>';
+                            TEMPLATE_COLORS.forEach(function (c) {
+                                var v = String(c.value || '');
+                                o += '<option value="' + escapeHtml(v) + '"' + (v === selectedVal ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>';
+                            });
+                            return o;
+                        };
+                        var textColorHtml = '<option value="">Predeterminado</option>';
+                        TEMPLATE_COLORS.forEach(function (c) {
+                            var v = String(c.value || '');
+                            textColorHtml += '<option value="' + escapeHtml(v) + '"' + (v === currentTextColor ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>';
+                        });
+                        var rowsHtml = '';
+                        if (opts.length === 0) {
+                            rowsHtml = '<p class="tm-analysis-hint" style="margin:0 0 8px 0;">Este campo no tiene lista de opciones en el catálogo. Puedes definir solo el color de letra de las celdas o añadir opciones al campo en el diseño del módulo.</p>';
+                        } else {
+                            rowsHtml = '<div style="max-height:220px;overflow:auto;border:1px solid #e2e8f0;border-radius:6px;">'
+                                + '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">'
+                                + '<thead><tr style="background:#f1f5f9;"><th style="text-align:left;padding:6px 8px;">Respuesta</th>'
+                                + '<th style="text-align:left;padding:6px 8px;">Color de fondo</th></tr></thead><tbody>';
+                            opts.forEach(function (opt, optIdx) {
+                                var hit = tmExportResolveCountRow2MapValue(currentFills, opt);
+                                var sel = hit != null && String(hit).trim() !== '' ? String(hit).trim() : '';
+                                rowsHtml += '<tr><td style="padding:6px 8px;vertical-align:middle;">' + escapeHtml(opt) + '</td>'
+                                    + '<td style="padding:4px 6px;"><select class="tm-input tm-bd-fill-select" style="width:100%;font-size:0.8rem;" data-option-index="' + String(optIdx) + '">'
+                                    + buildFillSelectForRow(sel)
+                                    + '</select></td></tr>';
+                            });
+                            rowsHtml += '</tbody></table></div>';
+                        }
+                        if (typeof Swal === 'undefined') {
+                            return;
+                        }
+                        Swal.fire({
+                            title: 'Sombrear respuestas',
+                            html: '<div style="text-align:left;font-size:0.88rem;">'
+                                + '<label for="tmBdTextColor" style="display:block;margin-bottom:4px;font-weight:600;">Color de letra (celdas de datos)</label>'
+                                + '<select id="tmBdTextColor" class="swal2-input" style="margin:0 0 12px 0;">' + textColorHtml + '</select>'
+                                + rowsHtml
+                                + '</div>',
+                            width: 520,
+                            showCancelButton: true,
+                            confirmButtonText: 'Guardar',
+                            cancelButtonText: 'Cancelar',
+                            preConfirm: function () {
+                                var ts = document.getElementById('tmBdTextColor');
+                                var textC = ts ? String(ts.value || '').trim() : '';
+                                var fills = {};
+                                document.querySelectorAll('.tm-bd-fill-select').forEach(function (sel) {
+                                    var idx = parseInt(sel.getAttribute('data-option-index') || '', 10);
+                                    if (Number.isNaN(idx) || idx < 0 || idx >= opts.length) {
+                                        return;
+                                    }
+                                    var ans = opts[idx];
+                                    var colv = String(sel.value || '').trim();
+                                    if (ans && colv) {
+                                        fills[ans] = colv;
+                                    }
+                                });
+                                return { textColor: textC, fills: fills };
+                            }
+                        }).then(function (res) {
+                            if (!res || !res.isConfirmed || !res.value) {
+                                return;
+                            }
+                            row.dataset.breakdownTextColor = String(res.value.textColor || '');
+                            row.dataset.breakdownFills = JSON.stringify(res.value.fills && typeof res.value.fills === 'object' ? res.value.fills : {});
+                            buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                        });
+                    };
+
                     var tmExportShowColumnCtxMenu = function (clientX, clientY, row) {
                         tmExportHideColumnCtxMenu();
                         if (!row) { return; }
@@ -5834,6 +6038,11 @@
                         addItem('Color de columna...', function () {
                             tmExportOpenColorDialog(row);
                         });
+                        if (!row.classList.contains('is-image') && ['item', 'delegacion_numero', 'cabecera_microrregion'].indexOf(String(row.dataset.key || '')) === -1) {
+                            addItem('Sombrear respuestas…', function () {
+                                tmExportOpenBreakdownDialog(row);
+                            });
+                        }
 
                         document.body.appendChild(menu);
                         menu.style.position = 'fixed';
@@ -6185,6 +6394,9 @@
                             groups: state.groups || [],
                             columns: orderedCols.map(function (col) {
                                 const colState = state.columns.find(function (c) { return c.key === col.key; }) || {};
+                                var fillsOut = (col.breakdown_answer_fills && typeof col.breakdown_answer_fills === 'object')
+                                    ? col.breakdown_answer_fills
+                                    : ((colState.breakdown_answer_fills && typeof colState.breakdown_answer_fills === 'object') ? colState.breakdown_answer_fills : {});
                                 return {
                                     key: col.key,
                                     label: (col.label != null && String(col.label).trim() !== '') ? String(col.label) : col.key,
@@ -6195,7 +6407,9 @@
                                     group: col.group || '',
                                     fill_empty_mode: col.fill_empty_mode || 'none',
                                     fill_empty_value: col.fill_empty_value != null ? String(col.fill_empty_value) : '',
-                                    content_bold: !!col.content_bold
+                                    content_bold: !!col.content_bold,
+                                    breakdown_answer_fills: fillsOut,
+                                    breakdown_data_text_color: String(col.breakdown_data_text_color != null ? col.breakdown_data_text_color : (colState.breakdown_data_text_color || '')).trim()
                                 };
                             })
                         };
@@ -6252,13 +6466,20 @@
                     }
 
                     function persistExportDraft(cfg) {
-                        if (!exportUrl) { return false; }
+                        if (!exportUrl) { return { ok: false, changed: false }; }
                         var payloadCfg = cfg || collectPersonalizeCfgObject();
                         var swalChoice = personalizeModal._swalChoice || 'single';
                         var previous = readSavedExportDraft();
                         var hadChanges = !previous || !isSameExportCfg(previous.cfg, payloadCfg) || previous.swal_choice !== swalChoice;
                         try {
                             localStorage.setItem(tmExportDraftStorageKey(exportUrl), JSON.stringify({ v: 1, swal_choice: swalChoice, cfg: payloadCfg, savedAt: Date.now() }));
+                            /* Evita que al cerrar (p. ej. tras generar reporte) se compare contra el estado inicial del modal. */
+                            if (personalizeModal) {
+                                try {
+                                    personalizeModal._openCfgSnapshot = JSON.stringify(payloadCfg);
+                                    personalizeModal._openSwalChoice = swalChoice;
+                                } catch (eSnap) { /* ignore */ }
+                            }
                             return { ok: true, changed: hadChanges };
                         } catch (eSave) {
                             return { ok: false, changed: hadChanges };
@@ -6270,7 +6491,8 @@
                         persistExportDraft(cfg);
                         const fmt = format || 'excel';
                         const exportMode = (fmt === 'excel') ? (mode || 'single') : 'single';
-                        closePersonalizeModal();
+                        /* Siempre cerrar sin diálogo: la config ya se persistió y el usuario pidió el reporte. */
+                        closePersonalizeModal({ force: true });
                         submitTemporaryModuleExportPost(exportUrl, fmt, exportMode, cfg);
                     }
 

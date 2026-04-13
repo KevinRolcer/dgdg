@@ -985,6 +985,66 @@ class TemporaryModuleExportService
         return null;
     }
 
+    private function columnHasBreakdownCellStyles(?array $cfg): bool
+    {
+        if (! is_array($cfg)) {
+            return false;
+        }
+        if (trim((string) ($cfg['breakdown_data_text_color'] ?? '')) !== '') {
+            return true;
+        }
+        $fills = $cfg['breakdown_answer_fills'] ?? null;
+
+        return is_array($fills) && $fills !== [];
+    }
+
+    /**
+     * @param  list<array{coord: string, field_key: string, text: string}>  $queue
+     */
+    private function queueBreakdownDataCellStyle(array &$queue, string $fieldKey, string $coord, string $displayText): void
+    {
+        $cfg = $this->columnConfigByKey[$fieldKey] ?? null;
+        if (! $this->columnHasBreakdownCellStyles($cfg)) {
+            return;
+        }
+        $queue[] = ['coord' => $coord, 'field_key' => $fieldKey, 'text' => $displayText];
+    }
+
+    /**
+     * @param  list<array{coord: string, field_key: string, text: string}>  $queue
+     */
+    private function applyBreakdownStylesFromQueue(Worksheet $sheet, array $queue): void
+    {
+        foreach ($queue as $item) {
+            $cfg = $this->columnConfigByKey[$item['field_key']] ?? null;
+            if (! $this->columnHasBreakdownCellStyles($cfg)) {
+                continue;
+            }
+            $coord = $item['coord'];
+            $displayText = (string) ($item['text'] ?? '');
+            $style = $sheet->getStyle($coord);
+            $textCss = trim((string) ($cfg['breakdown_data_text_color'] ?? ''));
+            if ($textCss !== '') {
+                $argb = $this->mapCssColorToArgb($textCss);
+                if ($argb !== null) {
+                    $style->getFont()->getColor()->setARGB($argb);
+                }
+            }
+            $fills = is_array($cfg['breakdown_answer_fills'] ?? null) ? $cfg['breakdown_answer_fills'] : [];
+            if ($fills === [] || trim($displayText) === '') {
+                continue;
+            }
+            $hit = $this->resolveCountTableRow2MapValue($fills, $displayText);
+            if ($hit === null || $hit === '') {
+                continue;
+            }
+            $fillArgb = $this->mapCssColorToArgb((string) $hit);
+            if ($fillArgb !== null) {
+                $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($fillArgb);
+            }
+        }
+    }
+
     private function parseSummaryNumber(mixed $value): ?float
     {
         if ($value === null) {
@@ -2002,6 +2062,8 @@ class TemporaryModuleExportService
         $sheet->setAutoFilter('A'.$tableHeaderFirstRow.':'.$lastColumnLetter.$tableHeaderLastRow);
 
         $rowIndex = $dataStartRow;
+        /** @var list<array{coord: string, field_key: string, text: string}> */
+        $breakdownStyleQueue = [];
 
         if ($entriesQuery->count() === 0) {
             $sheet->setCellValue('A'.$rowIndex, 'Sin registros');
@@ -2012,7 +2074,7 @@ class TemporaryModuleExportService
             $lastMicrorregionKey = null;
             $mergingStartRow = null;
 
-            $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule, $exportColumns, $headerRowCount, &$lastMicrorregionKey, &$mergingStartRow) {
+            $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule, $exportColumns, $headerRowCount, &$lastMicrorregionKey, &$mergingStartRow, &$breakdownStyleQueue) {
                 foreach ($entries as $entry) {
                     $sheet->setCellValue('A'.$rowIndex, $itemNumber);
                     $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
@@ -2059,14 +2121,18 @@ class TemporaryModuleExportService
                         $fieldType = $this->fieldService->canonicalFieldType((string) $field->type);
 
                         if (is_bool($cell)) {
-                            $sheet->setCellValue($cellCoordinate, $cell ? 'Sí' : 'No');
+                            $boolText = $cell ? 'Sí' : 'No';
+                            $sheet->setCellValue($cellCoordinate, $boolText);
+                            $this->queueBreakdownDataCellStyle($breakdownStyleQueue, (string) $field->key, $cellCoordinate, $boolText);
                             $columnIndex++;
                             continue;
                         }
 
                         // Multiselect: array → comma-joined string
                         if ($field->type === 'multiselect' && is_array($cell)) {
-                            $sheet->setCellValue($cellCoordinate, implode(', ', $cell));
+                            $multiText = implode(', ', $cell);
+                            $sheet->setCellValue($cellCoordinate, $multiText);
+                            $this->queueBreakdownDataCellStyle($breakdownStyleQueue, (string) $field->key, $cellCoordinate, $multiText);
                             $columnIndex++;
                             continue;
                         }
@@ -2085,16 +2151,21 @@ class TemporaryModuleExportService
                             if (($linkOpts['secondary_type'] ?? '') === 'semaforo' && $secondaryOut !== '') {
                                 $secondaryOut = TemporaryModuleFieldService::labelForSemaforo($secondaryOut) ?: $secondaryOut;
                             }
+                            $fk = (string) $field->key;
                             $sheet->setCellValue($cellCoordinate, $primaryOut);
+                            $this->queueBreakdownDataCellStyle($breakdownStyleQueue, $fk, $cellCoordinate, $primaryOut);
                             $columnIndex++;
                             $secondaryCoord = Coordinate::stringFromColumnIndex($columnIndex).$rowIndex;
                             $sheet->setCellValue($secondaryCoord, $secondaryOut);
+                            $this->queueBreakdownDataCellStyle($breakdownStyleQueue, $fk, $secondaryCoord, $secondaryOut);
                             $columnIndex++;
                             continue;
                         }
 
                         if ($field->type === 'semaforo' && is_string($cell) && trim($cell) !== '') {
-                            $sheet->setCellValue($cellCoordinate, TemporaryModuleFieldService::labelForSemaforo($cell) ?: $cell);
+                            $semText = (string) (TemporaryModuleFieldService::labelForSemaforo($cell) ?: $cell);
+                            $sheet->setCellValue($cellCoordinate, $semText);
+                            $this->queueBreakdownDataCellStyle($breakdownStyleQueue, (string) $field->key, $cellCoordinate, $semText);
                             $columnIndex++;
                             continue;
                         }
@@ -2137,6 +2208,7 @@ class TemporaryModuleExportService
                             }
                             if ($imagesRendered === 0) {
                                 $sheet->setCellValue($cellCoordinate, 'Sin Imagen');
+                                $this->queueBreakdownDataCellStyle($breakdownStyleQueue, (string) $field->key, $cellCoordinate, 'Sin Imagen');
                             }
                             $columnIndex++;
                             continue;
@@ -2149,11 +2221,14 @@ class TemporaryModuleExportService
                             if (filter_var($geoValue, FILTER_VALIDATE_URL)) {
                                 $sheet->getCell($cellCoordinate)->getHyperlink()->setUrl($geoValue);
                             }
+                            $this->queueBreakdownDataCellStyle($breakdownStyleQueue, (string) $field->key, $cellCoordinate, $geoValue);
                             $columnIndex++;
                             continue;
                         }
 
-                        $sheet->setCellValue($cellCoordinate, is_scalar($cell) ? (string) $cell : '');
+                        $scalarText = is_scalar($cell) ? (string) $cell : '';
+                        $sheet->setCellValue($cellCoordinate, $scalarText);
+                        $this->queueBreakdownDataCellStyle($breakdownStyleQueue, (string) $field->key, $cellCoordinate, $scalarText);
                         $columnIndex++;
                     }
 
@@ -2189,6 +2264,10 @@ class TemporaryModuleExportService
         if ($lastDataRow > $tableHeaderLastRow) {
             $sheet->getStyle('A'.$dataStartRow.':'.$lastColumnLetter.$lastDataRow)
                 ->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_CENTER);
+        }
+
+        if ($breakdownStyleQueue !== []) {
+            $this->applyBreakdownStylesFromQueue($sheet, $breakdownStyleQueue);
         }
 
         // Celdas de datos se mantienen con color de fondo por defecto (blanco),

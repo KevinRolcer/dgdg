@@ -83,7 +83,7 @@ class TemporaryModuleWordPdfService
         $headerFontRaw = $exportConfig['records_header_font_size_px'] ?? $exportConfig['header_font_size_px'] ?? $exportConfig['headerFontPx'] ?? null;
         $headerFontSizePx = $headerFontRaw !== null ? max(9, min(28, (int) $headerFontRaw)) : 12;
         $headerFontSizePt = max(7, min(21, (int) round($headerFontSizePx * 0.75)));
-    {
+
         $temporaryModule = TemporaryModule::query()->findOrFail($moduleId);
         $fileName = trim((string) $temporaryModule->name) !== '' ? $temporaryModule->name : 'Módulo '.$moduleId;
 
@@ -145,6 +145,8 @@ class TemporaryModuleWordPdfService
                 'fill_empty_mode' => (string) ($col['fill_empty_mode'] ?? 'none'),
                 'fill_empty_value' => (string) ($col['fill_empty_value'] ?? ''),
                 'content_bold' => !empty($col['content_bold']),
+                'breakdown_answer_fills' => is_array($col['breakdown_answer_fills'] ?? null) ? $col['breakdown_answer_fills'] : [],
+                'breakdown_data_text_color' => (string) ($col['breakdown_data_text_color'] ?? ''),
             ];
         }
         $columns = array_values($columnMap);
@@ -1303,14 +1305,31 @@ class TemporaryModuleWordPdfService
                         if (is_bool($val)) {
                             $text = $val ? 'Sí' : 'No';
                         } elseif (is_array($val)) {
-                            $text = implode(', ', array_map(static fn ($v) => is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE), $val));
+                            if (array_key_exists('primary', $val) || array_key_exists('secondary', $val)) {
+                                $p = $val['primary'] ?? '';
+                                $text = is_scalar($p) ? (string) $p : '';
+                            } else {
+                                $text = implode(', ', array_map(static fn ($v) => is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE), $val));
+                            }
                         } elseif (is_scalar($val)) {
                             $text = (string) $val;
+                            if ($fieldType === 'semaforo' && trim($text) !== '') {
+                                $text = TemporaryModuleFieldService::labelForSemaforo($text) ?: $text;
+                            }
                         } else {
                             $text = '';
                         }
                         $w = $columnTwips[$idx] ?? null;
-                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold], ['alignment' => Jc::CENTER]);
+                        $bd = $this->breakdownWordDataCellVisual($col, $text);
+                        $cellOpts = ['valign' => 'center'];
+                        if ($bd['bg'] !== null) {
+                            $cellOpts['bgColor'] = $bd['bg'];
+                        }
+                        $font = ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold];
+                        if ($bd['text'] !== null) {
+                            $font['color'] = $bd['text'];
+                        }
+                        $table->addCell($w, $cellOpts)->addText($text, $font, ['alignment' => Jc::CENTER]);
                     }
                 }
             }
@@ -1415,7 +1434,7 @@ class TemporaryModuleWordPdfService
             'url' => route('temporary-modules.admin.exports.download', ['file' => $pdfFileName])
         ];
     }
-    }
+
     /**
      * @param Collection $entries entries with 'data'
      * @param array<string> $countByFields
@@ -2301,6 +2320,72 @@ class TemporaryModuleWordPdfService
             'var(--clr-card)' => 'FFFFFF',
         ];
         return $map[$color] ?? '861E34';
+    }
+
+    private function foldBreakdownMatchAccents(string $text): string
+    {
+        if ($text === '') {
+            return '';
+        }
+        if (class_exists(\Normalizer::class)) {
+            $n = \Normalizer::normalize($text, \Normalizer::FORM_D);
+            if (is_string($n)) {
+                $text = $n;
+            }
+        }
+
+        return preg_replace('/\p{M}/u', '', $text) ?? $text;
+    }
+
+    /**
+     * @param  array<string|int, mixed>  $map
+     */
+    private function resolveBreakdownAnswerFillsMap(array $map, ?string $valueLabel): mixed
+    {
+        if ($valueLabel === null) {
+            return null;
+        }
+        $trimmed = trim($valueLabel);
+        if ($trimmed === '') {
+            return null;
+        }
+        if (array_key_exists($trimmed, $map)) {
+            return $map[$trimmed];
+        }
+        $needle = $this->foldBreakdownMatchAccents(mb_strtolower($trimmed, 'UTF-8'));
+        foreach ($map as $k => $v) {
+            if (! is_string($k) && ! is_int($k)) {
+                continue;
+            }
+            $kStr = trim((string) $k);
+            if ($kStr === '') {
+                continue;
+            }
+            if ($this->foldBreakdownMatchAccents(mb_strtolower($kStr, 'UTF-8')) === $needle) {
+                return $v;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{bg: ?string, text: ?string} Hex RGB sin # para PhpWord
+     */
+    private function breakdownWordDataCellVisual(array $col, string $displayText): array
+    {
+        $out = ['bg' => null, 'text' => null];
+        $textCss = trim((string) ($col['breakdown_data_text_color'] ?? ''));
+        if ($textCss !== '') {
+            $out['text'] = $this->cssColorToHex($textCss);
+        }
+        $fills = is_array($col['breakdown_answer_fills'] ?? null) ? $col['breakdown_answer_fills'] : [];
+        $hit = $this->resolveBreakdownAnswerFillsMap($fills, $displayText);
+        if ($hit !== null && trim((string) $hit) !== '') {
+            $out['bg'] = $this->cssColorToHex((string) $hit);
+        }
+
+        return $out;
     }
 
     /**
