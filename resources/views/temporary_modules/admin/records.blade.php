@@ -2330,7 +2330,8 @@
                     showPct: !!(pctCheck && pctCheck.checked),
                     showSR: true,
                     row2Values: {},
-                    row2Widths: {}
+                    row2Widths: {},
+                    includeValues: {}
                 };
                 var srCheck = row.querySelector('.tm-export-count-sr-check');
                 if (srCheck) { savedColors[k].showSR = !!srCheck.checked; }
@@ -2343,6 +2344,8 @@
                         var wn = parseInt(vw.value, 10);
                         if (!Number.isNaN(wn)) { savedColors[k].row2Widths[v] = Math.max(6, Math.min(40, wn)); }
                     }
+                    var includeCheck = vrow.querySelector('.tm-export-count-value-include-check');
+                    if (v && includeCheck) { savedColors[k].includeValues[v] = !!includeCheck.checked; }
                 });
             });
             }
@@ -2360,6 +2363,7 @@
                 var showSR = key === '_total' ? false : !(colors && colors.showSR === false);
                 var row2Values = (colors && colors.row2Values) ? colors.row2Values : {};
                 var row2Widths = (colors && colors.row2Widths) ? colors.row2Widths : {};
+                var includeValues = (colors && colors.includeValues) ? colors.includeValues : {};
                 var srControl = key === '_total' ? '' :
                     '<label class="tm-export-count-pct-item-check" title="Incluir S/R para este campo" style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.75rem;color:var(--clr-text-main);">' +
                     '<input type="checkbox" class="tm-export-count-sr-check"' + (showSR ? ' checked' : '') + '> S/R' +
@@ -2386,8 +2390,17 @@
                     valueLabels.forEach(function (vlabel) {
                         var vc = row2Values[vlabel] || defaultRow2;
                         var vw = row2Widths[vlabel] || 12;
+                        var includeValue = true;
+                        if (Object.prototype.hasOwnProperty.call(includeValues, vlabel)) {
+                            includeValue = !!includeValues[vlabel];
+                        } else if (Object.prototype.hasOwnProperty.call(includeValues, String(vlabel).toLowerCase())) {
+                            includeValue = !!includeValues[String(vlabel).toLowerCase()];
+                        }
                         block += '<div class="tm-export-count-table-value-color" data-value="' + escapeHtml(vlabel) + '">' +
                             '<span class="tm-export-value-label">' + escapeHtml(vlabel) + '</span>' +
+                            '<label class="tm-export-count-pct-item-check" title="Mostrar este valor en la tabla de conteo" style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.75rem;color:var(--clr-text-main);margin:0 4px;">' +
+                            '<input type="checkbox" class="tm-export-count-value-include-check"' + (includeValue ? ' checked' : '') + '> Mostrar' +
+                            '</label>' +
                             '<label class="tm-export-count-width-label" title="Ancho de celda para este valor">' +
                             '<span>Ancho</span>' +
                             '<input type="number" class="tm-export-count-width-input tm-input" min="6" max="40" value="' + escapeHtml(String(vw)) + '" aria-label="Ancho de celda para ' + escapeHtml(vlabel) + '">' +
@@ -2406,10 +2419,24 @@
                 if (!entries || !entries.length) { return list; }
                 entries.forEach(function (e) {
                     var v = (e.data && e.data[key]) !== undefined ? e.data[key] : null;
-                    var label = (typeof v === 'boolean') ? (v ? 'Sí' : 'No') : (v != null ? String(v).trim() : '');
-                    if (label !== '') {
-                        var lower = label.toLowerCase();
-                        if (!seen[lower]) { seen[lower] = label; list.push(label); }
+                    var pushValue = function (value) {
+                        var label = '';
+                        if (typeof value === 'boolean') {
+                            label = value ? 'Sí' : 'No';
+                        } else if (value != null) {
+                            label = String(value).trim();
+                        }
+                        if (label !== '') {
+                            var lower = label.toLowerCase();
+                            if (!seen[lower]) { seen[lower] = label; list.push(label); }
+                        }
+                    };
+                    if (Array.isArray(v)) {
+                        v.forEach(function (item) { pushValue(item); });
+                    } else if (v && typeof v === 'object' && Object.prototype.hasOwnProperty.call(v, 'primary')) {
+                        pushValue(v.primary);
+                    } else {
+                        pushValue(v);
                     }
                 });
                 list.sort(function (a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); });
@@ -3540,6 +3567,7 @@
                     };
                     var row2Values = {};
                     var row2Widths = {};
+                    var includeValues = {};
                     row.querySelectorAll('.tm-export-count-table-value-color').forEach(function (vrow) {
                         var v = vrow.getAttribute('data-value');
                         var vt = vrow.querySelector('.tm-export-color-trigger');
@@ -3549,9 +3577,12 @@
                             var wn = parseInt(vw.value, 10);
                             if (!Number.isNaN(wn)) { row2Widths[v] = Math.max(6, Math.min(40, wn)); }
                         }
+                        var includeCheck = vrow.querySelector('.tm-export-count-value-include-check');
+                        if (v && includeCheck) { includeValues[v] = !!includeCheck.checked; }
                     });
                     if (Object.keys(row2Values).length) { obj.row2Values = row2Values; }
                     if (Object.keys(row2Widths).length) { obj.row2Widths = row2Widths; }
+                    if (Object.keys(includeValues).length) { obj.includeValues = includeValues; }
                     var pctCheck = row.querySelector('.tm-export-count-pct-check');
                     obj.showPct = !!(pctCheck && pctCheck.checked);
                     var srCheck = row.querySelector('.tm-export-count-sr-check');
@@ -3988,6 +4019,7 @@
                         || ((labelEl && labelEl.textContent) ? labelEl.textContent.replace(/^\s+|\s+$/g, '') : key);
                     var groupCfg = (state.countTableColors && state.countTableColors[key]) ? state.countTableColors[key] : {};
                     var includeSR = key === '_total' ? false : !(groupCfg && groupCfg.showSR === false);
+                    var includeValuesCfg = (groupCfg && groupCfg.includeValues && typeof groupCfg.includeValues === 'object') ? groupCfg.includeValues : {};
                     var byVal = {};
                     var labelByLower = {};
                     var sinRespuesta = 0;
@@ -4040,7 +4072,16 @@
                     }
                     var values = [];
                     Object.keys(byVal).sort().forEach(function (lower) {
-                        values.push({ label: normalizeExportHeadingText(labelByLower[lower] || lower, headersUppercase), count: byVal[lower] });
+                        var valueLabel = labelByLower[lower] || lower;
+                        var includeValue = true;
+                        if (Object.prototype.hasOwnProperty.call(includeValuesCfg, valueLabel)) {
+                            includeValue = !!includeValuesCfg[valueLabel];
+                        } else if (Object.prototype.hasOwnProperty.call(includeValuesCfg, lower)) {
+                            includeValue = !!includeValuesCfg[lower];
+                        }
+                        if (includeValue) {
+                            values.push({ label: normalizeExportHeadingText(valueLabel, headersUppercase), count: byVal[lower] });
+                        }
                     });
                     if (includeSR && sinRespuesta > 0) {
                         values.push({ label: normalizeExportHeadingText('S/R', headersUppercase), count: sinRespuesta });
@@ -5489,7 +5530,7 @@
                                     }
                                     if (menu) { menu.hidden = true; }
                                     buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
-                                } else if (e.target.closest('.tm-export-count-pct-check') || e.target.closest('.tm-export-count-sr-check')) {
+                                } else if (e.target.closest('.tm-export-count-pct-check') || e.target.closest('.tm-export-count-sr-check') || e.target.closest('.tm-export-count-value-include-check')) {
                                     buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
                                 }
                             }
@@ -5500,7 +5541,13 @@
                             }
                         });
                         personalizeModal.addEventListener('change', function (e) {
-                            if (e.target && (e.target.closest('.tm-export-count-width-input') || e.target.id === 'tmExportCountTableCellWidth')) {
+                            if (e.target && (
+                                e.target.closest('.tm-export-count-width-input')
+                                || e.target.id === 'tmExportCountTableCellWidth'
+                                || e.target.closest('.tm-export-count-pct-check')
+                                || e.target.closest('.tm-export-count-sr-check')
+                                || e.target.closest('.tm-export-count-value-include-check')
+                            )) {
                                 buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
                             }
                         });

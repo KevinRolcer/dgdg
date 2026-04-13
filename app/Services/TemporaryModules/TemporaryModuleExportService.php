@@ -831,7 +831,7 @@ class TemporaryModuleExportService
      * @param array<string, string> $fieldLabels map field key => display label (e.g. estatus => ESTATUS)
      * @return array{groups: list<array{label: string, values: list<array{label: string, count: int}>}>}
      */
-    private function buildCountTableData(Collection $entries, array $countByFields, array $fieldLabels = []): array
+    private function buildCountTableData(Collection $entries, array $countByFields, array $fieldLabels = [], array $countTableColors = []): array
     {
         $total = $entries->count();
         $groups = [
@@ -839,6 +839,9 @@ class TemporaryModuleExportService
         ];
 
         foreach ($countByFields as $fieldKey) {
+            $fieldCfg = is_array($countTableColors[$fieldKey] ?? null) ? $countTableColors[$fieldKey] : [];
+            $includeValuesCfg = is_array($fieldCfg['includeValues'] ?? null) ? $fieldCfg['includeValues'] : [];
+            $includeSR = !array_key_exists('showSR', $fieldCfg) || !empty($fieldCfg['showSR']);
             $valueCounts = [];
             $labelByLower = [];
             $sinRespuestaCount = 0;
@@ -890,9 +893,18 @@ class TemporaryModuleExportService
             ksort($valueCounts, SORT_NATURAL);
             $values = [];
             foreach ($valueCounts as $lower => $count) {
-                $values[] = ['label' => $labelByLower[$lower] ?? $lower, 'count' => $count];
+                $valueLabel = (string) ($labelByLower[$lower] ?? $lower);
+                $includeValue = true;
+                if (array_key_exists($valueLabel, $includeValuesCfg)) {
+                    $includeValue = (bool) $includeValuesCfg[$valueLabel];
+                } elseif (array_key_exists($lower, $includeValuesCfg)) {
+                    $includeValue = (bool) $includeValuesCfg[$lower];
+                }
+                if ($includeValue) {
+                    $values[] = ['label' => $valueLabel, 'count' => $count];
+                }
             }
-            if ($sinRespuestaCount > 0) {
+            if ($includeSR && $sinRespuestaCount > 0) {
                 $values[] = ['label' => 'S/R', 'count' => $sinRespuestaCount];
             }
             if ($values !== []) {
@@ -1307,7 +1319,7 @@ class TemporaryModuleExportService
             $entriesForCount = $entriesForSummary instanceof Collection
                 ? $entriesForSummary
                 : (clone $entriesQuery)->get(['id', 'data', 'microrregion_id']);
-            $countData = $this->buildCountTableData($entriesForCount, $countByFields, $fieldLabels);
+            $countData = $this->buildCountTableData($entriesForCount, $countByFields, $fieldLabels, $countTableColors);
             $countData = $this->transformCountTableLabels($countData, $headersUppercase);
             $groups = $countData['groups'];
             $colIdx = 1;

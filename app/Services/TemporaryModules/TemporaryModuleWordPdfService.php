@@ -1418,6 +1418,7 @@ class TemporaryModuleWordPdfService
         foreach ($countByFields as $fieldKey) {
             $fieldCfg = is_array($countTableColors[$fieldKey] ?? null) ? $countTableColors[$fieldKey] : [];
             $includeSR = !array_key_exists('showSR', $fieldCfg) || !empty($fieldCfg['showSR']);
+            $includeValuesCfg = is_array($fieldCfg['includeValues'] ?? null) ? $fieldCfg['includeValues'] : [];
             $valueCounts = [];
             $labelByLower = [];
             $sinRespuestaCount = 0;
@@ -1464,7 +1465,16 @@ class TemporaryModuleWordPdfService
             ksort($valueCounts, SORT_NATURAL);
             $values = [];
             foreach ($valueCounts as $lower => $count) {
-                $values[] = ['label' => $labelByLower[$lower] ?? $lower, 'count' => $count];
+                $valueLabel = (string) ($labelByLower[$lower] ?? $lower);
+                $includeValue = true;
+                if (array_key_exists($valueLabel, $includeValuesCfg)) {
+                    $includeValue = (bool) $includeValuesCfg[$valueLabel];
+                } elseif (array_key_exists($lower, $includeValuesCfg)) {
+                    $includeValue = (bool) $includeValuesCfg[$lower];
+                }
+                if ($includeValue) {
+                    $values[] = ['label' => $valueLabel, 'count' => $count];
+                }
             }
             if ($includeSR && $sinRespuestaCount > 0) {
                 $values[] = ['label' => 'S/R', 'count' => $sinRespuestaCount];
