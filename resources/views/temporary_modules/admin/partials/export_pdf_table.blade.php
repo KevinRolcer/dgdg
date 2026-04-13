@@ -1,6 +1,7 @@
 @php
     $fieldTypesByKey = $fieldTypesByKey ?? [];
     $pdfImageDataByPath = $pdfImageDataByPath ?? [];
+    $rowHighlightStyles = is_array($rowHighlightStyles ?? null) ? $rowHighlightStyles : [];
     $operationsValueIsEmpty = function ($value) use (&$operationsValueIsEmpty): bool {
         if ($value === null) {
             return true;
@@ -1116,6 +1117,14 @@
         </thead>
         <tbody>
         @foreach ($tempEntries as $entry)
+            @php
+                $rowH = $rowHighlightStyles[$loop->index] ?? ['bg_css' => '', 'text_css' => ''];
+                $rowBgPdf = trim((string) ($rowH['bg_css'] ?? ''));
+                $rowTextPdf = trim((string) ($rowH['text_css'] ?? ''));
+                $rowBgResolvedPdf = $rowBgPdf !== '' ? $resolveCss($rowBgPdf) : '';
+                $rowTextResolvedPdf = $rowTextPdf !== '' ? $resolveCss($rowTextPdf) : '';
+                $rowTdBg = ($rowBgResolvedPdf !== '') ? ('background: '.$rowBgResolvedPdf.' !important;') : '';
+            @endphp
             <tr>
                 @foreach ($colHeaders as $col)
                     @php
@@ -1125,7 +1134,7 @@
                         $cellBoldStyle = !empty($col['content_bold']) ? 'font-weight:700;' : '';
                     @endphp
                     @if ($key === 'item')
-                        <td style="{{ $baseW }} text-align: center; {{ $cellBoldStyle }}">{{ $itemNumber }}</td>
+                        <td style="{{ $baseW }} text-align: center; {{ $cellBoldStyle }} {{ $rowTdBg }}">@if($rowTextResolvedPdf !== '' && $rowBgResolvedPdf !== '')<span style="color: {{ $rowTextResolvedPdf }} !important;">{{ $itemNumber }}</span>@else{{ $itemNumber }}@endif</td>
                         @php $itemNumber++; @endphp
                     @elseif ($key === 'microrregion')
                         @php
@@ -1133,19 +1142,19 @@
                             $lMrTxt = $lMeta['label'] ?? ($lMeta->label ?? 'Sin microrregión');
                         @endphp
                         {{-- Sin rowspan: Dompdf al partir la tabla entre páginas rompía columnas --}}
-                        <td style="vertical-align: middle; text-align: center; {{ $baseW }} {{ $cellBoldStyle }}">{{ $lMrTxt }}</td>
+                        <td style="vertical-align: middle; text-align: center; {{ $baseW }} {{ $cellBoldStyle }} {{ $rowTdBg }}">@if($rowTextResolvedPdf !== '' && $rowBgResolvedPdf !== '')<span style="color: {{ $rowTextResolvedPdf }} !important;">{{ $lMrTxt }}</span>@else{{ $lMrTxt }}@endif</td>
                     @elseif ($key === 'delegacion_numero')
                         @php
                             $lMeta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                             $lMrNumber = (string) ($lMeta['number'] ?? ($lMeta->number ?? ''));
                         @endphp
-                        <td style="vertical-align: middle; text-align: center; {{ $baseW }} {{ $cellBoldStyle }}">{{ $lMrNumber }}</td>
+                        <td style="vertical-align: middle; text-align: center; {{ $baseW }} {{ $cellBoldStyle }} {{ $rowTdBg }}">@if($rowTextResolvedPdf !== '' && $rowBgResolvedPdf !== '')<span style="color: {{ $rowTextResolvedPdf }} !important;">{{ $lMrNumber }}</span>@else{{ $lMrNumber }}@endif</td>
                     @elseif ($key === 'cabecera_microrregion')
                         @php
                             $lMeta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                             $lMrCabecera = (string) ($lMeta['cabecera'] ?? ($lMeta->cabecera ?? ''));
                         @endphp
-                        <td style="vertical-align: middle; text-align: center; {{ $baseW }} {{ $cellBoldStyle }}">{{ $lMrCabecera }}</td>
+                        <td style="vertical-align: middle; text-align: center; {{ $baseW }} {{ $cellBoldStyle }} {{ $rowTdBg }}">@if($rowTextResolvedPdf !== '' && $rowBgResolvedPdf !== '')<span style="color: {{ $rowTextResolvedPdf }} !important;">{{ $lMrCabecera }}</span>@else{{ $lMrCabecera }}@endif</td>
                     @elseif (
                         is_string($key)
                         && str_starts_with($key, '__calc_')
@@ -1207,7 +1216,7 @@
                                 if ($operationsOp === 'percent') { $operationsText .= '%'; }
                             }
                         @endphp
-                        <td style="{{ $baseW }} text-align: center; vertical-align: middle; {{ $cellBoldStyle }}">{!! nl2br(e($operationsText)) !!}</td>
+                        <td style="{{ $baseW }} text-align: center; vertical-align: middle; {{ $cellBoldStyle }} {{ $rowTdBg }}">@if($rowTextResolvedPdf !== '' && $rowBgResolvedPdf !== '')<span style="color: {{ $rowTextResolvedPdf }} !important;">{!! nl2br(e($operationsText)) !!}</span>@else{!! nl2br(e($operationsText)) !!}@endif</td>
                     @else
                         @php
                             $val = $entry->data[$key] ?? null;
@@ -1294,8 +1303,10 @@
                             $bdTcRaw = trim((string) ($col['breakdown_data_text_color'] ?? ''));
                             $hasBreakdownBg = $applyBreakdownPdf && $bdFillHit !== null && trim((string) $bdFillHit) !== '';
                             $breakdownTextColorResolved = ($hasBreakdownBg && $bdTcRaw !== '') ? $resolveCss($bdTcRaw) : '';
+                            $rowBgOnlyStyle = (! $hasBreakdownBg && $rowBgResolvedPdf !== '') ? ('background: '.$rowBgResolvedPdf.' !important;') : '';
+                            $useRowTextSpan = ! $hasBreakdownBg && $breakdownTextColorResolved === '' && $rowTextResolvedPdf !== '' && $rowBgResolvedPdf !== '';
                         @endphp
-                        <td style="{{ $baseW }} {{ $tdAlign }} {{ $cellBoldStyle }} {{ $breakdownExtraStyle }}">
+                        <td style="{{ $baseW }} {{ $tdAlign }} {{ $cellBoldStyle }} {{ $breakdownExtraStyle }} {{ $rowBgOnlyStyle }}">
                             @if(!empty($imageSources))
                                 <div style="display:block; text-align:center; white-space:nowrap;">
                                     @foreach ($imageSources as $imageSource)
@@ -1308,6 +1319,8 @@
                                 @if($breakdownTextColorResolved !== '')
                                     {{-- Dompdf a veces no aplica color solo en el td; el span fuerza el color de letra --}}
                                     <span style="color: {{ $breakdownTextColorResolved }} !important;">{{ $cellText }}</span>
+                                @elseif($useRowTextSpan)
+                                    <span style="color: {{ $rowTextResolvedPdf }} !important;">{{ $cellText }}</span>
                                 @else
                                     {{ $cellText }}
                                 @endif

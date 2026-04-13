@@ -446,6 +446,15 @@ class TemporaryModuleWordPdfService
 
         $columns = $this->transformExportColumns($columns, $headersUppercase);
 
+        $colByKey = [];
+        foreach ($columns as $c) {
+            $kk = trim((string) ($c['key'] ?? ''));
+            if ($kk !== '') {
+                $colByKey[$kk] = $c;
+            }
+        }
+        $rowHighlightStyles = $this->buildRowHighlightStyleRows($entries, $exportConfig, $columns, $colByKey, $fieldTypesByKey, $microrregionMeta, $headersUppercase);
+
         $paperPortraitWidthTwips = 12240;
         $paperPortraitHeightTwips = $paperSize === 'legal' ? 20160 : 15840;
         $marginTwips = $docMarginPreset === 'none' ? 0 : ($docMarginPreset === 'normal' ? 1134 : 720);
@@ -1221,7 +1230,9 @@ class TemporaryModuleWordPdfService
 
             // Filas
             $itemNumber = 1;
+            $rowHighlightEntryIdx = 0;
             foreach ($entries as $entry) {
+                $rh = $rowHighlightStyles[$rowHighlightEntryIdx] ?? ['bg_css' => '', 'text_css' => ''];
                 // Ajustar alto de fila para que la imagen quede dentro de la celda.
                 $hasImageInRow = false;
                 foreach ($columns as $c) {
@@ -1245,8 +1256,18 @@ class TemporaryModuleWordPdfService
                         $calcConfig = is_array($col['_calc_config'] ?? null) ? $col['_calc_config'] : [];
                         $text = $this->buildOperationsCellText((array) ($entry->data ?? []), $columns, $calcConfig, $headersUppercase);
                         $w = $columnTwips[$idx] ?? null;
-                        $opsCell = $table->addCell($w, ['valign' => 'center']);
-                        $this->addWordMultilineText($opsCell, $text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold], ['alignment' => Jc::CENTER]);
+                        $bdOps = $this->breakdownWordDataCellVisual($col, $text);
+                        $visOps = $this->mergeWordRowBreakdownCellVisual($bdOps, (string) ($rh['bg_css'] ?? ''), (string) ($rh['text_css'] ?? ''));
+                        $cellOptsOps = ['valign' => 'center'];
+                        if ($visOps['bg'] !== null) {
+                            $cellOptsOps['bgColor'] = $visOps['bg'];
+                        }
+                        $fontOps = ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold];
+                        if ($visOps['text'] !== null) {
+                            $fontOps['color'] = $visOps['text'];
+                        }
+                        $opsCell = $table->addCell($w, $cellOptsOps);
+                        $this->addWordMultilineText($opsCell, $text, $fontOps, ['alignment' => Jc::CENTER]);
                         continue;
                     }
                     $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
@@ -1254,7 +1275,17 @@ class TemporaryModuleWordPdfService
                         $text = (string) $itemNumber;
                         $itemNumber++;
                         $w = $columnTwips[$idx] ?? null;
-                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold], ['alignment' => Jc::CENTER]);
+                        $bd0 = $this->breakdownWordDataCellVisual($col, $text);
+                        $vis0 = $this->mergeWordRowBreakdownCellVisual($bd0, (string) ($rh['bg_css'] ?? ''), (string) ($rh['text_css'] ?? ''));
+                        $co0 = ['valign' => 'center'];
+                        if ($vis0['bg'] !== null) {
+                            $co0['bgColor'] = $vis0['bg'];
+                        }
+                        $f0 = ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold];
+                        if ($vis0['text'] !== null) {
+                            $f0['color'] = $vis0['text'];
+                        }
+                        $table->addCell($w, $co0)->addText($text, $f0, ['alignment' => Jc::CENTER]);
                         continue;
                     }
 
@@ -1262,21 +1293,51 @@ class TemporaryModuleWordPdfService
                         $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                         $text = (string) ($meta['label'] ?? $meta->label ?? '');
                         $w = $columnTwips[$idx] ?? null;
-                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold], ['alignment' => Jc::CENTER]);
+                        $bd0 = $this->breakdownWordDataCellVisual($col, $text);
+                        $vis0 = $this->mergeWordRowBreakdownCellVisual($bd0, (string) ($rh['bg_css'] ?? ''), (string) ($rh['text_css'] ?? ''));
+                        $co0 = ['valign' => 'center'];
+                        if ($vis0['bg'] !== null) {
+                            $co0['bgColor'] = $vis0['bg'];
+                        }
+                        $f0 = ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold];
+                        if ($vis0['text'] !== null) {
+                            $f0['color'] = $vis0['text'];
+                        }
+                        $table->addCell($w, $co0)->addText($text, $f0, ['alignment' => Jc::CENTER]);
                         continue;
                     }
                     if ($key === 'delegacion_numero') {
                         $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                         $text = (string) ($meta['number'] ?? $meta->number ?? '');
                         $w = $columnTwips[$idx] ?? null;
-                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold], ['alignment' => Jc::CENTER]);
+                        $bd0 = $this->breakdownWordDataCellVisual($col, $text);
+                        $vis0 = $this->mergeWordRowBreakdownCellVisual($bd0, (string) ($rh['bg_css'] ?? ''), (string) ($rh['text_css'] ?? ''));
+                        $co0 = ['valign' => 'center'];
+                        if ($vis0['bg'] !== null) {
+                            $co0['bgColor'] = $vis0['bg'];
+                        }
+                        $f0 = ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold];
+                        if ($vis0['text'] !== null) {
+                            $f0['color'] = $vis0['text'];
+                        }
+                        $table->addCell($w, $co0)->addText($text, $f0, ['alignment' => Jc::CENTER]);
                         continue;
                     }
                     if ($key === 'cabecera_microrregion') {
                         $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                         $text = (string) ($meta['cabecera'] ?? $meta->cabecera ?? '');
                         $w = $columnTwips[$idx] ?? null;
-                        $table->addCell($w, ['valign' => 'center'])->addText($text, ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold], ['alignment' => Jc::CENTER]);
+                        $bd0 = $this->breakdownWordDataCellVisual($col, $text);
+                        $vis0 = $this->mergeWordRowBreakdownCellVisual($bd0, (string) ($rh['bg_css'] ?? ''), (string) ($rh['text_css'] ?? ''));
+                        $co0 = ['valign' => 'center'];
+                        if ($vis0['bg'] !== null) {
+                            $co0['bgColor'] = $vis0['bg'];
+                        }
+                        $f0 = ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold];
+                        if ($vis0['text'] !== null) {
+                            $f0['color'] = $vis0['text'];
+                        }
+                        $table->addCell($w, $co0)->addText($text, $f0, ['alignment' => Jc::CENTER]);
                         continue;
                     }
 
@@ -1285,7 +1346,13 @@ class TemporaryModuleWordPdfService
                     $imagePaths = $this->resolveImageAbsolutePaths($val, $fieldType);
                     if ($imagePaths !== []) {
                         $w = $columnTwips[$idx] ?? null;
-                        $imgCell = $table->addCell($w, ['valign' => 'center']);
+                        $bdImg = $this->breakdownWordDataCellVisual($col, '');
+                        $visImg = $this->mergeWordRowBreakdownCellVisual($bdImg, (string) ($rh['bg_css'] ?? ''), (string) ($rh['text_css'] ?? ''));
+                        $imgCellOpts = ['valign' => 'center'];
+                        if ($visImg['bg'] !== null) {
+                            $imgCellOpts['bgColor'] = $visImg['bg'];
+                        }
+                        $imgCell = $table->addCell($w, $imgCellOpts);
                         if (count($imagePaths) === 1) {
                             $imgCell->addImage($imagePaths[0], [
                                 'height' => 72,
@@ -1321,17 +1388,19 @@ class TemporaryModuleWordPdfService
                         }
                         $w = $columnTwips[$idx] ?? null;
                         $bd = $this->breakdownWordDataCellVisual($col, $text);
+                        $vis = $this->mergeWordRowBreakdownCellVisual($bd, (string) ($rh['bg_css'] ?? ''), (string) ($rh['text_css'] ?? ''));
                         $cellOpts = ['valign' => 'center'];
-                        if ($bd['bg'] !== null) {
-                            $cellOpts['bgColor'] = $bd['bg'];
+                        if ($vis['bg'] !== null) {
+                            $cellOpts['bgColor'] = $vis['bg'];
                         }
                         $font = ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold];
-                        if ($bd['text'] !== null) {
-                            $font['color'] = $bd['text'];
+                        if ($vis['text'] !== null) {
+                            $font['color'] = $vis['text'];
                         }
                         $table->addCell($w, $cellOpts)->addText($text, $font, ['alignment' => Jc::CENTER]);
                     }
                 }
+                $rowHighlightEntryIdx++;
             }
 
             \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007')->save($fullPath);
@@ -1417,6 +1486,7 @@ class TemporaryModuleWordPdfService
             'countTableCellFontSizePx' => $pdfCountCellPx,
             'fieldTypesByKey' => $fieldTypesByKey,
             'pdfImageDataByPath' => $pdfImageDataByPath,
+            'rowHighlightStyles' => $rowHighlightStyles,
         ])->render();
 
         $dompdf = new Dompdf([
@@ -2232,6 +2302,129 @@ class TemporaryModuleWordPdfService
     }
 
     /**
+     * Texto mostrado en export para una sola columna (coherente con PDF/Word).
+     *
+     * @param  array<int, array<string, mixed>>  $columns
+     * @param  array<string, array<string, mixed>>  $colByKey
+     * @param  array<string, string>  $fieldTypesByKey
+     */
+    private function buildSingleColumnDisplayTextForExport(
+        object $entry,
+        string $key,
+        array $columns,
+        array $colByKey,
+        array $fieldTypesByKey,
+        $microrregionMeta,
+        int $itemNumber,
+        bool $headersUppercase,
+    ): string {
+        if (str_starts_with($key, '__calc_')) {
+            foreach ($columns as $c) {
+                if ((string) ($c['key'] ?? '') === $key) {
+                    $calc = is_array($c['_calc_config'] ?? null) ? $c['_calc_config'] : [];
+
+                    return $this->buildOperationsCellText((array) ($entry->data ?? []), $columns, $calc, $headersUppercase);
+                }
+            }
+
+            return '';
+        }
+        if ($key === 'item') {
+            return (string) $itemNumber;
+        }
+        if ($key === 'microrregion') {
+            $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+
+            return (string) ($meta['label'] ?? $meta->label ?? '');
+        }
+        if ($key === 'delegacion_numero') {
+            $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+
+            return (string) ($meta['number'] ?? $meta->number ?? '');
+        }
+        if ($key === 'cabecera_microrregion') {
+            $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+
+            return (string) ($meta['cabecera'] ?? $meta->cabecera ?? '');
+        }
+
+        $col = $colByKey[$key] ?? ['key' => $key];
+        $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
+        if (in_array(strtolower($fieldType), ['image', 'file', 'document', 'foto'], true)) {
+            return '';
+        }
+
+        $val = $entry->data[$key] ?? null;
+        $val = $this->applyColumnEmptyFillValue($val, $col, $fieldType);
+        if (is_bool($val)) {
+            return $val ? 'Sí' : 'No';
+        }
+        if (is_array($val)) {
+            if (array_key_exists('primary', $val) || array_key_exists('secondary', $val)) {
+                $p = $val['primary'] ?? '';
+
+                return is_scalar($p) ? (string) $p : '';
+            }
+
+            return implode(', ', array_map(static fn ($v) => is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE), $val));
+        }
+        if (is_scalar($val)) {
+            $text = (string) $val;
+            if ($fieldType === 'semaforo' && trim($text) !== '') {
+                $text = TemporaryModuleFieldService::labelForSemaforo($text) ?: $text;
+            }
+
+            return $text;
+        }
+
+        return '';
+    }
+
+    /**
+     * @return list<array{bg_css: string, text_css: string}>
+     */
+    private function buildRowHighlightStyleRows(
+        Collection $entries,
+        array $exportConfig,
+        array $columns,
+        array $colByKey,
+        array $fieldTypesByKey,
+        $microrregionMeta,
+        bool $headersUppercase,
+    ): array {
+        $enabled = !empty($exportConfig['row_highlight_enabled']);
+        $driverKey = trim((string) ($exportConfig['row_highlight_column_key'] ?? ''));
+        if (! $enabled || $driverKey === '') {
+            $n = $entries->count();
+
+            return array_fill(0, $n, ['bg_css' => '', 'text_css' => '']);
+        }
+        $fills = is_array($exportConfig['row_highlight_answer_fills'] ?? null) ? $exportConfig['row_highlight_answer_fills'] : [];
+        $textCss = trim((string) ($exportConfig['row_highlight_text_color'] ?? ''));
+        $rows = [];
+        $itemNumber = 1;
+        foreach ($entries as $entry) {
+            $plain = $this->buildSingleColumnDisplayTextForExport(
+                $entry,
+                $driverKey,
+                $columns,
+                $colByKey,
+                $fieldTypesByKey,
+                $microrregionMeta,
+                $itemNumber,
+                $headersUppercase,
+            );
+            $hit = $this->resolveBreakdownAnswerFillsMap($fills, $plain);
+            $bgCss = ($hit !== null && trim((string) $hit) !== '') ? trim((string) $hit) : '';
+            $txt = ($bgCss !== '' && $textCss !== '') ? $textCss : '';
+            $rows[] = ['bg_css' => $bgCss, 'text_css' => $txt];
+            $itemNumber++;
+        }
+
+        return $rows;
+    }
+
+    /**
      * @param array<string,mixed> $fontStyle
      * @param array<string,mixed> $paragraphStyle
      */
@@ -2375,17 +2568,38 @@ class TemporaryModuleWordPdfService
     private function breakdownWordDataCellVisual(array $col, string $displayText): array
     {
         $out = ['bg' => null, 'text' => null];
-        $textCss = trim((string) ($col['breakdown_data_text_color'] ?? ''));
-        if ($textCss !== '') {
-            $out['text'] = $this->cssColorToHex($textCss);
-        }
         $fills = is_array($col['breakdown_answer_fills'] ?? null) ? $col['breakdown_answer_fills'] : [];
         $hit = $this->resolveBreakdownAnswerFillsMap($fills, $displayText);
         if ($hit !== null && trim((string) $hit) !== '') {
             $out['bg'] = $this->cssColorToHex((string) $hit);
+            $textCss = trim((string) ($col['breakdown_data_text_color'] ?? ''));
+            if ($textCss !== '') {
+                $out['text'] = $this->cssColorToHex($textCss);
+            }
         }
 
         return $out;
+    }
+
+    /**
+     * @param  array{bg: ?string, text: ?string}  $bd
+     * @return array{bg: ?string, text: ?string}
+     */
+    private function mergeWordRowBreakdownCellVisual(array $bd, string $rowBgCss, string $rowTextCss): array
+    {
+        if ($bd['bg'] !== null) {
+            return ['bg' => $bd['bg'], 'text' => $bd['text']];
+        }
+        $rowBgCss = trim($rowBgCss);
+        $rowTextCss = trim($rowTextCss);
+        if ($rowBgCss === '') {
+            return ['bg' => null, 'text' => null];
+        }
+
+        return [
+            'bg' => $this->cssColorToHex($rowBgCss),
+            'text' => $rowTextCss !== '' ? $this->cssColorToHex($rowTextCss) : null,
+        ];
     }
 
     /**

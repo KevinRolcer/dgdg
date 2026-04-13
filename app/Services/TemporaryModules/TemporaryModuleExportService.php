@@ -993,9 +993,6 @@ class TemporaryModuleExportService
         if (! is_array($cfg)) {
             return false;
         }
-        if (trim((string) ($cfg['breakdown_data_text_color'] ?? '')) !== '') {
-            return true;
-        }
         $fills = $cfg['breakdown_answer_fills'] ?? null;
 
         return is_array($fills) && $fills !== [];
@@ -1026,13 +1023,6 @@ class TemporaryModuleExportService
             $coord = $item['coord'];
             $displayText = (string) ($item['text'] ?? '');
             $style = $sheet->getStyle($coord);
-            $textCss = trim((string) ($cfg['breakdown_data_text_color'] ?? ''));
-            if ($textCss !== '') {
-                $argb = $this->mapCssColorToArgb($textCss);
-                if ($argb !== null) {
-                    $style->getFont()->getColor()->setARGB($argb);
-                }
-            }
             $fills = is_array($cfg['breakdown_answer_fills'] ?? null) ? $cfg['breakdown_answer_fills'] : [];
             if ($fills === [] || trim($displayText) === '') {
                 continue;
@@ -1044,6 +1034,157 @@ class TemporaryModuleExportService
             $fillArgb = $this->mapCssColorToArgb((string) $hit);
             if ($fillArgb !== null) {
                 $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($fillArgb);
+            }
+            $textCss = trim((string) ($cfg['breakdown_data_text_color'] ?? ''));
+            if ($textCss !== '') {
+                $argb = $this->mapCssColorToArgb($textCss);
+                if ($argb !== null) {
+                    $style->getFont()->getColor()->setARGB($argb);
+                }
+            }
+        }
+    }
+
+    private function exportFillValueIsEmpty(mixed $value): bool
+    {
+        if ($value === null) {
+            return true;
+        }
+        if (is_array($value)) {
+            if (array_key_exists('primary', $value)) {
+                return $this->exportFillValueIsEmpty($value['primary'] ?? null);
+            }
+            if ($value === []) {
+                return true;
+            }
+            foreach ($value as $it) {
+                if (! $this->exportFillValueIsEmpty($it)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return trim((string) $value) === '';
+    }
+
+    private function exportFieldLooksNumericForFill(string $fieldType): bool
+    {
+        $t = strtolower($fieldType);
+        foreach (['number', 'numeric', 'int', 'integer', 'decimal', 'float', 'double'] as $token) {
+            if (str_contains($t, $token)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $colCfg
+     */
+    private function applyColumnEmptyFillForExportValue(mixed $value, ?array $colCfg, string $fieldKey, string $fieldType): mixed
+    {
+        if (in_array($fieldKey, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true)) {
+            return $value;
+        }
+        if (in_array(strtolower($fieldType), ['image', 'file', 'document', 'foto'], true)) {
+            return $value;
+        }
+        if (! $this->exportFillValueIsEmpty($value)) {
+            return $value;
+        }
+        if (! is_array($colCfg)) {
+            return $value;
+        }
+        $mode = strtolower(trim((string) ($colCfg['fill_empty_mode'] ?? 'none')));
+        if (! in_array($mode, ['auto', 'custom'], true)) {
+            return $value;
+        }
+        if ($mode === 'custom') {
+            return (string) ($colCfg['fill_empty_value'] ?? '');
+        }
+
+        return $this->exportFieldLooksNumericForFill($fieldType) ? 0 : 'S/R';
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $exportColumns
+     */
+    private function buildExcelRowDriverDisplayText($entry, string $driverKey, Collection $microrregionMeta, int $itemNumber, array $exportColumns): string
+    {
+        if ($driverKey === 'item') {
+            return (string) $itemNumber;
+        }
+        $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
+        if ($driverKey === 'microrregion') {
+            return (string) ($meta['label'] ?? (is_object($meta) ? ($meta->label ?? '') : ''));
+        }
+        if ($driverKey === 'delegacion_numero') {
+            return (string) ($meta['number'] ?? (is_object($meta) ? ($meta->number ?? '') : ''));
+        }
+        if ($driverKey === 'cabecera_microrregion') {
+            return (string) ($meta['cabecera'] ?? (is_object($meta) ? ($meta->cabecera ?? '') : ''));
+        }
+        foreach ($exportColumns as $col) {
+            $field = $col['field'] ?? null;
+            if (! $field || (string) $field->key !== $driverKey) {
+                continue;
+            }
+            $cell = $entry->data[$driverKey] ?? null;
+            $cfg = $this->columnConfigByKey[$driverKey] ?? null;
+            $fieldType = $this->fieldService->canonicalFieldType((string) $field->type);
+            $cell = $this->applyColumnEmptyFillForExportValue($cell, is_array($cfg) ? $cfg : null, $driverKey, $fieldType);
+            if (is_bool($cell)) {
+                return $cell ? 'Sí' : 'No';
+            }
+            if ($field->type === 'multiselect' && is_array($cell)) {
+                return implode(', ', $cell);
+            }
+            if ($field->type === 'linked' && is_array($cell)) {
+                $linkOpts = is_array($field->options) ? $field->options : [];
+                $primaryVal = $cell['primary'] ?? '';
+                $primaryOut = is_scalar($primaryVal) ? (string) $primaryVal : '';
+                if (($linkOpts['primary_type'] ?? '') === 'semaforo' && $primaryOut !== '') {
+                    $primaryOut = (string) (TemporaryModuleFieldService::labelForSemaforo($primaryOut) ?: $primaryOut);
+                }
+
+                return $primaryOut;
+            }
+            if ($fieldType === 'semaforo' && is_string($cell) && trim($cell) !== '') {
+                return (string) (TemporaryModuleFieldService::labelForSemaforo($cell) ?: $cell);
+            }
+            if ($this->shouldRenderAsImageCell($fieldType, $cell)) {
+                return '';
+            }
+            if ($fieldType === 'geopoint' && is_string($cell)) {
+                return trim($cell);
+            }
+
+            return is_scalar($cell) ? (string) $cell : '';
+        }
+
+        return '';
+    }
+
+    private function applyExcelRowHighlightForDataRow(Worksheet $sheet, int $rowIndex, string $lastColLetter, string $driverPlain, array $fills, string $textCss): void
+    {
+        $hit = $this->resolveCountTableRow2MapValue($fills, $driverPlain);
+        if ($hit === null || $hit === '') {
+            return;
+        }
+        $fillArgb = $this->mapCssColorToArgb((string) $hit);
+        if ($fillArgb === null) {
+            return;
+        }
+        $range = 'A'.$rowIndex.':'.$lastColLetter.$rowIndex;
+        $sheet->getStyle($range)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($fillArgb);
+        $textCss = trim($textCss);
+        if ($textCss !== '') {
+            $textArgb = $this->mapCssColorToArgb($textCss);
+            if ($textArgb !== null) {
+                $sheet->getStyle($range)->getFont()->getColor()->setARGB($textArgb);
             }
         }
     }
@@ -2068,6 +2209,20 @@ class TemporaryModuleExportService
         /** @var list<array{coord: string, field_key: string, text: string}> */
         $breakdownStyleQueue = [];
 
+        $mainDataLastColIdx = $numFixed;
+        foreach ($exportColumns as $ecol) {
+            $f = $ecol['field'] ?? null;
+            if (! $f) {
+                continue;
+            }
+            $mainDataLastColIdx += ($f->type === 'linked') ? 2 : 1;
+        }
+        $mainDataLastColLetter = Coordinate::stringFromColumnIndex($mainDataLastColIdx);
+        $rowHlEnabled = ! empty($this->exportConfig['row_highlight_enabled']);
+        $rowHlKey = $rowHlEnabled ? trim((string) ($this->exportConfig['row_highlight_column_key'] ?? '')) : '';
+        $rowHlFills = is_array($this->exportConfig['row_highlight_answer_fills'] ?? null) ? $this->exportConfig['row_highlight_answer_fills'] : [];
+        $rowHlText = trim((string) ($this->exportConfig['row_highlight_text_color'] ?? ''));
+
         if ($entriesQuery->count() === 0) {
             $sheet->setCellValue('A'.$rowIndex, 'Sin registros');
         } else {
@@ -2077,7 +2232,7 @@ class TemporaryModuleExportService
             $lastMicrorregionKey = null;
             $mergingStartRow = null;
 
-            $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule, $exportColumns, $headerRowCount, &$lastMicrorregionKey, &$mergingStartRow, &$breakdownStyleQueue) {
+            $entriesQuery->chunk(250, function ($entries) use (&$sheet, &$rowIndex, &$itemNumber, $microrregionMeta, $temporaryModule, $exportColumns, $headerRowCount, &$lastMicrorregionKey, &$mergingStartRow, &$breakdownStyleQueue, $mainDataLastColLetter, $rowHlKey, $rowHlFills, $rowHlText) {
                 foreach ($entries as $entry) {
                     $sheet->setCellValue('A'.$rowIndex, $itemNumber);
                     $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
@@ -2233,6 +2388,11 @@ class TemporaryModuleExportService
                         $sheet->setCellValue($cellCoordinate, $scalarText);
                         $this->queueBreakdownDataCellStyle($breakdownStyleQueue, (string) $field->key, $cellCoordinate, $scalarText);
                         $columnIndex++;
+                    }
+
+                    if ($rowHlKey !== '') {
+                        $drv = $this->buildExcelRowDriverDisplayText($entry, $rowHlKey, $microrregionMeta, $itemNumber, $exportColumns);
+                        $this->applyExcelRowHighlightForDataRow($sheet, $rowIndex, $mainDataLastColLetter, $drv, $rowHlFills, $rowHlText);
                     }
 
                     $rowIndex++;

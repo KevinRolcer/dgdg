@@ -97,6 +97,20 @@ html.theme-dark .tm-export-personalize-form {
     border-color: var(--clr-border);
 }
 
+/* Modal de exportación suele estar fuera de .app-content: inputs/select sin fondo oscuro */
+html.theme-dark .tm-export-personalize-modal input.tm-input:not([type="checkbox"]):not([type="radio"]),
+html.theme-dark .tm-export-personalize-modal select.tm-input,
+html.theme-dark .tm-export-personalize-modal textarea.tm-input {
+    background: var(--tm-input-bg) !important;
+    color: var(--clr-text-main) !important;
+    border-color: var(--clr-border) !important;
+}
+
+html.theme-dark .tm-export-group-tag {
+    background: color-mix(in srgb, var(--tm-surface-2) 92%, var(--clr-border)) !important;
+    border-color: var(--clr-border) !important;
+}
+
 html.theme-dark .tm-pagination--footer {
     background: var(--tm-muted-bg) !important;
 }
