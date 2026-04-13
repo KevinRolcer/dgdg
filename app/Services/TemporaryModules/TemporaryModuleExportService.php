@@ -705,8 +705,11 @@ class TemporaryModuleExportService
 
         if ($color[0] === '#') {
             $hex = strtoupper(ltrim($color, '#'));
-            if (strlen($hex) === 6) {
+            if (strlen($hex) === 6 && ctype_xdigit($hex)) {
                 return 'FF'.$hex;
+            }
+            if (strlen($hex) === 3 && ctype_xdigit($hex)) {
+                return 'FF'.strtoupper($hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2]);
             }
         }
 

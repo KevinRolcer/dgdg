@@ -745,14 +745,6 @@
                             </div>
                         </div>
 
-                        <div class="tm-export-breakdown-panel" style="margin:10px 0;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
-                            <div class="tm-export-groups-wrap__head" style="margin-bottom:6px;">
-                                <span class="tm-export-label-inline">Tabla de desglose — sombreado por respuesta</span>
-                            </div>
-                            <p class="tm-analysis-hint" style="margin:0;font-size:0.82rem;line-height:1.45;">
-                                Clic derecho en una columna de datos y elige <strong>Sombrear respuestas…</strong> para asignar color de fondo por cada valor (lista del campo o valores fijos como Sí/No o semáforo) y el color de letra de las celdas de esa columna. Se aplica en la vista previa, Excel, Word y PDF.
-                            </p>
-                        </div>
                         <p class="tm-export-personalize-hint">Arrastra columnas para reordenar. Usa &times; para omitir. Asigna un grupo a cada columna si aplica.</p>
                         <div class="tm-export-personalize-columns" id="tmExportPersonalizeColumns" role="list"></div>
                         <p class="tm-export-restore-wrap" id="tmExportRestoreWrap" hidden>
@@ -1945,6 +1937,7 @@
             { name: 'Acento', value: 'var(--clr-accent)' },
             { name: 'Texto principal', value: 'var(--clr-text-main)' },
             { name: 'Texto claro', value: 'var(--clr-text-light)' },
+            { name: 'Blanco', value: '#FFFFFF' },
             { name: 'Fondo', value: 'var(--clr-bg)' },
             { name: 'Tarjeta', value: 'var(--clr-card)' }
         ];
@@ -3952,25 +3945,74 @@
             return null;
         }
 
-        /** Fondo y color de texto para celdas de datos según respuesta (tabla de desglose). */
+        /**
+         * Texto de celda alineado con Excel/PDF (semáforo con etiqueta, vinculado → principal, etc.) para vista previa y sombreado.
+         */
+        function formatPreviewCellDisplay(col, rawVal) {
+            if (rawVal === null || rawVal === undefined) {
+                return '';
+            }
+            if (typeof rawVal === 'boolean') {
+                return rawVal ? 'Sí' : 'No';
+            }
+            if (typeof rawVal === 'object' && !Array.isArray(rawVal) && Object.prototype.hasOwnProperty.call(rawVal, 'primary')) {
+                var pr = rawVal.primary;
+                if (pr === null || pr === undefined) {
+                    return '';
+                }
+                if (typeof pr === 'boolean') {
+                    return pr ? 'Sí' : 'No';
+                }
+                if (typeof pr === 'object') {
+                    return '';
+                }
+                var ps = String(pr).trim();
+                var linkType = String(col && col.linked_primary_type ? col.linked_primary_type : '').toLowerCase();
+                if (linkType === 'semaforo' && ps !== '') {
+                    var sm = { verde: 'Verde', amarillo: 'Amarillo', rojo: 'Rojo' };
+                    return sm[ps.toLowerCase()] || ps;
+                }
+                return ps;
+            }
+            if (Array.isArray(rawVal)) {
+                return rawVal.map(function (v) {
+                    return typeof v === 'object' ? JSON.stringify(v) : String(v);
+                }).join(', ');
+            }
+            var t = String(col && col.type ? col.type : '').toLowerCase();
+            if (t === 'semaforo') {
+                var sv = String(rawVal).trim();
+                if (sv === '') {
+                    return '';
+                }
+                var sm2 = { verde: 'Verde', amarillo: 'Amarillo', rojo: 'Rojo' };
+                return sm2[sv.toLowerCase()] || sv;
+            }
+            return String(rawVal);
+        }
+
+        /** Fondo y color de texto para celdas de datos según respuesta (tabla de desglose). !important gana sobre tema oscuro .tm-export-preview-data-cell */
         function tmExportBreakdownDataCellStyle(col, displayText) {
             if (!col) {
-                return { extraStyle: '', cellBg: '#f5f5f5' };
+                return { cellStyle: 'background-color:#f5f5f5;' };
             }
-            var parts = [];
-            var cellBg = '#f5f5f5';
-            var tc = String(col.breakdown_data_text_color || '').trim();
-            if (tc) {
-                parts.push('color:' + tc + ';');
-            }
+            var fillHit = null;
             var fills = col.breakdown_answer_fills;
             if (fills && typeof fills === 'object' && displayText != null) {
-                var hit = tmExportResolveCountRow2MapValue(fills, String(displayText));
-                if (hit != null && String(hit).trim() !== '') {
-                    cellBg = String(hit).trim();
-                }
+                fillHit = tmExportResolveCountRow2MapValue(fills, String(displayText));
             }
-            return { extraStyle: parts.join(''), cellBg: cellBg };
+            var cellBg = '#f5f5f5';
+            var bgImp = '';
+            if (fillHit != null && String(fillHit).trim() !== '') {
+                cellBg = String(fillHit).trim();
+                bgImp = ' !important';
+            }
+            var tc = String(col.breakdown_data_text_color || '').trim();
+            var colorPart = '';
+            if (tc) {
+                colorPart = 'color:' + tc + ' !important;';
+            }
+            return { cellStyle: 'background-color:' + cellBg + bgImp + ';' + colorPart };
         }
 
         function tmExportBreakdownOptionListForRow(row) {
@@ -4560,14 +4602,14 @@
                             } else {
                                 var rawVal = entry.data && entry.data[col.key];
                                 rawVal = tmExportApplyEmptyFillForColumn(col, rawVal);
-                                val = formatPreviewCellValue(rawVal);
+                                val = formatPreviewCellDisplay(col, rawVal);
                                 valueHtml = escapeHtml(val);
                             }
                             var weightStyle = col.content_bold ? 'font-weight:700;' : '';
                             var skipBd = ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'].indexOf(String(col.key || '')) !== -1
                                 || String(col.key || '').indexOf('__calc_') === 0;
-                            var bd = skipBd ? { extraStyle: '', cellBg: cellColor } : tmExportBreakdownDataCellStyle(col, val);
-                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + widthStyle + 'background:' + escapeHtml(bd.cellBg) + ';font-size:' + recordsCellFontPx + 'px;' + weightStyle + bd.extraStyle + '">' + valueHtml + '</td>';
+                            var bd = skipBd ? { cellStyle: 'background-color:' + cellColor + ';' } : tmExportBreakdownDataCellStyle(col, val);
+                            html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + widthStyle + bd.cellStyle + 'font-size:' + recordsCellFontPx + 'px;' + weightStyle + '">' + valueHtml + '</td>';
                         }
                     });
                     html += '</tr>';
@@ -4587,12 +4629,13 @@
                         html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="' + widthStyle + 'background:' + escapeHtml(cellColor) + ';font-size:' + recordsCellFontPx + 'px;' + emptyCalcBold + '">OK</td>';
                     } else {
                         const rawSample = (savedRow && savedRow[col.key] !== undefined) ? savedRow[col.key] : '';
-                        const val = rawSample !== undefined && rawSample !== null ? escapeHtml(rawSample) : '';
+                        var dispSample = formatPreviewCellDisplay(col, rawSample);
+                        const val = (savedRow && savedRow[col.key] !== undefined) ? escapeHtml(dispSample) : '';
                         var emptyTextBold = col.content_bold ? 'font-weight:700;' : '';
                         var skipBdE = ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'].indexOf(String(col.key || '')) !== -1
                             || String(col.key || '').indexOf('__calc_') === 0;
-                        var bdE = skipBdE ? { extraStyle: '', cellBg: cellColor } : tmExportBreakdownDataCellStyle(col, rawSample);
-                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="' + widthStyle + 'background:' + escapeHtml(bdE.cellBg) + ';font-size:' + recordsCellFontPx + 'px;' + emptyTextBold + bdE.extraStyle + '" data-placeholder="Ejemplo">' + val + '</td>';
+                        var bdE = skipBdE ? { cellStyle: 'background-color:' + cellColor + ';' } : tmExportBreakdownDataCellStyle(col, dispSample);
+                        html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="' + widthStyle + bdE.cellStyle + 'font-size:' + recordsCellFontPx + 'px;' + emptyTextBold + '" data-placeholder="Ejemplo">' + val + '</td>';
                     }
                 });
                 html += '</tr>';

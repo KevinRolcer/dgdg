@@ -801,6 +801,7 @@
             { name: 'Acento', value: 'var(--clr-accent)' },
             { name: 'Texto principal', value: 'var(--clr-text-main)' },
             { name: 'Texto claro', value: 'var(--clr-text-light)' },
+            { name: 'Blanco', value: '#FFFFFF' },
             { name: 'Fondo', value: 'var(--clr-bg)' },
             { name: 'Tarjeta', value: 'var(--clr-card)' }
         ];

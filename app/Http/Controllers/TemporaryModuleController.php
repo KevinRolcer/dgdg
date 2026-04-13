@@ -2592,6 +2592,11 @@ class TemporaryModuleController extends Controller
         foreach ($exportColumns as $col) {
             $info = $maxWidths[$col['key']] ?? ['chars' => 15];
             $field = $temporaryModule->fields->firstWhere('key', $col['key']);
+            $linkedPrimaryType = '';
+            if ($field instanceof TemporaryModuleField && $field->type === 'linked') {
+                $lopts = is_array($field->options) ? $field->options : [];
+                $linkedPrimaryType = strtolower(trim((string) ($lopts['primary_type'] ?? '')));
+            }
             $columns[] = [
                 'key' => $col['key'],
                 'label' => $col['label'],
@@ -2600,6 +2605,7 @@ class TemporaryModuleController extends Controller
                 'max_width_chars' => $info['chars'] ?? 15,
                 'image_height' => $info['image_height'] ?? 80,
                 'option_values' => $this->exportPreviewFieldOptionValues($field instanceof TemporaryModuleField ? $field : null),
+                'linked_primary_type' => $linkedPrimaryType,
             ];
         }
 

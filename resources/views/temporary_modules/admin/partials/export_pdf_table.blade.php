@@ -119,7 +119,19 @@
         'var(--clr-card)' => '#FFFFFF',
     ];
     $resolveCss = function ($css) use ($varsCss) {
-        return isset($varsCss[$css]) ? $varsCss[$css] : (str_starts_with($css ?? '', '#') ? $css : '#861E34');
+        $css = trim((string) $css);
+        if ($css === '') {
+            return '#861E34';
+        }
+        if (isset($varsCss[$css])) {
+            return $varsCss[$css];
+        }
+        $lower = strtolower($css);
+        if (isset($varsCss[$lower])) {
+            return $varsCss[$lower];
+        }
+
+        return str_starts_with($css, '#') ? $css : '#861E34';
     };
     $breakdownFoldAccents = static function (string $text): string {
         if ($text === '') {
@@ -170,12 +182,14 @@
         $parts = [];
         $tc = trim((string) ($col['breakdown_data_text_color'] ?? ''));
         if ($tc !== '') {
-            $parts[] = 'color: '.$resolveCss($tc).';';
+            // !important: Dompdf/herencia y reglas de tabla no deben anular el color elegido
+            $parts[] = 'color: '.$resolveCss($tc).' !important;';
         }
         $fills = is_array($col['breakdown_answer_fills'] ?? null) ? $col['breakdown_answer_fills'] : [];
         $hit = $breakdownResolveFillMap($fills, $displayText);
         if ($hit !== null && trim((string) $hit) !== '') {
-            $parts[] = 'background-color: '.$resolveCss((string) $hit).';';
+            // `background` en lugar de solo background-color gana al shorthand de filas pares (#fdfdfd)
+            $parts[] = 'background: '.$resolveCss((string) $hit).' !important;';
         }
 
         return implode(' ', $parts);
@@ -330,6 +344,7 @@
             font-weight: bold;
             text-align: center;
         }
+        /* Sin !important: las celdas con sombreado personalizado aplican background inline !important */
         table.data-table tbody tr:nth-child(even) td {
             background: #fdfdfd;
         }
@@ -1269,6 +1284,8 @@
                             $thumbHeight = count($imageSources) > 1 ? 52 : 85;
                             $applyBreakdownPdf = ! $isImageType && empty($imageSources) && $imageFallbackLabel === '';
                             $breakdownExtraStyle = $breakdownCellInlineStyle($col, (string) $cellText, $applyBreakdownPdf);
+                            $bdTcRaw = trim((string) ($col['breakdown_data_text_color'] ?? ''));
+                            $breakdownTextColorResolved = ($applyBreakdownPdf && $bdTcRaw !== '') ? $resolveCss($bdTcRaw) : '';
                         @endphp
                         <td style="{{ $baseW }} {{ $tdAlign }} {{ $cellBoldStyle }} {{ $breakdownExtraStyle }}">
                             @if(!empty($imageSources))
@@ -1280,7 +1297,12 @@
                             @elseif($imageFallbackLabel !== '')
                                 <span style="font-size:8px; color:#6b7280;">{{ $imageFallbackLabel }}</span>
                             @else
-                                {{ $cellText }}
+                                @if($breakdownTextColorResolved !== '')
+                                    {{-- Dompdf a veces no aplica color solo en el td; el span fuerza el color de letra --}}
+                                    <span style="color: {{ $breakdownTextColorResolved }} !important;">{{ $cellText }}</span>
+                                @else
+                                    {{ $cellText }}
+                                @endif
                             @endif
                         </td>
                     @endif
