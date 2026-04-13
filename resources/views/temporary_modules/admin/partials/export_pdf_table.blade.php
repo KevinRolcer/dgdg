@@ -727,16 +727,19 @@
         ? [array_slice($sumAllRows, 0, $sumMidPoint), array_slice($sumAllRows, $sumMidPoint)]
         : [$sumAllRows];
 @endphp
-@if($sumTwoColumnsActive)
-<div style="display:flex;gap:8px;align-items:flex-start;">
 @foreach($sumRenderHalves as $sumHalfRows)
-<div style="flex:1;overflow:auto;">
-<table class="sum-table" style="width:100%; {{ $countTableInlineStyle }} --sum-header-fs: {{ $sumHeaderFontPx }}px; --sum-cell-fs: {{ $sumCellFontPx }}px; --sum-cell-pad: {{ $sumCellPadding }};">
-@else
-<div style="{{ $sumTableWrapStyle }}">
-@foreach($sumRenderHalves as $sumHalfRows)
-<table class="sum-table" style="{{ $sumTableStyle }} {{ $countTableInlineStyle }} --sum-header-fs: {{ $sumHeaderFontPx }}px; --sum-cell-fs: {{ $sumCellFontPx }}px; --sum-cell-pad: {{ $sumCellPadding }};">
-@endif
+    @if($sumTwoColumnsActive && $loop->first)
+    <div style="display:flex;gap:8px;align-items:flex-start;">
+    @endif
+    @if(!$sumTwoColumnsActive && $loop->first)
+    <div style="{{ $sumTableWrapStyle }}">
+    @endif
+    @if($sumTwoColumnsActive)
+    <div style="flex:1;overflow:auto;">
+    <table class="sum-table" style="width:100%; {{ $countTableInlineStyle }} --sum-header-fs: {{ $sumHeaderFontPx }}px; --sum-cell-fs: {{ $sumCellFontPx }}px; --sum-cell-pad: {{ $sumCellPadding }};">
+    @else
+    <table class="sum-table" style="{{ $sumTableStyle }} {{ $countTableInlineStyle }} --sum-header-fs: {{ $sumHeaderFontPx }}px; --sum-cell-fs: {{ $sumCellFontPx }}px; --sum-cell-pad: {{ $sumCellPadding }};">
+    @endif
     <thead>
     @if($sumHasGroups)
     <tr>
@@ -848,14 +851,16 @@
     @endif
     </tbody>
 </table>
-@if($sumTwoColumnsActive)
-</div>
+    @if($sumTwoColumnsActive)
+    </div>
+    @endif
+    @if(!$sumTwoColumnsActive && $loop->last)
+    </div>
+    @endif
+    @if($sumTwoColumnsActive && $loop->last)
+    </div>
+    @endif
 @endforeach
-</div>
-@else
-@endforeach
-</div>
-@endif
 @endif
 
 @php
