@@ -561,6 +561,10 @@
                                     Ancho (ch):
                                     <input type="number" id="tmExportCountTableCellWidth" class="tm-export-count-cell-width-input tm-input tm-input--large" style="width: 80px;" min="6" max="40" value="12" aria-label="Ancho de columnas de la tabla de conteo en caracteres">
                                 </label>
+                                <label class="tm-export-count-cell-width-label">
+                                    Tamaño letra (px):
+                                    <input type="number" id="tmExportCountTableFontSize" class="tm-input tm-input--large" style="width: 70px;" min="7" max="24" value="9" aria-label="Tamaño de letra de la tabla de conteo en píxeles">
+                                </label>
                             </div>
                             <span class="tm-export-label-inline">Conteo por valor de:</span>
                             <div class="tm-export-count-by-fields" id="tmExportCountByFields" role="group"></div>
@@ -652,6 +656,12 @@
                                 </div>
                             </div>
 
+                            <div class="tm-export-sum-row tm-export-sum-row--sum-config">
+                                <label class="tm-export-count-table-toggle">
+                                    <input type="checkbox" id="tmExportSumTwoColumns" value="1">
+                                    Dividir en 2 columnas (tabla partida a la mitad)
+                                </label>
+                            </div>
                             <div class="tm-export-sum-row tm-export-sum-row--sum-config">
                                 <label class="tm-export-count-table-toggle">
                                     <input type="checkbox" id="tmExportSumIncludeTotalsRow" value="1">
@@ -2853,6 +2863,7 @@
                     + '  <option value="count_non_empty">Conteo con dato</option>'
                     + '  <option value="count_empty">Conteo vacío</option>'
                     + '  <option value="count_unique">Conteo por dato único</option>'
+                    + '  <option value="count_equals">Conteo igual a valor</option>'
                     + '</select>'
                     + '<div class="tm-export-col-color">'
                     + '<button type="button" class="tm-export-color-trigger" data-sum-metric-color-trigger data-color="' + escapeHtml(String(m.text_color || 'var(--clr-primary)')) + '" aria-haspopup="listbox" aria-expanded="false" title="Color del encabezado">'
@@ -3294,7 +3305,7 @@
             return html;
         }
 
-        function tmExportRenderSumPreviewTable(sumData, headersUppercase, sumTableAlign, sumTitle, sumTitleCase, sumTitleAlign, sumTitleFontSize, sumHeaderFontPx, sumGroupHeaderFontPx, sumCellFontPx, sumGroupColor, sumIncludeTotalsRow, sumTotalsBold, sumTotalsTextColor, groups, sumLeadConfig) {
+        function tmExportRenderSumPreviewTable(sumData, headersUppercase, sumTableAlign, sumTitle, sumTitleCase, sumTitleAlign, sumTitleFontSize, sumHeaderFontPx, sumGroupHeaderFontPx, sumCellFontPx, sumGroupColor, sumIncludeTotalsRow, sumTotalsBold, sumTotalsTextColor, groups, sumLeadConfig, sumTwoColumns) {
             if (!sumData || !Array.isArray(sumData.groups) || sumData.groups.length === 0) { return ''; }
             var rawTitle = String(sumTitle || '').trim() !== '' ? String(sumTitle) : 'Sumatoria';
             var title = normalizeExportHeadingText(rawTitle, !!headersUppercase);
@@ -3351,6 +3362,82 @@
             }
             if (leadColumns.length === 0) {
                 leadColumns.push({ key: 'group', label: sumData.groupLabel || 'Grupo' });
+            }
+            if (sumTwoColumns && sumData.groups.length >= 2) {
+                var twoColMid = Math.ceil(sumData.groups.length / 2);
+                var buildHalfTable = function(halfGrps) {
+                    var t = '<table class="tm-export-preview-table tm-export-preview-sum-table" style="table-layout:auto;border-collapse:collapse;width:100%">';
+                    if (hasGroups) {
+                        t += '<tr class="tm-export-preview-row tm-export-preview-group-header">';
+                        leadColumns.forEach(function () { t += '<th class="tm-export-preview-cell" style="background:' + escapeHtml(firstColColor) + ';color:#fff;border:1px solid #334155;"></th>'; });
+                        spans.forEach(function (s) {
+                            if (s.label.trim() === '') {
+                                t += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:#f8fafc;border:1px solid #e2e8f0;font-size:' + sumGroupHeaderFont + 'px;"></th>';
+                            } else {
+                                var gc = groupColorMap[s.label] || '#64748b';
+                                t += '<th class="tm-export-preview-cell" colspan="' + s.span + '" style="background:' + escapeHtml(gc) + ';color:#fff;border:1px solid #1e293b;font-size:' + sumGroupHeaderFont + 'px;">' + escapeHtml(normalizeExportHeadingText(s.label, headersUppercase)) + '</th>';
+                            }
+                        });
+                        t += '</tr>';
+                    }
+                    t += '<tr class="tm-export-preview-row tm-export-preview-header">';
+                    leadColumns.forEach(function (col) { t += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(firstColColor) + ';color:#fff;font-size:' + sumHeaderFont + 'px;">' + escapeHtml(normalizeExportHeadingText(col.label, !!headersUppercase)) + '</th>'; });
+                    sumColumns.forEach(function (c) {
+                        var cGroup = String(c.group || '').trim();
+                        var cColor = cGroup !== '' ? (groupColorMap[cGroup] || '#64748b') : ((c.source && c.source.text_color) ? String(c.source.text_color) : '#0f172a');
+                        t += '<th class="tm-export-preview-cell tm-export-preview-header-cell" style="background-color:' + escapeHtml(cColor) + ';color:#fff;font-size:' + sumHeaderFont + 'px;">' + escapeHtml(normalizeExportHeadingText(c.label || c.id, !!headersUppercase)) + '</th>';
+                    });
+                    t += '</tr>';
+                    halfGrps.forEach(function (g, idx) {
+                        t += '<tr class="tm-export-preview-row tm-export-preview-data">';
+                        leadColumns.forEach(function (col) {
+                            var lv = '';
+                            if (col.key === 'item') { lv = String(idx + 1); }
+                            else if (col.key === 'delegacion_numero') { lv = String(g.mrNumber || ''); }
+                            else if (col.key === 'cabecera_microrregion') { lv = String(g.mrCabecera || ''); }
+                            else { lv = String(g.label || ''); }
+                            t += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="font-size:' + sumCellFont + 'px;">' + escapeHtml(lv) + '</td>';
+                        });
+                        sumColumns.forEach(function (c) {
+                            var val = c.type === 'metric' ? Number(g.metrics[c.id] || 0) : Number(g.formulas[c.id] || 0);
+                            var isPercent = c.type === 'formula' && String((c.source && c.source.op) || '') === 'percent';
+                            t += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="font-size:' + sumCellFont + 'px;">' + escapeHtml(String(Math.round((val + Number.EPSILON) * 100) / 100)) + (isPercent ? '%' : '') + '</td>';
+                        });
+                        t += '</tr>';
+                    });
+                    if (sumIncludeTotalsRow) {
+                        var tStyle = (sumTotalsBold ? 'font-weight:700;' : '') + 'color:' + escapeHtml(String(sumTotalsTextColor || 'var(--clr-primary)')) + ';';
+                        t += '<tr class="tm-export-preview-row tm-export-preview-data">';
+                        leadColumns.forEach(function (col, ci) { t += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="font-size:' + sumCellFont + 'px;' + tStyle + '">' + escapeHtml(ci === 0 ? normalizeExportHeadingText('Total', !!headersUppercase) : '') + '</td>'; });
+                        sumColumns.forEach(function (c) {
+                            var incT = !(c.source && Object.prototype.hasOwnProperty.call(c.source, 'include_total')) || !!c.source.include_total;
+                            var tv = 0;
+                            if (incT) {
+                                var isp = c.type === 'formula' && String((c.source && c.source.op) || '') === 'percent';
+                                if (isp) {
+                                    var mids = Array.isArray(c.source && c.source.metric_ids) ? c.source.metric_ids : [];
+                                    var numId = String(mids.length ? (mids[0] || '') : '');
+                                    var baseId = String((c.source && c.source.base_metric_id) || '');
+                                    var nT = 0, bT = 0;
+                                    if (numId !== '' && baseId !== '') { halfGrps.forEach(function (g) { nT += Number(g.metrics && g.metrics[numId] || 0); bT += Number(g.metrics && g.metrics[baseId] || 0); }); }
+                                    tv = bT !== 0 ? ((nT / bT) * 100) : 0;
+                                } else {
+                                    halfGrps.forEach(function (g) { var n = c.type === 'metric' ? Number(g.metrics[c.id] || 0) : Number(g.formulas[c.id] || 0); if (Number.isFinite(n)) { tv += n; } });
+                                }
+                            }
+                            var isp2 = c.type === 'formula' && String((c.source && c.source.op) || '') === 'percent';
+                            t += '<td class="tm-export-preview-cell tm-export-preview-data-cell" style="font-size:' + sumCellFont + 'px;' + tStyle + '">' + escapeHtml(incT ? String(Math.round((tv + Number.EPSILON) * 100) / 100) + (isp2 ? '%' : '') : '') + '</td>';
+                        });
+                        t += '</tr>';
+                    }
+                    t += '</table>';
+                    return t;
+                };
+                var titlePart = '<p class="tm-export-preview-desglose-label" style="font-weight:600;margin:10px 0 4px 0;text-align:' + titleAlign + ';font-size:' + titleFont + 'px;">' + escapeHtml(title) + '</p>';
+                return titlePart + '<div style="display:flex;gap:8px;align-items:flex-start;' + sumTableMargin + '">'
+                    + '<div style="flex:1;overflow:auto;">' + buildHalfTable(sumData.groups.slice(0, twoColMid)) + '</div>'
+                    + '<div style="flex:1;overflow:auto;">' + buildHalfTable(sumData.groups.slice(twoColMid)) + '</div>'
+                    + '</div>';
             }
             var html = '<p class="tm-export-preview-desglose-label" style="font-weight:600;margin:10px 0 4px 0;text-align:' + titleAlign + ';font-size:' + titleFont + 'px;">' + escapeHtml(title) + '</p>';
             html += '<table class="tm-export-preview-table tm-export-preview-sum-table" style="table-layout:auto;border-collapse:collapse;width:auto;' + sumTableMargin + '">';
@@ -3468,7 +3555,7 @@
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sectionLabel: 'Desglose', sectionLabelAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumShowItem: true, sumItemLabel: '#', sumShowDelegation: true, sumDelegationLabel: 'Delegación', sumShowCabecera: true, sumCabeceraLabel: 'Cabecera', sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, recordsCellFontPx: 12, recordsHeaderFontPx: 12, recordsGroupHeaderFontPx: 12, sumCellFontPx: 12, sumHeaderFontPx: 12, sumGroupHeaderFontPx: 12, totalsCellFontPx: 12, totalsHeaderFontPx: 12, totalsGroupHeaderFontPx: 12, cellFontPx: 12, headerFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', includeCalculatedColumns: false, calculatedColumns: [], includeOperationsColumn: false, operationsLabel: 'Operaciones', operationsReferenceField: '', operationsIncludePercent: true, operationsFields: [], sumMetrics: [], sumFormulas: [] };
+                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sectionLabel: 'Desglose', sectionLabelAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumShowItem: true, sumItemLabel: '#', sumShowDelegation: true, sumDelegationLabel: 'Delegación', sumShowCabecera: true, sumCabeceraLabel: 'Cabecera', sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, recordsCellFontPx: 12, recordsHeaderFontPx: 12, recordsGroupHeaderFontPx: 12, sumCellFontPx: 12, sumHeaderFontPx: 12, sumGroupHeaderFontPx: 12, totalsCellFontPx: 12, totalsHeaderFontPx: 12, totalsGroupHeaderFontPx: 12, cellFontPx: 12, headerFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', includeSumTable: false, sumTwoColumns: false, sumGroupBy: 'microrregion', includeCalculatedColumns: false, calculatedColumns: [], includeOperationsColumn: false, operationsLabel: 'Operaciones', operationsReferenceField: '', operationsIncludePercent: true, operationsFields: [], sumMetrics: [], sumFormulas: [] };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
             const titleUppercaseEl = modal ? modal.querySelector('#tmExportTitleUppercase') : document.getElementById('tmExportTitleUppercase');
@@ -3592,8 +3679,11 @@
             }
             var countTableCellWidthEl = modal ? modal.querySelector('#tmExportCountTableCellWidth') : document.getElementById('tmExportCountTableCellWidth');
             var countTableCellWidth = (countTableCellWidthEl && countTableCellWidthEl.value) ? (parseInt(countTableCellWidthEl.value, 10) || 12) : 12;
+            var countTableFontSizeEl = modal ? modal.querySelector('#tmExportCountTableFontSize') : document.getElementById('tmExportCountTableFontSize');
+            var countTableFontSize = (countTableFontSizeEl && countTableFontSizeEl.value) ? Math.max(7, Math.min(24, parseInt(countTableFontSizeEl.value, 10) || 9)) : 9;
             var groups = normalizeExportGroups((personalizeModal && personalizeModal._exportGroups) || []);
             var includeSumTableEl = modal ? modal.querySelector('#tmExportIncludeSumTable') : document.getElementById('tmExportIncludeSumTable');
+            var sumTwoColumnsEl = modal ? modal.querySelector('#tmExportSumTwoColumns') : document.getElementById('tmExportSumTwoColumns');
             var sumGroupByEl = modal ? modal.querySelector('#tmExportSumGroupBy') : document.getElementById('tmExportSumGroupBy');
             var sumCfg = tmExportReadSumConfigurator();
             var calculatedColumns = [];
@@ -3665,6 +3755,7 @@
                 columns: columns,
                 countTableColors: countTableColors,
                 countTableCellWidth: countTableCellWidth,
+                countTableFontPx: countTableFontSize,
                 recordsCellFontPx: recordsCellFontPx,
                 recordsHeaderFontPx: recordsHeaderFontPx,
                 recordsGroupHeaderFontPx: recordsGroupHeaderFontPx,
@@ -3682,6 +3773,7 @@
                 groups: groups,
                 microrregionSort: (microrregionSortEl && microrregionSortEl.value === 'desc') ? 'desc' : 'asc',
                 includeSumTable: !!(includeSumTableEl && includeSumTableEl.checked),
+                sumTwoColumns: !!(sumTwoColumnsEl && sumTwoColumnsEl.checked),
                 sumGroupBy: (sumGroupByEl && sumGroupByEl.value === 'municipio') ? 'municipio' : 'microrregion',
                 includeCalculatedColumns: !!(includeCalculatedColumnsEl && includeCalculatedColumnsEl.checked),
                 calculatedColumns: calculatedColumns,
@@ -4196,7 +4288,6 @@
 
             let html = '';
 
-            // Área de Título y Fecha (superior)
             html += '<div class="tm-export-preview-header" style="width:100%;margin-bottom:15px;border-bottom:1px solid #eee;padding-bottom:10px;">';
             html += '<table style="width:100%;border-collapse:collapse;table-layout:fixed;">';
             if (TM_EXPORT_PREVIEW_LOGO_URL) {
@@ -4265,7 +4356,8 @@
                     delegationLabel: state.sumDelegationLabel || 'Delegación',
                     showCabecera: state.sumShowCabecera !== false,
                     cabeceraLabel: state.sumCabeceraLabel || 'Cabecera'
-                }
+                },
+                state.sumTwoColumns
             );
 
             // Tabla de Datos (Desglose)
@@ -5316,6 +5408,8 @@
                         if (sumCabeceraLabelEl) { sumCabeceraLabelEl.value = (draftCfg.sum_cabecera_label != null && String(draftCfg.sum_cabecera_label).trim() !== '') ? String(draftCfg.sum_cabecera_label) : 'Cabecera'; }
                         setSumGroupColor(draftCfg.sum_group_color || 'var(--clr-primary)');
                         if (sumIncludeTotalsRowEl) { sumIncludeTotalsRowEl.checked = !!draftCfg.include_sum_totals_row; }
+                        var sumTwoColEl2 = document.getElementById('tmExportSumTwoColumns');
+                        if (sumTwoColEl2) { sumTwoColEl2.checked = !!draftCfg.sum_two_columns; }
                         if (sumCellFontEl && draftCfg.sum_table_cell_font_size_px != null) {
                             var ssf = parseInt(draftCfg.sum_table_cell_font_size_px, 10);
                             if (!Number.isNaN(ssf)) { sumCellFontEl.value = String(Math.max(9, Math.min(24, ssf))); }
@@ -5372,6 +5466,11 @@
                         if (cwEl && draftCfg.count_table_cell_width != null) {
                             var cwn = parseInt(draftCfg.count_table_cell_width, 10);
                             if (!Number.isNaN(cwn)) { cwEl.value = String(Math.max(6, Math.min(40, cwn))); }
+                        }
+                        var ctfEl = document.getElementById('tmExportCountTableFontSize');
+                        if (ctfEl && (draftCfg.count_table_font_px != null || draftCfg.countTableFontPx != null)) {
+                            var ctfn = parseInt((draftCfg.count_table_font_px != null ? draftCfg.count_table_font_px : draftCfg.countTableFontPx), 10);
+                            if (!Number.isNaN(ctfn)) { ctfEl.value = String(Math.max(7, Math.min(24, ctfn))); }
                         }
                         if (cellFontEl && (draftCfg.records_cell_font_size_px != null || draftCfg.cell_font_size_px != null)) {
                             var cfn = parseInt((draftCfg.records_cell_font_size_px != null ? draftCfg.records_cell_font_size_px : draftCfg.cell_font_size_px), 10);
@@ -5536,7 +5635,7 @@
                             }
                         });
                         personalizeModal.addEventListener('input', function (e) {
-                            if (e.target && (e.target.closest('.tm-export-count-width-input') || e.target.id === 'tmExportCountTableCellWidth')) {
+                            if (e.target && (e.target.closest('.tm-export-count-width-input') || e.target.id === 'tmExportCountTableCellWidth' || e.target.id === 'tmExportCountTableFontSize')) {
                                 buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
                             }
                         });
@@ -5544,6 +5643,8 @@
                             if (e.target && (
                                 e.target.closest('.tm-export-count-width-input')
                                 || e.target.id === 'tmExportCountTableCellWidth'
+                                || e.target.id === 'tmExportCountTableFontSize'
+                                || e.target.id === 'tmExportSumTwoColumns'
                                 || e.target.closest('.tm-export-count-pct-check')
                                 || e.target.closest('.tm-export-count-sr-check')
                                 || e.target.closest('.tm-export-count-value-include-check')

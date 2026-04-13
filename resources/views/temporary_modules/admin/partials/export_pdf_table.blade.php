@@ -633,7 +633,6 @@
     $sumCellPadding = $sumDensityScore >= 34 ? '2px 3px' : '3px 4px';
 @endphp
 <p style="font-weight: bold; margin: 4px 0 4px 0; text-align: {{ $sumTitleAlign }}; font-size: {{ $sumHeadingFontSizePx }}px;">{{ $sumHeadingText }}</p>
-<div style="{{ $sumTableWrapStyle }}">
 @php
     $sumMetricColumns = is_array($sumTable['metric_columns'] ?? null) ? $sumTable['metric_columns'] : [];
     $sumFormulaColumns = is_array($sumTable['formula_columns'] ?? null) ? $sumTable['formula_columns'] : [];
@@ -721,8 +720,23 @@
             }
         }
     }
+    $sumTwoColumnsActive = !empty($sumTwoColumns ?? false) && count($sumTable['rows'] ?? []) >= 2;
+    $sumAllRows = $sumTable['rows'] ?? [];
+    $sumMidPoint = $sumTwoColumnsActive ? (int) ceil(count($sumAllRows) / 2) : count($sumAllRows);
+    $sumRenderHalves = $sumTwoColumnsActive
+        ? [array_slice($sumAllRows, 0, $sumMidPoint), array_slice($sumAllRows, $sumMidPoint)]
+        : [$sumAllRows];
 @endphp
+@if($sumTwoColumnsActive)
+<div style="display:flex;gap:8px;align-items:flex-start;">
+@foreach($sumRenderHalves as $sumHalfRows)
+<div style="flex:1;overflow:auto;">
+<table class="sum-table" style="width:100%; {{ $countTableInlineStyle }} --sum-header-fs: {{ $sumHeaderFontPx }}px; --sum-cell-fs: {{ $sumCellFontPx }}px; --sum-cell-pad: {{ $sumCellPadding }};">
+@else
+<div style="{{ $sumTableWrapStyle }}">
+@foreach($sumRenderHalves as $sumHalfRows)
 <table class="sum-table" style="{{ $sumTableStyle }} {{ $countTableInlineStyle }} --sum-header-fs: {{ $sumHeaderFontPx }}px; --sum-cell-fs: {{ $sumCellFontPx }}px; --sum-cell-pad: {{ $sumCellPadding }};">
+@endif
     <thead>
     @if($sumHasGroups)
     <tr>
@@ -753,7 +767,7 @@
     </tr>
     </thead>
     <tbody>
-    @foreach (($sumTable['rows'] ?? []) as $row)
+    @foreach ($sumHalfRows as $row)
         <tr>
             @foreach($sumLeadColumns as $leadIndex => $lead)
                 @php
@@ -808,14 +822,14 @@
                             $numeratorTotal = 0.0;
                             $baseTotal = 0.0;
                             if ($numeratorMetricId !== '' && $baseMetricId !== '') {
-                                foreach (($sumTable['rows'] ?? []) as $sumRow) {
+                                foreach ($sumHalfRows as $sumRow) {
                                     $numeratorTotal += (float) (($sumRow['metrics'][$numeratorMetricId] ?? 0.0));
                                     $baseTotal += (float) (($sumRow['metrics'][$baseMetricId] ?? 0.0));
                                 }
                             }
                             $totalVal = $baseTotal !== 0.0 ? (($numeratorTotal / $baseTotal) * 100.0) : 0.0;
                         } else {
-                            foreach (($sumTable['rows'] ?? []) as $sumRow) {
+                            foreach ($sumHalfRows as $sumRow) {
                                 $isMetric = $op === 'metric';
                                 $totalVal += $isMetric
                                     ? (float) (($sumRow['metrics'][$id] ?? 0.0))
@@ -834,7 +848,14 @@
     @endif
     </tbody>
 </table>
+@if($sumTwoColumnsActive)
 </div>
+@endforeach
+</div>
+@else
+@endforeach
+</div>
+@endif
 @endif
 
 @php
