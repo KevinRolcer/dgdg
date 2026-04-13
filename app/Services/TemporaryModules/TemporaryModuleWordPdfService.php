@@ -1467,7 +1467,7 @@ class TemporaryModuleWordPdfService
                 $values[] = ['label' => $labelByLower[$lower] ?? $lower, 'count' => $count];
             }
             if ($includeSR && $sinRespuestaCount > 0) {
-                $values[] = ['label' => 'No aplica', 'count' => $sinRespuestaCount];
+                $values[] = ['label' => 'S/R', 'count' => $sinRespuestaCount];
             }
             if ($values !== []) {
                 $groups[] = [

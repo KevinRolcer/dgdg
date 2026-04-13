@@ -893,7 +893,7 @@ class TemporaryModuleExportService
                 $values[] = ['label' => $labelByLower[$lower] ?? $lower, 'count' => $count];
             }
             if ($sinRespuestaCount > 0) {
-                $values[] = ['label' => 'No aplica', 'count' => $sinRespuestaCount];
+                $values[] = ['label' => 'S/R', 'count' => $sinRespuestaCount];
             }
             if ($values !== []) {
                 $groups[] = [
