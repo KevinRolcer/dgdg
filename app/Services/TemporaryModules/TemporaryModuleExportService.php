@@ -1285,7 +1285,6 @@ class TemporaryModuleExportService
             : [];
         $sumIncludeTotalsRow = $includeSumTable && !empty($this->exportConfig['include_sum_totals_row']);
         $sumTableAlign = strtolower((string) ($this->exportConfig['sum_table_align'] ?? 'left'));
-        $sumTwoColumns = !empty($this->exportConfig['sum_two_columns']);
         $sumShowItem = !array_key_exists('sum_show_item', $this->exportConfig) || !empty($this->exportConfig['sum_show_item']);
         $sumItemLabel = trim((string) ($this->exportConfig['sum_item_label'] ?? '#'));
         if ($sumItemLabel === '') {
@@ -1614,17 +1613,8 @@ class TemporaryModuleExportService
                     $colIdx++;
                 }
 
-                // Split rows for two-column layout if needed
-                $sumMid = ($sumTwoColumns && count($sumRows) >= 2) ? (int) ceil(count($sumRows) / 2) : count($sumRows);
-                $sumRowsMain = array_slice($sumRows, 0, $sumMid);
-                $sumRowsSecond = ($sumTwoColumns && count($sumRows) >= 2) ? array_slice($sumRows, $sumMid) : [];
-                $sumStartCol2 = $sumLastCol + 2;
-                $sumLastCol2 = $sumStartCol2 + $sumCols - 1;
-                $sum2FirstLetter = Coordinate::stringFromColumnIndex($sumStartCol2);
-                $sum2LastLetter = Coordinate::stringFromColumnIndex($sumLastCol2);
-
                 $rowPtr = $sumDataStartRow;
-                foreach ($sumRowsMain as $rowIndex => $row) {
+                foreach ($sumRows as $rowIndex => $row) {
                     $colIdx = $sumStartCol;
                     foreach ($sumLeadCols as $leadCol) {
                         $leadKey = (string) ($leadCol['key'] ?? 'group');
@@ -1688,14 +1678,14 @@ class TemporaryModuleExportService
                             $numeratorTotal = 0.0;
                             $baseTotal = 0.0;
                             if ($numeratorMetricId !== '' && $baseMetricId !== '') {
-                                foreach ($sumRowsMain as $row) {
+                                foreach ($sumRows as $row) {
                                     $numeratorTotal += (float) (($row['metrics'][$numeratorMetricId] ?? 0.0));
                                     $baseTotal += (float) (($row['metrics'][$baseMetricId] ?? 0.0));
                                 }
                             }
                             $total = $baseTotal !== 0.0 ? (($numeratorTotal / $baseTotal) * 100.0) : 0.0;
                         } else {
-                            foreach ($sumRowsMain as $row) {
+                            foreach ($sumRows as $row) {
                                 if ($op === 'metric') {
                                     $total += (float) (($row['metrics'][$id] ?? 0.0));
                                 } else {
@@ -1765,159 +1755,7 @@ class TemporaryModuleExportService
                     $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth(14);
                 }
 
-                // Second column block for two-column layout
-                if ($sumRowsSecond !== []) {
-                    // Title for second column
-                    $sheet->setCellValue($sum2FirstLetter.$sumTitleRow, $sumTitleText.' '.$this->normalizeExportHeading('por '.$sumGroupLabel, $headersUppercase));
-                    $sheet->mergeCells($sum2FirstLetter.$sumTitleRow.':'.$sum2LastLetter.$sumTitleRow);
-                    $sheet->getStyle($sum2FirstLetter.$sumTitleRow)->getFont()->setBold(true);
-
-                    // Group headers for second column
-                    if ($hasSumGroupHeaders) {
-                        for ($li = 0; $li < $sumLeadCount; $li++) {
-                            $sheet->setCellValue(Coordinate::stringFromColumnIndex($sumStartCol2 + $li).$sumGroupHeaderRow, '');
-                        }
-                        foreach ($sumCombinedCols as $ci2 => $col) {
-                            $sheet->setCellValue(Coordinate::stringFromColumnIndex($sumStartCol2 + $sumLeadCount + $ci2).$sumGroupHeaderRow, '');
-                        }
-                        $grpStart2 = $sumStartCol2 + $sumLeadCount;
-                        $lastGrp2 = null;
-                        $grpColIdx2 = $sumStartCol2 + $sumLeadCount;
-                        foreach ($sumCombinedCols as $col) {
-                            $gl2 = (string) ($col['group'] ?? '');
-                            if ($lastGrp2 === null) { $lastGrp2 = $gl2; }
-                            if ($gl2 !== $lastGrp2) {
-                                $ge2 = $grpColIdx2 - 1;
-                                if (trim((string) $lastGrp2) !== '') {
-                                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($grpStart2).$sumGroupHeaderRow, $this->normalizeExportHeading((string) $lastGrp2, $headersUppercase));
-                                    if ($ge2 > $grpStart2) { $sheet->mergeCells(Coordinate::stringFromColumnIndex($grpStart2).$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($ge2).$sumGroupHeaderRow); }
-                                    $ga2 = $this->groupHeaderColorByName[mb_strtolower(trim((string) $lastGrp2), 'UTF-8')] ?? 'FF64748B';
-                                    $sheet->getStyle(Coordinate::stringFromColumnIndex($grpStart2).$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($ge2).$sumGroupHeaderRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($ga2);
-                                }
-                                $grpStart2 = $grpColIdx2;
-                                $lastGrp2 = $gl2;
-                            }
-                            $grpColIdx2++;
-                        }
-                        $ge2 = $grpColIdx2 - 1;
-                        if (trim((string) $lastGrp2) !== '') {
-                            $sheet->setCellValue(Coordinate::stringFromColumnIndex($grpStart2).$sumGroupHeaderRow, $this->normalizeExportHeading((string) $lastGrp2, $headersUppercase));
-                            if ($ge2 > $grpStart2) { $sheet->mergeCells(Coordinate::stringFromColumnIndex($grpStart2).$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($ge2).$sumGroupHeaderRow); }
-                            $ga2 = $this->groupHeaderColorByName[mb_strtolower(trim((string) $lastGrp2), 'UTF-8')] ?? 'FF64748B';
-                            $sheet->getStyle(Coordinate::stringFromColumnIndex($grpStart2).$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($ge2).$sumGroupHeaderRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($ga2);
-                        }
-                        $sheet->getStyle($sum2FirstLetter.$sumGroupHeaderRow.':'.Coordinate::stringFromColumnIndex($sumStartCol2 + $sumLeadCount - 1).$sumGroupHeaderRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($sumGroupColorArgb);
-                        $sheet->getStyle($sum2FirstLetter.$sumGroupHeaderRow.':'.$sum2LastLetter.$sumGroupHeaderRow)->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
-                        $sheet->getStyle($sum2FirstLetter.$sumGroupHeaderRow.':'.$sum2LastLetter.$sumGroupHeaderRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
-                    }
-
-                    // Column headers for second column
-                    $c2Idx = $sumStartCol2;
-                    foreach ($sumLeadCols as $lc2) {
-                        $sheet->setCellValue(Coordinate::stringFromColumnIndex($c2Idx).$sumHeaderRow, (string) ($lc2['label'] ?? ''));
-                        $c2Idx++;
-                    }
-                    foreach ($sumCombinedCols as $col) {
-                        $sheet->setCellValue(Coordinate::stringFromColumnIndex($c2Idx).$sumHeaderRow, $this->normalizeExportHeading((string) ($col['label'] ?? ''), $headersUppercase));
-                        $c2Idx++;
-                    }
-
-                    // Data rows for second column (parallel row positions to first column)
-                    $rPtr2 = $sumDataStartRow;
-                    foreach ($sumRowsSecond as $ri2 => $row) {
-                        $c2Idx = $sumStartCol2;
-                        foreach ($sumLeadCols as $lc2) {
-                            $lk2 = (string) ($lc2['key'] ?? 'group');
-                            $lt2 = '';
-                            if ($lk2 === 'item') { $lt2 = (string) ($ri2 + 1); }
-                            elseif ($lk2 === 'delegacion_numero') { $lt2 = (string) ($row['mr_number'] ?? ''); }
-                            elseif ($lk2 === 'cabecera_microrregion') { $lt2 = (string) ($row['mr_cabecera'] ?? ''); }
-                            else { $lt2 = (string) ($row['group'] ?? ''); }
-                            $sheet->setCellValue(Coordinate::stringFromColumnIndex($c2Idx).$rPtr2, $lt2);
-                            $c2Idx++;
-                        }
-                        foreach ($sumCombinedCols as $col) {
-                            $id2 = (string) ($col['id'] ?? '');
-                            if ((string) ($col['op'] ?? 'metric') === 'metric') {
-                                $v2 = (float) (($row['metrics'][$id2] ?? 0.0));
-                                $sheet->setCellValue(Coordinate::stringFromColumnIndex($c2Idx).$rPtr2, round($v2, 2));
-                            } else {
-                                $v2 = (float) (($row['formulas'][$id2] ?? 0.0));
-                                $sheet->setCellValue(Coordinate::stringFromColumnIndex($c2Idx).$rPtr2, round($v2, 2));
-                                if ((string) ($col['op'] ?? '') === 'percent') {
-                                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($c2Idx).$rPtr2, $v2 / 100);
-                                    $sheet->getStyle(Coordinate::stringFromColumnIndex($c2Idx).$rPtr2)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE_00);
-                                }
-                            }
-                            $c2Idx++;
-                        }
-                        $rPtr2++;
-                    }
-
-                    // Totals for second column
-                    if ($sumIncludeTotalsRow) {
-                        $c2Idx = $sumStartCol2;
-                        foreach ($sumLeadCols as $li2 => $lc2) {
-                            $sheet->setCellValue(Coordinate::stringFromColumnIndex($c2Idx).$rPtr2, $li2 === 0 ? $this->normalizeExportHeading('Total', $headersUppercase) : '');
-                            $c2Idx++;
-                        }
-                        foreach ($sumCombinedCols as $col) {
-                            $incT2 = !array_key_exists('include_total', $col) || !empty($col['include_total']);
-                            if (!$incT2) { $sheet->setCellValue(Coordinate::stringFromColumnIndex($c2Idx).$rPtr2, ''); $c2Idx++; continue; }
-                            $id2 = (string) ($col['id'] ?? '');
-                            $op2 = (string) ($col['op'] ?? 'metric');
-                            $tot2 = 0.0;
-                            if ($op2 === 'percent') {
-                                $mids2 = array_values(array_map('strval', (array) ($col['metric_ids'] ?? [])));
-                                $nmId2 = (string) ($mids2[0] ?? ''); $bmId2 = (string) ($col['base_metric_id'] ?? '');
-                                $nT2 = 0.0; $bT2 = 0.0;
-                                if ($nmId2 !== '' && $bmId2 !== '') { foreach ($sumRowsSecond as $rs2) { $nT2 += (float)(($rs2['metrics'][$nmId2] ?? 0.0)); $bT2 += (float)(($rs2['metrics'][$bmId2] ?? 0.0)); } }
-                                $tot2 = $bT2 !== 0.0 ? (($nT2 / $bT2) * 100.0) : 0.0;
-                            } else {
-                                foreach ($sumRowsSecond as $rs2) { $tot2 += $op2 === 'metric' ? (float)(($rs2['metrics'][$id2] ?? 0.0)) : (float)(($rs2['formulas'][$id2] ?? 0.0)); }
-                            }
-                            if ($op2 === 'percent') {
-                                $sheet->setCellValue(Coordinate::stringFromColumnIndex($c2Idx).$rPtr2, $tot2 / 100);
-                                $sheet->getStyle(Coordinate::stringFromColumnIndex($c2Idx).$rPtr2)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_PERCENTAGE_00);
-                            } else {
-                                $sheet->setCellValue(Coordinate::stringFromColumnIndex($c2Idx).$rPtr2, round($tot2, 2));
-                            }
-                            $c2Idx++;
-                        }
-                        $sheet->getStyle($sum2FirstLetter.$rPtr2.':'.$sum2LastLetter.$rPtr2)->getFont()->setBold($sumTotalsBold)->getColor()->setARGB($sumTotalsTextColorArgb);
-                        $rPtr2++;
-                    }
-
-                    // Styling for second column
-                    $sumLastDataRow2 = $rPtr2 - 1;
-                    $sheet->getStyle($sum2FirstLetter.$sumHeaderRow.':'.$sum2LastLetter.$sumHeaderRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF475569');
-                    $sheet->getStyle($sum2FirstLetter.$sumHeaderRow.':'.Coordinate::stringFromColumnIndex($sumStartCol2 + $sumLeadCount - 1).$sumHeaderRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($sumGroupColorArgb);
-                    foreach ($sumCombinedCols as $ci2 => $col) {
-                        $gl2 = trim((string) ($col['group'] ?? ''));
-                        if ($gl2 === '') { continue; }
-                        $gk2 = mb_strtolower($gl2, 'UTF-8');
-                        $ga2 = $this->groupHeaderColorByName[$gk2] ?? 'FF64748B';
-                        $sheet->getStyle(Coordinate::stringFromColumnIndex($sumStartCol2 + $sumLeadCount + $ci2).$sumHeaderRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($ga2);
-                    }
-                    $sheet->getStyle($sum2FirstLetter.$sumHeaderRow.':'.$sum2LastLetter.$sumHeaderRow)->getFont()->setBold(true)->getColor()->setARGB(self::HEADER_FONT_COLOR);
-                    if ($sumLastDataRow2 >= $sumHeaderRow) {
-                        $sheet->getStyle($sum2FirstLetter.$sumHeaderRow.':'.$sum2LastLetter.$sumLastDataRow2)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-                        $sheet->getStyle($sum2FirstLetter.$sumHeaderRow.':'.$sum2LastLetter.$sumLastDataRow2)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-                        $sheet->getStyle($sum2FirstLetter.$sumDataStartRow.':'.$sum2LastLetter.$sumLastDataRow2)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                    }
-                    for ($li2 = 0; $li2 < $sumLeadCount; $li2++) {
-                        $lk2 = (string) ($sumLeadCols[$li2]['key'] ?? 'group');
-                        $lw2 = 20;
-                        if ($lk2 === 'item') { $lw2 = 6; } elseif ($lk2 === 'delegacion_numero') { $lw2 = 12; } elseif ($lk2 === 'cabecera_microrregion') { $lw2 = 22; }
-                        $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($sumStartCol2 + $li2))->setWidth(max($lw2, (float) $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($sumStartCol2 + $li2))->getWidth()));
-                    }
-                    for ($c2 = $sumStartCol2 + $sumLeadCount; $c2 <= $sumLastCol2; $c2++) {
-                        $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($c2))->setWidth(14);
-                    }
-                    $maxColIdx = max($maxColIdx, $sumLastCol2);
-                }
-
-                $sumRowsConsumed = ($hasSumGroupHeaders ? 3 : 2) + count($sumRowsMain) + ($sumIncludeTotalsRow ? 1 : 0);
+                $sumRowsConsumed = ($hasSumGroupHeaders ? 3 : 2) + count($sumRows) + ($sumIncludeTotalsRow ? 1 : 0);
                 $countTableRows += $sumRowsConsumed + 3;
                 $maxColIdx = max($maxColIdx, $sumLastCol);
             }

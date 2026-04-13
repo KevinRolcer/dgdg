@@ -377,7 +377,6 @@ class TemporaryModuleWordPdfService
         }
         $sumGroupColorHex = $this->cssColorToHex((string) ($exportConfig['sum_group_color'] ?? 'var(--clr-primary)'));
         $sumIncludeTotalsRow = !empty($exportConfig['include_sum_totals_row']);
-        $sumTwoColumns = !empty($exportConfig['sum_two_columns']);
         $includeTotalsTable = !empty($exportConfig['include_totals_table']);
         $totalsTableTitle = trim((string) ($exportConfig['totals_table_title'] ?? 'Totales'));
         if ($totalsTableTitle === '') {
@@ -959,169 +958,145 @@ class TemporaryModuleWordPdfService
                     ['spaceAfter' => 90, 'alignment' => $sumTitleJc]
                 );
 
-                $sumTblStyle = [
+                $sumTbl = $section->addTable([
                     'borderSize' => 6,
                     'borderColor' => '444444',
                     'cellMargin' => $sumCellMarginTwips,
                     'alignment' => $this->resolveWordTableAlignment($sumTableAlign),
-                ];
-                $renderSumTableContent = function ($tbl, array $rowsToRender) use (
-                    $hasSumGroupHeaders, $sumCombinedCols, $sumLeadCols, $sumLeadColTwips, $sumDataColTwips,
-                    $groupHeaderColors, $exportFontName, $sumGroupColorHex, $sumHeaderCellPt, $sumGroupHeaderCellPt,
-                    $sumCellPt, $headersUppercase, $sumTable, $sumTotalsBold, $sumTotalsTextColorHex
-                ): void {
-                    if ($hasSumGroupHeaders) {
-                        $tbl->addRow();
-                        for ($leadIdx = 0; $leadIdx < count($sumLeadCols); $leadIdx++) {
-                            $tbl->addCell($sumLeadColTwips, ['bgColor' => $sumGroupColorHex, 'valign' => 'center']);
+                ]);
+                if ($hasSumGroupHeaders) {
+                    $sumTbl->addRow();
+                    for ($leadIdx = 0; $leadIdx < $sumLeadCount; $leadIdx++) {
+                        $sumTbl->addCell($sumLeadColTwips, ['bgColor' => $sumGroupColorHex, 'valign' => 'center']);
+                    }
+                    $spanCount = 0;
+                    $spanGroup = null;
+                    foreach ($sumCombinedCols as $idx => $col) {
+                        $grp = (string) ($col['group'] ?? '');
+                        if ($spanGroup === null) {
+                            $spanGroup = $grp;
+                            $spanCount = 1;
+                        } elseif ($grp === $spanGroup) {
+                            $spanCount++;
+                        } else {
+                            $spanGroupKey = mb_strtolower(trim((string) $spanGroup), 'UTF-8');
+                            $spanBg = trim((string) $spanGroup) !== '' ? ($groupHeaderColors[$spanGroupKey] ?? '64748B') : '334155';
+                            $sumTbl->addCell($sumDataColTwips * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => $spanBg, 'valign' => 'center'])
+                                ->addText(trim($spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $sumGroupHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                            $spanGroup = $grp;
+                            $spanCount = 1;
                         }
-                        $spanCount = 0;
-                        $spanGroup = null;
-                        foreach ($sumCombinedCols as $idx => $col) {
-                            $grp = (string) ($col['group'] ?? '');
-                            if ($spanGroup === null) {
-                                $spanGroup = $grp;
-                                $spanCount = 1;
-                            } elseif ($grp === $spanGroup) {
-                                $spanCount++;
-                            } else {
-                                $spanGroupKey = mb_strtolower(trim((string) $spanGroup), 'UTF-8');
-                                $spanBg = trim((string) $spanGroup) !== '' ? ($groupHeaderColors[$spanGroupKey] ?? '64748B') : '334155';
-                                $tbl->addCell($sumDataColTwips * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => $spanBg, 'valign' => 'center'])
-                                    ->addText(trim($spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $sumGroupHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
-                                $spanGroup = $grp;
-                                $spanCount = 1;
-                            }
-                            if ($idx === count($sumCombinedCols) - 1) {
-                                $spanGroupKey = mb_strtolower(trim((string) $spanGroup), 'UTF-8');
-                                $spanBg = trim((string) $spanGroup) !== '' ? ($groupHeaderColors[$spanGroupKey] ?? '64748B') : '334155';
-                                $tbl->addCell($sumDataColTwips * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => $spanBg, 'valign' => 'center'])
-                                    ->addText(trim((string) $spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $sumGroupHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
-                            }
+                        if ($idx === count($sumCombinedCols) - 1) {
+                            $spanGroupKey = mb_strtolower(trim((string) $spanGroup), 'UTF-8');
+                            $spanBg = trim((string) $spanGroup) !== '' ? ($groupHeaderColors[$spanGroupKey] ?? '64748B') : '334155';
+                            $sumTbl->addCell($sumDataColTwips * $spanCount, ['gridSpan' => $spanCount, 'bgColor' => $spanBg, 'valign' => 'center'])
+                                ->addText(trim((string) $spanGroup) === '' ? '' : (string) $spanGroup, ['name' => $exportFontName, 'bold' => true, 'size' => $sumGroupHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
                         }
                     }
-                    $tbl->addRow();
+                }
+
+                $sumTbl->addRow();
+                foreach ($sumLeadCols as $leadCol) {
+                    $sumTbl->addCell($sumLeadColTwips, ['bgColor' => $sumGroupColorHex, 'valign' => 'center'])
+                        ->addText((string) ($leadCol['label'] ?? ''), ['name' => $exportFontName, 'bold' => true, 'size' => $sumHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                }
+                foreach ($sumCombinedCols as $col) {
+                    $sumColGroup = trim((string) ($col['group'] ?? ''));
+                    $sumColGroupKey = mb_strtolower($sumColGroup, 'UTF-8');
+                    $sumColBg = $sumColGroup !== '' ? ($groupHeaderColors[$sumColGroupKey] ?? '64748B') : '475569';
+                    $sumTbl->addCell($sumDataColTwips, ['bgColor' => $sumColBg, 'valign' => 'center'])
+                        ->addText((string) ($col['label'] ?? ''), ['name' => $exportFontName, 'bold' => true, 'size' => $sumHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                }
+
+                foreach ($sumRows as $rowIndex => $row) {
+                    $sumTbl->addRow();
                     foreach ($sumLeadCols as $leadCol) {
-                        $tbl->addCell($sumLeadColTwips, ['bgColor' => $sumGroupColorHex, 'valign' => 'center'])
-                            ->addText((string) ($leadCol['label'] ?? ''), ['name' => $exportFontName, 'bold' => true, 'size' => $sumHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
+                        $leadKey = (string) ($leadCol['key'] ?? 'group');
+                        $leadText = '';
+                        if ($leadKey === 'item') {
+                            $leadText = (string) ($rowIndex + 1);
+                        } elseif ($leadKey === 'delegacion_numero') {
+                            $leadText = (string) ($row['mr_number'] ?? '');
+                        } elseif ($leadKey === 'cabecera_microrregion') {
+                            $leadText = (string) ($row['mr_cabecera'] ?? '');
+                        } else {
+                            $leadText = (string) ($row['group'] ?? '');
+                        }
+                        $sumTbl->addCell($sumLeadColTwips, ['valign' => 'center'])->addText($leadText, ['name' => $exportFontName, 'size' => $sumCellPt], ['alignment' => Jc::CENTER]);
                     }
+
                     foreach ($sumCombinedCols as $col) {
-                        $sumColGroup = trim((string) ($col['group'] ?? ''));
-                        $sumColGroupKey = mb_strtolower($sumColGroup, 'UTF-8');
-                        $sumColBg = $sumColGroup !== '' ? ($groupHeaderColors[$sumColGroupKey] ?? '64748B') : '475569';
-                        $tbl->addCell($sumDataColTwips, ['bgColor' => $sumColBg, 'valign' => 'center'])
-                            ->addText((string) ($col['label'] ?? ''), ['name' => $exportFontName, 'bold' => true, 'size' => $sumHeaderCellPt, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
-                    }
-                    foreach ($rowsToRender as $rowIndex => $row) {
-                        $tbl->addRow();
-                        foreach ($sumLeadCols as $leadCol) {
-                            $leadKey = (string) ($leadCol['key'] ?? 'group');
-                            $leadText = '';
-                            if ($leadKey === 'item') {
-                                $leadText = (string) ($rowIndex + 1);
-                            } elseif ($leadKey === 'delegacion_numero') {
-                                $leadText = (string) ($row['mr_number'] ?? '');
-                            } elseif ($leadKey === 'cabecera_microrregion') {
-                                $leadText = (string) ($row['mr_cabecera'] ?? '');
-                            } else {
-                                $leadText = (string) ($row['group'] ?? '');
-                            }
-                            $tbl->addCell($sumLeadColTwips, ['valign' => 'center'])->addText($leadText, ['name' => $exportFontName, 'size' => $sumCellPt], ['alignment' => Jc::CENTER]);
-                        }
-                        foreach ($sumCombinedCols as $col) {
-                            $id = (string) ($col['id'] ?? '');
-                            if ((string) ($col['op'] ?? 'metric') === 'metric') {
-                                $v = (float) (($row['metrics'][$id] ?? 0.0));
-                                $tbl->addCell($sumDataColTwips)->addText((string) round($v, 2), ['name' => $exportFontName, 'size' => $sumCellPt], ['alignment' => Jc::CENTER]);
-                            } else {
-                                $v = (float) (($row['formulas'][$id] ?? 0.0));
-                                $text = (string) round($v, 2);
-                                if ((string) ($col['op'] ?? '') === 'percent') {
-                                    $text .= '%';
-                                }
-                                $tbl->addCell($sumDataColTwips)->addText($text, ['name' => $exportFontName, 'size' => $sumCellPt], ['alignment' => Jc::CENTER]);
-                            }
-                        }
-                    }
-                    if (!empty($sumTable['include_totals_row'])) {
-                        $sumTotalsBoldCfg = !array_key_exists('totals_bold', $sumTable) || !empty($sumTable['totals_bold']);
-                        $sumTotalsTextColorCfg = (string) ($sumTable['totals_text_color'] ?? '861E34');
-                        $tbl->addRow();
-                        foreach ($sumLeadCols as $leadIdx => $leadCol) {
-                            $tbl->addCell($sumLeadColTwips, ['valign' => 'center'])->addText(
-                                $leadIdx === 0 ? $this->normalizeExportHeading('Total', $headersUppercase) : '',
-                                ['name' => $exportFontName, 'size' => $sumCellPt, 'bold' => $sumTotalsBoldCfg, 'color' => $sumTotalsTextColorCfg],
-                                ['alignment' => Jc::CENTER]
-                            );
-                        }
-                        foreach ($sumCombinedCols as $col) {
-                            $includeTotal = !array_key_exists('include_total', $col) || !empty($col['include_total']);
-                            if (!$includeTotal) {
-                                $tbl->addCell($sumDataColTwips)->addText('');
-                                continue;
-                            }
-                            $id = (string) ($col['id'] ?? '');
-                            $op = (string) ($col['op'] ?? 'metric');
-                            $total = 0.0;
-                            if ($op === 'percent') {
-                                $metricIds = array_values(array_map('strval', (array) ($col['metric_ids'] ?? [])));
-                                $numeratorMetricId = (string) ($metricIds[0] ?? '');
-                                $baseMetricId = (string) ($col['base_metric_id'] ?? '');
-                                $numeratorTotal = 0.0;
-                                $baseTotal = 0.0;
-                                if ($numeratorMetricId !== '' && $baseMetricId !== '') {
-                                    foreach ($rowsToRender as $row) {
-                                        $numeratorTotal += (float) (($row['metrics'][$numeratorMetricId] ?? 0.0));
-                                        $baseTotal += (float) (($row['metrics'][$baseMetricId] ?? 0.0));
-                                    }
-                                }
-                                $total = $baseTotal !== 0.0 ? (($numeratorTotal / $baseTotal) * 100.0) : 0.0;
-                            } else {
-                                foreach ($rowsToRender as $row) {
-                                    if ($op === 'metric') {
-                                        $total += (float) (($row['metrics'][$id] ?? 0.0));
-                                    } else {
-                                        $total += (float) (($row['formulas'][$id] ?? 0.0));
-                                    }
-                                }
-                            }
-                            $text = (string) round($total, 2);
-                            if ($op === 'percent') {
+                        $id = (string) ($col['id'] ?? '');
+                        if ((string) ($col['op'] ?? 'metric') === 'metric') {
+                            $v = (float) (($row['metrics'][$id] ?? 0.0));
+                            $sumTbl->addCell($sumDataColTwips)->addText((string) round($v, 2), ['name' => $exportFontName, 'size' => $sumCellPt], ['alignment' => Jc::CENTER]);
+                        } else {
+                            $v = (float) (($row['formulas'][$id] ?? 0.0));
+                            $text = (string) round($v, 2);
+                            if ((string) ($col['op'] ?? '') === 'percent') {
                                 $text .= '%';
                             }
-                            $tbl->addCell($sumDataColTwips)->addText(
-                                $text,
-                                ['name' => $exportFontName, 'size' => $sumCellPt, 'bold' => $sumTotalsBoldCfg, 'color' => $sumTotalsTextColorCfg],
-                                ['alignment' => Jc::CENTER]
-                            );
+                            $sumTbl->addCell($sumDataColTwips)->addText($text, ['name' => $exportFontName, 'size' => $sumCellPt], ['alignment' => Jc::CENTER]);
                         }
                     }
-                };
+                }
 
-                if ($sumTwoColumns && count($sumRows) >= 2) {
-                    $sumMid = (int) ceil(count($sumRows) / 2);
-                    $sumFirstHalf = array_slice($sumRows, 0, $sumMid);
-                    $sumSecondHalf = array_slice($sumRows, $sumMid);
-                    $halfWidth = (int) floor(($usableTableTwips - 280) / 2);
-                    $outerTbl = $section->addTable([
-                        'borderSize' => 0,
-                        'borderColor' => 'FFFFFF',
-                        'cellMarginTop' => 0,
-                        'cellMarginBottom' => 0,
-                        'cellMarginLeft' => 0,
-                        'cellMarginRight' => 0,
-                        'alignment' => $this->resolveWordTableAlignment($sumTableAlign),
-                    ]);
-                    $outerTbl->addRow();
-                    $leftCell = $outerTbl->addCell($halfWidth, ['borderSize' => 0, 'borderColor' => 'FFFFFF', 'valign' => 'top']);
-                    $rightCell = $outerTbl->addCell($halfWidth, ['borderSize' => 0, 'borderColor' => 'FFFFFF', 'valign' => 'top']);
-                    $leftTbl = $leftCell->addTable($sumTblStyle);
-                    $rightTbl = $rightCell->addTable($sumTblStyle);
-                    $renderSumTableContent($leftTbl, $sumFirstHalf);
-                    $renderSumTableContent($rightTbl, $sumSecondHalf);
-                } else {
-                    $sumTbl = $section->addTable($sumTblStyle);
-                    $renderSumTableContent($sumTbl, $sumRows);
+                if (!empty($sumTable['include_totals_row'])) {
+                    $sumTotalsBoldCfg = !array_key_exists('totals_bold', $sumTable) || !empty($sumTable['totals_bold']);
+                    $sumTotalsTextColorCfg = (string) ($sumTable['totals_text_color'] ?? '861E34');
+                    $sumTbl->addRow();
+                    foreach ($sumLeadCols as $leadIdx => $leadCol) {
+                        $sumTbl->addCell($sumLeadColTwips, ['valign' => 'center'])->addText(
+                            $leadIdx === 0 ? $this->normalizeExportHeading('Total', $headersUppercase) : '',
+                            ['name' => $exportFontName, 'size' => $sumCellPt, 'bold' => $sumTotalsBoldCfg, 'color' => $sumTotalsTextColorCfg],
+                            ['alignment' => Jc::CENTER]
+                        );
+                    }
+
+                    foreach ($sumCombinedCols as $col) {
+                        $includeTotal = !array_key_exists('include_total', $col) || !empty($col['include_total']);
+                        if (!$includeTotal) {
+                            $sumTbl->addCell($sumDataColTwips)->addText('');
+                            continue;
+                        }
+
+                        $id = (string) ($col['id'] ?? '');
+                        $op = (string) ($col['op'] ?? 'metric');
+                        $total = 0.0;
+                        if ($op === 'percent') {
+                            $metricIds = array_values(array_map('strval', (array) ($col['metric_ids'] ?? [])));
+                            $numeratorMetricId = (string) ($metricIds[0] ?? '');
+                            $baseMetricId = (string) ($col['base_metric_id'] ?? '');
+                            $numeratorTotal = 0.0;
+                            $baseTotal = 0.0;
+                            if ($numeratorMetricId !== '' && $baseMetricId !== '') {
+                                foreach ($sumRows as $row) {
+                                    $numeratorTotal += (float) (($row['metrics'][$numeratorMetricId] ?? 0.0));
+                                    $baseTotal += (float) (($row['metrics'][$baseMetricId] ?? 0.0));
+                                }
+                            }
+                            $total = $baseTotal !== 0.0 ? (($numeratorTotal / $baseTotal) * 100.0) : 0.0;
+                        } else {
+                            foreach ($sumRows as $row) {
+                                if ($op === 'metric') {
+                                    $total += (float) (($row['metrics'][$id] ?? 0.0));
+                                } else {
+                                    $total += (float) (($row['formulas'][$id] ?? 0.0));
+                                }
+                            }
+                        }
+
+                        $text = (string) round($total, 2);
+                        if ($op === 'percent') {
+                            $text .= '%';
+                        }
+
+                        $sumTbl->addCell($sumDataColTwips)->addText(
+                            $text,
+                            ['name' => $exportFontName, 'size' => $sumCellPt, 'bold' => $sumTotalsBoldCfg, 'color' => $sumTotalsTextColorCfg],
+                            ['alignment' => Jc::CENTER]
+                        );
+                    }
                 }
 
                 $section->addTextBreak(1);
@@ -1405,7 +1380,6 @@ class TemporaryModuleWordPdfService
             'stretch' => $stretch,
             'countTable' => $countTable,
             'sumTable' => $sumTable,
-            'sumTwoColumns' => $sumTwoColumns,
             'countTableColorKeys' => $countTableColorKeys,
             'countTableColors' => $countTableColors,
             'countTableCellWidth' => $countTableCellWidth,
