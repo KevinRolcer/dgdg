@@ -4032,7 +4032,7 @@
                         values.push({ label: normalizeExportHeadingText(labelByLower[lower] || lower, headersUppercase), count: byVal[lower] });
                     });
                     if (includeSR && sinRespuesta > 0) {
-                        values.push({ label: normalizeExportHeadingText('No aplica', headersUppercase), count: sinRespuesta });
+                        values.push({ label: normalizeExportHeadingText('S/R', headersUppercase), count: sinRespuesta });
                     }
                     if (values.length) { groups.push({ label: normalizeExportHeadingText(fieldLabel, headersUppercase), values: values }); }
                 });
