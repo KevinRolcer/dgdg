@@ -410,6 +410,17 @@ class TemporaryModuleWordPdfService
         $cellFontSizePt = $this->cellPxToWordPt($cellFontSizePx);
         $countTableCellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['count_table_font_px'] ?? $exportConfig['count_table_font_size_px'] ?? $exportConfig['countTableFontPx'] ?? 9);
         $countTableCellFontSizePt = $this->cellPxToWordPt($countTableCellFontSizePx);
+        $legacyCountTableFont = $exportConfig['count_table_font_px'] ?? $exportConfig['count_table_font_size_px'] ?? $exportConfig['countTableFontPx'] ?? null;
+        $pdfCountHeaderRaw = $exportConfig['count_table_header_font_size_px'] ?? $exportConfig['countTableHeaderFontPx'] ?? null;
+        $pdfCountCellRaw = $exportConfig['count_table_cell_font_size_px'] ?? $exportConfig['countTableCellFontPx'] ?? null;
+        $pdfCountHeaderPx = $pdfCountHeaderRaw !== null && $pdfCountHeaderRaw !== ''
+            ? (int) $pdfCountHeaderRaw
+            : ($legacyCountTableFont !== null && $legacyCountTableFont !== '' ? (int) $legacyCountTableFont : 8);
+        $pdfCountCellPx = $pdfCountCellRaw !== null && $pdfCountCellRaw !== ''
+            ? (int) $pdfCountCellRaw
+            : ($legacyCountTableFont !== null && $legacyCountTableFont !== '' ? (int) $legacyCountTableFont : 10);
+        $pdfCountHeaderPx = max(7, min(24, $pdfCountHeaderPx));
+        $pdfCountCellPx = max(7, min(24, $pdfCountCellPx));
         $sumTableCellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['sum_table_cell_font_size_px'] ?? $cellFontSizePx);
         $sumTableCellFontSizePt = $this->cellPxToWordPt($sumTableCellFontSizePx);
         $sumHeaderFontSizePx = max(9, min(28, (int) ($exportConfig['sum_table_header_font_size_px'] ?? $headerFontSizePx)));
@@ -723,7 +734,7 @@ class TemporaryModuleWordPdfService
                 };
                 $countTbl->addRow();
                 foreach ($countTable['groups'] as $gi => $group) {
-                    $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
+                    $key = (string) ($group['color_key'] ?? ($gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '')));
                     $bgHex = $resolveCountColor($key, 1);
                     $includePct = !empty($countTableColors[$key]['showPct']);
                     $numValues = count($group['values']);
@@ -750,7 +761,7 @@ class TemporaryModuleWordPdfService
                 }
                 $countTbl->addRow();
                 foreach ($countTable['groups'] as $gi => $group) {
-                    $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
+                    $key = (string) ($group['color_key'] ?? ($gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '')));
                     $includePct = !empty($countTableColors[$key]['showPct']);
 
                     foreach ($group['values'] as $v) {
@@ -775,7 +786,7 @@ class TemporaryModuleWordPdfService
                 }
                 $countTbl->addRow();
                 foreach ($countTable['groups'] as $gi => $group) {
-                    $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
+                    $key = (string) ($group['color_key'] ?? ($gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '')));
                     $includePct = !empty($countTableColors[$key]['showPct']);
                     $gTotal = array_sum(array_column($group['values'], 'count'));
 
@@ -1383,6 +1394,8 @@ class TemporaryModuleWordPdfService
             'countTableColorKeys' => $countTableColorKeys,
             'countTableColors' => $countTableColors,
             'countTableCellWidth' => $countTableCellWidth,
+            'countTableHeaderFontSizePx' => $pdfCountHeaderPx,
+            'countTableCellFontSizePx' => $pdfCountCellPx,
             'fieldTypesByKey' => $fieldTypesByKey,
             'pdfImageDataByPath' => $pdfImageDataByPath,
         ])->render();
@@ -1414,7 +1427,11 @@ class TemporaryModuleWordPdfService
     {
         $total = $entries->count();
         $groups = [
-            ['label' => 'Total de registros', 'values' => [['label' => '', 'count' => $total]]],
+            [
+                'label' => 'Total de registros',
+                'values' => [['label' => '', 'count' => $total]],
+                'color_key' => '_total',
+            ],
         ];
 
         foreach ($countByFields as $fieldKey) {
@@ -1485,6 +1502,7 @@ class TemporaryModuleWordPdfService
                 $groups[] = [
                     'label' => $fieldLabels[$fieldKey] ?? $fieldKey,
                     'values' => $values,
+                    'color_key' => $fieldKey,
                 ];
             }
         }

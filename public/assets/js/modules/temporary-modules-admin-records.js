@@ -1136,7 +1136,7 @@
             var countByFieldsEl = root.querySelector ? root.querySelector('#tmExportCountByFields') : document.getElementById('tmExportCountByFields');
             if (includeCountEl && includeCountEl.checked && countByFieldsEl) {
                 var totalCount = Array.isArray(entries) ? entries.length : 0;
-                var groups = [{ label: 'Total de registros', values: [{ label: '', count: totalCount }] }];
+                var groups = [{ label: 'Total de registros', values: [{ label: '', count: totalCount }], colorKey: '_total' }];
                 countByFieldsEl.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
                     var key = cb.getAttribute('data-count-key') || cb.value;
                     if (!key) { return; }
@@ -1167,24 +1167,15 @@
                     if (includeSR && sinRespuesta > 0) {
                         values.push({ label: 'S/R', count: sinRespuesta });
                     }
-                    if (values.length) { groups.push({ label: fieldLabel, values: values }); }
+                    if (values.length) { groups.push({ label: fieldLabel, values: values, colorKey: key }); }
                 });
                 if (groups.length > 0) {
-                    var countTableKeys = [];
-                    if (root.querySelector) {
-                        var colorListEl = root.querySelector('#tmExportCountTableColorList');
-                        if (colorListEl) {
-                            colorListEl.querySelectorAll('.tm-export-count-table-color-item').forEach(function (r) {
-                                var k = r.getAttribute('data-key');
-                                if (k) { countTableKeys.push(k); }
-                            });
-                        }
-                    }
                     var countTableColors = state.countTableColors || {};
                     var getCountColor = function (groupIndex, rowNum, valueLabel) {
-                        var key = countTableKeys[groupIndex];
-                        if (!key) { return rowNum === 1 ? '#861e34' : '#2d5a27'; }
-                        var c = countTableColors[key];
+                        var g = groups[groupIndex];
+                        var colorKey = (g && g.colorKey) ? String(g.colorKey) : '';
+                        if (!colorKey) { return rowNum === 1 ? '#861e34' : '#2d5a27'; }
+                        var c = countTableColors[colorKey];
                         if (typeof c === 'string') { return c; }
                         if (rowNum === 1) { return (c && c.row1) ? c.row1 : '#861e34'; }
                         if (valueLabel && c && c.row2Values && (c.row2Values[valueLabel] || c.row2Values[valueLabel.toLowerCase()])) {
@@ -1200,7 +1191,7 @@
                     countTableHtml += '<thead><tr>';
                     groups.forEach(function (g, gi) {
                         var bg = getCountColor(gi, 1);
-                        var key = countTableKeys[gi] || (gi === 0 ? '_total' : '');
+                        var key = (g && g.colorKey) ? String(g.colorKey) : (gi === 0 ? '_total' : '');
                         var groupCfg = countTableColors[key] || {};
                         var showPct = !!groupCfg.showPct;
 
@@ -1211,7 +1202,7 @@
                     });
                     countTableHtml += '</tr><tr>';
                     groups.forEach(function (g, gi) {
-                        var key = countTableKeys[gi] || (gi === 0 ? '_total' : '');
+                        var key = (g && g.colorKey) ? String(g.colorKey) : (gi === 0 ? '_total' : '');
                         var groupCfg = countTableColors[key] || {};
                         var showPct = !!groupCfg.showPct;
 
@@ -1235,7 +1226,7 @@
                     });
                     countTableHtml += '</tr></thead><tbody><tr>';
                     groups.forEach(function (g, gi) {
-                        var key = countTableKeys[gi] || (gi === 0 ? '_total' : '');
+                        var key = (g && g.colorKey) ? String(g.colorKey) : (gi === 0 ? '_total' : '');
                         var groupCfg = countTableColors[key] || {};
                         var showPct = !!groupCfg.showPct;
 

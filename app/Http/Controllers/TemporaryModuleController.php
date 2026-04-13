@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\GenerateTemporaryModuleAnalysisWordJob;
 use App\Models\TemporaryModule;
 use App\Models\TemporaryModuleEntry;
+use App\Models\TemporaryModuleField;
 use App\Services\TemporaryModules\TemporaryModuleAccessService;
 use App\Services\TemporaryModules\TemporaryModuleAdminSeedService;
 use App\Services\TemporaryModules\TemporaryModuleAnalysisWordService;
@@ -2590,6 +2591,7 @@ class TemporaryModuleController extends Controller
         $columns[] = ['key' => 'cabecera_microrregion', 'label' => 'Cabecera', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 18];
         foreach ($exportColumns as $col) {
             $info = $maxWidths[$col['key']] ?? ['chars' => 15];
+            $field = $temporaryModule->fields->firstWhere('key', $col['key']);
             $columns[] = [
                 'key' => $col['key'],
                 'label' => $col['label'],
@@ -2597,6 +2599,7 @@ class TemporaryModuleController extends Controller
                 'is_image' => $col['is_image'],
                 'max_width_chars' => $info['chars'] ?? 15,
                 'image_height' => $info['image_height'] ?? 80,
+                'option_values' => $this->exportPreviewFieldOptionValues($field instanceof TemporaryModuleField ? $field : null),
             ];
         }
 
@@ -2660,6 +2663,60 @@ class TemporaryModuleController extends Controller
         }
 
         return $cols;
+    }
+
+    /**
+     * Valores de catálogo del campo (lista desplegable en “Conteo igual a valor” cuando aún no hay respuestas).
+     *
+     * @return list<string>
+     */
+    private function exportPreviewFieldOptionValues(?TemporaryModuleField $field): array
+    {
+        if ($field === null) {
+            return [];
+        }
+        $type = (string) $field->type;
+        $raw = is_array($field->options) ? $field->options : [];
+
+        if (in_array($type, ['select', 'multiselect'], true)) {
+            $out = [];
+            foreach ($raw as $o) {
+                if (is_array($o)) {
+                    $n = trim((string) ($o['name'] ?? $o['label'] ?? ''));
+                    if ($n !== '') {
+                        $out[] = $n;
+                    }
+                } elseif (is_string($o) && trim($o) !== '') {
+                    $out[] = trim($o);
+                }
+            }
+
+            return array_values(array_unique($out));
+        }
+
+        if ($type === 'linked') {
+            $parsed = $this->fieldService->parseLinkedOptions($field->toArray());
+            $primary = $parsed['primary_options'] ?? [];
+            if (! is_array($primary)) {
+                return [];
+            }
+
+            return array_values(array_unique(array_filter(array_map(static fn ($v) => trim((string) $v), $primary))));
+        }
+
+        if ($type === 'boolean') {
+            return ['Sí', 'No'];
+        }
+
+        if ($type === 'semaforo') {
+            return TemporaryModuleFieldService::SEMAFORO_VALUES;
+        }
+
+        if ($type === 'categoria') {
+            return $this->fieldService->categoriaAllowedValues($raw);
+        }
+
+        return [];
     }
 
     public function analysisPreviewJson(Request $request, int $module): JsonResponse

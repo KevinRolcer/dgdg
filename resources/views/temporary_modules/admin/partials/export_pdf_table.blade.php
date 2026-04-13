@@ -109,7 +109,15 @@
     $totalsTableHeaderFontSizePx = max(9, min(48, (int) ($totalsTableHeaderFontSizePx ?? $sumTableHeaderFontSizePx)));
     $totalsGroupHeaderFontSizePx = max(9, min(48, (int) ($totalsGroupHeaderFontSizePx ?? $totalsTableHeaderFontSizePx)));
     $titleFontSizePx = max(10, min(36, (int) ($titleFontSizePx ?? 18)));
-    $varsCss = ['var(--clr-primary)' => '#861E34', 'var(--clr-secondary)' => '#2d5a27', 'var(--clr-accent)' => '#c9a227'];
+    $varsCss = [
+        'var(--clr-primary)' => '#861E34',
+        'var(--clr-secondary)' => '#246257',
+        'var(--clr-accent)' => '#C79B66',
+        'var(--clr-text-main)' => '#484747',
+        'var(--clr-text-light)' => '#6B6A6A',
+        'var(--clr-bg)' => '#F7F7F8',
+        'var(--clr-card)' => '#FFFFFF',
+    ];
     $resolveCss = function ($css) use ($varsCss) {
         return isset($varsCss[$css]) ? $varsCss[$css] : (str_starts_with($css ?? '', '#') ? $css : '#861E34');
     };
@@ -129,6 +137,10 @@
     if (!in_array($dataTableAlign, ['left', 'center', 'right', 'stretch'], true)) {
         $dataTableAlign = 'left';
     }
+
+    $countTableHeaderFontSizePx = max(7, min(24, (int) ($countTableHeaderFontSizePx ?? 8)));
+    $countTableCellFontSizePx = max(7, min(24, (int) ($countTableCellFontSizePx ?? 10)));
+    $countTablePctFontSizePx = max(6, min(22, (int) round($countTableCellFontSizePx * 0.9)));
 
     $preferredUnits = 0;
     foreach (($columns ?? []) as $col) {
@@ -272,8 +284,8 @@
         .count-table tr {
             page-break-inside: avoid;
         }
-        .count-table th { background: #861E34; color: #fff; text-align: center; font-size: 8px; }
-        .count-table td { text-align: center; color: #c00; font-weight: bold; font-size: 10px; }
+        .count-table th { background: #861E34; color: #fff; text-align: center; font-size: var(--count-header-fs, 8px); }
+        .count-table td { text-align: center; color: #c00; font-weight: bold; font-size: var(--count-cell-fs, 10px); }
         .count-table th,
         .count-table td {
             white-space: normal;
@@ -450,9 +462,11 @@
 @php
     $countTableColorKeys = $countTableColorKeys ?? [];
     $countTableColors = $countTableColors ?? [];
-    $countTableResolveColor = function ($index, $rowNum, $valueLabel = null) use ($countTableColorKeys, $countTableColors, $resolveCss) {
-        $key = $countTableColorKeys[$index] ?? null;
-        if ($key === null) return $rowNum === 1 ? '#861E34' : '#2d5a27';
+    $countTableResolveColor = function (string $colorKey, $rowNum, $valueLabel = null) use ($countTableColors, $resolveCss) {
+        $key = trim($colorKey);
+        if ($key === '') {
+            return $rowNum === 1 ? '#861E34' : '#2d5a27';
+        }
         $c = $countTableColors[$key] ?? null;
         if (is_array($c)) {
             if ($rowNum === 1) return $resolveCss($c['row1'] ?? '#861E34');
@@ -466,9 +480,9 @@
         if (is_string($c) && $c !== '') return $resolveCss($c);
         return $rowNum === 1 ? '#861E34' : '#2d5a27';
     };
-    $countTableResolveWidth = function ($index, $valueLabel) use ($countTableColorKeys, $countTableColors, $countTableCellWidth) {
-        $key = $countTableColorKeys[$index] ?? null;
-        if ($key === null) {
+    $countTableResolveWidth = function (string $colorKey, $valueLabel) use ($countTableColors, $countTableCellWidth) {
+        $key = trim($colorKey);
+        if ($key === '') {
             return $countTableCellWidth;
         }
         $c = $countTableColors[$key] ?? null;
@@ -484,35 +498,41 @@
     };
 @endphp
 <div style="{{ $countTableWrapStyle }}">
-<table class="count-table" style="{{ $countTableStyle }} {{ $countTableInlineStyle }}">
+<table class="count-table" style="{{ $countTableStyle }} {{ $countTableInlineStyle }} --count-header-fs: {{ $countTableHeaderFontSizePx }}px; --count-cell-fs: {{ $countTableCellFontSizePx }}px;">
     <thead>
     <tr>
         @foreach ($countTable['groups'] as $gi => $group)
             @php
-                $key = $countTableColorKeys[$gi] ?? '';
-                $includePct = !empty($countTableColors[$key]['showPct']);
+                $countColorKey = (string) ($group['color_key'] ?? '');
+                if ($countColorKey === '' && isset($countTableColorKeys[$gi])) {
+                    $countColorKey = (string) $countTableColorKeys[$gi];
+                }
+                $includePct = !empty($countTableColors[$countColorKey]['showPct']);
                 $numValues = count($group['values']);
                 $span = $includePct ? $numValues * 2 : $numValues;
                 $isRedundant = ($gi === 0 || ($numValues === 1 && (trim((string)($group['values'][0]['label'] ?? '')) === '' || trim((string)($group['values'][0]['label'] ?? '')) === trim((string)($group['label'] ?? '')))));
             @endphp
-            <th colspan="{{ $span }}" @if($isRedundant && !$includePct) rowspan="2" @endif style="background-color: {{ $countTableResolveColor($gi, 1) }}; color: #fff;">{{ $group['label'] }}</th>
+            <th colspan="{{ $span }}" @if($isRedundant && !$includePct) rowspan="2" @endif style="background-color: {{ $countTableResolveColor($countColorKey, 1) }}; color: #fff;">{{ $group['label'] }}</th>
         @endforeach
     </tr>
     <tr>
         @foreach ($countTable['groups'] as $gi => $group)
             @php
-                $key = $countTableColorKeys[$gi] ?? '';
-                $includePct = !empty($countTableColors[$key]['showPct']);
+                $countColorKey = (string) ($group['color_key'] ?? '');
+                if ($countColorKey === '' && isset($countTableColorKeys[$gi])) {
+                    $countColorKey = (string) $countTableColorKeys[$gi];
+                }
+                $includePct = !empty($countTableColors[$countColorKey]['showPct']);
                 $numValues = count($group['values']);
                 $isRedundant = ($gi === 0 || ($numValues === 1 && (trim((string)($group['values'][0]['label'] ?? '')) === '' || trim((string)($group['values'][0]['label'] ?? '')) === trim((string)($group['label'] ?? '')))));
             @endphp
             @foreach ($group['values'] as $v)
                 @php $subLabel = $v['label'] !== '' ? $v['label'] : $group['label']; @endphp
-                @php $valueW = $countTableResolveWidth($gi, $subLabel); @endphp
+                @php $valueW = $countTableResolveWidth($countColorKey, $subLabel); @endphp
                 @if($isRedundant && !$includePct)
                     @continue
                 @endif
-                <th @if($includePct) colspan="2" @endif style="background-color: {{ $countTableResolveColor($gi, 2, $subLabel) }}; color: #fff; width: {{ $includePct ? ($valueW * 1.7) : $valueW }}ch; min-width: {{ $valueW }}ch; white-space: normal; overflow-wrap: anywhere; word-break: break-word; line-height: 1.1;">
+                <th @if($includePct) colspan="2" @endif style="background-color: {{ $countTableResolveColor($countColorKey, 2, $subLabel) }}; color: #fff; width: {{ $includePct ? ($valueW * 1.7) : $valueW }}ch; min-width: {{ $valueW }}ch; white-space: normal; overflow-wrap: anywhere; word-break: break-word; line-height: 1.1;">
                     {{ $isRedundant && $includePct ? 'Cantidad' : $subLabel }}
                 </th>
             @endforeach
@@ -523,16 +543,19 @@
     <tr>
         @foreach ($countTable['groups'] as $gi => $group)
             @php
-                $key = $countTableColorKeys[$gi] ?? '';
-                $includePct = !empty($countTableColors[$key]['showPct']);
+                $countColorKey = (string) ($group['color_key'] ?? '');
+                if ($countColorKey === '' && isset($countTableColorKeys[$gi])) {
+                    $countColorKey = (string) $countTableColorKeys[$gi];
+                }
+                $includePct = !empty($countTableColors[$countColorKey]['showPct']);
                 $gTotal = array_sum(array_column($group['values'], 'count'));
             @endphp
             @foreach ($group['values'] as $v)
                 @php $subLabel = $v['label'] !== '' ? $v['label'] : $group['label']; @endphp
-                @php $valueW = $countTableResolveWidth($gi, $subLabel); @endphp
+                @php $valueW = $countTableResolveWidth($countColorKey, $subLabel); @endphp
                 <td style="width: {{ $valueW }}ch; min-width: {{ $valueW }}ch; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">{{ $v['count'] }}</td>
                 @if($includePct)
-                    <td style="width: {{ max(6, (int) floor($valueW * 0.7)) }}ch; font-size: 9px; color: #666; white-space: normal;">
+                    <td style="width: {{ max(6, (int) floor($valueW * 0.7)) }}ch; font-size: {{ $countTablePctFontSizePx }}px; color: #666; white-space: normal;">
                         {{ $gTotal > 0 ? round(($v['count'] / $gTotal) * 100, 2) : 0 }}%
                     </td>
                 @endif

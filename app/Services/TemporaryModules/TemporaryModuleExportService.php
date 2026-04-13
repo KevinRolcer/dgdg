@@ -835,7 +835,11 @@ class TemporaryModuleExportService
     {
         $total = $entries->count();
         $groups = [
-            ['label' => 'Total de registros', 'values' => [['label' => '', 'count' => $total]]],
+            [
+                'label' => 'Total de registros',
+                'values' => [['label' => '', 'count' => $total]],
+                'color_key' => '_total',
+            ],
         ];
 
         foreach ($countByFields as $fieldKey) {
@@ -911,6 +915,7 @@ class TemporaryModuleExportService
                 $groups[] = [
                     'label' => $fieldLabels[$fieldKey] ?? $fieldKey,
                     'values' => $values,
+                    'color_key' => $fieldKey,
                 ];
             }
         }
@@ -1330,7 +1335,7 @@ class TemporaryModuleExportService
 
             // Primero: Escribir contenido y calcular ancho
             foreach ($groups as $gi => $group) {
-                $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
+                $key = (string) ($group['color_key'] ?? ($gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '')));
                 $groupCfg = $countTableColors[$key] ?? [];
                 $includePct = !empty($groupCfg['showPct']);
 
@@ -1392,7 +1397,7 @@ class TemporaryModuleExportService
             };
             $colIdx = 1;
             foreach ($groups as $gi => $group) {
-                $key = $gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '');
+                $key = (string) ($group['color_key'] ?? ($gi === 0 ? '_total' : ($countByFields[$gi - 1] ?? '')));
                 $includePct = !empty($countTableColors[$key]['showPct']);
                 $argb1 = $resolveCountColor($key, 1);
                 $span = $includePct ? count($group['values']) * 2 : count($group['values']);
