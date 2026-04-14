@@ -370,7 +370,8 @@ class WhatsAppChatArchiveController extends Controller
             $absoluteTarget = $disk->path($targetRel);
             $existing = $existingByPath->get($relativeSafe);
 
-            if ($existing && $disk->exists($targetRel)
+            // Evita Flysystem::exists() para nombres con unicode raro (puede lanzar CorruptedPathDetected).
+            if ($existing && is_file($absoluteTarget)
                 && (int) $existing->file_size === (int) $item['file_size']
                 && (int) ($existing->client_last_modified_at ?? 0) === (int) ($item['last_modified'] ?? 0)) {
                 $skippedCount++;
@@ -554,7 +555,8 @@ class WhatsAppChatArchiveController extends Controller
         $targetRel = trim((string) $archive->storage_root_path, '/').'/'.$relativeSafe;
         $absoluteTarget = $disk->path($targetRel);
 
-        if ($existing && $disk->exists($targetRel)
+        // Evita Flysystem::exists() para nombres con unicode raro (puede lanzar CorruptedPathDetected).
+        if ($existing && is_file($absoluteTarget)
             && (int) $existing->file_size === $fileSize
             && (int) ($existing->client_last_modified_at ?? 0) === (int) ($lastModified ?? 0)) {
             return response()->json([
@@ -792,6 +794,18 @@ class WhatsAppChatArchiveController extends Controller
 
             $seg = mb_convert_encoding($seg, 'UTF-8', 'UTF-8,ISO-8859-1,Windows-1252');
 
+            // Flysystem (v3) rechaza "funky whitespace" en rutas (p. ej. NBSP, soft-hyphen, zero-width, etc.).
+            // Normaliza para evitar 500 cuando WhatsApp exporta nombres con caracteres invisibles.
+            $seg = preg_replace('/\p{Cf}+/u', '', $seg) ?? $seg; // format chars (soft hyphen, ZWSP, etc.)
+            $seg = preg_replace('/[\p{Z}\s]+/u', ' ', $seg) ?? $seg; // separadores/espacios raros -> espacio normal
+            $seg = trim($seg);
+            $seg = rtrim($seg, ". \t\n\r\0\x0B");
+            if ($seg === '') {
+                throw ValidationException::withMessages([
+                    'relative_path' => ['La ruta del archivo no es válida.'],
+                ]);
+            }
+
             if ($seg === '..') {
                 throw ValidationException::withMessages([
                     'relative_path' => ['La ruta del archivo no es válida.'],
@@ -934,28 +948,57 @@ class WhatsAppChatArchiveController extends Controller
                 ->exists();
 
             if ($existsOnMaster) {
-                if ($disk->exists($srcKey)) {
-                    $disk->delete($srcKey);
+                try {
+                    if ($disk->exists($srcKey)) {
+                        $disk->delete($srcKey);
+                    }
+                } catch (\Throwable) {
+                    $srcAbs = $disk->path($srcKey);
+                    if (is_file($srcAbs)) {
+                        File::delete($srcAbs);
+                    }
                 }
                 $uf->delete();
 
                 continue;
             }
 
-            if ($disk->exists($srcKey)) {
-                $absoluteDest = $disk->path($destKey);
-                File::ensureDirectoryExists(dirname($absoluteDest));
-                if ($disk->exists($destKey)) {
-                    $disk->delete($destKey);
+            try {
+                if ($disk->exists($srcKey)) {
+                    $absoluteDest = $disk->path($destKey);
+                    File::ensureDirectoryExists(dirname($absoluteDest));
+                    if ($disk->exists($destKey)) {
+                        $disk->delete($destKey);
+                    }
+                    $disk->move($srcKey, $destKey);
                 }
-                $disk->move($srcKey, $destKey);
+            } catch (\Throwable) {
+                $srcAbs = $disk->path($srcKey);
+                if (is_file($srcAbs)) {
+                    $absoluteDest = $disk->path($destKey);
+                    File::ensureDirectoryExists(dirname($absoluteDest));
+                    if (is_file($absoluteDest)) {
+                        File::delete($absoluteDest);
+                    }
+                    File::copy($srcAbs, $absoluteDest);
+                    File::delete($srcAbs);
+                }
             }
 
             $uf->forceFill(['whatsapp_chat_archive_id' => $master->id])->save();
         }
 
-        if ($slaveRoot !== '' && $slaveRoot !== $masterRoot && $disk->exists($slaveRoot)) {
-            $disk->deleteDirectory($slaveRoot);
+        if ($slaveRoot !== '' && $slaveRoot !== $masterRoot) {
+            try {
+                if ($disk->exists($slaveRoot)) {
+                    $disk->deleteDirectory($slaveRoot);
+                }
+            } catch (\Throwable) {
+                $slaveRootAbs = $disk->path($slaveRoot);
+                if (is_dir($slaveRootAbs)) {
+                    File::deleteDirectory($slaveRootAbs);
+                }
+            }
         }
 
         $slave->delete();
