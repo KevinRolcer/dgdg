@@ -162,6 +162,18 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.export-preview-structure');
+            Route::get('/{module}/exportacion-configuracion', [TemporaryModuleController::class, 'exportUserConfigShow'])
+                ->whereNumber('module')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.export-user-config.show');
+            Route::put('/{module}/exportacion-configuracion', [TemporaryModuleController::class, 'exportUserConfigUpdate'])
+                ->whereNumber('module')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.export-user-config.update');
+            Route::delete('/{module}/exportacion-configuracion', [TemporaryModuleController::class, 'exportUserConfigDestroy'])
+                ->whereNumber('module')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.export-user-config.destroy');
             Route::post('/', [TemporaryModuleController::class, 'store'])->middleware('can:Modulos-Temporales-Admin')->name('temporary-modules.admin.store');
             Route::get('/{module}/editar', [TemporaryModuleController::class, 'edit'])
                 ->whereNumber('module')
@@ -199,6 +211,11 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.export-analysis-word');
+            Route::delete('/{module}/registros/{entry}', [TemporaryModuleController::class, 'adminDestroyEntry'])
+                ->whereNumber('module')
+                ->whereNumber('entry')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.entry.destroy');
             Route::delete('/{module}/registros', [TemporaryModuleController::class, 'clearEntries'])
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')

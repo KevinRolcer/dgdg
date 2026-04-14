@@ -6,14 +6,15 @@ use App\Jobs\GenerateTemporaryModuleAnalysisWordJob;
 use App\Models\TemporaryModule;
 use App\Models\TemporaryModuleEntry;
 use App\Models\TemporaryModuleField;
+use App\Models\TemporaryModuleUserExportSetting;
 use App\Services\TemporaryModules\TemporaryModuleAccessService;
 use App\Services\TemporaryModules\TemporaryModuleAdminSeedService;
 use App\Services\TemporaryModules\TemporaryModuleAnalysisWordService;
 use App\Services\TemporaryModules\TemporaryModuleEntryDataService;
 use App\Services\TemporaryModules\TemporaryModuleExcelImportService;
-use App\Services\TemporaryModules\TemporaryModulePdfImportService;
 use App\Services\TemporaryModules\TemporaryModuleExportService;
 use App\Services\TemporaryModules\TemporaryModuleFieldService;
+use App\Services\TemporaryModules\TemporaryModulePdfImportService;
 use App\Services\TemporaryModules\TemporaryModuleSlugService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -266,12 +267,46 @@ class TemporaryModuleController extends Controller
 
         $modules = $modulesQuery->latest()->paginate(15)->withQueryString();
 
+        $activityFeedQuery = TemporaryModule::query()
+            ->select(['id', 'name'])
+            ->has('entries')
+            ->orderBy('name');
+
+        if ($searchQuery !== '') {
+            $like = '%'.addcslashes($searchQuery, '%_\\').'%';
+            $activityFeedQuery->where(function ($q) use ($like): void {
+                $q->where('name', 'like', $like)
+                    ->orWhere('description', 'like', $like);
+            });
+        }
+
+        $activityFeed = $activityFeedQuery
+            ->limit(100)
+            ->with(['entries' => function ($q): void {
+                $q->select([
+                    'temporary_module_entries.id',
+                    'temporary_module_entries.temporary_module_id',
+                    'temporary_module_entries.submitted_at',
+                    'temporary_module_entries.updated_at',
+                    'temporary_module_entries.microrregion_id',
+                    'temporary_module_entries.user_id',
+                ])
+                    ->with([
+                        'microrregion:id,microrregion,cabecera',
+                        'user:id,name',
+                    ])
+                    ->latest('submitted_at')
+                    ->limit(40);
+            }])
+            ->get();
+
         return view('temporary_modules.admin.records', [
             'pageTitle' => 'Registros de modulos temporales',
             'pageDescription' => 'Consulta registros de delegados y exporta resultados en Excel.',
             'topbarNotifications' => [],
             'modules' => $modules,
             'searchQuery' => $searchQuery,
+            'activityFeed' => $activityFeed,
         ]);
     }
 
@@ -1014,6 +1049,7 @@ class TemporaryModuleController extends Controller
             $token = $this->normalizeSiNoToken($label);
             if ($token === 'si' && $yesLabel === null) {
                 $yesLabel = $label;
+
                 continue;
             }
 
@@ -1330,7 +1366,8 @@ class TemporaryModuleController extends Controller
             ->get();
 
         $delegadosList = $this->accessService->onlyDelegates()->map(function ($del) {
-            $label = $del->name . (!empty($del->microrregion) ? ' (MR ' . str_pad((string) $del->microrregion, 2, '0', STR_PAD_LEFT) . ')' : '');
+            $label = $del->name.(! empty($del->microrregion) ? ' (MR '.str_pad((string) $del->microrregion, 2, '0', STR_PAD_LEFT).')' : '');
+
             return ['value' => $del->name, 'label' => $label];
         })->values()->all();
 
@@ -1554,13 +1591,17 @@ class TemporaryModuleController extends Controller
                 $remainingExistingPaths = array_values(array_filter($existingPaths, fn ($path) => ! in_array($path, $removeExistingPaths, true)));
                 $uploadedFiles = $request->file('values.'.$field->key);
                 if ($uploadedFiles) {
-                    if (!is_array($uploadedFiles)) { $uploadedFiles = [$uploadedFiles]; }
+                    if (! is_array($uploadedFiles)) {
+                        $uploadedFiles = [$uploadedFiles];
+                    }
                     $directory = 'temporary-modules/'.$temporaryModule->id.'/'.$request->user()->id;
                     $storedPaths = [];
                     foreach ($uploadedFiles as $uploadedFile) {
                         if ($field->type === 'image' && in_array($uploadedFile->getMimeType(), ['image/jpeg', 'image/png', 'image/webp'])) {
                             $storedPaths[] = $this->compressAndStoreImage($uploadedFile, $directory);
-                        } else { $storedPaths[] = $uploadedFile->store($directory, 'secure_shared'); }
+                        } else {
+                            $storedPaths[] = $uploadedFile->store($directory, 'secure_shared');
+                        }
                     }
 
                     if ($removeRequested) {
@@ -1779,7 +1820,7 @@ class TemporaryModuleController extends Controller
                 $preview = $this->excelImportService->preview($file, $headerRow, false, $sheetIndex);
             }
 
-            if (!$preview['success']) {
+            if (! $preview['success']) {
                 return response()->json($preview, 422);
             }
 
@@ -1805,7 +1846,7 @@ class TemporaryModuleController extends Controller
                 'is_required' => (bool) $f->is_required,
             ])->values()->all(),
         ];
-        if (!empty($preview['is_pdf'])) {
+        if (! empty($preview['is_pdf'])) {
             $out['is_pdf'] = true;
         }
         $pdfThumbs = is_array($preview['preview_thumbnails'] ?? null) ? $preview['preview_thumbnails'] : [];
@@ -1814,7 +1855,7 @@ class TemporaryModuleController extends Controller
                 'No se detectaron imágenes embebidas por fila en este PDF. Si las fotos están como enlace/texto o fuera de la tabla, no se podrán importar automáticamente.',
             ];
         }
-        if (!empty($preview['preview_rows'])) {
+        if (! empty($preview['preview_rows'])) {
             $out['preview_rows'] = $preview['preview_rows'];
         }
         if ($detected) {
@@ -2216,7 +2257,7 @@ class TemporaryModuleController extends Controller
                         $data[$f->key] = [$opts[$matchIdx]];
                     } else {
                         // Intentar split por coma/punto y coma
-                        $items = array_values(array_filter(array_map('trim', preg_split('/[,;]+/', $strVal)), fn($s) => $s !== ''));
+                        $items = array_values(array_filter(array_map('trim', preg_split('/[,;]+/', $strVal)), fn ($s) => $s !== ''));
                         $data[$f->key] = $items ?: [$strVal];
                     }
                 }
@@ -2279,6 +2320,24 @@ class TemporaryModuleController extends Controller
         return redirect()
             ->route('temporary-modules.admin.records')
             ->with('status', 'Se vaciaron los registros del módulo correctamente.');
+    }
+
+    /** Elimina un registro concreto (gestión admin; no exige ser el autor ni microrregión del delegado). */
+    public function adminDestroyEntry(Request $request, int $module, int $entry): RedirectResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+
+        $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
+        $entryModel = TemporaryModuleEntry::query()
+            ->where('id', $entry)
+            ->where('temporary_module_id', $temporaryModule->id)
+            ->firstOrFail();
+
+        $this->entryDataService->deleteEntryAndFiles($entryModel, $temporaryModule);
+
+        return redirect()
+            ->back()
+            ->with('status', 'Registro #'.$entry.' eliminado correctamente.');
     }
 
     public function registerSeedDiscardRow(Request $request, int $module): JsonResponse
@@ -2461,7 +2520,7 @@ class TemporaryModuleController extends Controller
         $imageColumns = 0;
         if (is_array($cfg['columns'] ?? null)) {
             foreach ($cfg['columns'] as $column) {
-                if (!is_array($column)) {
+                if (! is_array($column)) {
                     continue;
                 }
                 $key = strtolower((string) ($column['key'] ?? ''));
@@ -2478,16 +2537,16 @@ class TemporaryModuleController extends Controller
         $seconds += $columns * 3.0;
         $seconds += $calcColumns * 7.0;
         $seconds += ($sumMetrics + $sumFormulas) * 4.0;
-        if (!empty($cfg['include_count_table'])) {
+        if (! empty($cfg['include_count_table'])) {
             $seconds += 6.0;
         }
-        if (!empty($cfg['include_sum_table'])) {
+        if (! empty($cfg['include_sum_table'])) {
             $seconds += 8.0;
         }
-        if (!empty($cfg['include_totals_table'])) {
+        if (! empty($cfg['include_totals_table'])) {
             $seconds += 4.0;
         }
-        if (!empty($cfg['include_calculated_columns'])) {
+        if (! empty($cfg['include_calculated_columns'])) {
             $seconds += 3.0;
         }
         if ($imageColumns > 0) {
@@ -2545,6 +2604,75 @@ class TemporaryModuleController extends Controller
         }
 
         return response()->json($data);
+    }
+
+    /** Configuración de exportación/informes guardada por usuario y módulo (sincronizada entre dispositivos). */
+    public function exportUserConfigShow(Request $request, int $module): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+        TemporaryModule::query()->findOrFail($module);
+
+        $row = TemporaryModuleUserExportSetting::query()
+            ->where('user_id', (int) $request->user()->id)
+            ->where('temporary_module_id', $module)
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'data' => $row?->payload,
+        ]);
+    }
+
+    public function exportUserConfigUpdate(Request $request, int $module): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+        TemporaryModule::query()->findOrFail($module);
+
+        $validated = $request->validate([
+            'v' => ['required', 'integer', 'min:1', 'max:10'],
+            'swal_choice' => ['nullable', 'string', 'max:64'],
+            'cfg' => ['required', 'array'],
+        ]);
+
+        try {
+            $encoded = json_encode($validated['cfg'], JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return response()->json(['success' => false, 'message' => 'Configuración no válida.'], 422);
+        }
+
+        if (strlen($encoded) > 1_200_000) {
+            return response()->json(['success' => false, 'message' => 'La configuración es demasiado grande.'], 422);
+        }
+
+        $payload = [
+            'v' => (int) $validated['v'],
+            'swal_choice' => (string) ($validated['swal_choice'] ?? 'single'),
+            'cfg' => $validated['cfg'],
+            'savedAt' => (int) round(microtime(true) * 1000),
+        ];
+
+        TemporaryModuleUserExportSetting::query()->updateOrCreate(
+            [
+                'user_id' => (int) $request->user()->id,
+                'temporary_module_id' => $module,
+            ],
+            ['payload' => $payload]
+        );
+
+        return response()->json(['success' => true]);
+    }
+
+    public function exportUserConfigDestroy(Request $request, int $module): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+        TemporaryModule::query()->findOrFail($module);
+
+        TemporaryModuleUserExportSetting::query()
+            ->where('user_id', (int) $request->user()->id)
+            ->where('temporary_module_id', $module)
+            ->delete();
+
+        return response()->json(['success' => true]);
     }
 
     public function exportPreviewStructure(Request $request, int $module): \Illuminate\Http\JsonResponse
@@ -2865,23 +2993,23 @@ class TemporaryModuleController extends Controller
         $mime = $file->getMimeType();
         $image = match ($mime) {
             'image/jpeg' => @imagecreatefromjpeg($file->getRealPath()),
-            'image/png'  => @imagecreatefrompng($file->getRealPath()),
+            'image/png' => @imagecreatefrompng($file->getRealPath()),
             'image/webp' => @imagecreatefromwebp($file->getRealPath()),
-            default      => false,
+            default => false,
         };
 
-        if (!$image) {
+        if (! $image) {
             return $file->store($directory, 'secure_shared');
         }
 
-        $width  = imagesx($image);
+        $width = imagesx($image);
         $height = imagesy($image);
         $maxDim = 1920;
 
         if ($width > $maxDim || $height > $maxDim) {
             $ratio = min($maxDim / $width, $maxDim / $height);
-            $newW  = (int) round($width * $ratio);
-            $newH  = (int) round($height * $ratio);
+            $newW = (int) round($width * $ratio);
+            $newH = (int) round($height * $ratio);
             $resized = imagecreatetruecolor($newW, $newH);
 
             if ($mime === 'image/png' || $mime === 'image/webp') {
@@ -2897,17 +3025,17 @@ class TemporaryModuleController extends Controller
         $tmpPath = tempnam(sys_get_temp_dir(), 'img_');
 
         match ($mime) {
-            'image/png'  => imagepng($image, $tmpPath, 8),
+            'image/png' => imagepng($image, $tmpPath, 8),
             'image/webp' => imagewebp($image, $tmpPath, 75),
-            default      => imagejpeg($image, $tmpPath, 75),
+            default => imagejpeg($image, $tmpPath, 75),
         };
 
         imagedestroy($image);
 
         $filename = Str::random(40).match ($mime) {
-            'image/png'  => '.png',
+            'image/png' => '.png',
             'image/webp' => '.webp',
-            default      => '.jpg',
+            default => '.jpg',
         };
 
         $storedPath = $directory.'/'.$filename;

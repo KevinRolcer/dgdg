@@ -27,6 +27,14 @@
         <div class="tm-head tm-head--actions-only">
             <div class="tm-inline-actions">
                 <a href="{{ route('temporary-modules.admin.index') }}" class="tm-btn">Gestión de módulos</a>
+                <button
+                    type="button"
+                    class="tm-btn tm-btn-secondary"
+                    data-open-tm-admin-activity
+                    title="Registros recientes por módulo (misma búsqueda que la tabla)"
+                >
+                    <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Actividad
+                </button>
                 <a href="{{ route('temporary-modules.admin.create') }}" class="tm-btn tm-btn-primary">Nuevo módulo</a>
             </div>
         </div>
@@ -1116,6 +1124,77 @@
         </div>
     </div>
 
+    {{-- Actividad: registros recientes por módulo (plegables) --}}
+    <div
+        class="tm-modal"
+        id="tmAdminActivityModal"
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tmAdminActivityTitle"
+    >
+        <div class="tm-modal-backdrop" data-close-module-preview></div>
+        <div class="tm-modal-dialog tm-modal-dialog-activity">
+            <div class="tm-modal-head">
+                <div class="tm-modal-head-stack">
+                    <h3 id="tmAdminActivityTitle">Actividad — registros recientes</h3>
+                    <p class="tm-modal-subtitle tm-muted">Por módulo (hasta 40 entradas recientes cada uno). Usa la misma búsqueda que arriba.</p>
+                </div>
+                <button type="button" class="tm-modal-close" data-close-module-preview aria-label="Cerrar">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="tm-modal-body tm-admin-activity-modal-body">
+                <div class="tm-admin-activity-modal-toolbar">
+                    <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmAdminActivityExpandAll">Desplegar todo</button>
+                    <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmAdminActivityCollapseAll">Plegar todo</button>
+                </div>
+                @forelse ($activityFeed ?? [] as $am)
+                    <details class="tm-admin-activity-module-details">
+                        <summary>
+                            <span class="tm-admin-activity-module-title">{{ $am->name }}</span>
+                            <span class="tm-muted tm-admin-activity-module-count">{{ $am->entries->count() }} mostrado(s)</span>
+                        </summary>
+                        <ul class="tm-admin-activity-list">
+                            @foreach ($am->entries as $ent)
+                                <li>
+                                    <span class="tm-admin-activity-li-main">
+                                        <strong>#{{ $ent->id }}</strong>
+                                        · Envío {{ $ent->submitted_at?->timezone(config('app.timezone'))->format('d/m/Y H:i') ?? '—' }}
+                                        · Modif. {{ $ent->updated_at?->timezone(config('app.timezone'))->format('d/m/Y H:i') ?? '—' }}
+                                        @if ($ent->microrregion)
+                                            <span>· MR {{ $ent->microrregion->microrregion }}</span>
+                                        @endif
+                                        @if ($ent->user)
+                                            <span>· {{ $ent->user->name }}</span>
+                                        @endif
+                                    </span>
+                                    @can('Modulos-Temporales-Admin')
+                                        <span class="tm-admin-activity-li-actions">
+                                            <form
+                                                method="POST"
+                                                action="{{ route('temporary-modules.admin.entry.destroy', [$am->id, $ent->id]) }}"
+                                                class="tm-inline-form"
+                                                data-confirm-delete-activity-entry
+                                                data-entry-summary="{{ e('Registro #'.$ent->id.' del módulo «'.$am->name.'»') }}"
+                                            >
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="tm-btn tm-btn-sm tm-btn-danger">Eliminar</button>
+                                            </form>
+                                        </span>
+                                    @endcan
+                                </li>
+                            @endforeach
+                        </ul>
+                    </details>
+                @empty
+                    <p class="tm-muted">No hay módulos con registros{{ $searchQuery !== '' ? ' que coincidan con la búsqueda' : '' }}.</p>
+                @endforelse
+            </div>
+        </div>
+    </div>
+
     {{-- Log de filas descartadas al crear módulo desde Excel (solo si ya exportó) --}}
     <div
         class="tm-modal"
@@ -1160,7 +1239,11 @@
 
 @push('scripts')
 <script>
-window.TM_ADMIN_RECORDS_BOOT = { exportPreviewLogoUrl: @json(asset('images/LogoSegobHorizontal.png')) };
+window.TM_ADMIN_RECORDS_BOOT = {
+            exportPreviewLogoUrl: @json(asset('images/LogoSegobHorizontal.png')),
+            exportUserConfigBase: @json(rtrim(route('temporary-modules.admin.index'), '/\\')),
+            csrfToken: @json(csrf_token()),
+        };
 </script>
 <script src="{{ asset('assets/js/modules/temporary-modules-admin-records.js') }}?v={{ @filemtime(public_path('assets/js/modules/temporary-modules-admin-records.js')) ?: time() }}"></script>
 @endpush

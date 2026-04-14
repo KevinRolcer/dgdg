@@ -18,6 +18,9 @@
         };
 
         const openButtons = Array.from(document.querySelectorAll('[data-open-module-preview]'));
+        const activityModal = document.getElementById('tmAdminActivityModal');
+        const activityExpandAll = document.getElementById('tmAdminActivityExpandAll');
+        const activityCollapseAll = document.getElementById('tmAdminActivityCollapseAll');
         const clearButtons = Array.from(document.querySelectorAll('[data-clear-module-entries]'));
         const imagePreviewButtons = Array.from(document.querySelectorAll('[data-open-image-preview]'));
         const textToggleButtons = Array.from(document.querySelectorAll('[data-text-toggle]'));
@@ -771,6 +774,64 @@
             });
         });
 
+        Array.from(document.querySelectorAll('[data-open-tm-admin-activity]')).forEach(function (button) {
+            button.addEventListener('click', function () {
+                if (!activityModal) {
+                    return;
+                }
+                activityModal.classList.add('is-open');
+                activityModal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            });
+        });
+
+        if (activityExpandAll && activityModal) {
+            activityExpandAll.addEventListener('click', function () {
+                activityModal.querySelectorAll('.tm-admin-activity-module-details').forEach(function (d) {
+                    d.open = true;
+                });
+            });
+        }
+        if (activityCollapseAll && activityModal) {
+            activityCollapseAll.addEventListener('click', function () {
+                activityModal.querySelectorAll('.tm-admin-activity-module-details').forEach(function (d) {
+                    d.open = false;
+                });
+            });
+        }
+
+        Array.from(document.querySelectorAll('form[data-confirm-delete-activity-entry]')).forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                const summary = form.getAttribute('data-entry-summary') || 'este registro';
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        title: '¿Eliminar registro?',
+                        text: 'Se eliminará permanentemente: ' + summary + '. Esta acción no se puede deshacer.',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: 'Sí, eliminar',
+                        cancelButtonText: 'Cancelar',
+                        reverseButtons: true,
+                        buttonsStyling: false,
+                        customClass: {
+                            popup: 'tm-swal-popup',
+                            title: 'tm-swal-title',
+                            htmlContainer: 'tm-swal-text',
+                            confirmButton: 'tm-swal-confirm',
+                            cancelButton: 'tm-swal-cancel',
+                        },
+                    }).then(function (result) {
+                        if (result.isConfirmed) {
+                            form.submit();
+                        }
+                    });
+                } else if (confirm('¿Eliminar ' + summary + '?')) {
+                    form.submit();
+                }
+            });
+        });
+
         textToggleButtons.forEach(function (button) {
             button.addEventListener('click', function () {
                 const wrap = button.closest('[data-text-wrap]');
@@ -987,24 +1048,11 @@
                         return;
                     }
                     if (res.isDenied) {
-                        var saveOk = false;
-                        if (typeof persistFn === 'function') {
-                            var saveRes = persistFn(currentCfg);
-                            saveOk = !!(saveRes && saveRes.ok);
-                        }
-                        if (saveOk) {
-                            closePersonalizeModalImmediate();
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Configuración guardada',
-                                text: 'Se guardó la configuración y se cerró el editor.',
-                                toast: true,
-                                position: 'top-end',
-                                timer: 2200,
-                                timerProgressBar: true,
-                                showConfirmButton: false
-                            });
-                        } else {
+                        var saveRes = typeof persistFn === 'function' ? persistFn(currentCfg) : null;
+                        var localOk = !!(saveRes && saveRes.ok);
+                        var eu = personalizeModal._exportUrl || '';
+                        var sc = personalizeModal._swalChoice || 'single';
+                        if (!localOk) {
                             Swal.fire({
                                 icon: 'error',
                                 title: 'No se pudo guardar',
@@ -1015,7 +1063,25 @@
                                 timerProgressBar: true,
                                 showConfirmButton: false
                             });
+                            return;
                         }
+                        tmSaveUserExportDraft(eu, { v: 1, swal_choice: sc, cfg: currentCfg }).then(function (serverOk) {
+                            closePersonalizeModalImmediate();
+                            if (typeof Swal !== 'undefined') {
+                                Swal.fire({
+                                    icon: serverOk ? 'success' : 'warning',
+                                    title: serverOk ? 'Configuración guardada' : 'Guardado parcial',
+                                    text: serverOk
+                                        ? 'Se guardó en tu cuenta y se cerró el editor.'
+                                        : 'Se guardó en este navegador; no se pudo sincronizar con tu cuenta.',
+                                    toast: true,
+                                    position: 'top-end',
+                                    timer: 2600,
+                                    timerProgressBar: true,
+                                    showConfirmButton: false
+                                });
+                            }
+                        });
                     }
                 });
                 return;
@@ -1461,6 +1527,104 @@
 
         function tmExportDraftStorageKey(exportUrl) {
             return 'tm_export_draft_v1:' + (exportUrl || '');
+        }
+
+        function tmExportModuleIdFromUrl(exportUrl) {
+            if (!exportUrl) {
+                return 0;
+            }
+            try {
+                var base = typeof window !== 'undefined' && window.location && window.location.origin ? window.location.origin : '';
+                var u = exportUrl.indexOf('http') === 0 ? new URL(exportUrl) : new URL(exportUrl, base || undefined);
+                var m = u.pathname.match(/\/admin\/(\d+)\//);
+                return m ? parseInt(m[1], 10) : 0;
+            } catch (e) {
+                return 0;
+            }
+        }
+
+        function tmExportUserConfigUrl(moduleId) {
+            var boot = typeof window !== 'undefined' ? window.TM_ADMIN_RECORDS_BOOT : null;
+            var b = boot && boot.exportUserConfigBase ? String(boot.exportUserConfigBase).replace(/\/+$/, '') : '';
+            if (!b || !moduleId) {
+                return '';
+            }
+            return b + '/' + moduleId + '/exportacion-configuracion';
+        }
+
+        function tmExportCsrfToken() {
+            var boot = typeof window !== 'undefined' ? window.TM_ADMIN_RECORDS_BOOT : null;
+            if (boot && boot.csrfToken) {
+                return String(boot.csrfToken);
+            }
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            return meta ? String(meta.getAttribute('content') || '') : '';
+        }
+
+        function tmFetchUserExportDraft(exportUrl) {
+            var url = tmExportUserConfigUrl(tmExportModuleIdFromUrl(exportUrl));
+            if (!url) {
+                return Promise.resolve(null);
+            }
+            return fetch(url, {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            }).then(function (r) {
+                return r.ok ? r.json() : null;
+            }).then(function (j) {
+                if (!j || !j.success || !j.data || typeof j.data !== 'object') {
+                    return null;
+                }
+                return j.data;
+            }).catch(function () {
+                return null;
+            });
+        }
+
+        function tmSaveUserExportDraft(exportUrl, envelope) {
+            var url = tmExportUserConfigUrl(tmExportModuleIdFromUrl(exportUrl));
+            if (!url) {
+                return Promise.resolve(false);
+            }
+            return fetch(url, {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': tmExportCsrfToken(),
+                },
+                body: JSON.stringify({
+                    v: envelope.v,
+                    swal_choice: envelope.swal_choice,
+                    cfg: envelope.cfg,
+                }),
+            }).then(function (r) {
+                return r.ok;
+            }).catch(function () {
+                return false;
+            });
+        }
+
+        function tmDeleteUserExportDraft(exportUrl) {
+            var url = tmExportUserConfigUrl(tmExportModuleIdFromUrl(exportUrl));
+            if (!url) {
+                return Promise.resolve(false);
+            }
+            return fetch(url, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': tmExportCsrfToken(),
+                },
+            }).then(function (r) {
+                return r.ok;
+            }).catch(function () {
+                return false;
+            });
         }
 
         function applyColumnDraftVisuals(columnsEl, cfgColumns) {
@@ -4263,9 +4427,14 @@
             personalizeModal.setAttribute('aria-hidden', 'false');
             document.body.style.overflow = 'hidden';
 
-            fetch(structureUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
-                .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('Error al cargar')); })
-                .then(function (data) {
+            Promise.all([
+                fetch(structureUrl, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('Error al cargar')); }),
+                tmFetchUserExportDraft(exportUrl),
+            ])
+                .then(function (parts) {
+                    var data = parts[0];
+                    var serverDraft = parts[1];
                     let columns = Array.isArray(data.columns) ? data.columns : [];
                     if (personalizeModal) {
                         personalizeModal._personalizeColumns = columns;
@@ -4732,15 +4901,35 @@
                         });
                     }
                     var draftCfg = null;
-                    try {
-                        var rawDraft = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
-                        if (rawDraft) {
-                            var parsedDraft = JSON.parse(rawDraft);
-                            if (parsedDraft && parsedDraft.v === 1 && parsedDraft.cfg && typeof parsedDraft.cfg === 'object') {
-                                draftCfg = parsedDraft.cfg;
-                            }
+                    var draftEnvelope = null;
+                    if (serverDraft && serverDraft.v === 1 && serverDraft.cfg && typeof serverDraft.cfg === 'object') {
+                        draftCfg = serverDraft.cfg;
+                        draftEnvelope = serverDraft;
+                        if (personalizeModal && serverDraft.swal_choice) {
+                            personalizeModal._swalChoice = serverDraft.swal_choice;
                         }
-                    } catch (eDraft) {}
+                    } else {
+                        try {
+                            var rawDraft = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
+                            if (rawDraft) {
+                                var parsedDraft = JSON.parse(rawDraft);
+                                if (parsedDraft && parsedDraft.v === 1 && parsedDraft.cfg && typeof parsedDraft.cfg === 'object') {
+                                    draftCfg = parsedDraft.cfg;
+                                    draftEnvelope = parsedDraft;
+                                }
+                            }
+                        } catch (eDraft) { /* ignore */ }
+                    }
+                    if (draftEnvelope && draftEnvelope.cfg) {
+                        try {
+                            localStorage.setItem(tmExportDraftStorageKey(exportUrl), JSON.stringify({
+                                v: 1,
+                                swal_choice: draftEnvelope.swal_choice || 'single',
+                                cfg: draftEnvelope.cfg,
+                                savedAt: draftEnvelope.savedAt != null ? draftEnvelope.savedAt : Date.now(),
+                            }));
+                        } catch (eMirror) { /* ignore */ }
+                    }
 
                     if (personalizeModal) {
                         personalizeModal._exportGroups = normalizeExportGroups([]);
@@ -5836,8 +6025,10 @@
                                     ? (hasChanges ? 'Configuración guardada' : 'Sin cambios por guardar')
                                     : 'No se pudo guardar',
                                 text: savedOk
-                                    ? (hasChanges ? 'Se guardó la configuración actual.' : 'La configuración actual ya estaba guardada.')
-                                    : 'No fue posible guardar la configuración en este navegador.',
+                                    ? (hasChanges
+                                        ? 'Se guardó en tu cuenta y en este navegador; podrás usarla en cualquier dispositivo al iniciar sesión.'
+                                        : 'La configuración actual ya estaba guardada en tu cuenta.')
+                                    : 'No fue posible guardar en el servidor. Comprueba la conexión o vuelve a intentar (sigue una copia en este navegador si cabe).',
                                 toast: true,
                                 position: 'top-end',
                                 timer: 2200,
@@ -5847,10 +6038,10 @@
                             return;
                         }
                         if (!savedOk) {
-                            alert('No fue posible guardar la configuración en este navegador.');
+                            alert('No fue posible guardar la configuración en tu cuenta.');
                             return;
                         }
-                        alert(hasChanges ? 'Se guardó la configuración actual.' : 'La configuración actual ya estaba guardada.');
+                        alert(hasChanges ? 'Se guardó la configuración en tu cuenta.' : 'La configuración actual ya estaba guardada.');
                     }
 
                     function persistExportDraft(cfg) {
@@ -5877,6 +6068,8 @@
                     function applyExport(format, mode) {
                         const cfg = collectPersonalizeCfgObject();
                         persistExportDraft(cfg);
+                        var sc = personalizeModal._swalChoice || 'single';
+                        tmSaveUserExportDraft(exportUrl, { v: 1, swal_choice: sc, cfg: cfg }).catch(function () { /* ignore */ });
                         const fmt = format || 'excel';
                         const exportMode = (fmt === 'excel') ? (mode || 'single') : 'single';
                         /* Siempre cerrar sin diálogo: la config ya se persistió y el usuario pidió el reporte. */
@@ -5905,7 +6098,15 @@
                         if (!btn || !exportUrl) { return; }
                         btn.onclick = function () {
                             var result = persistExportDraft();
-                            showSaveConfigFeedback(!!(result && result.changed), !!(result && result.ok));
+                            if (!result || !result.ok) {
+                                showSaveConfigFeedback(!!(result && result.changed), false);
+                                return;
+                            }
+                            var payloadCfg = collectPersonalizeCfgObject();
+                            var swalChoice = personalizeModal._swalChoice || 'single';
+                            tmSaveUserExportDraft(exportUrl, { v: 1, swal_choice: swalChoice, cfg: payloadCfg }).then(function (serverOk) {
+                                showSaveConfigFeedback(!!(result && result.changed), serverOk);
+                            });
                         };
                     });
                     [clearCfgTopBtn, clearCfgBtn].forEach(function (btn) {
@@ -5916,7 +6117,8 @@
                             var doClear = function () {
                                 try {
                                     localStorage.removeItem(tmExportDraftStorageKey(exportUrl));
-                                } catch (eRm) {}
+                                } catch (eRm) { /* ignore */ }
+                                tmDeleteUserExportDraft(exportUrl).catch(function () { /* ignore */ });
                                 openExportPersonalizeModal(structureUrl, exportUrl);
                                 if (typeof Swal !== 'undefined') {
                                     Swal.fire({
@@ -6145,19 +6347,24 @@
         function openTemporaryModuleExportTypeDialog(exportBtnRef) {
             const exportUrl = exportBtnRef.getAttribute('data-export-url');
             if (!exportUrl || !templateSwal) { return; }
-            var savedChoice = null;
             var choiceAllow = { single: 1, analysis_word: 1 };
-            try {
-                var dr = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
-                if (dr) {
-                    var po = JSON.parse(dr);
-                    if (po && po.swal_choice && choiceAllow[po.swal_choice]) { savedChoice = po.swal_choice; }
+            tmFetchUserExportDraft(exportUrl).then(function (serverDraft) {
+                var savedChoice = null;
+                if (serverDraft && serverDraft.swal_choice && choiceAllow[serverDraft.swal_choice]) {
+                    savedChoice = serverDraft.swal_choice;
+                } else {
+                    try {
+                        var dr = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
+                        if (dr) {
+                            var po = JSON.parse(dr);
+                            if (po && po.swal_choice && choiceAllow[po.swal_choice]) { savedChoice = po.swal_choice; }
+                        }
+                    } catch (e) { /* ignore */ }
                 }
-            } catch (e) {}
-            if (savedChoice === 'mr') {
-                savedChoice = 'single';
-            }
-            templateSwal.fire({
+                if (savedChoice === 'mr') {
+                    savedChoice = 'single';
+                }
+                templateSwal.fire({
                 title: 'Exportación',
                 html: '<div class="tm-swal-export-options tm-swal-export-options--stacked">'
                     + '<label class="tm-swal-export-card">'
@@ -6239,6 +6446,7 @@
                 }
                 const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
                 submitTemporaryModuleExportPost(exportUrl, 'excel', 'single', { microrregion_sort: 'asc' });
+            });
             });
         }
 
