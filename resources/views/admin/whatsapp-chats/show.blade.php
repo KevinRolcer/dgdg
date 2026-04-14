@@ -39,6 +39,10 @@
                 </div>
             </div>
             <div class="wa-preview-head-actions">
+                <button type="button" class="wa-panel-toggle-btn wa-chatlist-toggle-btn" id="waChatsToggle" title="Ver todos los chats" aria-expanded="false" aria-controls="waChatsSidebar">
+                    <i class="fa-solid fa-comments" aria-hidden="true"></i>
+                    <span class="wa-panel-toggle-label">Ver todos los chats</span>
+                </button>
                 <button type="button" class="wa-panel-toggle-btn" id="wasPanelToggle" title="Mostrar / ocultar panel derecho" aria-expanded="true" aria-controls="wasRightPanel">
                     <i class="fa-solid fa-sliders" aria-hidden="true"></i>
                     <span class="wa-panel-toggle-label">Filtros &amp; Búsqueda</span>
@@ -71,6 +75,64 @@
             id="waPreviewRoot"
             data-wa-preview-mode="{{ $waPreviewMode }}"
         >
+            {{-- COLUMNA IZQUIERDA: LISTA / VISTA PREVIA (tipo WhatsApp Web) --}}
+            <nav class="wa-workspace-sidebar" id="waChatsSidebar" aria-label="Vista previa de chats">
+                <div class="wa-sidebar-top">
+                    <div class="wa-sidebar-search">
+                        <input
+                            id="waSidebarSearchInput"
+                            type="search"
+                            class="wa-sidebar-search-input"
+                            placeholder="Buscar chats"
+                            autocomplete="off"
+                        >
+                    </div>
+                </div>
+                <div class="wa-sidebar-list" id="waSidebarList">
+                    @foreach (($chatsList ?? collect()) as $sideChat)
+                        @php
+                            $sideStatus = (string) ($sideChat->import_status ?? 'ready');
+                            $sideReady = $sideStatus === 'ready';
+                            $sideActive = (int) $sideChat->id === (int) $chat->id;
+                            try {
+                                $sideImportedLabel = $sideChat->imported_at
+                                    ? ($sideChat->imported_at instanceof \Carbon\Carbon
+                                        ? $sideChat->imported_at->format('d/m/Y')
+                                        : \Carbon\Carbon::parse($sideChat->imported_at)->format('d/m/Y'))
+                                    : null;
+                            } catch (\Throwable) { $sideImportedLabel = null; }
+                        @endphp
+
+                        <a
+                            href="{{ $sideReady ? route('whatsapp-chats.admin.show', ['chat' => $sideChat->id]) : route('whatsapp-chats.admin.index') }}"
+                            class="wa-chatlist-item {{ $sideActive ? 'wa-chatlist-item--active' : '' }} {{ $sideReady ? '' : 'wa-chatlist-item--disabled' }}"
+                            data-title="{{ strtolower($sideChat->title ?? '') }}"
+                            @if (! $sideReady) aria-disabled="true" @endif
+                            title="{{ $sideReady ? 'Abrir chat' : 'Este chat aún no está listo' }}"
+                        >
+                            <div class="wa-chatlist-avatar" aria-hidden="true"></div>
+                            <div class="wa-chatlist-main">
+                                <div class="wa-chatlist-row">
+                                    <span class="wa-chatlist-title">{{ $sideChat->title }}</span>
+                                    @if ($sideImportedLabel)
+                                        <span class="wa-chatlist-date">{{ $sideImportedLabel }}</span>
+                                    @endif
+                                </div>
+                                <div class="wa-chatlist-sub">
+                                    @if (! $sideReady)
+                                        <span class="wa-chatlist-pill wa-chatlist-pill--muted">{{ $sideStatus === 'failed' ? 'Error' : 'Procesando' }}</span>
+                                    @elseif (!empty($sideChat->original_zip_name))
+                                        <span class="wa-chatlist-snippet">{{ \Illuminate\Support\Str::limit((string) $sideChat->original_zip_name, 44) }}</span>
+                                    @else
+                                        <span class="wa-chatlist-snippet">&nbsp;</span>
+                                    @endif
+                                </div>
+                            </div>
+                        </a>
+                    @endforeach
+                </div>
+            </nav>
+
             {{-- COLUMNA IZQUIERDA: CHAT --}}
             <div class="wa-workspace-chat" aria-label="Área de chat">
 
@@ -198,14 +260,12 @@
                                 <div class="wa-field">
                                     <label class="wa-label" for="waFilterDateFrom">Desde</label>
                                     <div class="wa-input-wrap">
-                                        <i class="fa-regular fa-calendar wa-input-icon" aria-hidden="true"></i>
                                         <input type="text" id="waFilterDateFrom" class="wa-input wa-input-has-icon" placeholder="dd/mm/yyyy" autocomplete="off">
                                     </div>
                                 </div>
                                 <div class="wa-field">
                                     <label class="wa-label" for="waFilterDateTo">Hasta</label>
                                     <div class="wa-input-wrap">
-                                        <i class="fa-regular fa-calendar wa-input-icon" aria-hidden="true"></i>
                                         <input type="text" id="waFilterDateTo" class="wa-input wa-input-has-icon" placeholder="dd/mm/yyyy" autocomplete="off">
                                     </div>
                                 </div>

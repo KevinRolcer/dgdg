@@ -290,6 +290,10 @@ Route::middleware('auth')->group(function () {
         Route::middleware([\App\Http\Middleware\ConfirmWhatsAppSensitiveAccess::class])->group(function () {
             Route::get('/', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'index'])->name('whatsapp-chats.admin.index');
             Route::post('/', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'store'])->name('whatsapp-chats.admin.store');
+            Route::get('/browser', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'browser'])->name('whatsapp-chats.admin.browser');
+            Route::patch('/{chat}', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'update'])
+                ->whereNumber('chat')
+                ->name('whatsapp-chats.admin.update');
             Route::post('/folder-upload', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'storeFolderFile'])
                 ->middleware('throttle:whatsapp-folder-upload')
                 ->name('whatsapp-chats.admin.folder-upload');

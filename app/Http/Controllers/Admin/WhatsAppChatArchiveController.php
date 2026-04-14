@@ -12,6 +12,7 @@ use App\Services\WhatsApp\WhatsAppChatEncryptionService;
 use App\Services\WhatsApp\WhatsAppChatPathNormalizer;
 use App\Services\WhatsApp\WhatsAppTotpService;
 use Carbon\Carbon;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -128,6 +130,7 @@ class WhatsAppChatArchiveController extends Controller
             'id',
             'title',
             'original_zip_name',
+            'storage_root_path',
             'imported_at',
             'message_parts_count',
             'import_status',
@@ -139,6 +142,9 @@ class WhatsAppChatArchiveController extends Controller
         }
         if (Schema::hasColumn('whatsapp_chat_archives', 'folder_uploaded_files')) {
             $select[] = 'folder_uploaded_files';
+        }
+        if (Schema::hasColumn('whatsapp_chat_archives', 'avatar_file')) {
+            $select[] = 'avatar_file';
         }
 
         $chats = WhatsAppChatArchive::query()
@@ -263,14 +269,35 @@ class WhatsAppChatArchiveController extends Controller
         $diskName = (string) config('whatsapp_chats.storage_disk', 'whatsapp_chats');
         $disk = Storage::disk($diskName);
 
-        $archive = $this->resolveFolderUploadArchiveLocked(
-            $request,
-            $folderSignature,
-            $label,
-            $rootName,
-            $folderTotalFiles,
-            $diskName
-        );
+        $userId = (int) $request->user()->id;
+        $archive = $this->findFolderUploadArchive($userId, $folderSignature);
+
+        // Evita serializar (y bloquear) todas las peticiones en paralelo:
+        // el lock sólo se usa cuando aún no existe el registro de la carpeta.
+        if ($archive) {
+            $displayName = $label !== '' ? $label : ($rootName !== '' ? $rootName : (string) ($archive->original_zip_name ?? 'Carpeta importada'));
+            $archive->forceFill([
+                'original_zip_name' => $displayName,
+                'folder_root_name' => $rootName !== '' ? $rootName : (string) ($archive->folder_root_name ?? ''),
+                'folder_total_files' => max($folderTotalFiles, (int) ($archive->folder_total_files ?? 0)),
+            ])->save();
+        } else {
+            try {
+                $archive = $this->resolveFolderUploadArchiveLocked(
+                    $request,
+                    $folderSignature,
+                    $label,
+                    $rootName,
+                    $folderTotalFiles,
+                    $diskName
+                );
+            } catch (LockTimeoutException) {
+                return response()->json([
+                    'message' => 'El servidor estÃ¡ ocupando este lote. Reintenta en unos segundos.',
+                    'retryable' => true,
+                ], 409);
+            }
+        }
 
         if ($archive->import_status === WhatsAppChatArchive::IMPORT_STATUS_READY) {
             return response()->json([
@@ -330,6 +357,7 @@ class WhatsAppChatArchiveController extends Controller
         $rowsToUpsert = [];
         $uploadedCount = 0;
         $skippedCount = 0;
+        $newRowsCount = 0;
 
         foreach ($normalizedItems as $item) {
             $uploadedFile = $item['file'];
@@ -347,6 +375,10 @@ class WhatsAppChatArchiveController extends Controller
                 && (int) ($existing->client_last_modified_at ?? 0) === (int) ($item['last_modified'] ?? 0)) {
                 $skippedCount++;
                 continue;
+            }
+
+            if (! $existing) {
+                $newRowsCount++;
             }
 
             File::ensureDirectoryExists(dirname($absoluteTarget));
@@ -376,10 +408,17 @@ class WhatsAppChatArchiveController extends Controller
             );
         }
 
-        $uploadedInArchive = $archive->uploadFiles()->count();
+        if ($newRowsCount > 0) {
+            WhatsAppChatArchive::query()
+                ->whereKey($archive->id)
+                ->increment('folder_uploaded_files', (int) $newRowsCount);
+        }
+
+        $uploadedInArchive = (int) (WhatsAppChatArchive::query()
+            ->whereKey($archive->id)
+            ->value('folder_uploaded_files') ?? ($archive->folder_uploaded_files ?? 0));
         $archive->forceFill([
             'folder_total_files' => max($folderTotalFiles, (int) ($archive->folder_total_files ?? 0)),
-            'folder_uploaded_files' => $uploadedInArchive,
             'import_status' => WhatsAppChatArchive::IMPORT_STATUS_UPLOADING,
             'import_error' => null,
             'import_progress' => 0,
@@ -412,12 +451,19 @@ class WhatsAppChatArchiveController extends Controller
         $userId = (int) $user->id;
         $folderSignature = strtolower((string) $validated['folder_signature']);
 
-        $lock = Cache::lock('wa-folder-archive:'.$userId.':'.$folderSignature, 120);
-        $chat = $lock->block(90, function () use ($userId, $folderSignature) {
-            $this->consolidateDuplicateFolderArchives($userId, $folderSignature);
+        $lock = Cache::lock('wa-folder-archive:'.$userId.':'.$folderSignature, 60);
+        try {
+            $chat = $lock->block(10, function () use ($userId, $folderSignature) {
+                $this->consolidateDuplicateFolderArchives($userId, $folderSignature);
 
-            return $this->findFolderUploadArchive($userId, $folderSignature);
-        });
+                return $this->findFolderUploadArchive($userId, $folderSignature);
+            });
+        } catch (LockTimeoutException) {
+            return response()->json([
+                'message' => 'El servidor estÃ¡ ocupando este lote. Reintenta en unos segundos.',
+                'retryable' => true,
+            ], 409);
+        }
 
         if (! $chat) {
             return response()->json([
@@ -533,9 +579,9 @@ class WhatsAppChatArchiveController extends Controller
         string $diskName
     ): WhatsAppChatArchive {
         $userId = (int) $request->user()->id;
-        $lock = Cache::lock('wa-folder-archive:'.$userId.':'.$folderSignature, 120);
+        $lock = Cache::lock('wa-folder-archive:'.$userId.':'.$folderSignature, 60);
 
-        return $lock->block(90, function () use ($userId, $folderSignature, $label, $rootName, $totalFiles, $diskName) {
+        return $lock->block(10, function () use ($userId, $folderSignature, $label, $rootName, $totalFiles, $diskName) {
             $this->consolidateDuplicateFolderArchives($userId, $folderSignature);
 
             return $this->resolveFolderUploadArchive($userId, $folderSignature, $label, $rootName, $totalFiles, $diskName);
@@ -818,11 +864,18 @@ class WhatsAppChatArchiveController extends Controller
 
         $waPreviewMode = $txtMessages->isNotEmpty() ? 'txt' : 'html';
 
+        $chatsList = WhatsAppChatArchive::query()
+            ->select(['id', 'title', 'import_status', 'imported_at', 'original_zip_name'])
+            ->orderByDesc('imported_at')
+            ->limit(100)
+            ->get();
+
         $this->audit($request, $chat->id, 'view');
 
         return view('admin.whatsapp-chats.show', [
             'pageTitle' => 'Chat: '.$chat->title,
             'chat' => $chat,
+            'chatsList' => $chatsList,
             'messageParts' => $messageParts,
             'messageUrls' => $messageUrls,
             'activePartIndex' => 0,
@@ -833,6 +886,27 @@ class WhatsAppChatArchiveController extends Controller
             'txtPreviewSkippedLargeFile' => $txtPreviewSkippedLargeFile,
             'txtPreviewMaxMessages' => (int) config('whatsapp_chats.txt_preview_max_messages', 5000),
             'txtPreviewMaxFileMb' => (int) config('whatsapp_chats.txt_preview_max_file_mb', 15),
+        ]);
+    }
+
+    public function browser(Request $request)
+    {
+        $select = ['id', 'title', 'import_status', 'imported_at', 'original_zip_name', 'storage_root_path'];
+        if (Schema::hasColumn('whatsapp_chat_archives', 'avatar_file')) {
+            $select[] = 'avatar_file';
+        }
+
+        $chatsList = WhatsAppChatArchive::query()
+            ->select($select)
+            ->orderByDesc('imported_at')
+            ->limit(250)
+            ->get();
+
+        $this->audit($request, null, 'browser');
+
+        return view('admin.whatsapp-chats.browser', [
+            'pageTitle' => 'Chats WhatsApp',
+            'chatsList' => $chatsList,
         ]);
     }
 
@@ -855,11 +929,12 @@ class WhatsAppChatArchiveController extends Controller
         abort_unless($disk->exists($file), 404);
 
         $dek = null;
-        if ($chat->is_encrypted) {
+        $isMeta = str_contains($file, '/__meta/');
+        if ($chat->is_encrypted && ! $isMeta) {
             $dek = $this->encryption->unwrapDek((string) $chat->wrapped_dek);
         }
 
-        [$contents, $mime] = $chat->is_encrypted && $dek
+        [$contents, $mime] = $chat->is_encrypted && $dek && ! $isMeta
             ? $this->encryption->decryptDiskFileForHttp($disk, $file, $dek, false)
             : [(string) $disk->get($file), $this->guessMimeFromPath($file)];
 
@@ -909,6 +984,79 @@ class WhatsAppChatArchiveController extends Controller
         return redirect()
             ->route('whatsapp-chats.admin.index')
             ->with('status', 'Exportación de chat eliminada correctamente.');
+    }
+
+    public function update(Request $request, WhatsAppChatArchive $chat): JsonResponse
+    {
+        abort_unless((int) $chat->created_by === (int) $request->user()->id, 403);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'avatar' => ['nullable', 'file', 'image', 'max:5120'], // ~5MB
+        ]);
+
+        $title = trim((string) $validated['title']);
+        if ($title === '') {
+            return response()->json(['message' => 'El nombre no puede estar vacío.'], 422);
+        }
+
+        $disk = $chat->disk();
+        $updatedAvatar = false;
+        $avatarUrl = null;
+
+        if ($request->hasFile('avatar')) {
+            $uploaded = $request->file('avatar');
+            if ($uploaded) {
+                $root = trim((string) $chat->storage_root_path, '/');
+                $targetDir = $root.'/' . '__meta';
+                $ext = strtolower((string) $uploaded->getClientOriginalExtension());
+                if ($ext === '') {
+                    $ext = 'jpg';
+                }
+                $filename = 'avatar.'.$ext;
+                $targetRel = $targetDir.'/'.$filename;
+
+                File::ensureDirectoryExists($disk->path($targetDir));
+                if ($disk->exists($targetRel)) {
+                    $disk->delete($targetRel);
+                }
+
+                $uploaded->move($disk->path($targetDir), $filename);
+
+                try {
+                    $chat->forceFill([
+                        'avatar_file' => '__meta/'.$filename,
+                    ])->save();
+                } catch (QueryException) {
+                    return response()->json([
+                        'message' => 'Falta aplicar migraciones para editar imagen. Ejecuta php artisan migrate.',
+                    ], 409);
+                }
+
+                $updatedAvatar = true;
+            }
+        }
+
+        if ($chat->title !== $title) {
+            $chat->forceFill(['title' => $title])->save();
+        }
+
+        if (! empty($chat->avatar_file)) {
+            $avatarUrl = route('whatsapp-chats.admin.media', [
+                'chat' => $chat->id,
+                'file' => trim((string) $chat->storage_root_path, '/').'/'.ltrim((string) $chat->avatar_file, '/'),
+            ]);
+        }
+
+        $this->audit($request, $chat->id, 'update_meta');
+
+        return response()->json([
+            'ok' => true,
+            'chat_id' => $chat->id,
+            'title' => $chat->title,
+            'avatar_updated' => $updatedAvatar,
+            'avatar_url' => $avatarUrl,
+        ]);
     }
 
     private function audit(Request $request, ?int $chatId, string $action, ?string $resourcePath = null): void

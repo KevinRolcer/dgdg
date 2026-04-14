@@ -314,9 +314,10 @@
             return '<div class="wa-msg-reactions" aria-label="Reacciones">' + Object.keys(grouped).map(function (emoji) {
                 const item = grouped[emoji];
                 const actorText = item.actors.length > 0 ? item.actors.join(', ') : 'Contacto';
-                const iconClass = mapReactionIconClass(item.emoji);
+                const count = Math.max(1, (item.actors || []).length);
                 return '<span class="wa-reaction-chip" title="' + escapeAttr(actorText) + '" aria-label="Reacción por ' + escapeAttr(actorText) + '">'
-                    + '<span class="wa-reaction-icon"><i class="fa-solid ' + iconClass + '" aria-hidden="true"></i></span>'
+                    + '<span class="wa-reaction-emoji" aria-hidden="true">' + escapeHtml(item.emoji) + '</span>'
+                    + '<span class="wa-reaction-count" aria-hidden="true">' + count + '</span>'
                     + '</span>';
             }).join('') + '</div>';
         }
@@ -719,7 +720,19 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        initHtmlPartsMode();
-        initTxtFiltersAndSearch();
+        if (typeof window !== 'undefined') {
+            window.WAChatPreview = window.WAChatPreview || {};
+            window.WAChatPreview.init = function () {
+                initHtmlPartsMode();
+                initTxtFiltersAndSearch();
+            };
+        }
+
+        if (window.WAChatPreview && typeof window.WAChatPreview.init === 'function') {
+            window.WAChatPreview.init();
+        } else {
+            initHtmlPartsMode();
+            initTxtFiltersAndSearch();
+        }
     });
 })();

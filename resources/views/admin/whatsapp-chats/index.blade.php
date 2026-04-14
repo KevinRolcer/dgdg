@@ -51,7 +51,7 @@
 
                 <div class="wai-tab-warn" id="waFolderTabWarn" role="alert" hidden>
                     <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                    <strong>No cierres ni cambies de pestaña</strong> mientras suben los archivos; si se interrumpe, vuelve a elegir la misma carpeta para reanudar.
+                    <strong>No cierres ni cambies de pestaña</strong> Mientras suben los archivos; si se interrumpe, vuelve a elegir la misma carpeta para reanudar.
                 </div>
 
                 <div class="wai-import-fields">
@@ -96,7 +96,7 @@
                     </div>
                 </div>
                 <p class="wai-import-desc">
-                    Compatible con export clásico <em>(_chat.txt + media)</em> y export en HTML por partes. El sistema lo descomprime y procesa automáticamente.
+                    Compatible con documentos <em>(_chat.txt + .zip)</em> El sistema lo descomprime y procesa automáticamente.
                 </p>
                 <form method="POST" action="{{ route('whatsapp-chats.admin.store') }}" enctype="multipart/form-data">
                     @csrf
@@ -114,13 +114,19 @@
                 </form>
                 <p class="wai-import-hint">
                     <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-                    Tamaño máximo: ~{{ (int) ($maxUploadMb ?? 768) }} MB (hasta 3 GB)
+                    Tamaño máximo: ~{{ (int) ($maxUploadMb ?? 768) }} MB
                 </p>
             </div>
         </div>
 
         {{-- SECCIÓN: LISTA DE CHATS --}}
         <div class="wai-chats-section">
+            <div
+                id="waiChatsEditRoot"
+                data-csrf="{{ csrf_token() }}"
+                data-update-url-template="{{ route('whatsapp-chats.admin.update', ['chat' => '__ID__']) }}"
+                hidden
+            ></div>
             <div class="wai-chats-head">
                 <span class="wai-chats-section-title" id="waiTotalBadge">
                     {{ $chats->total() }} {{ $chats->total() === 1 ? 'chat' : 'chats' }}
@@ -129,7 +135,6 @@
                 {{-- FILTROS --}}
                 <div class="wai-filters" id="waiFilters">
                     <div class="wai-search-wrap">
-                        <i class="fa-solid fa-magnifying-glass wai-search-icon" aria-hidden="true"></i>
                         <input
                             type="text"
                             id="waiSearchInput"
@@ -174,17 +179,34 @@
                             $isProcessing = $st === 'processing';
                             $isUploading  = $st === 'uploading';
                             $isFailed     = $st === 'failed';
+
+                            $palette = ['#246257', '#861e34', '#c79b66', '#2b6cb0', '#6b46c1', '#0f766e', '#b45309', '#334155'];
+                            $avatarBg = $palette[((int) $chat->id) % count($palette)];
+                            $avatarFile = isset($chat->avatar_file) ? (string) $chat->avatar_file : '';
+                            $avatarUrl = $avatarFile !== ''
+                                ? route('whatsapp-chats.admin.media', [
+                                    'chat' => $chat->id,
+                                    'file' => trim((string) ($chat->storage_root_path ?? ''), '/').'/'.ltrim($avatarFile, '/'),
+                                ])
+                                : null;
                         @endphp
 
                         <article class="wai-chat-card" data-status="{{ $st }}" data-title="{{ strtolower($chat->title ?? '') }}" data-chat-id="{{ $chat->id }}">
 
                             {{-- Header de la tarjeta --}}
                             <div class="wai-card-head">
-                                <div class="wai-card-avatar" aria-hidden="true">
-                                    {{ strtoupper(mb_substr($chat->title ?? 'W', 0, 1)) }}
+                                <div class="wai-card-avatar" style="background: {{ $avatarBg }};" aria-label="Imagen del chat">
+                                    @if ($avatarUrl)
+                                        <img src="{{ $avatarUrl }}" alt="{{ $chat->title }}" class="wai-card-avatar-img">
+                                    @endif
+                                    <i class="fa-solid fa-pen wai-card-avatar-pencil" aria-hidden="true"></i>
+                                    <input class="wai-card-avatar-file js-wai-avatar-file" type="file" accept="image/*" aria-label="Cambiar imagen" hidden>
                                 </div>
                                 <div class="wai-card-info">
-                                    <h3 class="wai-card-title">{{ $chat->title }}</h3>
+                                    <h3 class="wai-card-title">
+                                        <span class="wai-card-title-text">{{ $chat->title }}</span>
+                                        <input class="wai-card-title-input js-wai-title-input" type="text" maxlength="255" value="{{ $chat->title }}" hidden>
+                                    </h3>
                                     @if (!empty($chat->original_zip_name))
                                         <p class="wai-card-filename">
                                             <i class="fa-regular fa-file-zipper" aria-hidden="true"></i>
@@ -245,15 +267,23 @@
                             <div class="wai-card-popup" role="menu" aria-label="Opciones del chat">
                                 @if ($isReady)
                                     <a href="{{ route('whatsapp-chats.admin.show', ['chat' => $chat->id]) }}"
-                                       class="wai-popup-item" role="menuitem">
+                                       class="wai-popup-item" role="menuitem" style="justify-content: center;">
                                         <i class="fa-regular fa-eye" aria-hidden="true"></i>
                                         Abrir chat
                                     </a>
+                                    <button type="button" class="wai-popup-item js-wai-edit" role="menuitem">
+                                        <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                                        Editar
+                                    </button>
                                 @else
-                                    <span class="wai-popup-item wai-popup-item--disabled" aria-disabled="true"
-                                          title="{{ $isUploading ? 'Aún se reciben archivos' : ($isProcessing ? 'Aún se procesa' : 'Importación fallida') }}">
-                                        <i class="fa-regular fa-eye" aria-hidden="true"></i>
-                                        Abrir chat
+                                                                        <span class="wai-popup-item wai-popup-item--disabled" aria-disabled="true"
+                                                                                    title="{{ $isUploading ? 'Aún se reciben archivos' : ($isProcessing ? 'Aún se procesa' : 'Importación fallida') }}" style="justify-content: center;">
+                                                                                <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                                                                Abrir chat
+                                                                        </span>
+                                    <span class="wai-popup-item wai-popup-item--disabled" aria-disabled="true" title="Disponible cuando el chat esté listo">
+                                        <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                                        Editar
                                     </span>
                                 @endif
                                 <div class="wai-popup-divider"></div>
@@ -271,6 +301,15 @@
                                         Eliminar
                                     </button>
                                 </form>
+                            </div>
+
+                            <div class="wai-card-edit-actions" hidden>
+                                <button type="button" class="wai-edit-btn wai-edit-btn--save js-wai-edit-save" title="Guardar">
+                                    <i class="fa-solid fa-check" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" class="wai-edit-btn wai-edit-btn--cancel js-wai-edit-cancel" title="Cancelar">
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                </button>
                             </div>
                         </article>
                     @endforeach
@@ -299,6 +338,3 @@
 <script src="{{ asset('assets/js/modules/whatsapp-chats-resume-upload.js') }}?v={{ @filemtime(public_path('assets/js/modules/whatsapp-chats-resume-upload.js')) ?: time() }}"></script>
 <script src="{{ asset('assets/js/modules/whatsapp-chats-index-ui.js') }}?v={{ @filemtime(public_path('assets/js/modules/whatsapp-chats-index-ui.js')) ?: time() }}"></script>
 @endpush
-
-
-

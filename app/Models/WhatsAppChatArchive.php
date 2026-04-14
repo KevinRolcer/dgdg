@@ -26,6 +26,7 @@ class WhatsAppChatArchive extends Model
         'title',
         'original_zip_name',
         'storage_root_path',
+        'avatar_file',
         'message_parts',
         'message_parts_count',
         'created_by',
