@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class MesaPazAsistencia extends Model
 {
+    public const PRESIDENTE_VALUES = ['Si', 'No', 'Representante', 'Ambos', 'S/R'];
+
+    public const DELEGADO_ASISTIO_VALUES = ['Si', 'No', 'S/R'];
+
     protected $table = 'mesas_paz_asistencias';
     protected $primaryKey = 'asist_id';
     public $timestamps = false;

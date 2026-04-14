@@ -2609,7 +2609,7 @@ class TemporaryModuleController extends Controller
     /** Configuración de exportación/informes guardada por usuario y módulo (sincronizada entre dispositivos). */
     public function exportUserConfigShow(Request $request, int $module): JsonResponse
     {
-        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+        abort_unless($request->user() && Gate::forUser($request->user())->allows('modulos-temporales-admin-ver'), 403);
         TemporaryModule::query()->findOrFail($module);
 
         $row = TemporaryModuleUserExportSetting::query()
@@ -2625,7 +2625,7 @@ class TemporaryModuleController extends Controller
 
     public function exportUserConfigUpdate(Request $request, int $module): JsonResponse
     {
-        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+        abort_unless($request->user() && Gate::forUser($request->user())->allows('modulos-temporales-admin-ver'), 403);
         TemporaryModule::query()->findOrFail($module);
 
         $validated = $request->validate([
@@ -2664,7 +2664,7 @@ class TemporaryModuleController extends Controller
 
     public function exportUserConfigDestroy(Request $request, int $module): JsonResponse
     {
-        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+        abort_unless($request->user() && Gate::forUser($request->user())->allows('modulos-temporales-admin-ver'), 403);
         TemporaryModule::query()->findOrFail($module);
 
         TemporaryModuleUserExportSetting::query()

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\MesasPaz;
 
+use App\Models\MesaPazAsistencia;
 use Illuminate\Validation\Rule;
 
 class GuardarMunicipioRequest extends MesasPazFormRequest
@@ -17,7 +18,7 @@ class GuardarMunicipioRequest extends MesasPazFormRequest
 
         return [
             'modalidad' => ['required', 'string', Rule::in($this->modalidadesPermitidas())],
-            'delegado_asistio' => ['required', 'string', Rule::in(['Si', 'No', 'S/R'])],
+            'delegado_asistio' => ['required', 'string', Rule::in(MesaPazAsistencia::DELEGADO_ASISTIO_VALUES)],
             'municipio_id' => $municipioRules,
             'presidente' => ['required', 'string', Rule::in($this->opcionesPresidentePermitidas())],
             'representante' => ['nullable', 'string', 'max:160'],

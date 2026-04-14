@@ -141,12 +141,22 @@ html.theme-dark .home-personal-agenda-link {
 .home-shell .home-personal-agenda-notes.pa-notes-grid.is-grid {
     margin: 0;
     padding: 0.35rem 0.25rem 0.5rem;
-    gap: 1rem !important;
+    gap: 0.75rem 1rem !important;
+    /* Dos tarjetas por fila en inicio (evita una sola columna ancha por auto-fill). */
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 
 .home-shell .home-personal-agenda-notes .pa-card--note {
     min-width: 0;
     max-width: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+    .home-shell .home-personal-agenda-notes.pa-notes-grid.is-grid {
+        grid-template-columns: 1fr !important;
+    }
 }
 
 .home-personal-agenda-empty {

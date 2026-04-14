@@ -17,7 +17,7 @@ class GuardarAcuerdoHoyRequest extends MesasPazFormRequest
             'acuerdo_observacion_items.*' => ['nullable', 'string', 'max:500'],
             'acuerdo_observacion' => ['nullable', 'string', 'max:5000'],
             'modalidad' => ['nullable', 'string', Rule::in($this->modalidadesPermitidas())],
-            'delegado_asistio' => ['nullable', 'string', Rule::in(['Si', 'No', 'S/R'])],
+            'delegado_asistio' => ['nullable', 'string', Rule::in(MesaPazAsistencia::DELEGADO_ASISTIO_VALUES)],
             'fecha_asist' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
         ];
     }

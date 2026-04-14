@@ -12,6 +12,8 @@ class PersonalNote extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public const PRIORITY_VALUES = ['none', 'low', 'medium', 'high'];
+
     /**
      * Get the attachments for the note.
      */
