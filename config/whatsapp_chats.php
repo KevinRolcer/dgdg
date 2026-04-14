@@ -63,13 +63,16 @@ return [
     */
     'folder_import_max_files' => max(50, min(100000, (int) env('WHATSAPP_FOLDER_IMPORT_MAX_FILES', 25000))),
 
-    'folder_import_request_max_files' => max(1, min(20, (int) env('WHATSAPP_FOLDER_IMPORT_REQUEST_MAX_FILES', 20))),
+    // Nota: En producciÃ³n con Cloudflare, lotes grandes tienden a disparar 524 (timeout ~100s).
+    // Mantener los requests chicos reduce el riesgo de timeout a costa de mÃ¡s solicitudes.
+    'folder_import_request_max_files' => max(1, min(20, (int) env('WHATSAPP_FOLDER_IMPORT_REQUEST_MAX_FILES', 8))),
 
-    'folder_import_parallel_requests' => max(1, min(8, (int) env('WHATSAPP_FOLDER_IMPORT_PARALLEL_REQUESTS', 4))),
+    // Con CF es mÃ¡s estable con poca concurrencia.
+    'folder_import_parallel_requests' => max(1, min(8, (int) env('WHATSAPP_FOLDER_IMPORT_PARALLEL_REQUESTS', 2))),
 
     'folder_import_request_target_bytes' => max(
         1024 * 1024,
-        min(128 * 1024 * 1024, (int) env('WHATSAPP_FOLDER_IMPORT_REQUEST_TARGET_MB', 24) * 1024 * 1024)
+        min(128 * 1024 * 1024, (int) env('WHATSAPP_FOLDER_IMPORT_REQUEST_TARGET_MB', 8) * 1024 * 1024)
     ),
 
     /*

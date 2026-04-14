@@ -297,6 +297,9 @@ Route::middleware('auth')->group(function () {
             Route::post('/folder-upload', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'storeFolderFile'])
                 ->middleware('throttle:whatsapp-folder-upload')
                 ->name('whatsapp-chats.admin.folder-upload');
+            Route::post('/folder-upload-chunk', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'storeFolderChunk'])
+                ->middleware('throttle:whatsapp-folder-upload')
+                ->name('whatsapp-chats.admin.folder-upload-chunk');
             Route::post('/folder-finalize', [\App\Http\Controllers\Admin\WhatsAppChatArchiveController::class, 'finalizeFolderUpload'])
                 ->middleware('throttle:whatsapp-folder-finalize')
                 ->name('whatsapp-chats.admin.folder-finalize');

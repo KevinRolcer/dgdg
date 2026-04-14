@@ -32,6 +32,7 @@
             {{-- IZQUIERDA: CARPETA --}}
             <div id="waFolderUploadRoot"
                 data-upload-url="{{ route('whatsapp-chats.admin.folder-upload') }}"
+                data-upload-chunk-url="{{ route('whatsapp-chats.admin.folder-upload-chunk') }}"
                 data-finalize-url="{{ route('whatsapp-chats.admin.folder-finalize') }}"
                 data-csrf="{{ csrf_token() }}"
                 data-request-max-files="{{ (int) ($folderUploadRequestMaxFiles ?? 8) }}"
