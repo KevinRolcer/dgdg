@@ -323,6 +323,20 @@
         table.data-table tbody {
             display: table-row-group;
         }
+        .pdf-thumb-wrap {
+            display: block;
+            text-align: center;
+            font-size: 0; /* evita espacios entre inline-block en Dompdf */
+            line-height: 0;
+        }
+        .pdf-thumb {
+            display: inline-block;
+            margin: 2px;
+            vertical-align: middle;
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-size: cover;
+        }
         th, td {
             border: 1px solid #000;
             padding: 5px;
@@ -1308,9 +1322,13 @@
                         @endphp
                         <td style="{{ $baseW }} {{ $tdAlign }} {{ $cellBoldStyle }} {{ $breakdownExtraStyle }} {{ $rowBgOnlyStyle }}">
                             @if(!empty($imageSources))
-                                <div style="display:block; text-align:center; white-space:nowrap;">
+                                <div class="pdf-thumb-wrap">
                                     @foreach ($imageSources as $imageSource)
-                                        <img src="{{ $imageSource }}" alt="Imagen" style="max-width: {{ $thumbWidth }}px; max-height: {{ $thumbHeight }}px; display:inline-block; margin:2px; vertical-align:middle;">
+                                        <div
+                                            class="pdf-thumb"
+                                            style="width: {{ $thumbWidth }}px; height: {{ $thumbHeight }}px; background-image: url('{{ $imageSource }}');"
+                                            aria-label="Imagen"
+                                        ></div>
                                     @endforeach
                                 </div>
                             @elseif($imageFallbackLabel !== '')
