@@ -83,6 +83,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/mi-perfil/foto', [ProfileController::class, 'updateAvatar'])
         ->middleware('throttle:12,1')
         ->name('profile.avatar.update');
+    Route::get('/perfil/foto/{userId}', [ProfileController::class, 'serveAvatar'])
+        ->name('profile.avatar.serve');
 
     /* Mesas: consulta = Gate mesas-paz-ver; escritura = Gate Mesas-Paz */
     Route::get('/mesas-paz', [MesasPazController::class, 'index'])->name('mesas-paz')->middleware('can:mesas-paz-ver');

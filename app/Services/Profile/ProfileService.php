@@ -78,7 +78,7 @@ class ProfileService
 
         return [
             'roleName' => $roleName,
-            'profilePhoto' => $this->sanitizeProfilePhoto($profilePhotoRaw),
+            'profilePhoto' => $this->resolveProfilePhoto((int) $user->id, $profilePhotoRaw),
             'delegado' => $delegado,
             'microrregion' => $microrregion,
             'municipios' => $municipios,
@@ -95,6 +95,21 @@ class ProfileService
     {
         $user->password = $newPassword;
         $user->save();
+    }
+
+    private function resolveProfilePhoto(int $userId, ?string $raw): ?string
+    {
+        $value = trim((string) $raw);
+        if ($value === '') {
+            return null;
+        }
+
+        // Files stored in shared_uploads/profilePhoto/ are served via the serve route
+        if (str_starts_with($value, 'profilePhoto/')) {
+            return route('profile.avatar.serve', ['userId' => $userId]);
+        }
+
+        return $this->sanitizeProfilePhoto($value);
     }
 
     private function sanitizeProfilePhoto(?string $photo): ?string

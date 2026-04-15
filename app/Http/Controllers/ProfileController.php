@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Services\Profile\ProfileService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -9,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class ProfileController extends Controller
 {
@@ -76,26 +78,52 @@ class ProfileController extends Controller
             $ext = 'jpg';
         }
 
-        $path = $file->storeAs('avatars/users/'.$user->id, 'profile.'.$ext, 'public');
-        $publicUrl = Storage::disk('public')->url($path);
+        // Store in shared_uploads/profilePhoto/ (falls back to public disk locally if not configured)
+        $disk = config('filesystems.disks.secure_shared.root') ? 'secure_shared' : 'public';
+        $relativePath = 'profilePhoto/users/'.$user->id.'/profile.'.$ext;
+
+        Storage::disk($disk)->putFileAs('profilePhoto/users/'.$user->id, $file, 'profile.'.$ext);
 
         try {
-            $user->forceFill([
-                'avatar' => $publicUrl,
-            ])->save();
+            $user->forceFill(['avatar' => $relativePath])->save();
         } catch (QueryException) {
             return back()->with('error', 'Falta aplicar migraciones para usar foto de perfil. Ejecuta php artisan migrate.');
         }
 
-        if ($oldAvatar !== '') {
-            $oldPath = str_starts_with($oldAvatar, '/storage/')
-                ? ltrim(substr($oldAvatar, strlen('/storage/')), '/')
-                : ltrim($oldAvatar, '/');
-            if ($oldPath !== '' && $oldPath !== $path && str_starts_with($oldPath, 'avatars/users/'.$user->id.'/')) {
-                Storage::disk('public')->delete($oldPath);
+        // Clean up old file
+        if ($oldAvatar !== '' && $oldAvatar !== $relativePath) {
+            if (str_starts_with($oldAvatar, 'profilePhoto/users/'.$user->id.'/')) {
+                Storage::disk($disk)->delete($oldAvatar);
+            } elseif (str_starts_with($oldAvatar, 'avatars/users/'.$user->id.'/')) {
+                Storage::disk('public')->delete($oldAvatar);
             }
         }
 
         return back()->with('status', 'Foto de perfil actualizada correctamente.');
+    }
+
+    public function serveAvatar(Request $request, int $userId): Response
+    {
+        abort_unless($request->user() !== null, 403);
+
+        $user = User::findOrFail($userId);
+        $avatar = trim((string) ($user->avatar ?? ''));
+
+        abort_unless($avatar !== '' && str_starts_with($avatar, 'profilePhoto/'), 404);
+
+        // Try secure_shared first, then public disk
+        $disk = 'secure_shared';
+        if (!Storage::disk($disk)->exists($avatar)) {
+            $disk = 'public';
+        }
+        abort_unless(Storage::disk($disk)->exists($avatar), 404);
+
+        $fullPath = Storage::disk($disk)->path($avatar);
+        $mime = mime_content_type($fullPath) ?: 'image/jpeg';
+
+        return response()->file($fullPath, [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'private, max-age=3600',
+        ]);
     }
 }
