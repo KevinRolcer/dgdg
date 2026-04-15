@@ -2887,9 +2887,9 @@ class TemporaryModuleWordPdfService
     private function buildPdfImageDataByPath(Collection $entries, array $columns, array $fieldTypesByKey): array
     {
         $map = [];
-        $dataUriByOriginal = [];
-        $dataUriByUrl = [];
-        $dataUriByFullPath = [];
+        $payloadByOriginal = [];
+        $payloadByUrl = [];
+        $payloadByFullPath = [];
         $resolvedLocalByUrl = [];
 
         foreach ($entries as $entry) {
@@ -2916,8 +2916,8 @@ class TemporaryModuleWordPdfService
                     }
 
                     if (filter_var($raw, FILTER_VALIDATE_URL)) {
-                        if (array_key_exists($raw, $dataUriByUrl)) {
-                            $cached = $dataUriByUrl[$raw];
+                        if (array_key_exists($raw, $payloadByUrl)) {
+                            $cached = $payloadByUrl[$raw];
                             foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
                                 $map[$lookupKey] = $cached;
                             }
@@ -2931,27 +2931,34 @@ class TemporaryModuleWordPdfService
                         }
 
                         if ($localFromUrl !== null) {
-                            $dataUri = $dataUriByFullPath[$localFromUrl] ?? null;
-                            if ($dataUri === null) {
+                            $payload = $payloadByFullPath[$localFromUrl] ?? null;
+                            if ($payload === null) {
                                 $binary = @file_get_contents($localFromUrl);
                                 if ($binary !== false && $binary !== '') {
-                                    $mime = @mime_content_type($localFromUrl) ?: 'image/jpeg';
+                                    $dims = @getimagesizefromstring($binary) ?: null;
+                                    $width = is_array($dims) && isset($dims[0]) ? (int) $dims[0] : null;
+                                    $height = is_array($dims) && isset($dims[1]) ? (int) $dims[1] : null;
+                                    $mime = is_array($dims) && isset($dims['mime']) && is_string($dims['mime']) && $dims['mime'] !== ''
+                                        ? $dims['mime']
+                                        : (@mime_content_type($localFromUrl) ?: 'image/jpeg');
                                     $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
-                                    $dataUriByFullPath[$localFromUrl] = $dataUri;
+                                    $payload = ['src' => $dataUri, 'w' => $width, 'h' => $height];
+                                    $payloadByFullPath[$localFromUrl] = $payload;
                                 }
                             }
 
-                            if (is_string($dataUri) && $dataUri !== '') {
-                                $dataUriByUrl[$raw] = $dataUri;
+                            if (is_array($payload) && is_string($payload['src'] ?? null) && $payload['src'] !== '') {
+                                $payloadByUrl[$raw] = $payload;
                                 foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
-                                    $map[$lookupKey] = $dataUri;
+                                    $map[$lookupKey] = $payload;
                                 }
                                 continue;
                             }
                         }
 
+                        $fallbackPayload = ['src' => $raw, 'w' => null, 'h' => null];
                         foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
-                            $map[$lookupKey] = $raw;
+                            $map[$lookupKey] = $fallbackPayload;
                         }
                         continue;
                     }
@@ -2959,22 +2966,28 @@ class TemporaryModuleWordPdfService
                     $fullPath = $this->entryDataService->resolveStoredFilePath($raw);
                     if (!is_string($fullPath) || !is_file($fullPath)) continue;
 
-                    if (array_key_exists($original, $dataUriByOriginal)) {
-                        $dataUri = $dataUriByOriginal[$original];
-                    } elseif (array_key_exists($fullPath, $dataUriByFullPath)) {
-                        $dataUri = $dataUriByFullPath[$fullPath];
+                    if (array_key_exists($original, $payloadByOriginal)) {
+                        $payload = $payloadByOriginal[$original];
+                    } elseif (array_key_exists($fullPath, $payloadByFullPath)) {
+                        $payload = $payloadByFullPath[$fullPath];
                     } else {
                         $binary = @file_get_contents($fullPath);
                         if ($binary === false || $binary === '') continue;
-                        $mime = @mime_content_type($fullPath) ?: 'image/jpeg';
+                        $dims = @getimagesizefromstring($binary) ?: null;
+                        $width = is_array($dims) && isset($dims[0]) ? (int) $dims[0] : null;
+                        $height = is_array($dims) && isset($dims[1]) ? (int) $dims[1] : null;
+                        $mime = is_array($dims) && isset($dims['mime']) && is_string($dims['mime']) && $dims['mime'] !== ''
+                            ? $dims['mime']
+                            : (@mime_content_type($fullPath) ?: 'image/jpeg');
                         $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
-                        $dataUriByFullPath[$fullPath] = $dataUri;
+                        $payload = ['src' => $dataUri, 'w' => $width, 'h' => $height];
+                        $payloadByFullPath[$fullPath] = $payload;
                     }
 
-                    $dataUriByOriginal[$original] = $dataUri;
+                    $payloadByOriginal[$original] = $payload;
 
                     foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
-                        $map[$lookupKey] = $dataUri;
+                        $map[$lookupKey] = $payload;
                     }
                 }
             }

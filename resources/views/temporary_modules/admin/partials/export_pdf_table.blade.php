@@ -329,13 +329,35 @@
             font-size: 0; /* evita espacios entre inline-block en Dompdf */
             line-height: 0;
         }
-        .pdf-thumb {
+        .pdf-thumb-box {
             display: inline-block;
             margin: 2px;
             vertical-align: middle;
-            background-position: center center;
-            background-repeat: no-repeat;
-            background-size: cover;
+            overflow: hidden;
+            text-align: center;
+        }
+        .pdf-thumb-inner {
+            width: 100%;
+            height: 100%;
+            display: table;
+        }
+        .pdf-thumb-inner-cell {
+            width: 100%;
+            height: 100%;
+            display: table-cell;
+            vertical-align: middle;
+            text-align: center;
+        }
+        .pdf-thumb-img {
+            display: inline-block;
+        }
+        .pdf-thumb-fit-width {
+            width: 100%;
+            height: auto;
+        }
+        .pdf-thumb-fit-height {
+            height: 100%;
+            width: auto;
         }
         th, td {
             border: 1px solid #000;
@@ -1298,8 +1320,28 @@
                                         ?? $pdfImageDataByPath[$lookupAltD]
                                         ?? null;
 
-                                    if (is_string($resolvedSource) && $resolvedSource !== '' && !in_array($resolvedSource, $imageSources, true)) {
-                                        $imageSources[] = $resolvedSource;
+                                    $resolvedSrc = '';
+                                    $resolvedW = null;
+                                    $resolvedH = null;
+                                    if (is_array($resolvedSource)) {
+                                        $resolvedSrc = (string) ($resolvedSource['src'] ?? '');
+                                        $resolvedW = isset($resolvedSource['w']) && is_numeric($resolvedSource['w']) ? (int) $resolvedSource['w'] : null;
+                                        $resolvedH = isset($resolvedSource['h']) && is_numeric($resolvedSource['h']) ? (int) $resolvedSource['h'] : null;
+                                    } elseif (is_string($resolvedSource)) {
+                                        $resolvedSrc = $resolvedSource;
+                                    }
+
+                                    if ($resolvedSrc !== '') {
+                                        $duplicate = false;
+                                        foreach ($imageSources as $existingImg) {
+                                            if (is_array($existingImg) && ((string) ($existingImg['src'] ?? '')) === $resolvedSrc) {
+                                                $duplicate = true;
+                                                break;
+                                            }
+                                        }
+                                        if (!$duplicate) {
+                                            $imageSources[] = ['src' => $resolvedSrc, 'w' => $resolvedW, 'h' => $resolvedH];
+                                        }
                                     }
                                 }
                             }
@@ -1323,12 +1365,24 @@
                         <td style="{{ $baseW }} {{ $tdAlign }} {{ $cellBoldStyle }} {{ $breakdownExtraStyle }} {{ $rowBgOnlyStyle }}">
                             @if(!empty($imageSources))
                                 <div class="pdf-thumb-wrap">
-                                    @foreach ($imageSources as $imageSource)
-                                        <div
-                                            class="pdf-thumb"
-                                            style="width: {{ $thumbWidth }}px; height: {{ $thumbHeight }}px; background-image: url('{{ $imageSource }}');"
-                                            aria-label="Imagen"
-                                        ></div>
+                                    @foreach ($imageSources as $img)
+                                        @php
+                                            $imgSrc = is_array($img) ? (string) ($img['src'] ?? '') : '';
+                                            $imgW = is_array($img) && isset($img['w']) && is_numeric($img['w']) ? (int) $img['w'] : 0;
+                                            $imgH = is_array($img) && isset($img['h']) && is_numeric($img['h']) ? (int) $img['h'] : 0;
+                                            $containerRatio = ($thumbHeight > 0) ? ($thumbWidth / $thumbHeight) : 1.0;
+                                            $imgRatio = ($imgW > 0 && $imgH > 0) ? ($imgW / $imgH) : null;
+                                            $fitClass = ($imgRatio !== null && $imgRatio >= $containerRatio) ? 'pdf-thumb-fit-height' : 'pdf-thumb-fit-width';
+                                        @endphp
+                                        @if($imgSrc !== '')
+                                            <div class="pdf-thumb-box" style="width: {{ $thumbWidth }}px; height: {{ $thumbHeight }}px;">
+                                                <div class="pdf-thumb-inner">
+                                                    <div class="pdf-thumb-inner-cell">
+                                                        <img src="{{ $imgSrc }}" alt="Imagen" class="pdf-thumb-img {{ $fitClass }}">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endif
                                     @endforeach
                                 </div>
                             @elseif($imageFallbackLabel !== '')
