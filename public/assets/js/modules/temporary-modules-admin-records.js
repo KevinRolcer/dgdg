@@ -726,6 +726,167 @@
         const imageModalTitle = document.getElementById('tmImagePreviewTitle');
         let lastImageOpener = null;
         const templateSwal = createTemplateSwal();
+        const adminPreviewSearchCache = new WeakMap();
+
+        function tmNormText(value) {
+            var s = String(value || '').toLowerCase();
+            try {
+                s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            } catch (_) {}
+            return s.replace(/\s+/g, ' ').trim();
+        }
+
+        function initAdminPreviewFilters(modal) {
+            if (!(modal instanceof HTMLElement)) {
+                return;
+            }
+            if (modal.dataset.tmAdminPreviewFiltersInit === '1') {
+                return;
+            }
+            modal.dataset.tmAdminPreviewFiltersInit = '1';
+
+            var filterWrap = modal.querySelector('[data-admin-preview-filters]');
+            if (!(filterWrap instanceof HTMLElement)) {
+                return;
+            }
+
+            var inputText = filterWrap.querySelector('[data-admin-preview-filter-text]');
+            var selMr = filterWrap.querySelector('[data-admin-preview-filter-mr]');
+            var selMpio = filterWrap.querySelector('[data-admin-preview-filter-mpio]');
+            var selUser = filterWrap.querySelector('[data-admin-preview-filter-user]');
+            var btnClear = filterWrap.querySelector('[data-admin-preview-filter-clear]');
+            var countEl = filterWrap.querySelector('[data-admin-preview-filter-count]');
+
+            var records = Array.from(modal.querySelectorAll('[data-admin-record]'));
+            var total = records.length;
+
+            // List (accordion) elements
+            var listItems = Array.from(modal.querySelectorAll('[data-admin-record-legacy]'));
+            var listMpioGroups = Array.from(modal.querySelectorAll('[data-admin-mpio-group]'));
+            var listMrGroups = Array.from(modal.querySelectorAll('[data-admin-mr-group]'));
+
+            // Table elements
+            var tableRows = Array.from(modal.querySelectorAll('[data-admin-records-table-row]'));
+            var tableSections = Array.from(modal.querySelectorAll('[data-admin-table-mpio-section]'));
+
+            function getRecordSearchText(el) {
+                var cached = adminPreviewSearchCache.get(el);
+                if (cached) {
+                    return cached;
+                }
+                var txt = tmNormText(el.textContent || '');
+                adminPreviewSearchCache.set(el, txt);
+                return txt;
+            }
+
+            function applyFilters() {
+                var q = tmNormText(inputText && inputText.value ? inputText.value : '');
+                var mr = selMr && selMr.value ? String(selMr.value) : '';
+                var mp = selMpio && selMpio.value ? String(selMpio.value) : '';
+                var us = selUser && selUser.value ? String(selUser.value) : '';
+
+                var visible = 0;
+                var mrCounts = new Map();
+                var mpioCounts = new Map(); // key = mr||mpio
+
+                records.forEach(function (rec) {
+                    var dMr = rec.getAttribute('data-mr-name') || '';
+                    var dMp = rec.getAttribute('data-mpio-name') || '';
+                    var dUs = rec.getAttribute('data-user-name') || '';
+                    var ok = true;
+                    if (mr && dMr !== mr) ok = false;
+                    if (ok && mp && dMp !== mp) ok = false;
+                    if (ok && us && dUs !== us) ok = false;
+                    if (ok && q) {
+                        ok = getRecordSearchText(rec).indexOf(q) !== -1;
+                    }
+
+                    rec.hidden = !ok;
+                    if (ok) {
+                        visible += 1;
+                    }
+                });
+
+                if (countEl) {
+                    if (visible === total) {
+                        countEl.textContent = total ? ('Mostrando ' + total + ' registro(s).') : 'Sin registros para mostrar.';
+                    } else {
+                        countEl.textContent = 'Mostrando ' + visible + ' de ' + total + ' registro(s).';
+                    }
+                }
+
+                // ── Filter list (accordion) view ──────────────────────
+                listItems.forEach(function (item) {
+                    var dMr = item.getAttribute('data-mr-name') || '';
+                    var dMp = item.getAttribute('data-mpio-name') || '';
+                    var dUs = item.getAttribute('data-user-name') || '';
+                    var ok = true;
+                    if (mr && dMr !== mr) ok = false;
+                    if (ok && mp && dMp !== mp) ok = false;
+                    if (ok && us && dUs !== us) ok = false;
+                    if (ok && q) {
+                        ok = tmNormText(item.textContent || '').indexOf(q) !== -1;
+                    }
+                    item.hidden = !ok;
+                });
+                listMpioGroups.forEach(function (grp) {
+                    grp.hidden = listItems.length > 0 &&
+                        !listItems.some(function (r) {
+                            return !r.hidden && grp.contains(r);
+                        });
+                });
+                listMrGroups.forEach(function (grp) {
+                    grp.hidden = listMpioGroups.length > 0 &&
+                        !listMpioGroups.some(function (d) {
+                            return !d.hidden && grp.contains(d);
+                        });
+                });
+
+                // ── Filter table view ─────────────────────────────────
+                tableRows.forEach(function (row) {
+                    var dMr = row.getAttribute('data-mr-name') || '';
+                    var dMp = row.getAttribute('data-mpio-name') || '';
+                    var dUs = row.getAttribute('data-user-name') || '';
+                    var ok = true;
+                    if (mr && dMr !== mr) ok = false;
+                    if (ok && mp && dMp !== mp) ok = false;
+                    if (ok && us && dUs !== us) ok = false;
+                    if (ok && q) {
+                        ok = tmNormText(row.textContent || '').indexOf(q) !== -1;
+                    }
+                    row.hidden = !ok;
+                });
+                tableSections.forEach(function (sec) {
+                    sec.hidden = tableRows.length > 0 &&
+                        !tableRows.some(function (r) {
+                            return !r.hidden && sec.contains(r);
+                        });
+                });
+            }
+
+            var t = null;
+            if (inputText) {
+                inputText.addEventListener('input', function () {
+                    if (t) clearTimeout(t);
+                    t = setTimeout(applyFilters, 120);
+                });
+            }
+            if (selMr) selMr.addEventListener('change', applyFilters);
+            if (selMpio) selMpio.addEventListener('change', applyFilters);
+            if (selUser) selUser.addEventListener('change', applyFilters);
+            if (btnClear) {
+                btnClear.addEventListener('click', function () {
+                    if (inputText) inputText.value = '';
+                    if (selMr) selMr.value = '';
+                    if (selMpio) selMpio.value = '';
+                    if (selUser) selUser.value = '';
+                    applyFilters();
+                    if (inputText) inputText.focus();
+                });
+            }
+
+            applyFilters();
+        }
 
         const closeModal = function (modal) {
             modal.classList.remove('is-open');
@@ -768,10 +929,113 @@
                     return;
                 }
 
-                modal.classList.add('is-open');
-                modal.setAttribute('aria-hidden', 'false');
-                document.body.style.overflow = 'hidden';
+                const previewUrl = modal.getAttribute('data-preview-url');
+                const lazyBody = modal.querySelector('[data-modal-lazy-body]');
+
+                if (lazyBody && previewUrl && !modal.dataset.previewLoaded) {
+                    // Mostrar spinner y abrir el modal inmediatamente
+                    lazyBody.innerHTML = '<div class="tm-modal-lazy-loading"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Cargando registros\u2026</div>';
+                    modal.classList.add('is-open');
+                    modal.setAttribute('aria-hidden', 'false');
+                    document.body.style.overflow = 'hidden';
+
+                    fetch(previewUrl, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+                        credentials: 'same-origin',
+                    })
+                        .then(function (r) {
+                            if (!r.ok) { throw new Error('HTTP ' + r.status); }
+                            return r.text();
+                        })
+                        .then(function (html) {
+                            lazyBody.innerHTML = html;
+                            modal.dataset.previewLoaded = '1';
+                            initAdminPreviewFilters(modal);
+                            tmBindModalLazyContent(modal);
+                        })
+                        .catch(function () {
+                            lazyBody.innerHTML = '<p style="padding:32px;text-align:center;color:var(--clr-danger,#c0392b)"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> Error al cargar los registros. Recarga la p\u00e1gina e int\u00e9ntalo de nuevo.</p>';
+                        });
+                } else {
+                    modal.classList.add('is-open');
+                    modal.setAttribute('aria-hidden', 'false');
+                    document.body.style.overflow = 'hidden';
+                    initAdminPreviewFilters(modal);
+                }
             });
+        });
+
+        function tmBindModalLazyContent(modal) {
+            modal.querySelectorAll('[data-text-toggle]').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    const wrap = button.closest('[data-text-wrap]');
+                    const content = wrap ? wrap.querySelector('[data-text-content]') : null;
+                    if (!(content instanceof HTMLElement)) { return; }
+                    const isCollapsed = content.classList.contains('is-collapsed');
+                    content.classList.toggle('is-collapsed', !isCollapsed);
+                    button.textContent = isCollapsed ? 'Ver menos' : 'Ver mas';
+                });
+            });
+
+            modal.querySelectorAll('[data-open-image-preview]').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    if (!imageModal || !imageModalImg) { return; }
+                    const src = button.getAttribute('data-image-src') || '';
+                    const title = button.getAttribute('data-image-title') || 'Vista previa';
+                    if (src === '') { return; }
+                    lastImageOpener = button;
+                    imageModalImg.src = src;
+                    imageModalImg.alt = title;
+                    if (imageModalTitle) { imageModalTitle.textContent = title; }
+                    imageModal.classList.add('is-open');
+                    imageModal.setAttribute('aria-hidden', 'false');
+                    document.body.style.overflow = 'hidden';
+                });
+            });
+
+            // View mode toggle (Tarjetas / Listado / Tabla)
+            var viewBtns = Array.from(modal.querySelectorAll('[data-admin-preview-view]'));
+            var viewsWrap = modal.querySelector('[data-apr-views-wrap]');
+            viewBtns.forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var mode = btn.getAttribute('data-admin-preview-view');
+                    if (!mode) { return; }
+                    viewBtns.forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+                    if (viewsWrap) {
+                        Array.from(viewsWrap.querySelectorAll('[data-admin-records-view]')).forEach(function (v) {
+                            v.hidden = v.getAttribute('data-admin-records-view') !== mode;
+                        });
+                    }
+                });
+            });
+
+        }
+
+        document.addEventListener('click', function (event) {
+            var btn = event.target && event.target.closest ? event.target.closest('[data-admin-record-toggle]') : null;
+            if (!(btn instanceof HTMLElement)) {
+                return;
+            }
+            var card = btn.closest('.tm-admin-record-card');
+            if (!(card instanceof HTMLElement)) {
+                return;
+            }
+            var more = card.querySelector('[data-admin-record-more]');
+            if (!(more instanceof HTMLElement)) {
+                return;
+            }
+            var isOpen = !more.hidden;
+            more.hidden = isOpen;
+            card.classList.toggle('is-expanded', !isOpen);
+            var textEl = btn.querySelector('[data-admin-record-toggle-text]');
+            if (textEl) {
+                textEl.textContent = isOpen ? 'Ver todo' : 'Ver menos';
+            }
+            var icon = btn.querySelector('i.fa-chevron-down, i.fa-chevron-up');
+            if (icon) {
+                icon.classList.toggle('fa-chevron-down', isOpen);
+                icon.classList.toggle('fa-chevron-up', !isOpen);
+            }
         });
 
         Array.from(document.querySelectorAll('[data-open-tm-admin-activity]')).forEach(function (button) {

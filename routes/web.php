@@ -207,6 +207,10 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.analysis-preview');
+            Route::get('/{module}/registros-modal', [TemporaryModuleController::class, 'adminRecordsModalFragment'])
+                ->whereNumber('module')
+                ->middleware('can:modulos-temporales-admin-ver')
+                ->name('temporary-modules.admin.records-modal-fragment');
             Route::post('/{module}/exportar-analisis-word', [TemporaryModuleController::class, 'exportAnalysisWord'])
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')

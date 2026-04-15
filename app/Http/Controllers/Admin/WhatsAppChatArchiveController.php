@@ -143,6 +143,12 @@ class WhatsAppChatArchiveController extends Controller
         if (Schema::hasColumn('whatsapp_chat_archives', 'folder_uploaded_files')) {
             $select[] = 'folder_uploaded_files';
         }
+        if (Schema::hasColumn('whatsapp_chat_archives', 'folder_source_signature')) {
+            $select[] = 'folder_source_signature';
+        }
+        if (Schema::hasColumn('whatsapp_chat_archives', 'folder_root_name')) {
+            $select[] = 'folder_root_name';
+        }
         if (Schema::hasColumn('whatsapp_chat_archives', 'avatar_file')) {
             $select[] = 'avatar_file';
         }

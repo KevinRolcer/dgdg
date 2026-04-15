@@ -253,7 +253,6 @@ class TemporaryModuleController extends Controller
 
         $modulesQuery = TemporaryModule::query()
             ->select($select)
-            ->with(['entries.user', 'entries.microrregion', 'fields'])
             ->whereHas('entries')
             ->withCount(['fields', 'entries']);
 
@@ -307,6 +306,15 @@ class TemporaryModuleController extends Controller
             'modules' => $modules,
             'searchQuery' => $searchQuery,
             'activityFeed' => $activityFeed,
+        ]);
+    }
+
+    public function adminRecordsModalFragment(Request $request, TemporaryModule $module): View
+    {
+        $module->loadMissing(['entries.user', 'entries.microrregion', 'fields']);
+
+        return view('temporary_modules.admin.partials.records-modal-body', [
+            'module' => $module,
         ]);
     }
 

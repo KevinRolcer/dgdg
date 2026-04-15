@@ -84,7 +84,7 @@
                                 <form method="POST" action="{{ route('temporary-modules.admin.destroy', $module->id) }}" class="tm-inline-form" data-confirm-delete data-module-name="{{ $module->name }}">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="tm-btn tm-btn-danger">Eliminar</button>
+                                    <button type="submit" class="tm-btn tm-btn-danger"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
                                 </form>
                             </td>
                         </tr>

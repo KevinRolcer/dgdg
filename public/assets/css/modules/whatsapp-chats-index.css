@@ -508,6 +508,10 @@ html.theme-dark .wai-page-title {
     z-index: 1;
 }
 
+.wai-chat-card[hidden] {
+    display: none !important;
+}
+
 .wai-chat-card:hover {
     border-color: rgba(199, 155, 102, 0.45);
     z-index: 50;
@@ -732,6 +736,35 @@ html.theme-dark .wai-page-title {
 .wai-meta-item--accent { color: var(--wai-accent); }
 .wai-meta-item--danger { color: var(--wai-primary); }
 
+.wai-resume-progress {
+    margin-top: -2px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.wai-resume-progress-track {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.16);
+    overflow: hidden;
+}
+
+.wai-resume-progress-bar {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #1d4ed8, #2563eb);
+    transition: width 0.25s ease;
+}
+
+.wai-resume-progress-text {
+    margin: 0;
+    font-size: 0.72rem;
+    color: var(--clr-text-light);
+    line-height: 1.3;
+}
+
 /* Popup flotante de acciones */
 .wai-card-popup {
     position: absolute;
@@ -789,6 +822,12 @@ html.theme-dark .wai-page-title {
     color: var(--wai-accent);
 }
 .wai-popup-item:hover i { color: var(--wai-accent); }
+
+.wai-popup-item:disabled {
+    opacity: 0.55;
+    cursor: wait;
+    pointer-events: none;
+}
 
 .wai-popup-item--danger { color: var(--clr-text-main); }
 .wai-popup-item--danger i { color: var(--wai-primary); }

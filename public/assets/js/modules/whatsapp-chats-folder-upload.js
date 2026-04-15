@@ -203,17 +203,38 @@
         var btnPick = document.getElementById('waFolderPickBtn');
         var labelInput = document.getElementById('waFolderLabel');
         var progressWrap = document.getElementById('waFolderProgressWrap');
-        var progressBar = root.querySelector('.wa-folder-progress-bar');
+        var progressBar = document.getElementById('waFolderProgressBar');
         var progressMeta = document.getElementById('waFolderProgressMeta');
         var statusEl = document.getElementById('waFolderStatus');
         var warnEl = document.getElementById('waFolderTabWarn');
 
         var uploading = false;
         var batchToken = null;
+        var waResumeContext = null;
 
-        function setProgress(pct, text) {
-            if (progressBar) progressBar.style.width = Math.min(100, Math.max(0, pct)) + '%';
+        function emitResumeEvent(name, payload) {
+            if (!waResumeContext || !waResumeContext.chatId) {
+                return;
+            }
+            document.dispatchEvent(new CustomEvent('wa-folder-resume-' + name, {
+                detail: Object.assign({
+                    chatId: String(waResumeContext.chatId),
+                }, payload || {}),
+            }));
+        }
+
+        function clearResumeContext() {
+            waResumeContext = null;
+        }
+
+        function setProgress(pct, text, extra) {
+            var safePct = Math.min(100, Math.max(0, pct));
+            if (progressBar) progressBar.style.width = safePct + '%';
             if (progressMeta) progressMeta.textContent = text || '';
+            emitResumeEvent('progress', Object.assign({
+                percent: safePct,
+                text: text || '',
+            }, extra || {}));
         }
 
         window.addEventListener('beforeunload', function (e) {
@@ -249,7 +270,7 @@
                 labelInput.value = waFolderDefaultLabelFromFiles(list);
             }
 
-            startUploadSequence(list);
+            startUploadSequence(list, null);
         });
 
         // Listen for resume upload events
@@ -257,6 +278,9 @@
             if (uploading) return;
             var files = window.__waResumeFiles;
             if (!files || files.length === 0) return;
+            var resumePayload = (window.__waResumeContext && typeof window.__waResumeContext === 'object')
+                ? window.__waResumeContext
+                : null;
 
             var list = Array.from(files).filter(function (f) {
                 return !waFolderSkipPath(f.webkitRelativePath || '');
@@ -270,16 +294,24 @@
                 labelInput.value = waFolderDefaultLabelFromFiles(list);
             }
 
-            startUploadSequence(list);
+            startUploadSequence(list, resumePayload);
         });
 
-        async function startUploadSequence(list) {
+        async function startUploadSequence(list, resumePayload) {
             uploading = true;
             batchToken = waFolderRandomBatchToken();
+            waResumeContext = resumePayload && resumePayload.chatId ? {
+                chatId: String(resumePayload.chatId),
+            } : null;
             if (progressWrap) progressWrap.hidden = false;
             if (warnEl) warnEl.hidden = false;
             if (statusEl) statusEl.textContent = '';
-            setProgress(0, 'Preparando ' + list.length + ' archivos…');
+            emitResumeEvent('start', {
+                selectedFiles: list.length,
+            });
+            setProgress(0, 'Preparando ' + list.length + ' archivos…', {
+                selectedFiles: list.length,
+            });
 
             if (btnPick) btnPick.disabled = true;
             input.disabled = true;
@@ -306,6 +338,10 @@
                 if (labelInput) labelInput.disabled = false;
                 if (statusEl) statusEl.textContent = safeMsg || 'Error en la subida.';
                 setProgress(0, '');
+                emitResumeEvent('error', {
+                    message: safeMsg || 'Error en la subida.',
+                });
+                clearResumeContext();
             }
 
             async function finalizeBatch(folderSignature) {
@@ -359,11 +395,22 @@
                             return;
                         }
                         setProgress(100, alreadyImported ? 'La carpeta ya estaba importada.' : 'Listo.');
+                        var doneMessage = alreadyImported
+                            ? (data.message || 'La carpeta ya existia, se reutilizo la importacion previa.')
+                            : ('Carga completada. ' + uploadedCount + ' archivos enviados, ' + skippedCount + ' omitidos por ya existir.');
                         if (statusEl) {
                             statusEl.textContent = alreadyImported
                                 ? (data.message || 'La carpeta ya existia, se reutilizo la importacion previa.')
-                                : ('Carga completada. ' + uploadedCount + ' archivos enviados, ' + skippedCount + ' omitidos por ya existir.');
+                                : doneMessage;
                         }
+                        emitResumeEvent('complete', {
+                            message: doneMessage,
+                            alreadyImported: !!alreadyImported,
+                            uploadedCount: uploadedCount,
+                            skippedCount: skippedCount,
+                            totalFiles: total,
+                        });
+                        clearResumeContext();
                         if (data.redirect) {
                             window.location.href = data.redirect;
                         }

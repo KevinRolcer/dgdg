@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @push('css')
 <link rel="stylesheet" href="{{ asset('assets/css/modules/temporary-modules.css') }}?v={{ @filemtime(public_path('assets/css/modules/temporary-modules.css')) ?: time() }}">
@@ -127,7 +127,7 @@
                                         data-form-id="tmClearEntriesForm-{{ $module->id }}"
                                         data-module-name="{{ $module->name }}"
                                     >
-                                        Vaciar registros
+                                        <i class="fa-solid fa-trash" aria-hidden="true"></i>
                                     </button>
                                 </form>
                             </td>
@@ -153,7 +153,14 @@
     </div>
 
     @foreach ($modules as $module)
-        <div class="tm-modal" id="admin-preview-{{ $module->id }}" aria-hidden="true" role="dialog" aria-modal="true">
+        <div
+            class="tm-modal"
+            id="admin-preview-{{ $module->id }}"
+            aria-hidden="true"
+            role="dialog"
+            aria-modal="true"
+            data-preview-url="{{ route('temporary-modules.admin.records-modal-fragment', $module->id) }}"
+        >
             <div class="tm-modal-backdrop" data-close-module-preview></div>
             <div class="tm-modal-dialog tm-modal-dialog-admin-preview">
                 <div class="tm-modal-head">
@@ -163,205 +170,8 @@
                     </button>
                 </div>
 
-                <div class="tm-modal-body">
-                    @php
-                        $moduleDescription = (string) ($module->description ?: 'Sin descripcion adicional.');
-                        $isLongModuleDescription = mb_strlen($moduleDescription) > 180;
-                    @endphp
-                    @if ($isLongModuleDescription)
-                        <p class="tm-cell-text-wrap" data-text-wrap>
-                            <span class="tm-cell-text is-collapsed" data-text-content>{{ $moduleDescription }}</span>
-                            <button type="button" class="tm-cell-text-toggle" data-text-toggle>Ver mas</button>
-                        </p>
-                    @else
-                        <p>{{ $moduleDescription }}</p>
-                    @endif
-
-                    @can('Enlace')
-                    <div class="tm-enlace-eliminar-registro mb-3">
-                        <button type="button" class="tm-btn tm-btn-danger" id="btnEliminarRegistroEnlace">Eliminar registro de Municipios contestados hoy</button>
-                    </div>
-                    @endcan
-                    @php
-                        $municipiosMap = \App\Models\Municipio::with('microrregion')->get()->mapWithKeys(function ($m) {
-                            $norm = \Illuminate\Support\Str::slug($m->nombre, '');
-                            $mrName = $m->microrregion ? 'Microrregión ' . $m->microrregion->microrregion . ' - ' . $m->microrregion->cabecera : 'Sin microrregión asignada';
-                            return [$norm => $mrName];
-                        })->toArray();
-
-                        $moduleFields = $module->fields;
-
-                        $getMunicipioName = function ($entry) use ($moduleFields) {
-                            $data = is_array($entry->data) ? $entry->data : (array)$entry->data;
-
-                            // Iterate through all fields looking for "municipio"
-                            foreach ($moduleFields as $field) {
-                                $label = $field->label ?? $field['label'] ?? '';
-                                $key = $field->key ?? $field['key'] ?? '';
-
-                                if (stripos($label, 'municipio') !== false || stripos((string)$key, 'municipio') !== false) {
-                                    $val = $data[$key] ?? null;
-                                    if (is_string($val) && trim($val) !== '') {
-                                        return trim($val);
-                                    }
-                                }
-                            }
-                            return 'Sin municipio especificado';
-                        };
-
-                        $getMicrorregionName = function ($entry) use ($getMunicipioName, $municipiosMap) {
-                            // Option 1: It has an explicit microrregion relation already saved
-                            if ($entry->microrregion && $entry->microrregion->microrregion) {
-                                return 'Microrregión ' . $entry->microrregion->microrregion . ' - ' . $entry->microrregion->cabecera;
-                            }
-                            // Option 2: Fallback to mapping the text municipio from $entry->data
-                            $mpioName = $getMunicipioName($entry);
-                            if ($mpioName !== 'Sin municipio especificado') {
-                                $norm = \Illuminate\Support\Str::slug($mpioName, '');
-                                if (isset($municipiosMap[$norm])) {
-                                    return $municipiosMap[$norm];
-                                }
-                            }
-                            return 'Sin microrregión asignada';
-                        };
-
-                        // First group by Microrregión (Using explicit ID or mapped from string)
-                        $groupedByMr = collect($module->entries)->groupBy($getMicrorregionName);
-
-                        // Calculate unique municipalities
-                        $uniqueMpiosCount = collect($module->entries)->map($getMunicipioName)->filter(function($mp) {
-                            return $mp !== 'Sin municipio especificado';
-                        })->unique()->count();
-                    @endphp
-
-                    <div style="margin-bottom: 24px; display: flex; flex-wrap: wrap; gap: 24px;">
-                        <h4 style="color: var(--clr-accent, #c79b66); margin: 0; font-weight: 600;">
-                            <i class="fa-solid fa-list-ol"></i> Total de Registros: {{ $module->entries->count() }}
-                        </h4>
-                        <h4 style="color: var(--clr-accent, #c79b66); margin: 0; font-weight: 600;">
-                            <i class="fa-solid fa-map"></i> Municipios registrados: {{ $uniqueMpiosCount }}
-                        </h4>
-                    </div>
-
-                    @if ($module->entries->isEmpty())
-                        <div class="tm-table-wrap tm-table-wrap-admin-preview">
-                            <p style="text-align: center; padding: 20px;">Sin registros capturados todavía.</p>
-                        </div>
-                    @else
-                        <div class="tm-admin-preview-accordion">
-                            @foreach ($groupedByMr as $mrName => $mrEntries)
-                                @php
-                                    $mrLatestEntry = $mrEntries->sortByDesc('submitted_at')->first();
-                                    $mrUsers = $mrEntries->pluck('user.name')->filter()->unique()->implode(', ');
-
-                                    // Second group by Municipio
-                                    $groupedByMpio = $mrEntries->groupBy($getMunicipioName);
-                                @endphp
-                                <details class="tm-admin-preview-card">
-                                    <summary class="tm-admin-preview-summary">
-                                        <div class="tm-preview-summary-header">
-                                            <strong class="tm-preview-mr-name">{{ $mrName }}</strong>
-                                            <span class="tm-badge tm-badge-primary" style="margin-left:8px;">{{ $mrEntries->count() }} registro(s)</span>
-                                        </div>
-                                        <div class="tm-preview-summary-meta">
-                                            <span title="Usuario(s)"><i class="fa fa-user"></i> {{ $mrUsers ?: 'Sin usuario' }}</span>
-                                            <span title="Última captura"><i class="fa fa-calendar"></i> {{ optional($mrLatestEntry->submitted_at)->format('d/m/Y H:i') }}</span>
-                                        </div>
-                                        <div class="tm-preview-summary-icon">
-                                            <i class="fa-solid fa-chevron-down"></i>
-                                        </div>
-                                    </summary>
-
-                                    <div class="tm-admin-preview-detail tm-admin-preview-mpio-container">
-                                        @foreach ($groupedByMpio as $mpioName => $mpioEntries)
-                                            <details class="tm-mpio-group-details">
-                                                <summary class="tm-mpio-summary">
-                                                    <div class="tm-mpio-summary-header">
-                                                        <i class="fa-solid fa-map-location-dot"></i> <strong>{{ $mpioName }}</strong>
-                                                        <span class="tm-badge tm-badge-secondary" style="margin-left: 8px;">{{ $mpioEntries->count() }} registro(s)</span>
-                                                    </div>
-                                                    <i class="fa-solid fa-chevron-down tm-mpio-chevron"></i>
-                                                </summary>
-                                                <div class="tm-mpio-detail-content">
-                                                    <div class="tm-records-grid">
-                                                        @foreach ($mpioEntries as $entry)
-                                                            <div class="tm-record-item">
-                                                            <div class="tm-record-item-header">
-                                                                <span class="tm-record-user"><i class="fa-solid fa-user-circle"></i> {{ $entry->user->name ?? 'Sin usuario' }}</span>
-                                                                <span class="tm-record-date"><i class="fa-regular fa-clock"></i> {{ optional($entry->submitted_at)->format('d/m/Y H:i') }}</span>
-                                                            </div>
-                                                            <div class="tm-record-item-body">
-                                                                @foreach ($module->fields as $field)
-                                                                    @php
-                                                                        $cell = $entry->data[$field->key] ?? null;
-                                                                    @endphp
-                                                                    <div class="tm-record-field">
-                                                                        <div class="tm-record-label">{{ $field->label }}</div>
-                                                                        <div class="tm-record-value">
-                                                                            @php
-                                                                                $mediaPaths = in_array($field->type, ['file', 'image', 'document'], true)
-                                                                                    ? (is_array($cell)
-                                                                                        ? array_values(array_filter($cell, fn ($path) => is_string($path) && trim($path) !== ''))
-                                                                                        : ((is_string($cell) && trim($cell) !== '') ? [trim($cell)] : []))
-                                                                                    : [];
-                                                                            @endphp
-                                                                            @if (count($mediaPaths) > 0)
-                                                                                <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                                                                                    @foreach ($mediaPaths as $imageIndex => $imagePath)
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            class="tm-thumb-link"
-                                                                                            data-open-image-preview
-                                                                                            data-image-src="{{ route('temporary-modules.entry-file.preview', ['module' => $module->id, 'entry' => $entry->id, 'fieldKey' => $field->key, 'i' => $imageIndex]) }}"
-                                                                                            data-image-title="{{ $field->label }}{{ count($mediaPaths) > 1 ? ' ('.($imageIndex + 1).')' : '' }}"
-                                                                                            title="{{ count($mediaPaths) > 1 ? 'Ver imagen '.($imageIndex + 1) : 'Ver imagen' }}"
-                                                                                        >
-                                                                                            <i class="fa fa-image" aria-hidden="true"></i> {{ count($mediaPaths) > 1 ? 'Imagen '.($imageIndex + 1) : 'Ver imagen' }}
-                                                                                        </button>
-                                                                                    @endforeach
-                                                                                </div>
-                                                                            @elseif (is_bool($cell))
-                                                                                {{ $cell ? 'Sí' : 'No' }}
-                                                                            @elseif ($field->type === 'semaforo' && is_string($cell) && $cell !== '')
-                                                                                @php $semLab = \App\Services\TemporaryModules\TemporaryModuleFieldService::labelForSemaforo($cell); @endphp
-                                                                                <span class="tm-semaforo-badge tm-semaforo-badge--{{ $cell }}" title="{{ $semLab }}">{{ $semLab }}</span>
-                                                                            @else
-                                                                                @php
-                                                                                    if (is_array($cell)) {
-                                                                                        $displayText = implode(', ', array_map(function ($item) {
-                                                                                            return is_scalar($item) ? (string) $item : json_encode($item, JSON_UNESCAPED_UNICODE);
-                                                                                        }, $cell));
-                                                                                    } elseif (is_scalar($cell)) {
-                                                                                        $displayText = (string) $cell;
-                                                                                    } else {
-                                                                                        $displayText = '-';
-                                                                                    }
-                                                                                    $displayText = trim($displayText) !== '' ? $displayText : '-';
-                                                                                @endphp
-                                                                                <span class="tm-cell-text-wrap" data-text-wrap>
-                                                                                    <span class="tm-cell-text is-collapsed" data-text-content>{{ $displayText }}</span>
-                                                                                    @if (mb_strlen($displayText) > 120)
-                                                                                        <span class="tm-cell-actions">
-                                                                                            <button type="button" class="tm-cell-text-toggle" data-text-toggle>Ver mas</button>
-                                                                                        </span>
-                                                                                    @endif
-                                                                                </span>
-                                                                            @endif
-                                                                        </div>
-                                                                    </div>
-                                                                @endforeach
-                                                            </div>
-                                                        </div>
-                                                    @endforeach
-                                                </div>
-                                            </div>
-                                            </details>
-                                        @endforeach
-                                    </div>
-                                </details>
-                            @endforeach
-                        </div>
-                    @endif
+                <div class="tm-modal-body" data-modal-lazy-body>
+                    {{-- Cargado al abrir el modal --}}
                 </div>
             </div>
         </div>
@@ -1180,7 +990,7 @@
                                             >
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="tm-btn tm-btn-sm tm-btn-danger">Eliminar</button>
+                                                <button type="submit" class="tm-btn tm-btn-sm tm-btn-danger"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
                                             </form>
                                         </span>
                                     @endcan

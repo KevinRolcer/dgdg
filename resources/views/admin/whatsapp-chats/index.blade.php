@@ -192,7 +192,7 @@
                                 : null;
                         @endphp
 
-                        <article class="wai-chat-card" data-status="{{ $st }}" data-title="{{ strtolower($chat->title ?? '') }}" data-chat-id="{{ $chat->id }}">
+                        <article class="wai-chat-card" data-status="{{ $st }}" data-title="{{ strtolower($chat->title ?? '') }}" data-filename="{{ strtolower((string) ($chat->original_zip_name ?? '')) }}" data-chat-id="{{ $chat->id }}">
 
                             {{-- Header de la tarjeta --}}
                             <div class="wai-card-head">
@@ -250,7 +250,7 @@
                                     </span>
                                 @endif
                                 @if ($isUploading)
-                                    <span class="wai-meta-item wai-meta-item--accent">
+                                    <span class="wai-meta-item wai-meta-item--accent js-wa-upload-count-meta">
                                         <i class="fa-solid fa-upload" aria-hidden="true"></i>
                                         {{ (int) ($chat->folder_uploaded_files ?? 0) }} / {{ max(1, (int) ($chat->folder_total_files ?? 0)) }} archivos
                                     </span>
@@ -262,6 +262,22 @@
                                     </span>
                                 @endif
                             </div>
+
+                            @if ($isUploading)
+                                @php
+                                    $uploadedFilesCount = (int) ($chat->folder_uploaded_files ?? 0);
+                                    $totalFilesCount = max(1, (int) ($chat->folder_total_files ?? 0));
+                                    $progressPct = max(0, min(100, (int) floor(($uploadedFilesCount / $totalFilesCount) * 100)));
+                                @endphp
+                                <div class="wai-resume-progress js-wa-resume-progress" data-chat-id="{{ $chat->id }}">
+                                    <div class="wai-resume-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $progressPct }}">
+                                        <div class="wai-resume-progress-bar js-wa-resume-progress-bar" style="width: {{ $progressPct }}%;"></div>
+                                    </div>
+                                    <p class="wai-resume-progress-text js-wa-resume-progress-text">
+                                        {{ $uploadedFilesCount }} / {{ $totalFilesCount }} archivos ({{ $progressPct }}%)
+                                    </p>
+                                </div>
+                            @endif
 
 
                             {{-- Popup de acciones --}}
@@ -282,6 +298,22 @@
                                                                                 <i class="fa-regular fa-eye" aria-hidden="true"></i>
                                                                                 Abrir chat
                                                                         </span>
+                                    @if ($isUploading && !empty($chat->folder_source_signature))
+                                        <button
+                                            type="button"
+                                            class="wai-popup-item js-wa-resume-upload-btn"
+                                            role="menuitem"
+                                            data-chat-id="{{ $chat->id }}"
+                                            data-folder-signature="{{ $chat->folder_source_signature }}"
+                                            data-folder-root-name="{{ (string) ($chat->folder_root_name ?? '') }}"
+                                            data-folder-total-files="{{ (int) ($chat->folder_total_files ?? 0) }}"
+                                            data-folder-uploaded-files="{{ (int) ($chat->folder_uploaded_files ?? 0) }}"
+                                            data-chat-title="{{ $chat->title }}"
+                                        >
+                                            <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+                                            Reanudar carga
+                                        </button>
+                                    @endif
                                     <span class="wai-popup-item wai-popup-item--disabled" aria-disabled="true" title="Disponible cuando el chat esté listo">
                                         <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
                                         Editar

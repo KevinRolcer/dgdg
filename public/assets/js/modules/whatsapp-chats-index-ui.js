@@ -24,13 +24,37 @@
     var activeFilter = 'all';
     var activePopup = null;
 
+    function normalizeText(value) {
+        return String(value || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim();
+    }
+
+    function cardMatchesStatusFilter(cardStatus, filter) {
+        if (filter === 'all') {
+            return true;
+        }
+        // "Procesando" incluye fase de subida por carpeta + procesamiento en cola.
+        if (filter === 'processing') {
+            return cardStatus === 'processing' || cardStatus === 'uploading';
+        }
+        return cardStatus === filter;
+    }
+
     function applyFilters() {
-        var query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        var query = searchInput ? normalizeText(searchInput.value) : '';
         var visible = 0;
 
         cards.forEach(function (card) {
-            var matchesQuery = !query || (card.dataset.title || '').includes(query);
-            var matchesFilter = activeFilter === 'all' || card.dataset.status === activeFilter;
+            var title = normalizeText(card.dataset.title || '');
+            var filename = normalizeText(card.dataset.filename || '');
+            var searchTarget = (title + ' ' + filename).trim();
+            var cardStatus = String(card.dataset.status || '').toLowerCase();
+
+            var matchesQuery = !query || searchTarget.indexOf(query) !== -1;
+            var matchesFilter = cardMatchesStatusFilter(cardStatus, activeFilter);
             card.hidden = !(matchesQuery && matchesFilter);
             if (!card.hidden) {
                 visible += 1;
