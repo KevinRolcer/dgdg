@@ -77,6 +77,9 @@
                             <div class="profile-meta-line">
                                 <span class="profile-role-badge">{{ $roleName }}</span>
                                 <span class="profile-phone-pill">{{ $phoneNumber }}</span>
+                                <button type="button" class="profile-phone-edit-btn" data-open-phone-modal title="Editar teléfono" aria-label="Editar teléfono">
+                                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -174,6 +177,32 @@
             </section>
         </article>
     </section>
+
+    <div class="profile-password-modal" id="profilePhoneModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="profilePhoneModalTitle">
+        <div class="profile-password-modal__backdrop" data-close-phone-modal></div>
+        <div class="profile-password-modal__dialog">
+            <div class="profile-password-modal__head">
+                <h3 id="profilePhoneModalTitle">Editar teléfono</h3>
+                <button type="button" class="profile-password-modal__close" aria-label="Cerrar" data-close-phone-modal>&times;</button>
+            </div>
+            <form method="POST" action="{{ route('profile.phone.update') }}" class="profile-password-form">
+                @csrf
+                <label>
+                    Número de teléfono
+                    <input
+                        type="tel"
+                        name="telefono"
+                        id="profilePhoneInput"
+                        value="{{ old('telefono', $phoneNumber !== 'No registrado' ? $phoneNumber : '') }}"
+                        placeholder="Ej. 2481234567"
+                        maxlength="20"
+                        autocomplete="tel"
+                    >
+                </label>
+                <button type="submit" class="profile-save-btn">Guardar teléfono</button>
+            </form>
+        </div>
+    </div>
 
     <div class="profile-password-modal" id="profilePasswordModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="profilePasswordModalTitle">
         <div class="profile-password-modal__backdrop" data-close-password-modal></div>

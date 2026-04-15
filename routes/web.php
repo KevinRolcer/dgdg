@@ -83,6 +83,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/mi-perfil/foto', [ProfileController::class, 'updateAvatar'])
         ->middleware('throttle:12,1')
         ->name('profile.avatar.update');
+    Route::post('/mi-perfil/telefono', [ProfileController::class, 'updatePhone'])
+        ->middleware('throttle:10,1')
+        ->name('profile.phone.update');
     Route::get('/perfil/foto/{userId}', [ProfileController::class, 'serveAvatar'])
         ->name('profile.avatar.serve');
 

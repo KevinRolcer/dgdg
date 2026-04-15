@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const passwordModal = document.getElementById('profilePasswordModal');
     const openPasswordModalButton = document.querySelector('[data-open-password-modal]');
     const closePasswordModalButtons = Array.from(document.querySelectorAll('[data-close-password-modal]'));
+    const phoneModal = document.getElementById('profilePhoneModal');
+    const openPhoneModalButton = document.querySelector('[data-open-phone-modal]');
+    const closePhoneModalButtons = Array.from(document.querySelectorAll('[data-close-phone-modal]'));
     const toneClasses = ['texture-tone-verde', 'texture-tone-amarillo', 'texture-tone-rojo', 'texture-tone-blanco'];
     const buttonByUrl = new Map();
     const toneByUrl = new Map();
@@ -133,6 +136,36 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (event.key === 'Escape' && passwordModal.classList.contains('is-open')) {
                 closePasswordModal();
+            }
+        });
+    }
+
+    if (phoneModal) {
+        const openPhoneModal = function () {
+            phoneModal.classList.add('is-open');
+            phoneModal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+            const input = document.getElementById('profilePhoneInput');
+            if (input) { setTimeout(function () { input.focus(); }, 80); }
+        };
+
+        const closePhoneModal = function () {
+            phoneModal.classList.remove('is-open');
+            phoneModal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+        };
+
+        if (openPhoneModalButton) {
+            openPhoneModalButton.addEventListener('click', openPhoneModal);
+        }
+
+        closePhoneModalButtons.forEach(function (button) {
+            button.addEventListener('click', closePhoneModal);
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && phoneModal.classList.contains('is-open')) {
+                closePhoneModal();
             }
         });
     }

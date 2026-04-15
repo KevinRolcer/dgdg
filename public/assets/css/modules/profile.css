@@ -252,6 +252,27 @@
     text-shadow: var(--hero-text-shadow);
 }
 
+.profile-phone-edit-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    border: 1px solid var(--hero-phone-border);
+    background: var(--hero-phone-bg);
+    color: var(--hero-phone-text);
+    font-size: 0.68rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    opacity: 0.75;
+    transition: opacity 0.15s, transform 0.15s;
+}
+.profile-phone-edit-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
 .profile-texture-picker {
     display: flex;
     flex-wrap: wrap;

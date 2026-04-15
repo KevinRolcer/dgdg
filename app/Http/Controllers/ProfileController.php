@@ -7,6 +7,8 @@ use App\Services\Profile\ProfileService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
@@ -100,6 +102,32 @@ class ProfileController extends Controller
         }
 
         return back()->with('status', 'Foto de perfil actualizada correctamente.');
+    }
+
+    public function updatePhone(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'telefono' => ['nullable', 'string', 'max:20', 'regex:/^[0-9\s\+\-\(\)]*$/'],
+        ], [
+            'telefono.max'   => 'El teléfono no puede superar los 20 caracteres.',
+            'telefono.regex' => 'El teléfono solo puede contener dígitos, espacios y los caracteres + - ( ).',
+        ]);
+
+        $user = $request->user();
+        $telefono = trim((string) ($validated['telefono'] ?? ''));
+
+        if (Schema::hasColumn('users', 'telefono')) {
+            $user->forceFill(['telefono' => $telefono !== '' ? $telefono : null])->save();
+        }
+
+        $delegado = DB::table('delegados')->where('user_id', $user->id)->first();
+        if ($delegado) {
+            DB::table('delegados')
+                ->where('user_id', $user->id)
+                ->update(['telefono' => $telefono !== '' ? $telefono : null]);
+        }
+
+        return back()->with('status', 'Teléfono actualizado correctamente.');
     }
 
     public function serveAvatar(Request $request, int $userId): Response
