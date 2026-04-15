@@ -52,7 +52,7 @@
 
                 <div class="wai-tab-warn" id="waFolderTabWarn" role="alert" hidden>
                     <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                    <strong>No cierres ni cambies de pestaña</strong> Mientras suben los archivos; si se interrumpe, vuelve a elegir la misma carpeta para reanudar.
+                    <strong>No cierres ni cambies de pestaña</strong>
                 </div>
 
                 <div class="wai-import-fields">
