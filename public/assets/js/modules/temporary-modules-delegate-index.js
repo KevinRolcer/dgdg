@@ -1497,6 +1497,16 @@
             modal.setAttribute('aria-hidden', 'true');
             document.body.style.overflow = '';
 
+            if (modal.classList.contains('tm-bulk-edit-modal')) {
+                const mid = modal.getAttribute('data-module-id');
+                const panel = mid ? document.getElementById('module-records-' + mid) : null;
+                if (modal.__tmBulkPendingRecordsRefresh && panel && typeof window.__tmReloadRecordsPanel === 'function') {
+                    window.__tmReloadRecordsPanel(panel, { requireActive: false });
+                }
+                modal.__tmBulkPendingRecordsRefresh = false;
+                modal.__tmDeferRecordsReload = false;
+            }
+
             const opener = modalOpeners.get(modal.id);
             if (opener instanceof HTMLElement) {
                 opener.focus();
@@ -1636,6 +1646,54 @@
             });
         });
 
+        /** URLs de vista previa de archivos/imagenes de registros (misma ruta, bytes nuevos → el navegador cachea sin esto). */
+        function tmEntryFilePreviewUrlNeedsCacheBust(url) {
+            if (!url || typeof url !== 'string') {
+                return false;
+            }
+            return url.indexOf('/registros/') !== -1 && url.indexOf('/archivo/') !== -1;
+        }
+
+        function tmUrlWithSearchParam(url, key, val) {
+            if (!url || typeof url !== 'string') {
+                return url;
+            }
+            try {
+                const u = new URL(url, window.location.origin);
+                u.searchParams.set(key, String(val));
+                if (url.indexOf('://') === -1 && url.indexOf('//') !== 0) {
+                    return u.pathname + u.search + u.hash;
+                }
+                return u.toString();
+            } catch (e) {
+                const sep = url.indexOf('?') >= 0 ? '&' : '?';
+                return url + sep + encodeURIComponent(key) + '=' + encodeURIComponent(String(val));
+            }
+        }
+
+        function tmBustMediaPreviewUrlsInRoot(root, token) {
+            if (!(root instanceof HTMLElement)) {
+                return;
+            }
+            const t = token != null ? String(token) : String(Date.now());
+            root.querySelectorAll('img[src]').forEach(function (img) {
+                const s = img.getAttribute('src');
+                if (!tmEntryFilePreviewUrlNeedsCacheBust(s)) {
+                    return;
+                }
+                img.setAttribute('src', tmUrlWithSearchParam(s, '_tmcb', t));
+            });
+            ['data-image-src', 'data-file-src'].forEach(function (attr) {
+                root.querySelectorAll('[' + attr + ']').forEach(function (el) {
+                    const s = el.getAttribute(attr);
+                    if (!tmEntryFilePreviewUrlNeedsCacheBust(s)) {
+                        return;
+                    }
+                    el.setAttribute(attr, tmUrlWithSearchParam(s, '_tmcb', t));
+                });
+            });
+        }
+
         const buildRecordsQueryFromPanel = function (panel, entriesPage) {
             if (!panel) {
                 return '';
@@ -1721,8 +1779,11 @@
             host.innerHTML = '<p class="tm-muted tm-records-loading">Cargando…</p>';
             host.hidden = false;
             const sep = fragmentRecordsBase.indexOf('?') >= 0 ? '&' : '?';
-            return fetch(fragmentRecordsBase + sep + qs.replace(/^\?/, ''), {
+            const qsClean = qs.replace(/^\?/, '');
+            const fragBust = '&_tmfrag=' + Date.now();
+            return fetch(fragmentRecordsBase + sep + qsClean + fragBust, {
                 credentials: 'same-origin',
+                cache: 'no-store',
                 headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }
             }).then(function (res) {
                 if (res.redirected || (res.url && res.url.includes('/login'))) {
@@ -1742,6 +1803,7 @@
                     panel.querySelectorAll('.tm-record-bulk-check, .tm-bulk-col').forEach(el => el.classList.remove('tm-hidden'));
                 }
                 if (typeof updateBulkUI === 'function') updateBulkUI(panel);
+                tmBustMediaPreviewUrlsInRoot(host, Date.now());
                 Array.from(host.querySelectorAll(mediaInputSelector)).forEach(function (inp) {
                     initializeImagePreview(inp);
                 });
@@ -3504,7 +3566,9 @@
                 }
                 el.style.overflowY = 'hidden';
                 el.style.height = 'auto';
-                const natural = el.scrollHeight;
+                // scrollHeight no incluye bordes; compensar para evitar texto recortado.
+                const extra = Math.max(0, (el.offsetHeight || 0) - (el.clientHeight || 0));
+                const natural = el.scrollHeight + extra;
                 const maxH = Math.min(window.innerHeight * 0.5, 448);
                 const next = Math.min(natural, maxH);
                 el.style.height = next + 'px';
@@ -3599,6 +3663,31 @@
                 }
                 return { fieldCount, entryCount: entryIds.size };
             }
+
+            function updateBulkRowVisualState(modal, st, entryId) {
+                if (!modal || !st || !entryId) {
+                    return;
+                }
+                const edited = entryIsDirty(st, entryId);
+                const pending = entryHasPendingFileChanges(st, entryId);
+
+                const listRow = modal.querySelector('.tm-bulk-edit-row[data-entry-id="' + entryId + '"]');
+                if (listRow) {
+                    listRow.classList.toggle('tm-bulk-edit-row--edited', edited && !pending);
+                    listRow.classList.toggle('tm-bulk-edit-row--pending', pending);
+                }
+
+                const sheetRow = modal.querySelector('.tm-bulk-sheet-row[data-entry-id="' + entryId + '"]');
+                if (sheetRow) {
+                    sheetRow.classList.toggle('is-edited', edited && !pending);
+                    sheetRow.classList.toggle('is-pending', pending);
+                }
+
+                const filesBox = modal.querySelector('.tm-bulk-sheet-files[data-sheet-entry-id="' + entryId + '"][data-sheet-field-key]');
+                if (filesBox) {
+                    // noop placeholder to keep future-proof hook; actual cell rendering updates counts on render
+                }
+            }
             function refreshBulkCounter(modal) {
                 const st = modal.__bulkState;
                 if (!st) {
@@ -3617,10 +3706,12 @@
                     const id = parseInt(btn.getAttribute('data-entry-id'), 10);
                     const dirty = entryIsDirty(st, id);
                     btn.classList.toggle('tm-hidden', !dirty);
+                    updateBulkRowVisualState(modal, st, id);
                 });
                 modal.querySelectorAll('[data-tm-bulk-dirty-badge]').forEach(function (badge) {
                     const id = parseInt(badge.getAttribute('data-entry-id'), 10);
                     badge.classList.toggle('tm-hidden', !entryIsDirty(st, id));
+                    updateBulkRowVisualState(modal, st, id);
                 });
             }
             /** Valor “sin dato” para filtros de columna vacía (sobre datos guardados). */
@@ -3827,6 +3918,1436 @@
                     ff.value = '';
                 }
                 applyBulkListFilters(modal);
+            }
+
+            function ensureDraftsForAllEntries(st) {
+                if (!st || !Array.isArray(st.entries)) {
+                    return;
+                }
+                st.entries.forEach(function (e) {
+                    if (!e || !e.id) {
+                        return;
+                    }
+                    if (!st.drafts[e.id]) {
+                        st.drafts[e.id] = deepClone(st.originals[e.id]);
+                    }
+                });
+            }
+
+            function normalizeForSearch(v) {
+                if (v === null || v === undefined) {
+                    return '';
+                }
+                if (Array.isArray(v)) {
+                    return v.map(function (x) { return String(x ?? '').trim(); }).filter(Boolean).join(', ');
+                }
+                if (typeof v === 'object') {
+                    try {
+                        return JSON.stringify(v);
+                    } catch (e) {
+                        return '';
+                    }
+                }
+                return String(v);
+            }
+
+            function getMrForEntry(st, entryId) {
+                const entry = st.entryById[entryId];
+                const mrOrig = entry ? entry.microrregion_id : null;
+                const mr = st.draftMicrorregion[entryId] !== undefined ? st.draftMicrorregion[entryId] : mrOrig;
+                return mr != null ? parseInt(mr, 10) : null;
+            }
+
+            function buildSheetFilterCellHtml(col, st) {
+                if (!col || col.key === '__row') {
+                    return '<th class="row-num" data-col-key="__row"></th>';
+                }
+
+                const f = col.field || null;
+                const keyAttr = ' data-tm-bulk-sheet-filter data-sheet-filter-key="' + tmBulkEsc(col.key) + '"';
+
+                if (col.key === '__title') {
+                    return '<th data-col-key="__title"><input type="search" class="tm-bulk-sheet-filter-input"' + keyAttr + ' placeholder="Filtrar…"></th>';
+                }
+
+                if (col.key === '__mr') {
+                    let opts = '<option value="">Todas</option>';
+                    (microrregionesMeta || []).forEach(function (m) {
+                        if (!m || !m.id) return;
+                        opts += '<option value="' + tmBulkEsc(String(m.id)) + '">' + tmBulkEsc(String(m.label || m.id)) + '</option>';
+                    });
+                    return '<th data-col-key="__mr"><select class="tm-bulk-sheet-filter-select"' + keyAttr + '>' + opts + '</select></th>';
+                }
+
+                if (!f) {
+                    return '<th data-col-key="' + tmBulkEsc(col.key) + '"><input type="search" class="tm-bulk-sheet-filter-input"' + keyAttr + ' placeholder="Filtrar…"></th>';
+                }
+
+                if (f.type === 'image') {
+                    return '<th data-col-key="' + tmBulkEsc(col.key) + '"></th>';
+                }
+
+                if (f.type === 'boolean') {
+                    return '<th data-col-key="' + tmBulkEsc(col.key) + '"><select class="tm-bulk-sheet-filter-select"' + keyAttr + '><option value="">Todos</option><option value="1">Si</option><option value="0">No</option></select></th>';
+                }
+
+                if (f.type === 'select') {
+                    const opts = Array.isArray(f.options) ? f.options : [];
+                    let html = '<option value="">Todos</option>';
+                    opts.forEach(function (opt) {
+                        if (typeof opt !== 'string' && typeof opt !== 'number') return;
+                        html += '<option value="' + tmBulkEsc(String(opt)) + '">' + tmBulkEsc(String(opt)) + '</option>';
+                    });
+                    return '<th data-col-key="' + tmBulkEsc(col.key) + '"><select class="tm-bulk-sheet-filter-select"' + keyAttr + '>' + html + '</select></th>';
+                }
+
+                if (f.type === 'semaforo') {
+                    let html = '<option value="">Todos</option>';
+                    Object.keys(tmSemaforoLabels || {}).forEach(function (semVal) {
+                        html += '<option value="' + tmBulkEsc(String(semVal)) + '">' + tmBulkEsc(String(tmSemaforoLabels[semVal])) + '</option>';
+                    });
+                    return '<th data-col-key="' + tmBulkEsc(col.key) + '"><select class="tm-bulk-sheet-filter-select"' + keyAttr + '>' + html + '</select></th>';
+                }
+
+                if (f.type === 'categoria') {
+                    const catOpts = Array.isArray(f.options) ? f.options : [];
+                    let html = '<option value="">Todos</option>';
+                    catOpts.forEach(function (cat) {
+                        const catName = cat && cat.name ? String(cat.name) : '';
+                        if (!catName) return;
+                        html += '<option value="' + tmBulkEsc(catName) + '">' + tmBulkEsc(catName) + '</option>';
+                        (cat.sub || []).forEach(function (sub) {
+                            const subVal = catName + ' > ' + String(sub);
+                            html += '<option value="' + tmBulkEsc(subVal) + '">' + tmBulkEsc(subVal) + '</option>';
+                        });
+                    });
+                    return '<th data-col-key="' + tmBulkEsc(col.key) + '"><select class="tm-bulk-sheet-filter-select"' + keyAttr + '>' + html + '</select></th>';
+                }
+
+                return '<th data-col-key="' + tmBulkEsc(col.key) + '"><input type="search" class="tm-bulk-sheet-filter-input"' + keyAttr + ' placeholder="Filtrar…"></th>';
+            }
+
+            function buildSheetCellHtml(col, st, entry, rowIndex, previewTpl) {
+                const entryId = entry.id;
+                const draft = st.drafts[entryId] || {};
+
+                function wrap(inner, isDirty) {
+                    return '<div class="tm-bulk-sheet-cell-wrap' + (isDirty ? ' is-dirty' : '') + '">' + inner + '</div>';
+                }
+
+                if (col.key === '__row') {
+                    return '<td class="row-num" data-col-key="__row">' + tmBulkEsc(String(rowIndex)) + '</td>';
+                }
+
+                if (col.key === '__title') {
+                    return '<td data-col-key="__title">' + tmBulkEsc(String(entry.title || '')) + '</td>';
+                }
+
+                if (col.key === '__mr') {
+                    const mr = getMrForEntry(st, entryId);
+                    let opts = '';
+                    (microrregionesMeta || []).forEach(function (m) {
+                        if (!m || !m.id) return;
+                        const sel = mr != null && parseInt(mr, 10) === parseInt(m.id, 10) ? ' selected' : '';
+                        opts += '<option value="' + tmBulkEsc(String(m.id)) + '"' + sel + '>' + tmBulkEsc(String(m.label || m.id)) + '</option>';
+                    });
+                    const dirty = st.showMrSelect ? (mr !== (entry.microrregion_id || null)) : false;
+                    return '<td data-col-key="__mr">' + wrap('<select class="tm-bulk-sheet-cell" data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-mr="1">' + opts + '</select>', dirty) + '</td>';
+                }
+
+                const field = col.field;
+                const k = field.key;
+                const type = field.type;
+                let v = draft[k];
+                if (v === undefined || v === null) v = '';
+
+                const orig = (st.originals[entryId] || {})[k];
+                const dirty = (type === 'image' || type === 'file' || type === 'document') ? false : !valEqual(v, orig);
+
+                const baseAttrs = ' data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-field-key="' + tmBulkEsc(String(k)) + '"';
+
+                if (type === 'textarea') {
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<textarea class="tm-bulk-sheet-cell tm-bulk-textarea"' + baseAttrs + ' rows="1">' + tmBulkEsc(String(v)) + '</textarea>', dirty) + '</td>';
+                }
+
+                if (type === 'number') {
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<input class="tm-bulk-sheet-cell" type="number" step="any"' + baseAttrs + ' value="' + tmBulkEsc(String(v)) + '">', dirty) + '</td>';
+                }
+
+                if (type === 'date') {
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<input class="tm-bulk-sheet-cell" type="date"' + baseAttrs + ' value="' + tmBulkEsc(String(v)) + '">', dirty) + '</td>';
+                }
+
+                if (type === 'datetime') {
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<input class="tm-bulk-sheet-cell" type="datetime-local"' + baseAttrs + ' value="' + tmBulkEsc(String(v)) + '">', dirty) + '</td>';
+                }
+
+                if (type === 'select') {
+                    const opts = Array.isArray(field.options) ? field.options : [];
+                    let html = '<option value="">Selecciona</option>';
+                    opts.forEach(function (opt) {
+                        if (typeof opt !== 'string' && typeof opt !== 'number') return;
+                        const sel = String(opt) === String(v) ? ' selected' : '';
+                        html += '<option value="' + tmBulkEsc(String(opt)) + '"' + sel + '>' + tmBulkEsc(String(opt)) + '</option>';
+                    });
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell"' + baseAttrs + '>' + html + '</select>', dirty) + '</td>';
+                }
+
+                if (type === 'multiselect') {
+                    const opts = Array.isArray(field.options) ? field.options : [];
+                    const arr = Array.isArray(v)
+                        ? v
+                        : (typeof v === 'string' && v ? v.split(',').map(function (s) { return s.trim(); }) : []);
+                    const selected = new Set(arr.map(function (x) { return String(x ?? '').trim(); }).filter(Boolean));
+                    let html = '';
+                    opts.forEach(function (opt) {
+                        if (typeof opt !== 'string' && typeof opt !== 'number') return;
+                        const val = String(opt);
+                        const isOn = selected.has(val);
+                        html += '<button type="button" class="tm-bulk-sheet-chip' + (isOn ? ' is-on' : '') + '" data-sheet-multi-chip="1"' +
+                            ' data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '"' +
+                            ' data-sheet-field-key="' + tmBulkEsc(String(k)) + '"' +
+                            ' data-sheet-multi-opt="' + tmBulkEsc(val) + '">' + tmBulkEsc(val) + '</button>';
+                    });
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' +
+                        wrap('<div class="tm-bulk-sheet-multi"' + baseAttrs + '>' + html + '</div>', dirty) +
+                        '</td>';
+                }
+
+                if (type === 'boolean') {
+                    const boolYes = v === true || v === 1 || v === '1' || (typeof v === 'string' && ['sí', 'si', 'yes', 'true', 'verdadero'].indexOf(String(v).toLowerCase().trim()) !== -1);
+                    const boolNo = v === false || v === 0 || v === '0' || (typeof v === 'string' && ['no', 'false', 'falso'].indexOf(String(v).toLowerCase().trim()) !== -1);
+                    const html = '<option value="">Selecciona</option>' +
+                        '<option value="1"' + (boolYes ? ' selected' : '') + '>Si</option>' +
+                        '<option value="0"' + (boolNo && !boolYes ? ' selected' : '') + '>No</option>';
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell"' + baseAttrs + '>' + html + '</select>', dirty) + '</td>';
+                }
+
+                if (type === 'semaforo') {
+                    let html = '<option value="">Selecciona</option>';
+                    Object.keys(tmSemaforoLabels || {}).forEach(function (semVal) {
+                        const sel = String(v) === String(semVal) ? ' selected' : '';
+                        html += '<option value="' + tmBulkEsc(String(semVal)) + '"' + sel + '>' + tmBulkEsc(String(tmSemaforoLabels[semVal])) + '</option>';
+                    });
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell tm-semaforo-select"' + baseAttrs + '>' + html + '</select>', dirty) + '</td>';
+                }
+
+                if (type === 'categoria') {
+                    const catOpts = Array.isArray(field.options) ? field.options : [];
+                    let html = '<option value="">Selecciona</option>';
+                    catOpts.forEach(function (cat) {
+                        const catName = cat && cat.name ? String(cat.name) : '';
+                        if (!catName) return;
+                        const sel = String(v) === catName ? ' selected' : '';
+                        html += '<option value="' + tmBulkEsc(catName) + '"' + sel + '>' + tmBulkEsc(catName) + '</option>';
+                        (cat.sub || []).forEach(function (sub) {
+                            const subVal = catName + ' > ' + String(sub);
+                            const sel2 = String(v) === subVal ? ' selected' : '';
+                            html += '<option value="' + tmBulkEsc(subVal) + '"' + sel2 + '>' + tmBulkEsc(subVal) + '</option>';
+                        });
+                    });
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell"' + baseAttrs + '>' + html + '</select>', dirty) + '</td>';
+                }
+
+                if (type === 'municipio') {
+                    const cur = String(v || '');
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell tm-municipio-select"' + baseAttrs + '><option value="">Selecciona un municipio</option></select>' +
+                        (cur ? '<span class="tm-hidden" data-sheet-mun-initial="' + tmBulkEsc(cur) + '"></span>' : ''), dirty) + '</td>';
+                }
+
+                if (type === 'linked') {
+                    const opts = field.options || {};
+                    const pt = opts.primary_type || 'text';
+                    const pOpts = opts.primary_options || [];
+                    const st2 = opts.secondary_type || 'text';
+                    const sOpts = opts.secondary_options || [];
+                    const existing = typeof v === 'object' && v !== null ? v : {};
+                    const pv = existing.primary != null ? existing.primary : '';
+                    const sv = existing.secondary != null ? existing.secondary : '';
+                    const showSec = pv !== '' && pv !== null && pv !== undefined;
+
+                    const pAttr = ' data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-linked-key="' + tmBulkEsc(String(k)) + '" data-sheet-linked-part="primary"';
+                    const sAttr = ' data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-linked-key="' + tmBulkEsc(String(k)) + '" data-sheet-linked-part="secondary"';
+
+                    let pHtml = '';
+                    if (pt === 'select') {
+                        pHtml = '<select class="tm-bulk-sheet-cell"' + pAttr + '><option value="">Selecciona</option>' +
+                            pOpts.map(function (opt) {
+                                const sel = String(pv) === String(opt) ? ' selected' : '';
+                                return '<option value="' + tmBulkEsc(String(opt)) + '"' + sel + '>' + tmBulkEsc(String(opt)) + '</option>';
+                            }).join('') + '</select>';
+                    } else {
+                        pHtml = '<input class="tm-bulk-sheet-cell" type="text"' + pAttr + ' value="' + tmBulkEsc(String(pv)) + '" placeholder="Principal">';
+                    }
+
+                    let sHtml = '';
+                    if (st2 === 'select') {
+                        sHtml = '<select class="tm-bulk-sheet-cell"' + sAttr + (showSec ? '' : ' disabled') + '><option value="">Selecciona</option>' +
+                            sOpts.map(function (opt) {
+                                const sel = String(sv) === String(opt) ? ' selected' : '';
+                                return '<option value="' + tmBulkEsc(String(opt)) + '"' + sel + '>' + tmBulkEsc(String(opt)) + '</option>';
+                            }).join('') + '</select>';
+                    } else {
+                        sHtml = '<input class="tm-bulk-sheet-cell" type="text"' + sAttr + (showSec ? '' : ' disabled') + ' value="' + tmBulkEsc(String(sv)) + '" placeholder="Secundario">';
+                    }
+
+                    const html = '<div style="display:flex; flex-direction:column; gap:6px;">' +
+                        pHtml +
+                        '<div data-sheet-linked-secondary-wrap="' + tmBulkEsc(String(k)) + '"' + (showSec ? '' : ' hidden') + '>' + sHtml + '</div>' +
+                        '</div>';
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap(html, dirty) + '</td>';
+                }
+
+                if (type === 'geopoint') {
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<textarea class="tm-bulk-sheet-cell tm-bulk-textarea"' + baseAttrs + ' rows="1" placeholder="lat,lng o JSON">' + tmBulkEsc(String(v)) + '</textarea>', dirty) + '</td>';
+                }
+
+                if (type === 'image' || type === 'file' || type === 'document') {
+                    const removedSet = new Set(((((st.removeExisting || {})[entryId] || {})[k]) || []).filter(function (p) { return typeof p === 'string' && p.trim() !== ''; }));
+                    const paths = Array.isArray(v)
+                        ? v.filter(function (p) { return typeof p === 'string' && p.trim() !== ''; })
+                        : (typeof v === 'string' && String(v).trim() !== '' ? [String(v).trim()] : []);
+                    const visibleExisting = paths.filter(function (p) { return !removedSet.has(p); });
+                    const pendingCount = (((st.pendingFiles || {})[entryId] || {})[k] || []).length;
+
+                    const tpl = typeof previewTpl === 'string' ? previewTpl : '';
+                    const base = tpl ? tpl.replace('__EID__', String(entryId)).replace('__FKEY__', String(k)) : '';
+                    const sep = base.indexOf('?') >= 0 ? '&' : '?';
+
+                    if (type === 'image') {
+                        const visible = paths.map(function (p, idx) { return { path: p, idx: idx }; }).filter(function (x) { return !removedSet.has(x.path); });
+                        const slot0 = visible[0] ? (base ? (base + sep + 'i=' + visible[0].idx) : '') : '';
+                        const slot1 = visible[1] ? (base ? (base + sep + 'i=' + visible[1].idx) : '') : '';
+
+                        const cell = '<div class="tm-bulk-sheet-images" data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-field-key="' + tmBulkEsc(String(k)) + '">' +
+                            '<div class="tm-bulk-sheet-img-slot" data-img-slot="0" data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-field-key="' + tmBulkEsc(String(k)) + '">' +
+                            '<img class="tm-bulk-sheet-img" alt="Imagen" src="' + tmBulkEsc(slot0) + '"' + (visible[0] ? (' data-existing="' + tmBulkEsc(visible[0].path) + '" data-existing-idx="' + tmBulkEsc(String(visible[0].idx)) + '"') : '') + '>' +
+                            '</div>' +
+                            '<div class="tm-bulk-sheet-img-slot" data-img-slot="1" data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-field-key="' + tmBulkEsc(String(k)) + '">' +
+                            '<img class="tm-bulk-sheet-img" alt="Imagen" src="' + tmBulkEsc(slot1) + '"' + (visible[1] ? (' data-existing="' + tmBulkEsc(visible[1].path) + '" data-existing-idx="' + tmBulkEsc(String(visible[1].idx)) + '"') : '') + '>' +
+                            '</div>' +
+                            '</div>';
+                        const dirtyMedia = pendingCount > 0 || removedSet.size > 0;
+                        return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap(cell, dirtyMedia) + '</td>';
+                    }
+
+                    // file/document: mantener UI previa (botón editar)
+                    const label = (type === 'document' || type === 'file') ? 'Archivo' : 'Archivo';
+                    const counts = '<span class="tm-bulk-sheet-files-count">' +
+                        (visibleExisting.length ? (visibleExisting.length + ' existente(s)') : 'Sin ' + tmBulkEsc(label.toLowerCase())) +
+                        (pendingCount ? (' • ' + pendingCount + ' pendiente(s)') : '') +
+                        '</span>';
+                    const actions = '<div class="tm-bulk-sheet-files-actions">' +
+                        '<button type="button" class="tm-btn tm-btn-sm tm-btn-outline" data-tm-bulk-sheet-edit-files data-entry-id="' + tmBulkEsc(String(entryId)) + '" data-field-key="' + tmBulkEsc(String(k)) + '">Editar</button>' +
+                        '</div>';
+                    const box = '<div class="tm-bulk-sheet-files" data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-field-key="' + tmBulkEsc(String(k)) + '" data-sheet-file-kind="' + tmBulkEsc(String(type)) + '">' +
+                        '<div class="tm-bulk-sheet-files-meta">' + counts + '</div>' +
+                        actions +
+                        '</div>';
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap(box, false) + '</td>';
+                }
+
+                // Default: texto multilinea para que el contenido se vea completo.
+                return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<textarea class="tm-bulk-sheet-cell tm-bulk-textarea"' + baseAttrs + ' rows="1">' + tmBulkEsc(String(v)) + '</textarea>', dirty) + '</td>';
+            }
+
+            function renderBulkSheet(modal) {
+                const st = modal.__bulkState;
+                const inner = modal.querySelector('[data-tm-bulk-sheet-inner]');
+                if (!st || !inner) {
+                    return;
+                }
+
+                ensureDraftsForAllEntries(st);
+                const previewTpl = modal.getAttribute('data-preview-url-template') || '';
+                bulkEnableColumnResizeOnce();
+
+                if (st.showMrSelect) {
+                    // Order: #, Microrregión, Municipio
+                    var cols = [{ key: '__row', label: '#', kind: 'rownum' }, { key: '__mr', label: 'Microrregión', kind: 'mr' }, { key: '__title', label: 'Municipio', kind: 'title' }];
+                } else {
+                    var cols = [{ key: '__row', label: '#', kind: 'rownum' }, { key: '__title', label: 'Municipio', kind: 'title' }];
+                }
+                st.fields.forEach(function (f) {
+                    if (!f || f.type === 'seccion') return;
+                    cols.push({ key: f.key, label: f.label, kind: 'field', field: f });
+                });
+
+                const colgroupHtml = '<colgroup>' + cols.map(function (c) {
+                    const widths = modal.__bulkSheetColWidths || {};
+                    let w = widths[c.key];
+                    if (typeof w !== 'number') {
+                        if (c.key === '__row') w = 64;
+                        else if (c.key === '__mr') w = 280;
+                        else if (c.key === '__title') w = 260;
+                        else w = 220;
+                    }
+                    return '<col data-col-key="' + tmBulkEsc(String(c.key)) + '" style="width:' + tmBulkEsc(String(Math.round(w))) + 'px">';
+                }).join('') + '</colgroup>';
+
+                const headerHtml = '<tr class="tm-bulk-sheet-header-row">' + cols.map(function (c) {
+                    const cls = c.key === '__row' ? ' class="row-num"' : '';
+                    const key = tmBulkEsc(String(c.key));
+                    const resizer = c.key === '__row' ? '' : '<span class="tm-bulk-sheet-resizer" data-tm-bulk-col-resize="' + key + '" aria-hidden="true"></span>';
+                    return '<th' + cls + ' data-col-key="' + key + '">' + tmBulkEsc(String(c.label || '')) + resizer + '</th>';
+                }).join('') + '</tr>';
+
+                const filterHtml = '<tr class="tm-bulk-sheet-filter-row">' + cols.map(function (c) {
+                    return buildSheetFilterCellHtml(c, st);
+                }).join('') + '</tr>';
+
+                function buildSheetRowHtml(e, globalIndex) {
+                    const eid = e.id;
+                    const edited = entryIsDirty(st, eid);
+                    const pending = entryHasPendingFileChanges(st, eid);
+                    const tds = cols.map(function (c) { return buildSheetCellHtml(c, st, e, globalIndex + 1, previewTpl); }).join('');
+                    return '<tr class="tm-bulk-sheet-row' + (edited || pending ? ' is-dirty' : '') + (pending ? ' is-pending' : (edited ? ' is-edited' : '')) + '" data-entry-id="' + tmBulkEsc(String(eid)) + '">' + tds + '</tr>';
+                }
+
+                inner.innerHTML = '<table class="tm-excel-preview-table tm-bulk-sheet-table">' +
+                    colgroupHtml +
+                    '<thead>' +
+                    headerHtml +
+                    filterHtml +
+                    '</thead><tbody></tbody></table>';
+
+                // Ajustar sticky de filtros al alto real del encabezado (sin huecos).
+                const table = inner.querySelector('table.tm-bulk-sheet-table');
+                const headRow = table ? table.querySelector('thead tr.tm-bulk-sheet-header-row') : null;
+                if (table && headRow) {
+                    const h = Math.ceil(headRow.getBoundingClientRect().height || 34);
+                    table.style.setProperty('--tm-bulk-sheet-head-h', h + 'px');
+                }
+
+                // Render incremental (10 en 10) para evitar saturar el DOM.
+                const tbody = table ? table.querySelector('tbody') : null;
+                if (!tbody) {
+                    return;
+                }
+                modal.__bulkSheetBatchSize = 10;
+                modal.__bulkSheetCursor = 0;
+                const entries = Array.isArray(st.entries) ? st.entries : [];
+                const container = modal.querySelector('[data-tm-bulk-sheet] .tm-bulk-sheet-container');
+
+                function ensureSentinel() {
+                    let s = tbody.querySelector('tr.tm-bulk-sheet-sentinel');
+                    if (!s) {
+                        s = document.createElement('tr');
+                        s.className = 'tm-bulk-sheet-sentinel';
+                        const td = document.createElement('td');
+                        td.colSpan = Math.max(1, cols.length);
+                        td.style.padding = '0';
+                        td.style.border = '0';
+                        td.style.height = '1px';
+                        s.appendChild(td);
+                    }
+                    tbody.appendChild(s);
+                    return s;
+                }
+
+                const appendNextBatch = function () {
+                    const cursor = modal.__bulkSheetCursor || 0;
+                    const batchSize = modal.__bulkSheetBatchSize || 10;
+                    if (cursor >= entries.length) {
+                        return false;
+                    }
+                    const end = Math.min(entries.length, cursor + batchSize);
+                    let html = '';
+                    for (let i = cursor; i < end; i++) {
+                        const e = entries[i];
+                        if (!e) continue;
+                        html += buildSheetRowHtml(e, i);
+                    }
+                    tbody.insertAdjacentHTML('beforeend', html);
+                    modal.__bulkSheetCursor = end;
+                    ensureSentinel();
+
+                    // Fit textareas and render images only for new rows.
+                    const fitNew = function () {
+                        tbody.querySelectorAll('tr.tm-bulk-sheet-row:nth-last-child(-n+' + (end - cursor) + ') textarea.tm-bulk-textarea').forEach(function (ta) {
+                            ta.addEventListener('input', function () { tmBulkFitTextareaHeight(ta); });
+                            ta.addEventListener('focus', function () { tmBulkFitTextareaHeight(ta); });
+                            tmBulkFitTextareaHeight(ta);
+                        });
+                    };
+                    fitNew();
+                    requestAnimationFrame(fitNew);
+
+                    // Render previews de imágenes pendientes/existentes para nuevas filas.
+                    for (let i = cursor; i < end; i++) {
+                        const e = entries[i];
+                        if (!e || !e.id) continue;
+                        st.fields.forEach(function (f) {
+                            if (f && f.type === 'image') {
+                                bulkRenderImagesCell(modal, e.id, f.key);
+                            }
+                        });
+                        updateBulkRowVisualState(modal, st, e.id);
+                    }
+
+                    // Reaplicar filtros actuales a las filas nuevas.
+                    applySheetFilters(modal);
+                    return true;
+                };
+
+                // Exponer para el listener de scroll (evita closures viejos tras re-render).
+                modal.__bulkSheetAppendNextBatch = appendNextBatch;
+
+                const maybeAppendMore = function () {
+                    if (!container) {
+                        return;
+                    }
+                    let guard = 0;
+                    while (guard < 50 && (modal.__bulkSheetCursor || 0) < entries.length) {
+                        const remaining = container.scrollHeight - (container.scrollTop + container.clientHeight);
+                        if (remaining > 260) {
+                            break;
+                        }
+                        guard++;
+                        const did = appendNextBatch();
+                        if (!did) {
+                            break;
+                        }
+                    }
+                };
+                modal.__bulkSheetMaybeAppendMore = maybeAppendMore;
+
+                appendNextBatch();
+
+                // Municipios: poblar selects por microrregión.
+                const munField = st.fields.find(function (f) { return f && f.type === 'municipio'; });
+                if (munField) {
+                    inner.querySelectorAll('.tm-bulk-sheet-row').forEach(function (row) {
+                        const eid = parseInt(row.getAttribute('data-entry-id'), 10);
+                        const mr = getMrForEntry(st, eid);
+                        if (mr != null) {
+                            setMunicipiosForForm(row, String(mr));
+                        }
+                        const ms = row.querySelector('[data-sheet-field-key="' + munField.key + '"]');
+                        const mv = (st.drafts[eid] || {})[munField.key];
+                        if (ms && mv != null && String(mv) !== '') {
+                            ms.value = String(mv);
+                        } else if (ms) {
+                            const init = row.querySelector('[data-sheet-mun-initial]');
+                            if (init && init.getAttribute('data-sheet-mun-initial')) {
+                                ms.value = String(init.getAttribute('data-sheet-mun-initial'));
+                            }
+                        }
+                    });
+                }
+
+                // Scroll infinito dentro del contenedor (requiere overflow en .tm-bulk-sheet-container).
+                if (container && !container.__bulkSheetScrollBound) {
+                    container.__bulkSheetScrollBound = true;
+                    container.addEventListener('scroll', function () {
+                        if (modal.getAttribute('data-tm-bulk-view') !== 'sheet') {
+                            return;
+                        }
+                        const nearBottom = (container.scrollTop + container.clientHeight) >= (container.scrollHeight - 160);
+                        if (nearBottom) {
+                            if (typeof modal.__bulkSheetMaybeAppendMore === 'function') {
+                                modal.__bulkSheetMaybeAppendMore();
+                            } else if (typeof modal.__bulkSheetAppendNextBatch === 'function') {
+                                modal.__bulkSheetAppendNextBatch();
+                            }
+                        }
+                    });
+                }
+
+                // IntersectionObserver (más confiable que scroll en algunos layouts).
+                if (container && typeof IntersectionObserver !== 'undefined') {
+                    const sentinel = ensureSentinel();
+                    if (modal.__bulkSheetObserver) {
+                        try { modal.__bulkSheetObserver.disconnect(); } catch (e) {}
+                    }
+                    modal.__bulkSheetObserver = new IntersectionObserver(function (entriesObs) {
+                        if (modal.getAttribute('data-tm-bulk-view') !== 'sheet') {
+                            return;
+                        }
+                        const ent = entriesObs && entriesObs[0];
+                        if (ent && ent.isIntersecting) {
+                            if (typeof modal.__bulkSheetMaybeAppendMore === 'function') {
+                                modal.__bulkSheetMaybeAppendMore();
+                            } else if (typeof modal.__bulkSheetAppendNextBatch === 'function') {
+                                modal.__bulkSheetAppendNextBatch();
+                            }
+                        }
+                    }, { root: container, threshold: 0.1 });
+                    modal.__bulkSheetObserver.observe(sentinel);
+                }
+
+                // Si el primer lote no alcanza para scrollear, rellenar automáticamente.
+                if (container) {
+                    requestAnimationFrame(function () {
+                        let guard = 0;
+                        while (guard < 50 && (modal.__bulkSheetCursor || 0) < entries.length && container.scrollHeight <= (container.clientHeight + 24)) {
+                            guard++;
+                            if (typeof modal.__bulkSheetAppendNextBatch === 'function') {
+                                modal.__bulkSheetAppendNextBatch();
+                            } else {
+                                break;
+                            }
+                        }
+                    });
+                }
+            }
+
+            function applySheetFilters(modal) {
+                const st = modal.__bulkState;
+                const sheet = modal.querySelector('[data-tm-bulk-sheet]');
+                const inner = modal.querySelector('[data-tm-bulk-sheet-inner]');
+                if (!st || !sheet || sheet.classList.contains('tm-hidden') || !inner) {
+                    return;
+                }
+
+                const q = String(modal.querySelector('[data-tm-bulk-sheet-search]')?.value || '').trim().toLowerCase();
+                const filterInputs = Array.from(inner.querySelectorAll('[data-tm-bulk-sheet-filter][data-sheet-filter-key]'));
+                const filters = filterInputs.map(function (el) {
+                    return { key: String(el.getAttribute('data-sheet-filter-key') || ''), val: String(el.value || '').trim().toLowerCase() };
+                }).filter(function (x) { return x.key && x.val; });
+
+                inner.querySelectorAll('.tm-bulk-sheet-row').forEach(function (row) {
+                    const eid = parseInt(row.getAttribute('data-entry-id'), 10);
+                    const entry = st.entryById[eid];
+                    const draft = st.drafts[eid] || {};
+
+                    let rowText = '';
+                    if (q) {
+                        rowText += ' ' + String(entry && entry.title ? entry.title : '');
+                        rowText += ' ' + String(entry && entry.microrregion_label ? entry.microrregion_label : '');
+                        st.fields.forEach(function (f) {
+                            if (!f || f.type === 'seccion') return;
+                            rowText += ' ' + normalizeForSearch(draft[f.key]);
+                        });
+                        rowText = rowText.toLowerCase();
+                    }
+
+                    let ok = !q || rowText.indexOf(q) !== -1;
+
+                    if (ok && filters.length) {
+                        ok = filters.every(function (flt) {
+                            if (flt.key === '__title') {
+                                return String(entry && entry.title ? entry.title : '').toLowerCase().indexOf(flt.val) !== -1;
+                            }
+                            if (flt.key === '__mr') {
+                                const mr = getMrForEntry(st, eid);
+                                return mr != null && String(mr) === String(flt.val);
+                            }
+                            return normalizeForSearch(draft[flt.key]).toLowerCase().indexOf(flt.val) !== -1;
+                        });
+                    }
+
+                    row.classList.toggle('tm-hidden', !ok);
+                });
+            }
+
+            function setBulkView(modal, view) {
+                const main = modal.querySelector('[data-tm-bulk-main]');
+                const sheet = modal.querySelector('[data-tm-bulk-sheet]');
+                const toggleBtn = modal.querySelector('[data-tm-bulk-sheet-toggle]');
+                const form = modal.querySelector('[data-tm-bulk-form]');
+                const emptyEl = modal.querySelector('[data-tm-bulk-form-empty]');
+                const zoomWrap = modal.querySelector('[data-tm-bulk-sheet] [data-tm-bulk-sheet-zoom]');
+                if (!main || !sheet) {
+                    return;
+                }
+
+                const next = view === 'sheet' ? 'sheet' : 'form';
+                modal.setAttribute('data-tm-bulk-view', next);
+
+                if (next === 'sheet') {
+                    syncDraftFromForm(modal);
+                    if (form) {
+                        form.classList.add('tm-hidden');
+                    }
+                    renderBulkSheet(modal);
+                    main.classList.add('tm-hidden');
+                    sheet.classList.remove('tm-hidden');
+                    applySheetFilters(modal);
+                    if (zoomWrap) {
+                        zoomWrap.classList.remove('tm-hidden');
+                        applyBulkSheetZoom(modal);
+                    }
+                    if (toggleBtn) {
+                        toggleBtn.innerHTML = '<i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Pasar al editor';
+                    }
+                } else {
+                    sheet.classList.add('tm-hidden');
+                    main.classList.remove('tm-hidden');
+                    if (zoomWrap) {
+                        zoomWrap.classList.add('tm-hidden');
+                    }
+                    const inner = modal.querySelector('[data-tm-bulk-sheet-inner]');
+                    if (inner) {
+                        inner.style.transform = '';
+                    }
+                    const st = modal.__bulkState;
+                    if (st && st.selectedId) {
+                        if (emptyEl) {
+                            emptyEl.classList.add('tm-hidden');
+                        }
+                        if (form) {
+                            form.classList.remove('tm-hidden');
+                        }
+                    } else {
+                        if (form) {
+                            form.classList.add('tm-hidden');
+                        }
+                        if (emptyEl) {
+                            emptyEl.classList.remove('tm-hidden');
+                        }
+                    }
+                    if (toggleBtn) {
+                        toggleBtn.innerHTML = '<i class="fa-solid fa-table-cells" aria-hidden="true"></i> Volver a hoja de cálculo';
+                    }
+                }
+            }
+
+            function clamp(n, min, max) {
+                return Math.max(min, Math.min(max, n));
+            }
+
+            function applyBulkSheetZoom(modal) {
+                const zoomWrap = modal.querySelector('[data-tm-bulk-sheet-zoom]');
+                const valEl = modal.querySelector('[data-tm-bulk-sheet-zoom-val]');
+                const inner = modal.querySelector('[data-tm-bulk-sheet-inner]');
+                if (!inner) {
+                    return;
+                }
+                const z = typeof modal.__bulkSheetZoom === 'number' ? modal.__bulkSheetZoom : 1;
+                inner.style.transform = 'scale(' + z.toFixed(2) + ')';
+                inner.style.minWidth = (z > 1 ? (100 * z).toFixed(0) : 100) + '%';
+                if (valEl) {
+                    valEl.textContent = Math.round(z * 100) + '%';
+                }
+                if (zoomWrap && modal.getAttribute('data-tm-bulk-view') !== 'sheet') {
+                    zoomWrap.classList.add('tm-hidden');
+                }
+            }
+
+            function bulkEnsureFilesState(st, eid, key) {
+                if (!st.pendingFiles[eid]) {
+                    st.pendingFiles[eid] = {};
+                }
+                if (!st.pendingFiles[eid][key]) {
+                    st.pendingFiles[eid][key] = [];
+                }
+                if (!st.removeExisting[eid]) {
+                    st.removeExisting[eid] = {};
+                }
+                if (!st.removeExisting[eid][key]) {
+                    st.removeExisting[eid][key] = [];
+                }
+            }
+
+            function bulkEnsureSheetPreviewState(st) {
+                if (!st.__sheetPreview) {
+                    st.__sheetPreview = { objUrls: {} };
+                }
+            }
+
+            function bulkGetObjUrlKey(eid, key, slot) {
+                return String(eid) + '|' + String(key) + '|' + String(slot);
+            }
+
+            function bulkGetPendingObjectUrl(st, eid, key, slot) {
+                bulkEnsureSheetPreviewState(st);
+                const objUrls = st.__sheetPreview.objUrls;
+                const mapKey = bulkGetObjUrlKey(eid, key, slot);
+                const f = (((st.pendingFiles || {})[eid] || {})[key] || [])[slot];
+                if (!(f instanceof File)) {
+                    if (objUrls[mapKey]) {
+                        try { URL.revokeObjectURL(objUrls[mapKey]); } catch (e) {}
+                        delete objUrls[mapKey];
+                    }
+                    return '';
+                }
+                if (!objUrls[mapKey]) {
+                    objUrls[mapKey] = URL.createObjectURL(f);
+                }
+                return objUrls[mapKey];
+            }
+
+            function bulkGetExistingPaths(st, eid, key) {
+                const data = st.originals[eid] || {};
+                const v = data[key];
+                const paths = Array.isArray(v)
+                    ? v.filter(function (p) { return typeof p === 'string' && p.trim() !== ''; })
+                    : (typeof v === 'string' && v.trim() !== '' ? [v.trim()] : []);
+                const removed = new Set((((st.removeExisting || {})[eid] || {})[key] || []).filter(function (p) { return typeof p === 'string' && p.trim() !== ''; }));
+                return paths.filter(function (p) { return !removed.has(p); });
+            }
+
+            function bulkRenderImagesCell(modal, eid, key) {
+                const st = modal.__bulkState;
+                if (!st) return;
+                const wrap = modal.querySelector('.tm-bulk-sheet-images[data-sheet-entry-id="' + eid + '"][data-sheet-field-key="' + key + '"]');
+                if (!wrap) return;
+
+                bulkEnsureFilesState(st, eid, key);
+
+                const previewTpl = modal.getAttribute('data-preview-url-template') || '';
+                const tpl = typeof previewTpl === 'string' ? previewTpl : '';
+                const base = tpl ? tpl.replace('__EID__', String(eid)).replace('__FKEY__', String(key)) : '';
+                const sep = base.indexOf('?') >= 0 ? '&' : '?';
+
+                const data = st.originals[eid] || {};
+                const v = data[key];
+                const paths = Array.isArray(v)
+                    ? v.filter(function (p) { return typeof p === 'string' && p.trim() !== ''; })
+                    : (typeof v === 'string' && String(v).trim() !== '' ? [String(v).trim()] : []);
+
+                const removedSet = new Set(((((st.removeExisting || {})[eid] || {})[key]) || []).filter(function (p) { return typeof p === 'string' && p.trim() !== ''; }));
+                const visible = paths.map(function (p, idx) { return { path: p, idx: idx }; }).filter(function (x) { return !removedSet.has(x.path); });
+
+                [0, 1].forEach(function (slot) {
+                    const slotEl = wrap.querySelector('[data-img-slot="' + slot + '"]');
+                    if (!slotEl) return;
+                    const img = slotEl.querySelector('img');
+                    const pendingUrl = bulkGetPendingObjectUrl(st, eid, key, slot);
+                    if (pendingUrl && img) {
+                        img.src = pendingUrl;
+                        img.removeAttribute('data-existing');
+                        img.setAttribute('data-pending', '1');
+                        img.alt = 'Imagen pendiente';
+                        return;
+                    }
+                    const ex = visible[slot];
+                    if (ex && img) {
+                        img.src = base ? (base + sep + 'i=' + ex.idx) : '';
+                        img.setAttribute('data-existing', ex.path);
+                        img.setAttribute('data-existing-idx', String(ex.idx));
+                        img.removeAttribute('data-pending');
+                        img.alt = 'Imagen';
+                        return;
+                    }
+                    if (img) {
+                        img.src = '';
+                        img.removeAttribute('data-existing');
+                        img.removeAttribute('data-existing-idx');
+                        img.removeAttribute('data-pending');
+                        img.alt = 'Sin imagen';
+                    }
+                });
+            }
+
+            function bulkResetImagesCellToDefault(modal, eid, key) {
+                const st = modal.__bulkState;
+                if (!st) return;
+                bulkEnsureFilesState(st, eid, key);
+                st.pendingFiles[eid][key] = [];
+                st.removeExisting[eid][key] = [];
+                bulkRenderImagesCell(modal, eid, key);
+                refreshBulkCounter(modal);
+                updateBulkRowVisualState(modal, st, eid);
+            }
+
+            function bulkMarkExistingRemoved(st, eid, key, path) {
+                bulkEnsureFilesState(st, eid, key);
+                if (path && typeof path === 'string') {
+                    st.removeExisting[eid][key] = Array.from(new Set((st.removeExisting[eid][key] || []).concat([path])));
+                }
+            }
+
+            function bulkSetPendingImage(st, eid, key, slot, file) {
+                bulkEnsureFilesState(st, eid, key);
+                const arr = st.pendingFiles[eid][key] || [];
+                arr[slot] = file;
+                st.pendingFiles[eid][key] = arr.slice(0, 2);
+            }
+
+            async function bulkClipboardWriteFile(file) {
+                if (!file || !(file instanceof Blob) || !navigator.clipboard || !navigator.clipboard.write || typeof ClipboardItem === 'undefined') {
+                    throw new Error('Clipboard no disponible');
+                }
+                const item = new ClipboardItem({ [file.type || 'application/octet-stream']: file });
+                await navigator.clipboard.write([item]);
+            }
+
+            function bulkBlobToPng(blob) {
+                if (!(blob instanceof Blob)) {
+                    return Promise.reject(new Error('Blob inválido'));
+                }
+                if (typeof createImageBitmap === 'function') {
+                    return createImageBitmap(blob).then(function (bmp) {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = bmp.width;
+                        canvas.height = bmp.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(bmp, 0, 0);
+                        return new Promise(function (resolve, reject) {
+                            canvas.toBlob(function (png) {
+                                if (!png) {
+                                    reject(new Error('No se pudo convertir'));
+                                    return;
+                                }
+                                resolve(png);
+                            }, 'image/png');
+                        });
+                    });
+                }
+                // Fallback: intentar usar <img>
+                return new Promise(function (resolve, reject) {
+                    const url = URL.createObjectURL(blob);
+                    const img = new Image();
+                    img.onload = function () {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.naturalWidth || img.width;
+                            canvas.height = img.naturalHeight || img.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0);
+                            canvas.toBlob(function (png) {
+                                URL.revokeObjectURL(url);
+                                if (!png) {
+                                    reject(new Error('No se pudo convertir'));
+                                    return;
+                                }
+                                resolve(png);
+                            }, 'image/png');
+                        } catch (e) {
+                            URL.revokeObjectURL(url);
+                            reject(e);
+                        }
+                    };
+                    img.onerror = function () {
+                        URL.revokeObjectURL(url);
+                        reject(new Error('No se pudo cargar la imagen'));
+                    };
+                    img.src = url;
+                });
+            }
+
+            function bulkCopyImageFromSlot(modal, st, eid, key, slot, existingIdx, hasPending) {
+                const previewTpl = modal.getAttribute('data-preview-url-template') || '';
+                const tpl = typeof previewTpl === 'string' ? previewTpl : '';
+                const base = tpl ? tpl.replace('__EID__', String(eid)).replace('__FKEY__', String(key)) : '';
+                const sep = base.indexOf('?') >= 0 ? '&' : '?';
+
+                if (hasPending) {
+                    const f = (((st.pendingFiles || {})[eid] || {})[key] || [])[slot];
+                    if (f instanceof File) {
+                        if (!navigator.clipboard || !navigator.clipboard.write || typeof ClipboardItem === 'undefined') {
+                            return Promise.reject(new Error('Clipboard no disponible'));
+                        }
+                        const item = new ClipboardItem({ [f.type || 'image/png']: f });
+                        return navigator.clipboard.write([item]);
+                    }
+                }
+
+                if (base && typeof existingIdx === 'number') {
+                    const url = base + sep + 'i=' + existingIdx;
+                    if (!navigator.clipboard || !navigator.clipboard.write || typeof ClipboardItem === 'undefined') {
+                        return Promise.reject(new Error('Clipboard no disponible'));
+                    }
+                    // Mantener user-activation: clipboard.write inmediato con promesa.
+                    const pngPromise = fetch(url, { credentials: 'same-origin' })
+                        .then(function (r) { return r.blob(); })
+                        .then(function (blob) {
+                            return bulkBlobToPng(blob);
+                        });
+                    const item = new ClipboardItem({ 'image/png': pngPromise });
+                    return navigator.clipboard.write([item]);
+                }
+                return Promise.reject(new Error('Sin imagen'));
+            }
+
+            function bulkEnsureImagePicker() {
+                let inp = document.getElementById('tmBulkSheetImagePicker');
+                if (!inp) {
+                    inp = document.createElement('input');
+                    inp.type = 'file';
+                    inp.accept = 'image/*';
+                    inp.id = 'tmBulkSheetImagePicker';
+                    inp.style.position = 'fixed';
+                    inp.style.left = '-9999px';
+                    inp.style.top = '-9999px';
+                    document.body.appendChild(inp);
+                }
+                return inp;
+            }
+
+            function bulkOpenImagePicker(modal, st, eid, key, slot, existingPath, hasSomething) {
+                const inp = bulkEnsureImagePicker();
+                inp.value = '';
+
+                const applyFile = function (file) {
+                    if (!(file instanceof File)) {
+                        return;
+                    }
+                    if (existingPath) {
+                        bulkMarkExistingRemoved(st, eid, key, existingPath);
+                    }
+                    bulkSetPendingImage(st, eid, key, slot, file);
+                    bulkRenderImagesCell(modal, eid, key);
+                    refreshBulkCounter(modal);
+                    updateBulkRowVisualState(modal, st, eid);
+                };
+
+                const onPicked = function () {
+                    inp.removeEventListener('change', onPicked);
+                    const file = (inp.files && inp.files[0]) ? inp.files[0] : null;
+                    inp.value = '';
+                    if (!file) {
+                        return;
+                    }
+                    if (hasSomething) {
+                        Swal.fire({
+                            title: 'Sustituir imagen',
+                            text: '¿Deseas sustituir la imagen de esta celda?',
+                            icon: 'question',
+                            showCancelButton: true,
+                            confirmButtonText: 'Sí, sustituir',
+                            cancelButtonText: 'Cancelar',
+                        }).then(function (res) {
+                            if (res.isConfirmed) {
+                                applyFile(file);
+                            }
+                        });
+                    } else {
+                        applyFile(file);
+                    }
+                };
+
+                inp.addEventListener('change', onPicked);
+                inp.click();
+            }
+
+            function bulkShowContextMenu(modal, x, y, items) {
+                if (!modal) return;
+                let menu = document.getElementById('tmBulkSheetCtxMenu');
+                if (!menu) {
+                    menu = document.createElement('div');
+                    menu.id = 'tmBulkSheetCtxMenu';
+                    menu.className = 'tm-bulk-sheet-ctx tm-hidden';
+                    menu.innerHTML = '<div class="tm-bulk-sheet-ctx-inner" data-ctx-inner></div>';
+                    document.body.appendChild(menu);
+                    document.addEventListener('click', function () {
+                        menu.classList.add('tm-hidden');
+                    });
+                    window.addEventListener('scroll', function () {
+                        menu.classList.add('tm-hidden');
+                    }, true);
+                }
+
+                const inner = menu.querySelector('[data-ctx-inner]');
+                if (inner) {
+                    inner.innerHTML = (items || []).map(function (it, idx) {
+                        const dis = it && it.disabled ? ' disabled' : '';
+                        return '<button type="button" class="tm-bulk-sheet-ctx-item"' + dis + ' data-ctx-idx="' + idx + '">' + tmBulkEsc(String(it.label || '')) + '</button>';
+                    }).join('');
+                }
+                menu.style.left = x + 'px';
+                menu.style.top = y + 'px';
+                menu.classList.remove('tm-hidden');
+
+                // Evitar que el menú se corte fuera de pantalla.
+                requestAnimationFrame(function () {
+                    try {
+                        const rect = menu.getBoundingClientRect();
+                        const pad = 8;
+                        let left = rect.left;
+                        let top = rect.top;
+                        if (rect.right > (window.innerWidth - pad)) {
+                            left = Math.max(pad, window.innerWidth - rect.width - pad);
+                        }
+                        if (rect.bottom > (window.innerHeight - pad)) {
+                            top = Math.max(pad, window.innerHeight - rect.height - pad);
+                        }
+                        menu.style.left = left + 'px';
+                        menu.style.top = top + 'px';
+                    } catch (e) {}
+                });
+
+                menu.querySelectorAll('[data-ctx-idx]').forEach(function (btn) {
+                    btn.onclick = function (ev) {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        const idx = parseInt(String(btn.getAttribute('data-ctx-idx') || '0'), 10);
+                        const it = items[idx];
+                        menu.classList.add('tm-hidden');
+                        if (it && typeof it.onClick === 'function' && !it.disabled) {
+                            it.onClick();
+                        }
+                    };
+                });
+            }
+
+            async function bulkClipboardReadImageOrFile() {
+                if (!navigator.clipboard || !navigator.clipboard.read) {
+                    return null;
+                }
+                const items = await navigator.clipboard.read();
+                for (const item of items) {
+                    for (const t of item.types) {
+                        if (t.startsWith('image/')) {
+                            const blob = await item.getType(t);
+                            return new File([blob], 'clipboard.' + (t.split('/')[1] || 'png'), { type: t });
+                        }
+                    }
+                }
+                return null;
+            }
+
+            function bulkIsLikelyUrl(s) {
+                const str = String(s || '').trim();
+                if (/^https?:\/\/\S+/i.test(str)) {
+                    return true;
+                }
+                if (str.startsWith('/')) {
+                    return true;
+                }
+                // Ruta relativa sin slash inicial (ej. "modulos-temporales/...").
+                if (/^[A-Za-z0-9].*\/.+/.test(str) && str.indexOf(' ') === -1) {
+                    return true;
+                }
+                return false;
+            }
+
+            function bulkNormalizeUrlMaybe(urlOrPath) {
+                const raw = String(urlOrPath || '').trim();
+                if (!raw) return '';
+                try {
+                    if (raw.startsWith('/')) {
+                        return new URL(raw, window.location.origin).toString();
+                    }
+                    if (!/^https?:\/\//i.test(raw) && /^[A-Za-z0-9].*\/.+/.test(raw) && raw.indexOf(' ') === -1) {
+                        return new URL('/' + raw.replace(/^\/+/, ''), window.location.origin).toString();
+                    }
+                    return new URL(raw).toString();
+                } catch (e) {
+                    return '';
+                }
+            }
+
+            function bulkUrlToFilename(url, fallbackExt) {
+                try {
+                    const u = new URL(url, window.location.origin);
+                    const last = (u.pathname || '').split('/').filter(Boolean).pop() || '';
+                    if (last && last.indexOf('.') >= 0) {
+                        return last.slice(0, 140);
+                    }
+                } catch (e) {}
+                return 'url-image.' + (fallbackExt || 'png');
+            }
+
+            function bulkFetchUrlAsImageFile(url) {
+                const u0 = String(url || '').trim();
+                if (!bulkIsLikelyUrl(u0)) {
+                    return Promise.reject(new Error('URL inválida'));
+                }
+                const u = bulkNormalizeUrlMaybe(u0) || u0;
+                return fetch(u, { credentials: 'same-origin' }).then(function (r) {
+                    if (!r.ok) {
+                        throw new Error('No se pudo descargar (' + r.status + ')');
+                    }
+                    return r.blob();
+                }).then(function (blob) {
+                    const type = blob.type || 'image/png';
+                    const ext = (type.split('/')[1] || 'png').toLowerCase();
+                    const name = bulkUrlToFilename(u, ext);
+                    return new File([blob], name, { type: type });
+                });
+            }
+
+            function bulkClipboardReadImageOrUrlText() {
+                const canReadImage = !!(window.isSecureContext && navigator.clipboard && navigator.clipboard.read);
+                const canReadText = !!(navigator.clipboard && navigator.clipboard.readText);
+                const imgPromise = canReadImage ? bulkClipboardReadImageOrFile().then(function (f) { return f ? { kind: 'file', file: f } : null; }) : Promise.resolve(null);
+                return imgPromise.then(function (imgRes) {
+                    if (imgRes) {
+                        return imgRes;
+                    }
+                    if (!canReadText) {
+                        return null;
+                    }
+                    return navigator.clipboard.readText().then(function (txt) {
+                        const t = String(txt || '').trim();
+                        if (!t) return null;
+                        return { kind: 'text', text: t };
+                    }).catch(function () {
+                        return null;
+                    });
+                });
+            }
+
+            function bulkCopyTextFallback(text) {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = String(text || '');
+                    ta.setAttribute('readonly', 'readonly');
+                    ta.style.position = 'fixed';
+                    ta.style.left = '-9999px';
+                    ta.style.top = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    ta.setSelectionRange(0, ta.value.length);
+                    const ok = document.execCommand && document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    return !!ok;
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            function bulkGetSheetTable(modal) {
+                if (!modal) return null;
+                const inner = modal.querySelector('[data-tm-bulk-sheet-inner]');
+                return inner ? inner.querySelector('table.tm-bulk-sheet-table') : null;
+            }
+
+            function bulkSetColWidth(modal, colKey, px) {
+                if (!modal || !colKey) return;
+                const table = bulkGetSheetTable(modal);
+                if (!table) return;
+                const cols = Array.from(table.querySelectorAll('col[data-col-key]'));
+                const col = cols.find(function (c) { return String(c.getAttribute('data-col-key') || '') === String(colKey); });
+                if (!col) return;
+                const w = clamp(parseInt(px, 10) || 0, 80, 800);
+                col.style.width = w + 'px';
+                if (!modal.__bulkSheetColWidths) {
+                    modal.__bulkSheetColWidths = {};
+                }
+                modal.__bulkSheetColWidths[colKey] = w;
+            }
+
+            function bulkEnableColumnResizeOnce() {
+                if (window.__tmBulkSheetColResize) {
+                    return;
+                }
+                window.__tmBulkSheetColResize = true;
+
+                let resizing = null;
+
+                const onMove = function (ev) {
+                    if (!resizing) return;
+                    const dx = ev.clientX - resizing.startX;
+                    const next = resizing.startW + dx;
+                    bulkSetColWidth(resizing.modal, resizing.key, next);
+                };
+
+                const onUp = function () {
+                    if (!resizing) return;
+                    document.body.classList.remove('tm-bulk-col-resizing');
+                    document.body.style.cursor = '';
+                    resizing = null;
+                    window.removeEventListener('mousemove', onMove, true);
+                    window.removeEventListener('mouseup', onUp, true);
+                };
+
+                document.addEventListener('mousedown', function (e) {
+                    let key = '';
+                    let th = null;
+                    const handle = e.target.closest('[data-tm-bulk-col-resize]');
+                    if (handle) {
+                        key = String(handle.getAttribute('data-tm-bulk-col-resize') || '');
+                        th = handle.closest('th');
+                    } else {
+                        th = e.target.closest('th[data-col-key]');
+                        if (th && th.closest('.tm-bulk-sheet-header-row')) {
+                            const rect = th.getBoundingClientRect();
+                            const nearRight = (rect.right - e.clientX) <= 8;
+                            const notTooLeft = (e.clientX - rect.left) >= 24;
+                            if (nearRight && notTooLeft) {
+                                key = String(th.getAttribute('data-col-key') || '');
+                            }
+                        }
+                    }
+
+                    if (!key || key === '__row') return;
+
+                    const modal = th ? th.closest('.tm-bulk-edit-modal') : null;
+                    const sheet = modal ? modal.querySelector('[data-tm-bulk-sheet]') : null;
+                    if (!modal || !sheet || sheet.classList.contains('tm-hidden') || !modal.__bulkState) {
+                        return;
+                    }
+
+                    // Preferir ancho actual del <col> si existe.
+                    const table = bulkGetSheetTable(modal);
+                    let startW = th ? th.getBoundingClientRect().width : 200;
+                    if (table) {
+                        const colEl = Array.from(table.querySelectorAll('col[data-col-key]')).find(function (c) { return String(c.getAttribute('data-col-key') || '') === key; });
+                        const cssW = colEl ? parseInt(String((colEl.style.width || '').replace('px', '') || '0'), 10) : 0;
+                        if (cssW > 0) {
+                            startW = cssW;
+                        }
+                    }
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    resizing = { modal: modal, key: key, startX: e.clientX, startW: startW };
+                    document.body.classList.add('tm-bulk-col-resizing');
+                    document.body.style.cursor = 'col-resize';
+                    window.addEventListener('mousemove', onMove, true);
+                    window.addEventListener('mouseup', onUp, true);
+                }, true);
+            }
+
+            function syncDraftFromSheetCell(modal, el) {
+                const st = modal.__bulkState;
+                const inner = modal.querySelector('[data-tm-bulk-sheet-inner]');
+                if (!st || !inner || !(el instanceof Element)) {
+                    return;
+                }
+                const eid = parseInt(String(el.getAttribute('data-sheet-entry-id') || '0'), 10);
+                if (!eid) {
+                    return;
+                }
+
+                ensureDraftsForAllEntries(st);
+                const draft = st.drafts[eid] || (st.drafts[eid] = deepClone(st.originals[eid]));
+
+                const row = el.closest('.tm-bulk-sheet-row');
+
+                // Microrregión (columna especial)
+                if (el.getAttribute('data-sheet-mr') === '1') {
+                    const mrVal = el.value ? parseInt(String(el.value), 10) : null;
+                    st.draftMicrorregion[eid] = mrVal;
+                    if (row) {
+                        if (mrVal != null) {
+                            setMunicipiosForForm(row, String(mrVal));
+                        }
+                        const munField = st.fields.find(function (f) { return f && f.type === 'municipio'; });
+                        if (munField) {
+                            const ms = row.querySelector('[data-sheet-field-key="' + munField.key + '"]');
+                            if (ms) {
+                                draft[munField.key] = ms.value === '' ? null : ms.value;
+                            }
+                        }
+                    }
+                    refreshBulkCounter(modal);
+                    if (row) {
+                        row.classList.toggle('is-dirty', entryIsDirty(st, eid) || entryHasPendingFileChanges(st, eid));
+                    }
+                    updateBulkRowVisualState(modal, st, eid);
+                    applySheetFilters(modal);
+                    return;
+                }
+
+                // Linked: primary/secondary (atributos especiales)
+                const linkedKey = el.getAttribute('data-sheet-linked-key');
+                if (linkedKey) {
+                    const part = el.getAttribute('data-sheet-linked-part') || 'primary';
+                    const existing = typeof draft[linkedKey] === 'object' && draft[linkedKey] !== null ? draft[linkedKey] : {};
+                    const nextObj = { primary: existing.primary ?? null, secondary: existing.secondary ?? null };
+                    const cell = el.closest('td');
+                    if (part === 'primary') {
+                        nextObj.primary = el.value === '' ? null : el.value;
+                        const showSec = nextObj.primary !== null && String(nextObj.primary).trim() !== '';
+                        const secWrap = cell ? cell.querySelector('[data-sheet-linked-secondary-wrap="' + linkedKey + '"]') : null;
+                        if (secWrap) {
+                            secWrap.hidden = !showSec;
+                        }
+                        const secEl = cell ? cell.querySelector('[data-sheet-linked-key="' + linkedKey + '"][data-sheet-linked-part="secondary"]') : null;
+                        if (secEl) {
+                            secEl.disabled = !showSec;
+                            if (!showSec) {
+                                secEl.value = '';
+                                nextObj.secondary = null;
+                            }
+                        }
+                    } else {
+                        nextObj.secondary = el.disabled || el.value === '' ? null : el.value;
+                    }
+                    draft[linkedKey] = nextObj;
+
+                    const orig = (st.originals[eid] || {})[linkedKey];
+                    const wrap = el.closest('.tm-bulk-sheet-cell-wrap');
+                    if (wrap) {
+                        wrap.classList.toggle('is-dirty', !valEqual(nextObj, orig));
+                    }
+
+                    refreshBulkCounter(modal);
+                    if (row) {
+                        row.classList.toggle('is-dirty', entryIsDirty(st, eid) || entryHasPendingFileChanges(st, eid));
+                    }
+                    updateBulkRowVisualState(modal, st, eid);
+                    applySheetFilters(modal);
+                    return;
+                }
+
+                const key = el.getAttribute('data-sheet-field-key');
+                if (!key) {
+                    return;
+                }
+
+                const field = st.fields.find(function (f) { return f && f.key === key; });
+                if (!field) {
+                    return;
+                }
+
+                let nextVal = el.value;
+
+                if (field.type === 'multiselect') {
+                    // Chips manejados por click (ver handler dedicado)
+                    const parts = String(nextVal || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+                    nextVal = parts.length ? parts : null;
+                } else if (field.type === 'boolean') {
+                    nextVal = nextVal === '' ? null : (nextVal === '1' || nextVal === 'true');
+                } else {
+                    nextVal = nextVal === '' ? null : nextVal;
+                }
+
+                draft[key] = nextVal;
+
+                const orig = (st.originals[eid] || {})[key];
+                const wrap = el.closest('.tm-bulk-sheet-cell-wrap');
+                if (wrap) {
+                    wrap.classList.toggle('is-dirty', !valEqual(nextVal, orig));
+                }
+
+                refreshBulkCounter(modal);
+                if (row) {
+                    row.classList.toggle('is-dirty', entryIsDirty(st, eid) || entryHasPendingFileChanges(st, eid));
+                }
+                updateBulkRowVisualState(modal, st, eid);
+                applySheetFilters(modal);
+            }
+
+            function syncDraftFromSheetMultiChip(modal, chipBtn) {
+                const st = modal.__bulkState;
+                if (!st || !(chipBtn instanceof Element)) {
+                    return;
+                }
+                const eid = parseInt(String(chipBtn.getAttribute('data-sheet-entry-id') || '0'), 10);
+                const key = String(chipBtn.getAttribute('data-sheet-field-key') || '');
+                const opt = String(chipBtn.getAttribute('data-sheet-multi-opt') || '');
+                if (!eid || !key || !opt) {
+                    return;
+                }
+
+                ensureDraftsForAllEntries(st);
+                const draft = st.drafts[eid] || (st.drafts[eid] = deepClone(st.originals[eid]));
+
+                const cur = draft[key];
+                const arr = Array.isArray(cur)
+                    ? cur.map(function (x) { return String(x ?? '').trim(); }).filter(Boolean)
+                    : (typeof cur === 'string' && cur ? cur.split(',').map(function (s) { return s.trim(); }).filter(Boolean) : []);
+
+                const set = new Set(arr);
+                if (set.has(opt)) {
+                    set.delete(opt);
+                } else {
+                    set.add(opt);
+                }
+                const next = Array.from(set);
+                draft[key] = next.length ? next : null;
+
+                // Reflejar UI
+                chipBtn.classList.toggle('is-on', set.has(opt));
+                const wrap = chipBtn.closest('.tm-bulk-sheet-cell-wrap');
+                const orig = (st.originals[eid] || {})[key];
+                if (wrap) {
+                    wrap.classList.toggle('is-dirty', !valEqual(draft[key], orig));
+                }
+                const row = chipBtn.closest('.tm-bulk-sheet-row');
+                refreshBulkCounter(modal);
+                if (row) {
+                    row.classList.toggle('is-dirty', entryIsDirty(st, eid) || entryHasPendingFileChanges(st, eid));
+                }
+                updateBulkRowVisualState(modal, st, eid);
+                applySheetFilters(modal);
             }
             function buildFieldHtml(field, val, entryId, previewTpl, fileMeta) {
                 function isScalar(x) {
@@ -4068,7 +5589,7 @@
             function syncDraftFromForm(modal) {
                 const st = modal.__bulkState;
                 const form = modal.querySelector('[data-tm-bulk-form]');
-                if (!st || !form || !st.selectedId) {
+                if (!st || !form || form.classList.contains('tm-hidden') || !st.selectedId) {
                     return;
                 }
                 const eid = st.selectedId;
@@ -4382,7 +5903,9 @@
                         }
                         delete st.draftMicrorregion[entryId];
                         refreshBulkCounter(modal);
-                        if (typeof window.__tmReloadRecordsPanel === 'function') {
+                        if (modal.__tmDeferRecordsReload === true) {
+                            modal.__tmBulkPendingRecordsRefresh = true;
+                        } else if (typeof window.__tmReloadRecordsPanel === 'function') {
                             const panel = document.getElementById('module-records-' + st.moduleId);
                             if (panel) {
                                 window.__tmReloadRecordsPanel(panel, { requireActive: false });
@@ -4429,6 +5952,7 @@
                 if (c.fieldCount === 0) {
                     return Promise.resolve();
                 }
+                modal.__tmDeferRecordsReload = true;
                 const ids = [];
                 st.entries.forEach(function (e) {
                     if (entryIsDirty(st, e.id)) {
@@ -4442,8 +5966,17 @@
                     });
                 });
                 return chain.then(function () {
+                    modal.__tmDeferRecordsReload = false;
+                    modal.__tmBulkPendingRecordsRefresh = false;
+                    if (typeof window.__tmReloadRecordsPanel === 'function') {
+                        const panel = document.getElementById('module-records-' + st.moduleId);
+                        if (panel) {
+                            window.__tmReloadRecordsPanel(panel, { requireActive: false });
+                        }
+                    }
                     Swal.fire({ title: 'Listo', text: 'Registros actualizados.', icon: 'success', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false });
                 }).catch(function (e) {
+                    modal.__tmDeferRecordsReload = false;
                     Swal.fire('Error', e.message || 'No se pudo guardar', 'error');
                     return Promise.reject(e);
                 });
@@ -4464,6 +5997,18 @@
                             applyBulkFieldFilter(modal);
                         }
                     }
+                    if (t && t.matches && t.matches('[data-tm-bulk-sheet-search], [data-tm-bulk-sheet-filter]')) {
+                        const modal = t.closest('.tm-bulk-edit-modal');
+                        if (modal && modal.__bulkState) {
+                            applySheetFilters(modal);
+                        }
+                    }
+                    if (t && t.getAttribute && t.getAttribute('data-sheet-entry-id')) {
+                        const modal = t.closest('.tm-bulk-edit-modal');
+                        if (modal && modal.__bulkState) {
+                            syncDraftFromSheetCell(modal, t);
+                        }
+                    }
                 });
                 document.addEventListener('change', function (ev) {
                     const t = ev.target;
@@ -4473,9 +6018,132 @@
                             applyBulkListFilters(modal);
                         }
                     }
+                    if (t && t.matches && t.matches('[data-tm-bulk-sheet-filter]')) {
+                        const modal = t.closest('.tm-bulk-edit-modal');
+                        if (modal && modal.__bulkState) {
+                            applySheetFilters(modal);
+                        }
+                    }
+                    if (t && t.getAttribute && t.getAttribute('data-sheet-entry-id')) {
+                        const modal = t.closest('.tm-bulk-edit-modal');
+                        if (modal && modal.__bulkState) {
+                            syncDraftFromSheetCell(modal, t);
+                        }
+                    }
                 });
             }
             document.addEventListener('click', function (e) {
+                const sheetToggle = e.target.closest('[data-tm-bulk-sheet-toggle]');
+                if (sheetToggle) {
+                    e.preventDefault();
+                    const modal = sheetToggle.closest('.tm-bulk-edit-modal');
+                    if (modal && modal.__bulkState) {
+                        const cur = modal.getAttribute('data-tm-bulk-view') === 'sheet' ? 'sheet' : 'form';
+                        setBulkView(modal, cur === 'sheet' ? 'form' : 'sheet');
+                    }
+                    return;
+                }
+                const sheetExit = e.target.closest('[data-tm-bulk-sheet-exit]');
+                if (sheetExit) {
+                    e.preventDefault();
+                    const modal = sheetExit.closest('.tm-bulk-edit-modal');
+                    if (modal && modal.__bulkState) {
+                        setBulkView(modal, 'form');
+                    }
+                    return;
+                }
+                const sheetClear = e.target.closest('[data-tm-bulk-sheet-clear-filters]');
+                if (sheetClear) {
+                    e.preventDefault();
+                    const modal = sheetClear.closest('.tm-bulk-edit-modal');
+                    if (modal && modal.__bulkState) {
+                        const inner = modal.querySelector('[data-tm-bulk-sheet-inner]');
+                        const search = modal.querySelector('[data-tm-bulk-sheet-search]');
+                        if (search) {
+                            search.value = '';
+                        }
+                        if (inner) {
+                            inner.querySelectorAll('[data-tm-bulk-sheet-filter]').forEach(function (el) {
+                                el.value = '';
+                            });
+                        }
+                        applySheetFilters(modal);
+                    }
+                    return;
+                }
+                const chip = e.target.closest('[data-sheet-multi-chip="1"]');
+                if (chip) {
+                    const modal = chip.closest('.tm-bulk-edit-modal');
+                    const sheet = modal ? modal.querySelector('[data-tm-bulk-sheet]') : null;
+                    if (modal && sheet && !sheet.classList.contains('tm-hidden') && modal.__bulkState) {
+                        e.preventDefault();
+                        syncDraftFromSheetMultiChip(modal, chip);
+                    }
+                    return;
+                }
+                const zoomOut = e.target.closest('[data-tm-bulk-sheet-zoom-out]');
+                if (zoomOut) {
+                    e.preventDefault();
+                    const modal = zoomOut.closest('.tm-bulk-edit-modal');
+                    if (modal && modal.__bulkState) {
+                        const cur = typeof modal.__bulkSheetZoom === 'number' ? modal.__bulkSheetZoom : 1;
+                        modal.__bulkSheetZoom = clamp(cur - 0.1, 0.5, 1.6);
+                        applyBulkSheetZoom(modal);
+                    }
+                    return;
+                }
+                const zoomIn = e.target.closest('[data-tm-bulk-sheet-zoom-in]');
+                if (zoomIn) {
+                    e.preventDefault();
+                    const modal = zoomIn.closest('.tm-bulk-edit-modal');
+                    if (modal && modal.__bulkState) {
+                        const cur = typeof modal.__bulkSheetZoom === 'number' ? modal.__bulkSheetZoom : 1;
+                        modal.__bulkSheetZoom = clamp(cur + 0.1, 0.5, 1.6);
+                        applyBulkSheetZoom(modal);
+                    }
+                    return;
+                }
+                const zoomReset = e.target.closest('[data-tm-bulk-sheet-zoom-reset]');
+                if (zoomReset) {
+                    e.preventDefault();
+                    const modal = zoomReset.closest('.tm-bulk-edit-modal');
+                    if (modal && modal.__bulkState) {
+                        modal.__bulkSheetZoom = 1;
+                        applyBulkSheetZoom(modal);
+                    }
+                    return;
+                }
+                const sheetRow = e.target.closest('.tm-bulk-sheet-row');
+                if (sheetRow) {
+                    const modal = sheetRow.closest('.tm-bulk-edit-modal');
+                    const sheet = modal ? modal.querySelector('[data-tm-bulk-sheet]') : null;
+                    if (modal && sheet && !sheet.classList.contains('tm-hidden') && modal.__bulkState) {
+                        const entryId = parseInt(String(sheetRow.getAttribute('data-entry-id') || '0'), 10);
+                        if (entryId) {
+                            modal.querySelectorAll('.tm-bulk-sheet-row.is-active').forEach(function (r) { r.classList.remove('is-active'); });
+                            sheetRow.classList.add('is-active');
+                            modal.__bulkState.selectedId = entryId;
+                        }
+                    }
+                }
+                const sheetEditFiles = e.target.closest('[data-tm-bulk-sheet-edit-files]');
+                if (sheetEditFiles) {
+                    e.preventDefault();
+                    const modal = sheetEditFiles.closest('.tm-bulk-edit-modal');
+                    const entryId = parseInt(String(sheetEditFiles.getAttribute('data-entry-id') || '0'), 10);
+                    const fieldKey = String(sheetEditFiles.getAttribute('data-field-key') || '');
+                    if (modal && modal.__bulkState && entryId) {
+                        setBulkView(modal, 'form');
+                        selectEntry(modal, entryId);
+                        if (fieldKey) {
+                            const blk = modal.querySelector('.tm-bulk-field-block[data-bulk-field-key="' + fieldKey + '"]');
+                            if (blk && typeof blk.scrollIntoView === 'function') {
+                                blk.scrollIntoView({ block: 'center' });
+                            }
+                        }
+                    }
+                    return;
+                }
                 const emptyReset = e.target.closest('[data-tm-bulk-empty-filter-reset]');
                 if (emptyReset) {
                     e.preventDefault();
@@ -4510,6 +6178,8 @@
                     if (mr) {
                         url.searchParams.set('microrregion_id', mr);
                     }
+                    modal.__tmDeferRecordsReload = false;
+                    modal.__tmBulkPendingRecordsRefresh = false;
                     modal.querySelector('[data-tm-bulk-loading]').classList.remove('tm-hidden');
                     modal.querySelector('[data-tm-bulk-main]').classList.add('tm-hidden');
                     modal.querySelector('[data-tm-bulk-error]').classList.add('tm-hidden');
@@ -4541,6 +6211,9 @@
                                 st.entryById[e.id] = e;
                             });
                             modal.__bulkState = st;
+                            if (typeof modal.__bulkSheetZoom !== 'number') {
+                                modal.__bulkSheetZoom = 1;
+                            }
                             const listEl = modal.querySelector('[data-tm-bulk-list]');
                             const nameEl = modal.querySelector('.tm-bulk-edit-module-name');
                             if (nameEl) {
@@ -4566,6 +6239,9 @@
                             modal.querySelector('[data-tm-bulk-main]').classList.remove('tm-hidden');
                             modal.querySelector('[data-tm-bulk-form]')?.classList.add('tm-hidden');
                             modal.querySelector('[data-tm-bulk-form-empty]')?.classList.remove('tm-hidden');
+                            modal.querySelector('[data-tm-bulk-sheet-search]') && (modal.querySelector('[data-tm-bulk-sheet-search]').value = '');
+                            modal.querySelector('[data-tm-bulk-sheet-inner]') && (modal.querySelector('[data-tm-bulk-sheet-inner]').innerHTML = '');
+                            setBulkView(modal, 'sheet');
                             refreshBulkCounter(modal);
                             openModal(modal, openBtn);
                         })
@@ -4651,6 +6327,193 @@
                     if (modal) {
                         tryCloseBulkModal(modal);
                     }
+                }
+            });
+
+            document.addEventListener('contextmenu', function (e) {
+                const imgSlot = e.target.closest('.tm-bulk-sheet-img-slot');
+                if (imgSlot) {
+                    const modal = imgSlot.closest('.tm-bulk-edit-modal');
+                    const sheet = modal ? modal.querySelector('[data-tm-bulk-sheet]') : null;
+                    if (!modal || !sheet || sheet.classList.contains('tm-hidden') || !modal.__bulkState) {
+                        return;
+                    }
+
+                    e.preventDefault();
+
+                    const st = modal.__bulkState;
+                    const eid = parseInt(String(imgSlot.getAttribute('data-sheet-entry-id') || '0'), 10);
+                    const key = String(imgSlot.getAttribute('data-sheet-field-key') || '');
+                    const slot = parseInt(String(imgSlot.getAttribute('data-img-slot') || '0'), 10);
+                    if (!eid || !key) return;
+
+                    bulkEnsureFilesState(st, eid, key);
+                    const img = imgSlot.querySelector('img.tm-bulk-sheet-img');
+                    const existingPath = img ? String(img.getAttribute('data-existing') || '') : '';
+                    const existingIdx = img && img.getAttribute('data-existing-idx') ? parseInt(String(img.getAttribute('data-existing-idx')), 10) : null;
+                    const hasPending = img && img.getAttribute('data-pending') === '1';
+
+                    const canWriteText = !!(navigator.clipboard && navigator.clipboard.writeText);
+                    const canReadAny = !!((window.isSecureContext && navigator.clipboard && navigator.clipboard.read) || (navigator.clipboard && navigator.clipboard.readText));
+                    const previewTpl = modal.getAttribute('data-preview-url-template') || '';
+                    const tpl = typeof previewTpl === 'string' ? previewTpl : '';
+                    const base = tpl ? tpl.replace('__EID__', String(eid)).replace('__FKEY__', String(key)) : '';
+                    const sep = base.indexOf('?') >= 0 ? '&' : '?';
+                    const existingUrl = (base && existingIdx !== null) ? (base + sep + 'i=' + existingIdx) : '';
+                    const existingUrlAbs = bulkNormalizeUrlMaybe(existingUrl) || existingUrl;
+                    const lastCopiedUrl = modal.__bulkSheetLastCopiedUrl || window.__tmBulkSheetLastCopiedUrl || '';
+
+                    const items = [
+                        {
+                            label: 'Copiar',
+                            disabled: !existingUrlAbs,
+                            onClick: function () {
+                                if (!existingUrlAbs) return;
+                                const onOk = function () {
+                                    modal.__bulkSheetLastCopiedUrl = existingUrlAbs;
+                                    window.__tmBulkSheetLastCopiedUrl = existingUrlAbs;
+                                    Swal.fire({ title: 'Copiado', text: 'URL copiada al portapapeles.', icon: 'success', toast: true, position: 'top-end', timer: 1600, showConfirmButton: false });
+                                };
+                                const onFail = function () {
+                                    Swal.fire({ title: 'No se pudo copiar', text: 'El navegador bloqueó el portapapeles.', icon: 'info', toast: true, position: 'top-end', timer: 2200, showConfirmButton: false });
+                                };
+
+                                if (canWriteText) {
+                                    navigator.clipboard.writeText(existingUrlAbs).then(onOk).catch(function () {
+                                        // Fallback legacy
+                                        const ok = bulkCopyTextFallback(existingUrlAbs);
+                                        ok ? onOk() : onFail();
+                                    });
+                                    return;
+                                }
+
+                                // Fallback legacy (para contextos sin Clipboard API)
+                                const ok = bulkCopyTextFallback(existingUrlAbs);
+                                ok ? onOk() : onFail();
+                            },
+                        },
+                        {
+                            label: 'Pegar imagen',
+                            disabled: !canReadAny && !lastCopiedUrl,
+                            onClick: function () {
+                                const readPromise = canReadAny ? bulkClipboardReadImageOrUrlText() : Promise.resolve(null);
+                                readPromise.then(function (res) {
+                                    if (!res) {
+                                        if (lastCopiedUrl && bulkIsLikelyUrl(lastCopiedUrl)) {
+                                            res = { kind: 'text', text: lastCopiedUrl };
+                                        } else {
+                                            Swal.fire('Sin contenido', 'No se pudo leer del portapapeles.', 'info');
+                                            return;
+                                        }
+                                    }
+
+                                    const hasSomething = hasPending || !!existingPath;
+
+                                    const doApplyFile = function (file) {
+                                        if (existingPath) {
+                                            bulkMarkExistingRemoved(st, eid, key, existingPath);
+                                        }
+                                        bulkSetPendingImage(st, eid, key, slot, file);
+                                        bulkRenderImagesCell(modal, eid, key);
+                                        refreshBulkCounter(modal);
+                                        updateBulkRowVisualState(modal, st, eid);
+                                    };
+
+                                    const confirmIfNeeded = function (cb) {
+                                        if (hasSomething) {
+                                            Swal.fire({
+                                                title: 'Sustituir imagen',
+                                                text: '¿Deseas sustituir la imagen de esta celda?',
+                                                icon: 'question',
+                                                showCancelButton: true,
+                                                confirmButtonText: 'Sí, sustituir',
+                                                cancelButtonText: 'Cancelar',
+                                            }).then(function (r) { if (r.isConfirmed) cb(); });
+                                        } else {
+                                            cb();
+                                        }
+                                    };
+
+                                    if (res.kind === 'file' && res.file) {
+                                        confirmIfNeeded(function () { doApplyFile(res.file); });
+                                        return;
+                                    }
+
+                                    const txt = String(res.text || '').trim();
+                                    if (!bulkIsLikelyUrl(txt)) {
+                                        if (lastCopiedUrl && bulkIsLikelyUrl(lastCopiedUrl)) {
+                                            res.text = lastCopiedUrl;
+                                        } else {
+                                            Swal.fire('No es URL', 'Copia una URL de imagen y vuelve a intentar.', 'info');
+                                            return;
+                                        }
+                                    }
+                                    const normalizedUrl = bulkNormalizeUrlMaybe(String(res.text || '').trim()) || String(res.text || '').trim();
+                                    confirmIfNeeded(function () {
+                                        Swal.fire({ title: 'Cargando…', text: 'Descargando imagen…', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+                                        bulkFetchUrlAsImageFile(normalizedUrl).then(function (file) {
+                                            Swal.close();
+                                            doApplyFile(file);
+                                        }).catch(function (err) {
+                                            Swal.close();
+                                            Swal.fire('Error', err && err.message ? String(err.message) : 'No se pudo descargar la imagen.', 'error');
+                                        });
+                                    });
+                                });
+                            },
+                        },
+                        {
+                            label: 'Insertar imagen…',
+                            disabled: false,
+                            onClick: function () {
+                                const hasSomething = hasPending || !!existingPath;
+                                bulkOpenImagePicker(modal, st, eid, key, slot, existingPath, hasSomething);
+                            },
+                        },
+                        {
+                            label: 'Quitar imagen',
+                            disabled: !hasPending && !existingPath,
+                            onClick: function () {
+                                Swal.fire({
+                                    title: 'Quitar imagen',
+                                    text: '¿Deseas quitar la imagen de esta celda?',
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonText: 'Sí, quitar',
+                                    cancelButtonText: 'Cancelar',
+                                }).then(function (res) {
+                                    if (!res.isConfirmed) return;
+                                    if (existingPath) {
+                                        bulkMarkExistingRemoved(st, eid, key, existingPath);
+                                    }
+                                    bulkSetPendingImage(st, eid, key, slot, undefined);
+                                    bulkRenderImagesCell(modal, eid, key);
+                                    refreshBulkCounter(modal);
+                                    updateBulkRowVisualState(modal, st, eid);
+                                });
+                            },
+                        },
+                        {
+                            label: 'Restablecer celda (por defecto)',
+                            disabled: false,
+                            onClick: function () {
+                                Swal.fire({
+                                    title: 'Restablecer',
+                                    text: '¿Deseas restablecer esta celda a sus valores por defecto?',
+                                    icon: 'question',
+                                    showCancelButton: true,
+                                    confirmButtonText: 'Sí, restablecer',
+                                    cancelButtonText: 'Cancelar',
+                                }).then(function (res) {
+                                    if (!res.isConfirmed) return;
+                                    bulkResetImagesCellToDefault(modal, eid, key);
+                                });
+                            },
+                        },
+                    ];
+
+                    bulkShowContextMenu(modal, e.clientX, e.clientY, items);
+                    return;
                 }
             });
         })();

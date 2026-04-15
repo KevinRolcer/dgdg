@@ -789,7 +789,7 @@
                                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                                         <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-tm-bulk-toggle title="Selección masiva">Eliminar varios</button>
                                         <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" data-tm-bulk-edit-open data-module-id="{{ $module->id }}" title="Editar varios registros">
-                                            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Edición múltiple
+                                            <i class="fa-solid fa-table-cells" aria-hidden="true"></i> Editar en hoja de cálculo
                                         </button>
                                         <button type="button" class="tm-btn tm-btn-sm tm-btn-danger tm-hidden" data-tm-bulk-delete-trigger>
                                             <i class="fa-solid fa-trash-can"></i> <span data-tm-bulk-count>0</span>
@@ -833,12 +833,19 @@
                             <div class="tm-modal-dialog tm-modal-dialog-bulk-edit">
                                 <div class="tm-modal-head">
                                     <div class="tm-modal-head-stack">
-                                        <h3 id="tmBulkEditTitle-{{ $module->id }}">Edición múltiple</h3>
+                                        <div class="tm-bulk-head-title-row">
+                                            <h3 id="tmBulkEditTitle-{{ $module->id }}">Editar en hoja de cálculo</h3>
+                                        </div>
                                         <p class="tm-modal-subtitle tm-bulk-edit-module-name">{{ $module->name }}</p>
                                     </div>
-                                    <button type="button" class="tm-modal-close" data-tm-bulk-edit-dismiss aria-label="Cerrar">
-                                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                                    </button>
+                                    <div class="tm-modal-head-actions">
+                                        <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" data-tm-bulk-sheet-toggle>
+                                            <i class="fa-solid fa-table-cells" aria-hidden="true"></i> Editar en hojas de cálculo
+                                        </button>
+                                        <button type="button" class="tm-modal-close" data-tm-bulk-edit-dismiss aria-label="Cerrar">
+                                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="tm-modal-body tm-bulk-edit-body">
                                     <div class="tm-bulk-edit-loading" data-tm-bulk-loading>
@@ -884,6 +891,26 @@
                                                     </button>
                                                 </div>
                                             </form>
+                                        </div>
+                                    </div>
+
+                                    <div class="tm-bulk-sheet-view tm-hidden" data-tm-bulk-sheet>
+                                        <div class="tm-bulk-sheet-toolbar">
+                                            <label class="tm-bulk-toolbar-label tm-bulk-sheet-search">
+                                                <span class="tm-bulk-toolbar-label-text">Buscar en la hoja</span>
+                                                <input type="search" class="tm-input tm-input-sm" data-tm-bulk-sheet-search placeholder="Buscar en cualquier celda…" autocomplete="off">
+                                            </label>
+                                            <div class="tm-bulk-sheet-zoom tm-hidden" data-tm-bulk-sheet-zoom aria-label="Zoom de hoja">
+                                                <button type="button" class="tm-btn tm-btn-ghost tm-btn-sm" data-tm-bulk-sheet-zoom-out title="Alejar">-</button>
+                                                <span class="tm-bulk-sheet-zoom-val" data-tm-bulk-sheet-zoom-val>100%</span>
+                                                <button type="button" class="tm-btn tm-btn-ghost tm-btn-sm" data-tm-bulk-sheet-zoom-in title="Acercar">+</button>
+                                                <button type="button" class="tm-btn tm-btn-ghost tm-btn-sm" data-tm-bulk-sheet-zoom-reset title="Restablecer">Reset</button>
+                                            </div>
+                                            <button type="button" class="tm-btn tm-btn-ghost tm-btn-sm" data-tm-bulk-sheet-clear-filters>Limpiar filtros</button>
+                                            <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" data-tm-bulk-sheet-exit>Volver al editor</button>
+                                        </div>
+                                        <div class="tm-excel-sheet-container tm-bulk-sheet-container">
+                                            <div class="tm-excel-sheet-inner tm-bulk-sheet-inner" data-tm-bulk-sheet-inner></div>
                                         </div>
                                     </div>
                                     <div class="tm-bulk-edit-error tm-hidden" data-tm-bulk-error></div>
