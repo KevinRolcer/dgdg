@@ -39,7 +39,9 @@
         $topbarAvatarRaw = trim((string) ($topbarUser?->avatar ?? ''));
         $topbarAvatarUrl = null;
         if ($topbarAvatarRaw !== '') {
-            if (filter_var($topbarAvatarRaw, FILTER_VALIDATE_URL)) {
+            if (str_starts_with($topbarAvatarRaw, 'profilePhoto/')) {
+                $topbarAvatarUrl = $topbarUser ? route('profile.avatar.serve', ['userId' => $topbarUser->id]) : null;
+            } elseif (filter_var($topbarAvatarRaw, FILTER_VALIDATE_URL)) {
                 $avatarScheme = strtolower((string) parse_url($topbarAvatarRaw, PHP_URL_SCHEME));
                 if (in_array($avatarScheme, ['http', 'https'], true)) {
                     $topbarAvatarUrl = $topbarAvatarRaw;
