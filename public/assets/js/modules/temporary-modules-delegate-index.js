@@ -3970,45 +3970,91 @@
                     const paths = Array.isArray(v)
                         ? v.filter(function (p) { return typeof p === 'string' && p.trim() !== ''; })
                         : (typeof v === 'string' && v.trim() !== '' ? [v.trim()] : []);
-                    const maxFiles = field.type === 'image' ? 2 : 1;
-                    const accept = field.type === 'image'
-                        ? 'image/jpeg,image/png,image/webp'
-                        : (field.type === 'document' ? '.pdf,.docx' : '.jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv');
-                    const rowHtml = paths.map(function (path, idx) {
-                        const base = previewTpl ? previewTpl.replace('__EID__', String(entryId)).replace('__FKEY__', String(k)) : '';
-                        const sep = base.indexOf('?') >= 0 ? '&' : '?';
+
+                    const isSingleFileField = field.type === 'file' || field.type === 'document';
+                    const isDocumentField = field.type === 'document';
+                    const uploadAccept = isDocumentField ? '.pdf,.docx' : 'image/*';
+                    const dropIcon = isDocumentField ? 'fa-file-arrow-up' : 'fa-images';
+                    const maxFilesAllowed = isSingleFileField ? 1 : 2;
+                    const dropText = isDocumentField
+                        ? 'Suelta tu documento aquí (PDF/DOCX, Máx. 1)'
+                        : 'Suelta las imagenes aqui (Max. 2)';
+
+                    const inputId = 'tmBulkUpload_' + entryId + '_' + String(k).replace(/[^A-Za-z0-9_]/g, '_');
+                    const removeExistingName = 'remove_existing_images[' + k + '][]';
+
+                    const visibleExistingCount = paths.filter(function (p) { return !removedSet.has(p); }).length;
+                    const placeholderHidden = (visibleExistingCount + pendingCount) > 0;
+                    const removeFlagVal = ((visibleExistingCount + pendingCount) === 0 && (paths.length > 0 || removedSet.size > 0)) ? '1' : '0';
+
+                    const base = previewTpl ? previewTpl.replace('__EID__', String(entryId)).replace('__FKEY__', String(k)) : '';
+                    const sep = base.indexOf('?') >= 0 ? '&' : '?';
+
+                    const removedHiddenInputs = Array.from(removedSet).map(function (path) {
+                        return '<input type="hidden" name="' + tmBulkEsc(removeExistingName) + '" value="' + tmBulkEsc(path) + '">';
+                    }).join('');
+
+                    const existingPreviews = paths.map(function (path, idx) {
+                        if (removedSet.has(path)) {
+                            return '';
+                        }
                         const previewUrl = base ? (base + sep + 'i=' + idx) : '';
-                        if (field.type === 'image' && previewUrl) {
-                            return '<div class="tm-bulk-existing-file-row">'
-                                + '<button type="button" class="tm-thumb-link" data-open-image-preview data-image-src="' + tmBulkEsc(previewUrl) + '" data-image-title="' + lab + ' (' + (idx + 1) + ')" title="Ver imagen ' + (idx + 1) + '">'
-                                + '<i class="fa fa-image" aria-hidden="true"></i> Imagen ' + (idx + 1) + '</button>'
-                                + '<label style="margin-left:8px;"><input type="checkbox" data-bulk-remove-existing data-entry-id="' + entryId + '" data-field-key="' + tmBulkEsc(k) + '" data-existing-path="' + tmBulkEsc(path) + '"' + (removedSet.has(path) ? ' checked' : '') + '> Quitar</label>'
+                        if (isDocumentField) {
+                            return '<div class="tm-inline-image-preview tm-image-preview" data-existing-preview="1" style="position:relative;">'
+                                + '<button type="button" class="tm-thumb-link" data-open-file-preview="1" data-file-src="' + tmBulkEsc(previewUrl) + '" data-file-title="' + tmBulkEsc(String(lab).replace(/<[^>]*>/g, '')) + '" style="display:inline-flex; align-items:flex-start; gap:6px; max-width:360px; width:min(100%,360px); text-align:left;">'
+                                + '<i class="fa-solid fa-file-lines" aria-hidden="true"></i>'
+                                + '<span style="white-space:normal; word-break:break-word; line-height:1.25;">Ver documento</span>'
+                                + '</button>'
+                                + '<button type="button" class="tm-image-clear" data-remove-existing-image data-target-input="' + tmBulkEsc(inputId) + '" data-existing-path="' + tmBulkEsc(path) + '" data-remove-existing-name="' + tmBulkEsc(removeExistingName) + '" aria-label="Quitar archivo ' + (idx + 1) + '" title="Quitar archivo">&times;</button>'
                                 + '</div>';
                         }
-                        if (previewUrl) {
-                            return '<div class="tm-bulk-existing-file-row">'
-                                + '<button type="button" class="tm-thumb-link" data-open-file-preview="1" data-file-src="' + tmBulkEsc(previewUrl) + '" data-file-title="' + tmBulkEsc(String(lab).replace(/<[^>]*>/g, '')) + '" style="max-width:420px; width:min(100%,420px); text-align:left;">'
-                                + '<i class="fa-solid fa-file" aria-hidden="true"></i> Ver documento</button>'
-                                + '<label style="margin-left:8px;"><input type="checkbox" data-bulk-remove-existing data-entry-id="' + entryId + '" data-field-key="' + tmBulkEsc(k) + '" data-existing-path="' + tmBulkEsc(path) + '"' + (removedSet.has(path) ? ' checked' : '') + '> Quitar</label>'
-                                + '</div>';
-                        }
-                        return '<div class="tm-bulk-existing-file-row">'
-                            + '<span class="tm-muted">Archivo ' + (idx + 1) + '</span>'
-                            + '<label style="margin-left:8px;"><input type="checkbox" data-bulk-remove-existing data-entry-id="' + entryId + '" data-field-key="' + tmBulkEsc(k) + '" data-existing-path="' + tmBulkEsc(path) + '"' + (removedSet.has(path) ? ' checked' : '') + '> Quitar</label>'
+                        return '<div class="tm-inline-image-preview tm-image-preview" data-existing-preview="1" style="position:relative;">'
+                            + '<img src="' + tmBulkEsc(previewUrl) + '" style="max-width:120px; max-height:120px; border-radius:8px; object-fit:cover;" alt="Imagen ' + (idx + 1) + '">'
+                            + '<button type="button" class="tm-image-clear" data-remove-existing-image data-target-input="' + tmBulkEsc(inputId) + '" data-existing-path="' + tmBulkEsc(path) + '" data-remove-existing-name="' + tmBulkEsc(removeExistingName) + '" aria-label="Quitar archivo ' + (idx + 1) + '" title="Quitar archivo">&times;</button>'
                             + '</div>';
                     }).join('');
-                    return '<div class="tm-entry-field tm-col-full">'
-                        + '<strong>' + lab + '</strong>' + comment
-                        + '<div class="tm-bulk-existing-files" style="display:grid; gap:6px; margin:8px 0;">'
-                        + (rowHtml || '<span class="tm-muted" style="font-size:0.78rem;">Sin archivo actual.</span>')
+
+                    const pasteBtn = isDocumentField
+                        ? ''
+                        : '<button type="button" class="tm-btn tm-btn-outline" data-paste-image-button data-target-input="' + tmBulkEsc(inputId) + '" aria-label="Pegar imagen" title="Pegar imagen">'
+                            + '<i class="fa-solid fa-paste" aria-hidden="true"></i> Pegar</button>';
+
+                    const removeExistingBtn = visibleExistingCount > 0
+                        ? '<button type="button" class="tm-btn tm-btn-outline" data-remove-existing-images data-target-input="' + tmBulkEsc(inputId) + '" aria-label="Quitar archivos actuales" title="Quitar archivos actuales">'
+                            + '<i class="fa-solid fa-trash" aria-hidden="true"></i> Quitar actuales</button>'
+                        : '';
+
+                    const pendingHelp = pendingCount > 0
+                        ? '<small class="tm-field-help">Hay ' + pendingCount + ' archivo(s) listo(s) para subir al guardar (si cambias de registro, tendrás que volver a seleccionarlos).</small>'
+                        : '';
+
+                    return '<label class="tm-entry-field tm-col-full is-media">' + lab + (field.is_required ? ' *' : '') + comment
+                        + '<div class="tm-upload-evidence">'
+                        + '<input type="hidden" name="remove_images[' + tmBulkEsc(k) + ']" value="' + tmBulkEsc(removeFlagVal) + '" data-remove-flag>'
+                        + '<div class="tm-upload-evidence-toolbar">'
+                        + '<button type="button" class="tm-btn tm-btn-outline" data-upload-trigger data-target-input="' + tmBulkEsc(inputId) + '" aria-label="Cargar archivo">'
+                        + '<i class="fa-solid fa-upload" aria-hidden="true"></i> Cargar</button>'
+                        + pasteBtn
+                        + removeExistingBtn
                         + '</div>'
-                        + '<label style="display:block; margin:4px 0 8px;">'
-                        + '<input type="checkbox" data-bulk-remove-all data-entry-id="' + entryId + '" data-field-key="' + tmBulkEsc(k) + '"' + ((paths.length > 0 && removedSet.size >= paths.length) ? ' checked' : '') + '> Quitar todos los archivos actuales'
-                        + '</label>'
-                        + '<input type="file" data-bulk-file-input data-entry-id="' + entryId + '" data-field-key="' + tmBulkEsc(k) + '" accept="' + tmBulkEsc(accept) + '"' + (maxFiles > 1 ? ' multiple' : '') + ' data-max-files="' + maxFiles + '">'
-                        + (pendingCount > 0 ? '<small class="tm-field-help">Hay ' + pendingCount + ' archivo(s) listo(s) para subir al guardar.</small>' : '')
-                        + '<small class="tm-field-help">Puedes subir hasta ' + maxFiles + ' archivo(s) por campo.</small>'
-                        + '</div>';
+                        + '<small class="tm-upload-evidence-hint">'
+                        + (isDocumentField ? 'Arrastra aquí tu PDF/DOCX o usa el botón cargar.' : 'Arrastra aqui o usa los botones.')
+                        + '</small>'
+                        + '<div class="tm-upload-evidence-dropzone" data-paste-upload-wrap>'
+                        + '<input id="' + tmBulkEsc(inputId) + '" type="file" accept="' + tmBulkEsc(uploadAccept) + '" name="values[' + tmBulkEsc(k) + '][]" class="d-none"' + (field.is_required && visibleExistingCount === 0 && pendingCount === 0 ? ' required' : '') + (isSingleFileField ? '' : ' multiple') + ' data-max-files="' + maxFilesAllowed + '" data-upload-kind="' + (isDocumentField ? 'document' : 'image') + '" data-bulk-file-input data-entry-id="' + entryId + '" data-field-key="' + tmBulkEsc(k) + '">'
+                        + '<div data-remove-existing-container>' + removedHiddenInputs + '</div>'
+                        + '<div class="tm-upload-evidence-placeholder"' + (placeholderHidden ? ' hidden' : '') + '>'
+                        + '<i class="fa-solid ' + tmBulkEsc(dropIcon) + '" aria-hidden="true"></i>'
+                        + '<p>' + tmBulkEsc(dropText) + '</p>'
+                        + '</div>'
+                        + '<div class="tm-inline-image-preview-container" data-inline-image-preview-container style="display:flex; flex-wrap:wrap; gap:8px; width:100%; justify-content:center;">'
+                        + existingPreviews
+                        + '</div>'
+                        + '</div>'
+                        + pendingHelp
+                        + '<small class="tm-field-help">Puedes subir hasta ' + maxFilesAllowed + ' archivo(s) por campo.</small>'
+                        + '</div>'
+                        + '</label>';
                 }
                 if (field.type === 'geopoint') {
                     const gr = tmBulkTextareaRows(v);
@@ -4035,24 +4081,21 @@
                         return;
                     }
                     if (f.type === 'image' || f.type === 'file' || f.type === 'document') {
-                        const removeChecks = Array.from(form.querySelectorAll('[data-bulk-remove-existing][data-entry-id="' + eid + '"][data-field-key="' + f.key + '"]:checked'));
-                        const removeAll = form.querySelector('[data-bulk-remove-all][data-entry-id="' + eid + '"][data-field-key="' + f.key + '"]');
                         if (!st.removeExisting[eid]) {
                             st.removeExisting[eid] = {};
                         }
-                        st.removeExisting[eid][f.key] = removeChecks.map(function (el) {
-                            return String(el.getAttribute('data-existing-path') || '').trim();
-                        }).filter(function (path) {
-                            return path !== '';
-                        });
-                        if (removeAll && removeAll.checked) {
-                            const allPaths = form.querySelectorAll('[data-bulk-remove-existing][data-entry-id="' + eid + '"][data-field-key="' + f.key + '"]');
-                            st.removeExisting[eid][f.key] = Array.from(allPaths).map(function (el) {
-                                return String(el.getAttribute('data-existing-path') || '').trim();
-                            }).filter(function (path) {
-                                return path !== '';
-                            });
-                        }
+
+                        // Compatibilidad (HTML legado): checkboxes de "Quitar".
+                        const legacyRemoveChecks = Array.from(form.querySelectorAll('[data-bulk-remove-existing][data-entry-id="' + eid + '"][data-field-key="' + f.key + '"]:checked'))
+                            .map(function (el) { return String(el.getAttribute('data-existing-path') || '').trim(); })
+                            .filter(function (path) { return path !== ''; });
+
+                        // UI nueva: removals como inputs hidden name="remove_existing_images[key][]".
+                        const hiddenRemoveInputs = Array.from(form.querySelectorAll('input[type="hidden"][name="remove_existing_images[' + f.key + '][]"]'))
+                            .map(function (el) { return String(el.value || '').trim(); })
+                            .filter(function (path) { return path !== ''; });
+
+                        st.removeExisting[eid][f.key] = Array.from(new Set(legacyRemoveChecks.concat(hiddenRemoveInputs)));
                         return;
                     }
                     if (f.type === 'multiselect') {
@@ -4092,6 +4135,9 @@
                     return;
                 }
                 const st = modal.__bulkState;
+                if (typeof bindImageUploadInteractions === 'function') {
+                    bindImageUploadInteractions(form);
+                }
                 form.querySelectorAll('[data-field-key], [data-field-key-multi], [data-linked-primary], [data-linked-secondary]').forEach(function (el) {
                     el.addEventListener('input', function () { syncDraftFromForm(modal); refreshBulkCounter(modal); });
                     el.addEventListener('change', function () { syncDraftFromForm(modal); refreshBulkCounter(modal); });
@@ -4116,22 +4162,6 @@
                             input.value = '';
                             Swal.fire('Aviso', 'Solo puedes seleccionar hasta ' + maxFiles + ' archivo(s).', 'warning');
                             st.pendingFiles[entryId][key] = [];
-                        }
-                        syncDraftFromForm(modal);
-                        refreshBulkCounter(modal);
-                    });
-                });
-                form.querySelectorAll('[data-bulk-remove-existing], [data-bulk-remove-all]').forEach(function (el) {
-                    el.addEventListener('change', function () {
-                        const removeAll = el.matches('[data-bulk-remove-all]');
-                        if (removeAll) {
-                            const entryId = el.getAttribute('data-entry-id');
-                            const key = el.getAttribute('data-field-key');
-                            if (entryId && key) {
-                                form.querySelectorAll('[data-bulk-remove-existing][data-entry-id="' + entryId + '"][data-field-key="' + key + '"]').forEach(function (chk) {
-                                    chk.checked = el.checked;
-                                });
-                            }
                         }
                         syncDraftFromForm(modal);
                         refreshBulkCounter(modal);
