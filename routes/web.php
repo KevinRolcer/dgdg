@@ -80,6 +80,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/mi-perfil/password', [ProfileController::class, 'updatePassword'])
         ->middleware('throttle:6,1')
         ->name('profile.password.update');
+    Route::post('/mi-perfil/foto', [ProfileController::class, 'updateAvatar'])
+        ->middleware('throttle:12,1')
+        ->name('profile.avatar.update');
 
     /* Mesas: consulta = Gate mesas-paz-ver; escritura = Gate Mesas-Paz */
     Route::get('/mesas-paz', [MesasPazController::class, 'index'])->name('mesas-paz')->middleware('can:mesas-paz-ver');

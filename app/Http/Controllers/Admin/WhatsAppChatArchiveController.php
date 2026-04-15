@@ -137,6 +137,13 @@ class WhatsAppChatArchiveController extends Controller
             'import_error',
         ];
 
+        if (Schema::hasColumn('whatsapp_chat_archives', 'import_progress')) {
+            $select[] = 'import_progress';
+        }
+        if (Schema::hasColumn('whatsapp_chat_archives', 'import_phase')) {
+            $select[] = 'import_phase';
+        }
+
         if (Schema::hasColumn('whatsapp_chat_archives', 'folder_total_files')) {
             $select[] = 'folder_total_files';
         }

@@ -13,16 +13,6 @@
 @section('content')
 <section class="agenda-page agenda-shell app-density-compact">
     <div class="agenda-shell-main">
-        <header class="agenda-shell-head">
-            <h1 class="agenda-shell-title">Agenda Directiva</h1>
-            <p class="agenda-shell-desc">
-                @if(!empty($soloAsignaciones))
-                    Solo ves los eventos asignados a ti (actualizaciones incluidas). Para pasar pre-gira a gira o registrar actualizaciones usa Seguimiento de Agenda.
-                @else
-                    Gestiona asuntos, giras y pre-giras; asigna usuarios y envía invitaciones a calendario.
-                @endif
-            </p>
-        </header>
 
         <article class="agenda-card agenda-card-in-shell">
             <div class="agenda-head agenda-head-actions-only">

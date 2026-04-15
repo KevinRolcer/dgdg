@@ -74,7 +74,7 @@ class ProfileService
             }
         }
 
-        $profilePhotoRaw = $delegado?->foto ?: ($user->avatar ?? null);
+        $profilePhotoRaw = $user->avatar ?: ($delegado?->foto ?: null);
 
         return [
             'roleName' => $roleName,
@@ -112,7 +112,9 @@ class ProfileService
 
         $normalized = '/'.ltrim(str_replace('\\\\', '/', $value), '/');
 
-        if (str_starts_with($normalized, '/images/') || str_starts_with($normalized, '/localstorage/')) {
+        if (str_starts_with($normalized, '/images/')
+            || str_starts_with($normalized, '/localstorage/')
+            || str_starts_with($normalized, '/storage/')) {
             return $normalized;
         }
 

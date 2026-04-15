@@ -681,6 +681,19 @@ body.sidebar-collapsed .sidebar-logout-btn {
     justify-content: center;
 }
 
+.topbar-avatar.topbar-avatar--photo {
+    padding: 0;
+    overflow: hidden;
+    background: #fff;
+}
+
+.topbar-avatar-img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
 .topbar-profile-meta {
     min-width: 0;
     display: flex;

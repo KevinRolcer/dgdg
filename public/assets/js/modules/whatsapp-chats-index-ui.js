@@ -158,6 +158,105 @@
         return editRoot.getAttribute('data-csrf') || '';
     }
 
+    function getImportStatusUrl(chatId) {
+        if (!editRoot) return null;
+        var tpl = editRoot.getAttribute('data-import-status-url-template') || '';
+        if (!tpl) return null;
+        return tpl.replace('__ID__', String(chatId));
+    }
+
+    function updateCardProcessingProgress(card, statusData) {
+        if (!card || !statusData) return;
+        var textEl = card.querySelector('.js-wa-resume-progress-text');
+        var barEl = card.querySelector('.js-wa-resume-progress-bar');
+        var track = card.querySelector('.wai-resume-progress-track');
+        if (!textEl || !barEl || !track) return;
+
+        var pct = Math.max(0, Math.min(100, parseInt(statusData.progress || 0, 10)));
+        var phase = String(statusData.phase || '').trim();
+        barEl.style.width = pct + '%';
+        track.setAttribute('aria-valuenow', String(pct));
+        textEl.textContent = (phase ? phase + ' ' : 'Importando... ') + pct + '%';
+    }
+
+    function startImportStatusPolling() {
+        var pendingCards = cards.filter(function (card) {
+            var st = String(card.dataset.status || '').toLowerCase();
+            return st === 'uploading' || st === 'processing';
+        });
+        if (!pendingCards.length) {
+            return;
+        }
+
+        var inFlight = {};
+        var stopped = false;
+
+        function hasPendingCards() {
+            return cards.some(function (card) {
+                var st = String(card.dataset.status || '').toLowerCase();
+                return st === 'uploading' || st === 'processing';
+            });
+        }
+
+        function pollOnce() {
+            if (stopped) {
+                return;
+            }
+
+            cards.forEach(function (card) {
+                var chatId = card.getAttribute('data-chat-id');
+                if (!chatId) return;
+
+                var currentStatus = String(card.dataset.status || '').toLowerCase();
+                if (currentStatus !== 'uploading' && currentStatus !== 'processing') {
+                    return;
+                }
+                if (inFlight[chatId]) {
+                    return;
+                }
+
+                var url = getImportStatusUrl(chatId);
+                if (!url) return;
+
+                inFlight[chatId] = true;
+                fetch(url, {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Cache-Control': 'no-cache'
+                    }
+                }).then(function (res) {
+                    return res.ok ? res.json() : null;
+                }).then(function (data) {
+                    inFlight[chatId] = false;
+                    if (!data) return;
+
+                    updateCardProcessingProgress(card, data);
+
+                    var newStatus = String(data.status || '').toLowerCase();
+                    var done = !!data.done;
+                    if ((newStatus && newStatus !== currentStatus) || done) {
+                        stopped = true;
+                        window.location.reload();
+                    }
+                }).catch(function () {
+                    inFlight[chatId] = false;
+                });
+            });
+        }
+
+        pollOnce();
+        var timer = setInterval(function () {
+            if (stopped || !hasPendingCards()) {
+                clearInterval(timer);
+                return;
+            }
+            pollOnce();
+        }, 6000);
+    }
+
     function enterEditMode(card) {
         if (!card) return;
         card.classList.add('wai-card--editing');
@@ -314,4 +413,5 @@
     });
 
     applyFilters();
+    startImportStatusPolling();
 })();

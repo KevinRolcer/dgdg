@@ -29,8 +29,6 @@
 <div id="vistaEvidencias">
     <header class="mesas-paz-shell-head d-flex justify-content-between align-items-start flex-wrap gap-2">
         <div>
-            <h1 class="mesas-paz-shell-title">Evidencias Mesas de Paz</h1>
-            <p class="mesas-paz-shell-desc">Consulta de evidencias y asistencias por delegado. Filtros por fecha y análisis por microregión.</p>
         </div>
         <div class="pt-1">
             <button type="button" id="btnToggleBruto" class="btn btn-sm btn-outline-primary">

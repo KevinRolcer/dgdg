@@ -44,17 +44,32 @@
             >
                 <div class="profile-hero-top">
                     <div class="profile-header-block">
-                        <div class="profile-avatar-wrap profile-avatar-wrap-lg {{ empty($profilePhoto) ? 'no-photo' : '' }}">
-                            @if (!empty($profilePhoto))
-                                <img
-                                    src="{{ $profilePhoto }}"
-                                    alt="Foto de {{ $user->name }}"
-                                    class="profile-photo profile-photo-lg"
-                                    onerror="this.closest('.profile-avatar-wrap').classList.add('has-fallback'); this.remove();"
+                        <form method="POST" action="{{ route('profile.avatar.update') }}" enctype="multipart/form-data" class="profile-avatar-form">
+                            @csrf
+                            <div class="profile-avatar-outer">
+                                <div class="profile-avatar-wrap profile-avatar-wrap-lg {{ empty($profilePhoto) ? 'no-photo' : '' }}">
+                                    @if (!empty($profilePhoto))
+                                        <img
+                                            src="{{ $profilePhoto }}"
+                                            alt="Foto de {{ $user->name }}"
+                                            class="profile-photo profile-photo-lg"
+                                            onerror="this.closest('.profile-avatar-wrap').classList.add('has-fallback'); this.remove();"
+                                        >
+                                    @endif
+                                    <span class="profile-photo profile-photo-fallback profile-photo-lg">{{ strtoupper(substr($user->name ?? 'U', 0, 1)) }}</span>
+                                </div>
+                                <label for="profileAvatarInput" class="profile-avatar-upload-btn" title="Editar foto de perfil" aria-label="Editar foto de perfil">
+                                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                                </label>
+                                <input
+                                    id="profileAvatarInput"
+                                    class="profile-avatar-input"
+                                    type="file"
+                                    name="avatar"
+                                    accept="image/*"
                                 >
-                            @endif
-                            <span class="profile-photo profile-photo-fallback profile-photo-lg">{{ strtoupper(substr($user->name ?? 'U', 0, 1)) }}</span>
-                        </div>
+                            </div>
+                        </form>
 
                         <div class="profile-hero-main">
                             <h2>{{ $user->name }}</h2>
@@ -192,6 +207,19 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const avatarInput = document.getElementById('profileAvatarInput');
+        if (avatarInput) {
+            avatarInput.addEventListener('change', function () {
+                if (!avatarInput.files || !avatarInput.files[0]) {
+                    return;
+                }
+                const form = avatarInput.closest('form');
+                if (form) {
+                    form.submit();
+                }
+            });
+        }
+
         const chipsWrap = document.querySelector('.profile-micro-chips');
         const chips = Array.from(document.querySelectorAll('[data-profile-micro-chip]'));
         const panes = Array.from(document.querySelectorAll('[data-profile-micro-pane]'));

@@ -34,8 +34,48 @@
 >
     @php
         $topbarNotifications = collect($topbarNotifications ?? []);
-        if (auth()->check()) {
-            $dbNotifications = auth()->user()->unreadNotifications->map(function ($noty) {
+        $topbarUser = auth()->user();
+        $topbarUserName = $topbarUser?->name ?? 'Usuario';
+        $topbarAvatarRaw = trim((string) ($topbarUser?->avatar ?? ''));
+        $topbarAvatarUrl = null;
+        if ($topbarAvatarRaw !== '') {
+            if (filter_var($topbarAvatarRaw, FILTER_VALIDATE_URL)) {
+                $avatarScheme = strtolower((string) parse_url($topbarAvatarRaw, PHP_URL_SCHEME));
+                if (in_array($avatarScheme, ['http', 'https'], true)) {
+                    $topbarAvatarUrl = $topbarAvatarRaw;
+                }
+            } else {
+                $normalizedAvatar = '/'.ltrim(str_replace('\\', '/', $topbarAvatarRaw), '/');
+                if (str_starts_with($normalizedAvatar, '/storage/')
+                    || str_starts_with($normalizedAvatar, '/images/')
+                    || str_starts_with($normalizedAvatar, '/localstorage/')) {
+                    $topbarAvatarUrl = $normalizedAvatar;
+                }
+            }
+        }
+        $topbarUserWords = \Illuminate\Support\Str::of($topbarUserName)
+            ->squish()
+            ->explode(' ')
+            ->filter();
+        $topbarUserNameShortWords = [];
+        foreach ($topbarUserWords as $word) {
+            $topbarUserNameShortWords[] = (string) $word;
+            $containsDe = in_array('de', array_map(
+                fn ($w) => mb_strtolower((string) $w),
+                $topbarUserNameShortWords
+            ), true);
+            $maxWords = $containsDe ? 3 : 2;
+            if (count($topbarUserNameShortWords) >= $maxWords) {
+                break;
+            }
+        }
+        $topbarUserNameShort = implode(' ', $topbarUserNameShortWords);
+        if ($topbarUserNameShort === '') {
+            $topbarUserNameShort = $topbarUserWords->take(2)->implode(' ');
+        }
+
+        if ($topbarUser) {
+            $dbNotifications = $topbarUser->unreadNotifications->map(function ($noty) {
                 $d = $noty->data ?? [];
                 $waArchiveId = $d['whatsapp_archive_id'] ?? $d['whatsapp_chat_id'] ?? null;
                 $waStatus = $d['whatsapp_import_status'] ?? null;
@@ -173,11 +213,17 @@
                             id="topbarProfileToggle"
                             aria-expanded="false"
                             aria-controls="topbarProfilePanel"
-                            title="{{ auth()->user()->name }}"
+                            title="{{ $topbarUserName }}"
                         >
-                            <span class="topbar-avatar">{{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}</span>
+                            <span class="topbar-avatar{{ $topbarAvatarUrl ? ' topbar-avatar--photo' : '' }}">
+                                @if ($topbarAvatarUrl)
+                                    <img src="{{ $topbarAvatarUrl }}" alt="Foto de {{ $topbarUserName }}" class="topbar-avatar-img">
+                                @else
+                                    {{ strtoupper(substr($topbarUserName, 0, 1)) }}
+                                @endif
+                            </span>
                             <div class="topbar-profile-meta">
-                                <strong>{{ auth()->user()->name }}</strong>
+                                <strong>{{ $topbarUserNameShort }}</strong>
                                 <small>Ver mi perfil</small>
                             </div>
                             <i class="fa-solid fa-chevron-down topbar-profile-chevron" aria-hidden="true"></i>

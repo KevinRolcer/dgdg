@@ -52,7 +52,7 @@
 
                 <div class="wai-tab-warn" id="waFolderTabWarn" role="alert" hidden>
                     <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                    <strong>No cierres ni cambies de pestaña</strong>
+                    <strong>No cierres ni cambies de pestaña</strong> Mientras suben los archivos; si se interrumpe, vuelve a elegir la misma carpeta para reanudar.
                 </div>
 
                 <div class="wai-import-fields">
@@ -126,6 +126,7 @@
                 id="waiChatsEditRoot"
                 data-csrf="{{ csrf_token() }}"
                 data-update-url-template="{{ route('whatsapp-chats.admin.update', ['chat' => '__ID__']) }}"
+                data-import-status-url-template="{{ route('whatsapp-chats.admin.import-status', ['chat' => '__ID__']) }}"
                 hidden
             ></div>
             <div class="wai-chats-head">
@@ -263,18 +264,23 @@
                                 @endif
                             </div>
 
-                            @if ($isUploading)
+                            @if ($isUploading || $isProcessing)
                                 @php
                                     $uploadedFilesCount = (int) ($chat->folder_uploaded_files ?? 0);
                                     $totalFilesCount = max(1, (int) ($chat->folder_total_files ?? 0));
-                                    $progressPct = max(0, min(100, (int) floor(($uploadedFilesCount / $totalFilesCount) * 100)));
+                                    $uploadPct = max(0, min(100, (int) floor(($uploadedFilesCount / $totalFilesCount) * 100)));
+                                    $processingPct = max(0, min(100, (int) ($chat->import_progress ?? 0)));
+                                    $progressPct = $isProcessing ? $processingPct : $uploadPct;
+                                    $progressText = $isProcessing
+                                        ? trim(((string) ($chat->import_phase ?? 'Importando...')).' '.$progressPct.'%')
+                                        : ($uploadedFilesCount.' / '.$totalFilesCount.' archivos ('.$progressPct.'%)');
                                 @endphp
                                 <div class="wai-resume-progress js-wa-resume-progress" data-chat-id="{{ $chat->id }}">
                                     <div class="wai-resume-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $progressPct }}">
                                         <div class="wai-resume-progress-bar js-wa-resume-progress-bar" style="width: {{ $progressPct }}%;"></div>
                                     </div>
                                     <p class="wai-resume-progress-text js-wa-resume-progress-text">
-                                        {{ $uploadedFilesCount }} / {{ $totalFilesCount }} archivos ({{ $progressPct }}%)
+                                        {{ $progressText }}
                                     </p>
                                 </div>
                             @endif
