@@ -589,6 +589,9 @@ class TemporaryModuleController extends Controller
             'applies_to' => ['required', Rule::in(['all', 'selected'])],
             'delegate_ids' => ['nullable', 'array'],
             'delegate_ids.*' => ['integer', Rule::exists('users', 'id')],
+            'registration_scope' => ['nullable', Rule::in(['microrregion', 'free', 'municipios'])],
+            'target_municipios' => ['nullable', 'array'],
+            'target_municipios.*' => ['string', 'max:120'],
             'fields' => ['required', 'array', 'min:1'],
             'fields.*.label' => ['required', 'string', 'max:120'],
             'fields.*.key' => ['nullable', 'string', 'max:120'],
@@ -604,6 +607,16 @@ class TemporaryModuleController extends Controller
         }
 
         $validated = $request->validate($rules);
+
+        $regScope = in_array($validated['registration_scope'] ?? '', ['microrregion', 'free', 'municipios'], true)
+            ? $validated['registration_scope']
+            : 'microrregion';
+
+        if ($regScope === 'municipios' && empty($validated['target_municipios'])) {
+            throw ValidationException::withMessages([
+                'target_municipios' => 'Selecciona al menos un municipio para el modo "Por municipio".',
+            ]);
+        }
 
         if (! $this->isIndefiniteMode($validated) && empty($validated['expires_at'])) {
             throw ValidationException::withMessages([
@@ -634,6 +647,10 @@ class TemporaryModuleController extends Controller
                 }
             }
 
+            $targetMunicipios = ($regScope === 'municipios')
+                ? array_values(array_unique(array_filter(array_map('strval', $validated['target_municipios'] ?? []))))
+                : null;
+
             $module = TemporaryModule::query()->create([
                 'name' => $validated['name'],
                 'slug' => $slug,
@@ -641,6 +658,8 @@ class TemporaryModuleController extends Controller
                 'expires_at' => $this->resolveExpiresAt($validated),
                 'is_active' => (bool) ($validated['is_active'] ?? true),
                 'applies_to_all' => ($validated['applies_to'] ?? 'all') === 'all',
+                'registration_scope' => $regScope,
+                'target_municipios' => $targetMunicipios,
                 'created_by' => $request->user()->id,
             ]);
 
@@ -1424,6 +1443,10 @@ class TemporaryModuleController extends Controller
         abort_unless($temporaryModule->isAvailable(), 404);
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
 
+        $regScope = in_array((string) ($temporaryModule->registration_scope ?? ''), ['microrregion', 'free', 'municipios'], true)
+            ? (string) $temporaryModule->registration_scope
+            : 'microrregion';
+
         $requestedMicrorregionId = $request->filled('microrregion_id')
             ? (int) $request->input('microrregion_id')
             : null;
@@ -1432,15 +1455,26 @@ class TemporaryModuleController extends Controller
         $microrregionesAsignadas = $this->accessService->microrregionesConMunicipiosPorUsuario((int) $request->user()->id);
 
         $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
-        $entries = $temporaryModule->entries()
-            ->when(
-                $microrregionIdsUsuario !== [],
-                fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
-                fn ($q) => $q->whereRaw('1 = 0')
-            )
-            ->latest('submitted_at')
-            ->take(200)
-            ->get();
+
+        // Filter entries based on scope
+        if ($regScope === 'microrregion') {
+            $entries = $temporaryModule->entries()
+                ->when(
+                    $microrregionIdsUsuario !== [],
+                    fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
+                    fn ($q) => $q->whereRaw('1 = 0')
+                )
+                ->latest('submitted_at')
+                ->take(200)
+                ->get();
+        } else {
+            // free / municipios: show only this user's own entries
+            $entries = $temporaryModule->entries()
+                ->where('user_id', $request->user()->id)
+                ->latest('submitted_at')
+                ->take(200)
+                ->get();
+        }
 
         $editingEntry = null;
         $editId = (int) $request->query('entry', 0);
@@ -1448,8 +1482,17 @@ class TemporaryModuleController extends Controller
             $editingEntry = $temporaryModule->entries()
                 ->whereKey($editId)
                 ->first();
-            if ($editingEntry && ! $this->accessService->userCanAccessEntryByMicrorregion((int) $request->user()->id, (int) $editingEntry->microrregion_id)) {
-                $editingEntry = null;
+
+            if ($editingEntry) {
+                if ($regScope === 'microrregion') {
+                    if (! $this->accessService->userCanAccessEntryByMicrorregion((int) $request->user()->id, (int) $editingEntry->microrregion_id)) {
+                        $editingEntry = null;
+                    }
+                } else {
+                    if ((int) $editingEntry->user_id !== (int) $request->user()->id) {
+                        $editingEntry = null;
+                    }
+                }
             }
         }
 
@@ -1475,18 +1518,48 @@ class TemporaryModuleController extends Controller
         abort_unless($temporaryModule->isAvailable(), 404);
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
 
-        $requestedMicrorregionId = $request->filled('selected_microrregion_id')
-            ? (int) $request->input('selected_microrregion_id')
-            : null;
+        $regScope = in_array((string) ($temporaryModule->registration_scope ?? ''), ['microrregion', 'free', 'municipios'], true)
+            ? (string) $temporaryModule->registration_scope
+            : 'microrregion';
 
-        $microrregionIdsPermitidos = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
-        if ($requestedMicrorregionId !== null && ! in_array($requestedMicrorregionId, $microrregionIdsPermitidos, true)) {
-            throw ValidationException::withMessages([
-                'selected_microrregion_id' => 'La microrregión seleccionada no está dentro de tus asignaciones.',
-            ]);
+        // ── Resolución de microrregion_id según scope ──────────────────────
+        $microrregionId = null;
+        $municipios     = [];
+
+        if ($regScope === 'microrregion') {
+            $requestedMicrorregionId = $request->filled('selected_microrregion_id')
+                ? (int) $request->input('selected_microrregion_id')
+                : null;
+
+            $microrregionIdsPermitidos = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
+            if ($requestedMicrorregionId !== null && ! in_array($requestedMicrorregionId, $microrregionIdsPermitidos, true)) {
+                throw ValidationException::withMessages([
+                    'selected_microrregion_id' => 'La microrregión seleccionada no está dentro de tus asignaciones.',
+                ]);
+            }
+
+            [$microrregionId, $municipios] = $this->accessService->delegadoMunicipios($request->user()->id, $requestedMicrorregionId);
+        } elseif ($regScope === 'municipios') {
+            // Valida que los municipios enviados pertenezcan a la lista del módulo
+            $allowedMuns = is_array($temporaryModule->target_municipios)
+                ? array_values(array_filter(array_map('strval', $temporaryModule->target_municipios)))
+                : [];
+            $sentMuns = array_values(array_filter(array_map('strval', $request->input('_municipios_captura', []))));
+
+            if (empty($sentMuns)) {
+                throw ValidationException::withMessages([
+                    '_municipios_captura' => 'Selecciona al menos un municipio.',
+                ]);
+            }
+
+            $invalid = array_diff($sentMuns, $allowedMuns);
+            if (!empty($invalid)) {
+                throw ValidationException::withMessages([
+                    '_municipios_captura' => 'Uno o más municipios seleccionados no están permitidos en este módulo.',
+                ]);
+            }
         }
-
-        [$microrregionId, $municipios] = $this->accessService->delegadoMunicipios($request->user()->id, $requestedMicrorregionId);
+        // regScope === 'free': microrregionId stays null, no validation needed
 
         $entryId = (int) ($request->input('entry_id') ?? 0);
         $existingEntry = null;
@@ -1495,14 +1568,24 @@ class TemporaryModuleController extends Controller
                 ->where('id', $entryId)
                 ->where('temporary_module_id', $temporaryModule->id)
                 ->first();
-            abort_unless(
-                $existingEntry !== null
-                && $this->accessService->userCanAccessEntryByMicrorregion(
-                    (int) $request->user()->id,
-                    (int) $existingEntry->microrregion_id
-                ),
-                403
-            );
+
+            if ($regScope === 'microrregion') {
+                abort_unless(
+                    $existingEntry !== null
+                    && $this->accessService->userCanAccessEntryByMicrorregion(
+                        (int) $request->user()->id,
+                        (int) $existingEntry->microrregion_id
+                    ),
+                    403
+                );
+            } else {
+                // For free/municipios scopes, only check the entry belongs to this user's module
+                abort_unless(
+                    $existingEntry !== null
+                    && (int) $existingEntry->user_id === (int) $request->user()->id,
+                    403
+                );
+            }
         }
 
         $rules = [];
@@ -1667,6 +1750,13 @@ class TemporaryModuleController extends Controller
             }
 
             $values[$field->key] = $value;
+        }
+
+        // For scope = 'municipios': inject selected municipalities into the entry data
+        if ($regScope === 'municipios') {
+            $values['_municipios_captura'] = array_values(array_filter(
+                array_map('strval', $request->input('_municipios_captura', []))
+            ));
         }
 
         $duplicateEntryId = $this->findDuplicateEntryId(

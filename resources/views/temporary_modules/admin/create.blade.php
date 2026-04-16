@@ -40,6 +40,76 @@
                 <textarea name="description" rows="2">{{ old('description') }}</textarea>
             </label>
 
+            {{-- ── Modo de captura ── --}}
+            <section class="tm-target-box" id="tmRegistrationScopeBox">
+                <h3>Modo de captura</h3>
+                <p class="tm-help-text" style="margin:0 0 10px;">Define si los registros se asocian a una microregión, a municipios específicos o se capturan sin asociación geográfica.</p>
+
+                <div class="tm-scope-radios" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+                    @php $oldScope = old('registration_scope', 'microrregion'); @endphp
+
+                    <label class="tm-scope-radio-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                        <input type="radio" name="registration_scope" value="microrregion"
+                               @checked($oldScope === 'microrregion') id="scopeMicrorregion">
+                        Por microregión <small style="color:#888;">(predeterminado)</small>
+                    </label>
+
+                    <label class="tm-scope-radio-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                        <input type="radio" name="registration_scope" value="free"
+                               @checked($oldScope === 'free') id="scopeFree">
+                        Sin microregión
+                    </label>
+
+                    <label class="tm-scope-radio-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                        <input type="radio" name="registration_scope" value="municipios"
+                               @checked($oldScope === 'municipios') id="scopeMunicipios">
+                        Por municipio
+                    </label>
+                </div>
+
+                {{-- Panel municipios (visible solo cuando scope = municipios) --}}
+                <div id="tmMunicipiosPanel" style="{{ $oldScope === 'municipios' ? '' : 'display:none;' }}">
+                    <label style="display:block;margin-bottom:6px;font-weight:600;">
+                        Municipios disponibles para captura
+                        <small style="font-weight:400;color:#888;">(selecciona 1 o varios)</small>
+                    </label>
+
+                    {{-- Buscador y botones --}}
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
+                        <input type="text" id="tmMunicipioSearch" placeholder="Buscar municipio…"
+                               class="tm-input-sm" style="flex:1;min-width:180px;padding:5px 8px;border:1px solid #ccc;border-radius:4px;">
+                        <button type="button" class="tm-btn" id="tmSelectAllMunicipios">Todos</button>
+                        <button type="button" class="tm-btn" id="tmClearAllMunicipios">Ninguno</button>
+                    </div>
+
+                    <div id="tmMunicipiosList"
+                         style="max-height:260px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px;">
+                        @php
+                            $allMunicipios = \Illuminate\Support\Facades\DB::table('municipios')
+                                ->orderBy('municipio')
+                                ->pluck('municipio')
+                                ->unique()
+                                ->values();
+                            $oldMunicipios = old('target_municipios', []);
+                            if (is_string($oldMunicipios)) {
+                                $oldMunicipios = json_decode($oldMunicipios, true) ?? [];
+                            }
+                        @endphp
+                        @foreach ($allMunicipios as $mun)
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.85rem;cursor:pointer;"
+                                   class="tm-mun-item" data-mun="{{ mb_strtolower($mun) }}">
+                                <input type="checkbox" name="target_municipios[]" value="{{ $mun }}"
+                                       @checked(in_array($mun, $oldMunicipios, true))>
+                                {{ $mun }}
+                            </label>
+                        @endforeach
+                    </div>
+                    <small style="color:#888;display:block;margin-top:4px;" id="tmMunicipiosCount">
+                        <span id="tmMunicipiosSelected">0</span> seleccionados
+                    </small>
+                </div>
+            </section>
+
             <section class="tm-target-box">
                 <h3>Alcance del módulo</h3>
                 <input type="hidden" name="applies_to" value="selected">
@@ -243,4 +313,75 @@
 window.TM_ADMIN_CREATE_BOOT = { copyFieldsUrl: @json(route('temporary-modules.admin.fields-json', ['module' => '__ID__'])) };
 </script>
 <script src="{{ asset('assets/js/modules/temporary-modules-admin-create.js') }}?v={{ @filemtime(public_path('assets/js/modules/temporary-modules-admin-create.js')) ?: time() }}"></script>
+<script>
+(function () {
+    'use strict';
+
+    /* ── Scope radios ── */
+    var radios = document.querySelectorAll('input[name="registration_scope"]');
+    var panel  = document.getElementById('tmMunicipiosPanel');
+
+    function togglePanel() {
+        var checked = document.querySelector('input[name="registration_scope"]:checked');
+        if (panel) {
+            panel.style.display = (checked && checked.value === 'municipios') ? '' : 'none';
+        }
+    }
+
+    radios.forEach(function (r) { r.addEventListener('change', togglePanel); });
+    togglePanel();
+
+    /* ── Municipios: buscador + seleccionar todo / ninguno ── */
+    var search     = document.getElementById('tmMunicipioSearch');
+    var btnAll     = document.getElementById('tmSelectAllMunicipios');
+    var btnClear   = document.getElementById('tmClearAllMunicipios');
+    var countSpan  = document.getElementById('tmMunicipiosSelected');
+
+    function updateCount() {
+        if (!countSpan) return;
+        var total = document.querySelectorAll('#tmMunicipiosList input[type="checkbox"]:checked').length;
+        countSpan.textContent = total;
+    }
+
+    function visibleItems() {
+        return Array.from(document.querySelectorAll('#tmMunicipiosList .tm-mun-item'))
+            .filter(function (el) { return el.style.display !== 'none'; });
+    }
+
+    if (search) {
+        search.addEventListener('input', function () {
+            var q = search.value.toLowerCase().trim();
+            document.querySelectorAll('#tmMunicipiosList .tm-mun-item').forEach(function (el) {
+                el.style.display = (!q || el.dataset.mun.includes(q)) ? '' : 'none';
+            });
+        });
+    }
+
+    if (btnAll) {
+        btnAll.addEventListener('click', function () {
+            visibleItems().forEach(function (el) {
+                var cb = el.querySelector('input[type="checkbox"]');
+                if (cb) cb.checked = true;
+            });
+            updateCount();
+        });
+    }
+
+    if (btnClear) {
+        btnClear.addEventListener('click', function () {
+            visibleItems().forEach(function (el) {
+                var cb = el.querySelector('input[type="checkbox"]');
+                if (cb) cb.checked = false;
+            });
+            updateCount();
+        });
+    }
+
+    document.querySelectorAll('#tmMunicipiosList input[type="checkbox"]').forEach(function (cb) {
+        cb.addEventListener('change', updateCount);
+    });
+
+    updateCount();
+})();
+</script>
 @endpush

@@ -4690,6 +4690,111 @@
                 }
             }
 
+            // ── Undo / Redo por celda ────────────────────────────────────────────
+            function bulkUndoRedoKey(eid, key) {
+                return String(eid) + '\u00b6' + String(key);
+            }
+            function bulkEnsureUndoRedo(st) {
+                if (!st.__undoStacks) st.__undoStacks = {};
+                if (!st.__redoStacks) st.__redoStacks = {};
+            }
+            function bulkSnapshotImageCell(st, eid, key) {
+                bulkEnsureFilesState(st, eid, key);
+                return {
+                    type: 'image',
+                    pendingFiles: (st.pendingFiles[eid][key] || []).slice(),
+                    removeExisting: ((st.removeExisting[eid] || {})[key] || []).slice(),
+                };
+            }
+            function bulkSnapshotValueCell(st, eid, key) {
+                const d = (st.drafts || {})[eid];
+                const v = (d !== undefined && d !== null && key in d) ? d[key] : ((st.originals[eid] || {})[key]);
+                return { type: 'value', value: deepClone(v !== undefined ? v : null) };
+            }
+            function bulkPushUndoImage(modal, eid, key) {
+                const st = modal.__bulkState;
+                if (!st) return;
+                bulkEnsureUndoRedo(st);
+                const ck = bulkUndoRedoKey(eid, key);
+                if (!st.__undoStacks[ck]) st.__undoStacks[ck] = [];
+                st.__undoStacks[ck].push(bulkSnapshotImageCell(st, eid, key));
+                if (st.__undoStacks[ck].length > 20) st.__undoStacks[ck].shift();
+                st.__redoStacks[ck] = [];
+            }
+            function bulkPushUndoValue(modal, eid, key) {
+                const st = modal.__bulkState;
+                if (!st) return;
+                bulkEnsureUndoRedo(st);
+                const ck = bulkUndoRedoKey(eid, key);
+                if (!st.__undoStacks[ck]) st.__undoStacks[ck] = [];
+                st.__undoStacks[ck].push(bulkSnapshotValueCell(st, eid, key));
+                if (st.__undoStacks[ck].length > 20) st.__undoStacks[ck].shift();
+                st.__redoStacks[ck] = [];
+            }
+            function bulkRestoreImageSnap(modal, eid, key, snap) {
+                const st = modal.__bulkState;
+                if (!st) return;
+                bulkEnsureFilesState(st, eid, key);
+                st.pendingFiles[eid][key] = (snap.pendingFiles || []).slice();
+                st.removeExisting[eid][key] = (snap.removeExisting || []).slice();
+                bulkRenderImagesCell(modal, eid, key);
+                refreshBulkCounter(modal);
+                updateBulkRowVisualState(modal, st, eid);
+            }
+            function bulkRestoreValueSnap(modal, eid, key, snap) {
+                const st = modal.__bulkState;
+                if (!st) return;
+                ensureDraftsForAllEntries(st);
+                if (!st.drafts[eid]) st.drafts[eid] = deepClone(st.originals[eid] || {});
+                st.drafts[eid][key] = deepClone(snap.value !== undefined ? snap.value : null);
+                const row = modal.querySelector('.tm-bulk-sheet-row[data-entry-id="' + eid + '"]');
+                const el = row ? row.querySelector('[data-sheet-field-key="' + key + '"][data-sheet-entry-id="' + eid + '"]') : null;
+                if (el) {
+                    const v = snap.value;
+                    const vStr = v == null ? '' : (Array.isArray(v) ? v.join(',') : String(v));
+                    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+                        el.value = vStr;
+                        if (el.tagName === 'TEXTAREA') tmBulkFitTextareaHeight(el);
+                    }
+                    const orig = (st.originals[eid] || {})[key];
+                    const wrap = el.closest('.tm-bulk-sheet-cell-wrap');
+                    if (wrap) wrap.classList.toggle('is-dirty', !valEqual(v, orig));
+                }
+                refreshBulkCounter(modal);
+                if (row) row.classList.toggle('is-dirty', entryIsDirty(st, eid) || entryHasPendingFileChanges(st, eid));
+                updateBulkRowVisualState(modal, st, eid);
+                applySheetFilters(modal);
+            }
+            function bulkUndoCell(modal, eid, key, isImage) {
+                const st = modal.__bulkState;
+                if (!st) return false;
+                bulkEnsureUndoRedo(st);
+                const ck = bulkUndoRedoKey(eid, key);
+                const undos = st.__undoStacks[ck] || [];
+                if (!undos.length) return false;
+                if (!st.__redoStacks[ck]) st.__redoStacks[ck] = [];
+                st.__redoStacks[ck].push(isImage ? bulkSnapshotImageCell(st, eid, key) : bulkSnapshotValueCell(st, eid, key));
+                if (st.__redoStacks[ck].length > 20) st.__redoStacks[ck].shift();
+                const snap = undos.pop();
+                if (isImage) { bulkRestoreImageSnap(modal, eid, key, snap); } else { bulkRestoreValueSnap(modal, eid, key, snap); }
+                return true;
+            }
+            function bulkRedoCell(modal, eid, key, isImage) {
+                const st = modal.__bulkState;
+                if (!st) return false;
+                bulkEnsureUndoRedo(st);
+                const ck = bulkUndoRedoKey(eid, key);
+                const redos = st.__redoStacks[ck] || [];
+                if (!redos.length) return false;
+                if (!st.__undoStacks[ck]) st.__undoStacks[ck] = [];
+                st.__undoStacks[ck].push(isImage ? bulkSnapshotImageCell(st, eid, key) : bulkSnapshotValueCell(st, eid, key));
+                if (st.__undoStacks[ck].length > 20) st.__undoStacks[ck].shift();
+                const snap = redos.pop();
+                if (isImage) { bulkRestoreImageSnap(modal, eid, key, snap); } else { bulkRestoreValueSnap(modal, eid, key, snap); }
+                return true;
+            }
+            // ── fin undo/redo ────────────────────────────────────────────────────
+
             function bulkEnsureSheetPreviewState(st) {
                 if (!st.__sheetPreview) {
                     st.__sheetPreview = { objUrls: {} };
@@ -4925,6 +5030,7 @@
                     if (!(file instanceof File)) {
                         return;
                     }
+                    bulkPushUndoImage(modal, eid, key);
                     if (existingPath) {
                         bulkMarkExistingRemoved(st, eid, key, existingPath);
                     }
@@ -4983,8 +5089,12 @@
                 const inner = menu.querySelector('[data-ctx-inner]');
                 if (inner) {
                     inner.innerHTML = (items || []).map(function (it, idx) {
+                        if (it && it.separator) {
+                            return '<hr class="tm-bulk-sheet-ctx-sep" data-ctx-sep="1">';
+                        }
                         const dis = it && it.disabled ? ' disabled' : '';
-                        return '<button type="button" class="tm-bulk-sheet-ctx-item"' + dis + ' data-ctx-idx="' + idx + '">' + tmBulkEsc(String(it.label || '')) + '</button>';
+                        const icon = it && it.icon ? '<span class="tm-ctx-icon" aria-hidden="true">' + tmBulkEsc(String(it.icon)) + '</span>' : '';
+                        return '<button type="button" class="tm-bulk-sheet-ctx-item"' + dis + ' data-ctx-idx="' + idx + '">' + icon + tmBulkEsc(String(it.label || '')) + '</button>';
                     }).join('');
                 }
                 menu.style.left = x + 'px';
@@ -5016,7 +5126,7 @@
                         const idx = parseInt(String(btn.getAttribute('data-ctx-idx') || '0'), 10);
                         const it = items[idx];
                         menu.classList.add('tm-hidden');
-                        if (it && typeof it.onClick === 'function' && !it.disabled) {
+                        if (it && !it.separator && typeof it.onClick === 'function' && !it.disabled) {
                             it.onClick();
                         }
                     };
@@ -5812,12 +5922,20 @@
                             st.pendingFiles[entryId] = {};
                         }
                         const maxFiles = parseInt(input.getAttribute('data-max-files') || '1', 10) || 1;
+                        const existingCount = bulkGetExistingPaths(st, entryId, key).length;
+                        const available = Math.max(0, maxFiles - existingCount);
                         const selected = Array.from(input.files || []);
-                        st.pendingFiles[entryId][key] = selected.slice(0, maxFiles);
-                        if (selected.length > maxFiles) {
+                        if (available === 0) {
                             input.value = '';
-                            Swal.fire('Aviso', 'Solo puedes seleccionar hasta ' + maxFiles + ' archivo(s).', 'warning');
-                            st.pendingFiles[entryId][key] = [];
+                            Swal.fire('Aviso', 'Ya tienes el máximo de ' + maxFiles + ' imagen(es). Elimina alguna antes de agregar más.', 'warning');
+                            return;
+                        }
+                        if (selected.length > available) {
+                            input.value = '';
+                            Swal.fire('Aviso', 'Solo puedes subir ' + available + ' archivo(s) más (límite total: ' + maxFiles + ').', 'warning');
+                            st.pendingFiles[entryId][key] = selected.slice(0, available);
+                        } else {
+                            st.pendingFiles[entryId][key] = selected.slice(0, available);
                         }
                         syncDraftFromForm(modal);
                         refreshBulkCounter(modal);
@@ -6085,6 +6203,7 @@
                 syncDraftFromForm(modal);
                 const c = countDirty(st);
                 if (c.fieldCount === 0) {
+                    Swal.fire({ title: 'Sin cambios', text: 'No hay modificaciones pendientes para guardar.', icon: 'info', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false });
                     return Promise.resolve();
                 }
                 modal.__tmDeferRecordsReload = true;
@@ -6141,6 +6260,7 @@
                     if (t && t.getAttribute && t.getAttribute('data-sheet-entry-id')) {
                         const modal = t.closest('.tm-bulk-edit-modal');
                         if (modal && modal.__bulkState) {
+                            t.__tmUndoDirty = true;
                             syncDraftFromSheetCell(modal, t);
                         }
                     }
@@ -6279,6 +6399,25 @@
                     }
                     return;
                 }
+                // ── Click izquierdo en imagen de la hoja: abrir vista previa completa ──
+                const clickedSheetImg = e.target.closest('.tm-bulk-sheet-img');
+                if (clickedSheetImg) {
+                    const src = clickedSheetImg.getAttribute('src') || '';
+                    if (src && src.trim() !== '') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const imgPreviewModal = document.getElementById('tmImagePreviewModal');
+                        const imgPreviewImg   = document.getElementById('tmImagePreviewImg');
+                        const imgPreviewTitle = document.getElementById('tmImagePreviewTitle');
+                        if (imgPreviewModal && imgPreviewImg) {
+                            imgPreviewImg.src = src;
+                            imgPreviewImg.alt = 'Vista previa';
+                            if (imgPreviewTitle) imgPreviewTitle.textContent = 'Vista previa';
+                            openModal(imgPreviewModal, clickedSheetImg);
+                        }
+                    }
+                    return;
+                }
                 const emptyReset = e.target.closest('[data-tm-bulk-empty-filter-reset]');
                 if (emptyReset) {
                     e.preventDefault();
@@ -6412,6 +6551,10 @@
                             selectEntry(modal, id);
                         }
                         syncDraftFromForm(modal);
+                        if (!entryIsDirty(modal.__bulkState, id)) {
+                            Swal.fire({ title: 'Sin cambios', text: 'Este registro no tiene modificaciones pendientes.', icon: 'info', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false });
+                            return;
+                        }
                         saveEntryRequest(modal, id).then(function (ok) {
                             if (ok) {
                                 Swal.fire({ title: 'Guardado', text: 'Registro actualizado.', icon: 'success', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
@@ -6428,6 +6571,10 @@
                     const st = modal && modal.__bulkState;
                     if (st && st.selectedId) {
                         syncDraftFromForm(modal);
+                        if (!entryIsDirty(st, st.selectedId)) {
+                            Swal.fire({ title: 'Sin cambios', text: 'Este registro no tiene modificaciones pendientes.', icon: 'info', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false });
+                            return;
+                        }
                         saveEntryRequest(modal, st.selectedId).then(function (ok) {
                             if (ok) {
                                 Swal.fire({ title: 'Guardado', text: 'Registro actualizado.', icon: 'success', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
@@ -6498,7 +6645,25 @@
                     const existingUrlAbs = bulkNormalizeUrlMaybe(existingUrl) || existingUrl;
                     const lastCopiedUrl = modal.__bulkSheetLastCopiedUrl || window.__tmBulkSheetLastCopiedUrl || '';
 
+                    bulkEnsureUndoRedo(st);
+                    const imgCellKey = bulkUndoRedoKey(eid, key);
+                    const canUndo = (st.__undoStacks[imgCellKey] || []).length > 0;
+                    const canRedo = (st.__redoStacks[imgCellKey] || []).length > 0;
+
                     const items = [
+                        {
+                            icon: '\u21A9',
+                            label: ' Deshacer',
+                            disabled: !canUndo,
+                            onClick: function () { bulkUndoCell(modal, eid, key, true); },
+                        },
+                        {
+                            icon: '\u21AA',
+                            label: ' Rehacer',
+                            disabled: !canRedo,
+                            onClick: function () { bulkRedoCell(modal, eid, key, true); },
+                        },
+                        { separator: true },
                         {
                             label: 'Copiar',
                             disabled: !existingUrlAbs,
@@ -6545,6 +6710,7 @@
                                     const hasSomething = hasPending || !!existingPath;
 
                                     const doApplyFile = function (file) {
+                                        bulkPushUndoImage(modal, eid, key);
                                         if (existingPath) {
                                             bulkMarkExistingRemoved(st, eid, key, existingPath);
                                         }
@@ -6618,6 +6784,7 @@
                                     cancelButtonText: 'Cancelar',
                                 }).then(function (res) {
                                     if (!res.isConfirmed) return;
+                                    bulkPushUndoImage(modal, eid, key);
                                     if (existingPath) {
                                         bulkMarkExistingRemoved(st, eid, key, existingPath);
                                     }
@@ -6641,6 +6808,7 @@
                                     cancelButtonText: 'Cancelar',
                                 }).then(function (res) {
                                     if (!res.isConfirmed) return;
+                                    bulkPushUndoImage(modal, eid, key);
                                     bulkResetImagesCellToDefault(modal, eid, key);
                                 });
                             },
@@ -6650,7 +6818,85 @@
                     bulkShowContextMenu(modal, e.clientX, e.clientY, items);
                     return;
                 }
+
+                // ── Menú contextual para celdas de valor (texto, número, fecha, select…) ──
+                const sheetCellEl = e.target.closest('.tm-bulk-sheet-cell');
+                if (sheetCellEl && !e.target.closest('.tm-bulk-sheet-img-slot')) {
+                    const modal = sheetCellEl.closest('.tm-bulk-edit-modal');
+                    const sheet = modal ? modal.querySelector('[data-tm-bulk-sheet]') : null;
+                    if (!modal || !sheet || sheet.classList.contains('tm-hidden') || !modal.__bulkState) return;
+
+                    e.preventDefault();
+                    const st = modal.__bulkState;
+                    const eid = parseInt(String(sheetCellEl.getAttribute('data-sheet-entry-id') || '0'), 10);
+                    const key = String(sheetCellEl.getAttribute('data-sheet-field-key') || '');
+                    if (!eid || !key) return;
+
+                    bulkEnsureUndoRedo(st);
+                    const vck = bulkUndoRedoKey(eid, key);
+                    const vCanUndo = (st.__undoStacks[vck] || []).length > 0;
+                    const vCanRedo = (st.__redoStacks[vck] || []).length > 0;
+
+                    const vItems = [
+                        {
+                            icon: '\u21A9',
+                            label: ' Deshacer',
+                            disabled: !vCanUndo,
+                            onClick: function () { bulkUndoCell(modal, eid, key, false); },
+                        },
+                        {
+                            icon: '\u21AA',
+                            label: ' Rehacer',
+                            disabled: !vCanRedo,
+                            onClick: function () { bulkRedoCell(modal, eid, key, false); },
+                        },
+                    ];
+                    bulkShowContextMenu(modal, e.clientX, e.clientY, vItems);
+                    return;
+                }
             });
+
+            // ── Captura undo para celdas de valor al salir del campo ──
+            document.addEventListener('focusin', function (ev) {
+                const el = ev.target;
+                if (!el || !el.getAttribute) return;
+                const eid = parseInt(String(el.getAttribute('data-sheet-entry-id') || '0'), 10);
+                const key = String(el.getAttribute('data-sheet-field-key') || '');
+                if (!eid || !key) return;
+                const modal = el.closest('.tm-bulk-edit-modal');
+                if (!modal || !modal.__bulkState) return;
+                const sheet = modal.querySelector('[data-tm-bulk-sheet]');
+                if (!sheet || sheet.classList.contains('tm-hidden')) return;
+                // Guardar snapshot del valor antes de editar
+                el.__tmUndoBeforeSnap = bulkSnapshotValueCell(modal.__bulkState, eid, key);
+                el.__tmUndoDirty = false;
+            }, true);
+
+            document.addEventListener('focusout', function (ev) {
+                const el = ev.target;
+                if (!el || !el.getAttribute || !el.__tmUndoDirty) return;
+                const eid = parseInt(String(el.getAttribute('data-sheet-entry-id') || '0'), 10);
+                const key = String(el.getAttribute('data-sheet-field-key') || '');
+                if (!eid || !key || !el.__tmUndoBeforeSnap) return;
+                const modal = el.closest('.tm-bulk-edit-modal');
+                if (!modal || !modal.__bulkState) return;
+                const sheet = modal.querySelector('[data-tm-bulk-sheet]');
+                if (!sheet || sheet.classList.contains('tm-hidden')) return;
+                const st = modal.__bulkState;
+                // Verificar si el valor realmente cambió
+                const after = bulkSnapshotValueCell(st, eid, key);
+                if (JSON.stringify(after.value) === JSON.stringify(el.__tmUndoBeforeSnap.value)) {
+                    el.__tmUndoDirty = false;
+                    return;
+                }
+                bulkEnsureUndoRedo(st);
+                const ck = bulkUndoRedoKey(eid, key);
+                if (!st.__undoStacks[ck]) st.__undoStacks[ck] = [];
+                st.__undoStacks[ck].push(el.__tmUndoBeforeSnap);
+                if (st.__undoStacks[ck].length > 20) st.__undoStacks[ck].shift();
+                st.__redoStacks[ck] = [];
+                el.__tmUndoDirty = false;
+            }, true);
         })();
 
         // --- Trigger initial load for the active module panel if we are in records view ---

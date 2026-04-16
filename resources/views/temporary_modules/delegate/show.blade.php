@@ -59,27 +59,82 @@
             @endif
 
             @php
-                $microsAsignadas = ($microrregionesAsignadas ?? collect())->values();
-                $mostrarSelectorMicrorregion = $microsAsignadas->count() > 1;
+                $regScope      = (string) ($temporaryModule->registration_scope ?? 'microrregion');
+                $microsAsignadas   = ($microrregionesAsignadas ?? collect())->values();
+                $mostrarSelectorMicrorregion = $regScope === 'microrregion' && $microsAsignadas->count() > 1;
                 $bloquearMicro = !empty($editingEntry);
+
+                // Municipios configurados para el módulo (scope = 'municipios')
+                $targetMuns = [];
+                if ($regScope === 'municipios') {
+                    $raw = $temporaryModule->target_municipios;
+                    $targetMuns = is_array($raw) ? array_values(array_filter($raw)) : [];
+                }
             @endphp
 
-            @if ($mostrarSelectorMicrorregion)
-                <label class="tm-col-full">
-                    Microrregion de captura *
-                    <select id="tmMicrorregionSelector" name="selected_microrregion_id" required @disabled($bloquearMicro)>
-                        @foreach ($microsAsignadas as $micro)
-                            <option value="{{ $micro->id }}" @selected((int) $microrregionId === (int) $micro->id)>
-                                MR {{ $micro->microrregion }} - {{ $micro->cabecera }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @if ($bloquearMicro)
-                        <input type="hidden" name="selected_microrregion_id" value="{{ $microrregionId }}">
+            {{-- ── Selector de microregión (scope = microrregion) ── --}}
+            @if ($regScope === 'microrregion')
+                @if ($mostrarSelectorMicrorregion)
+                    <label class="tm-col-full">
+                        Microrregion de captura *
+                        <select id="tmMicrorregionSelector" name="selected_microrregion_id" required @disabled($bloquearMicro)>
+                            @foreach ($microsAsignadas as $micro)
+                                <option value="{{ $micro->id }}" @selected((int) $microrregionId === (int) $micro->id)>
+                                    MR {{ $micro->microrregion }} - {{ $micro->cabecera }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @if ($bloquearMicro)
+                            <input type="hidden" name="selected_microrregion_id" value="{{ $microrregionId }}">
+                        @endif
+                    </label>
+                @else
+                    <input type="hidden" name="selected_microrregion_id" value="{{ $microrregionId }}">
+                @endif
+            @endif
+
+            {{-- ── Sin microregión (scope = free): no se envía microrregion_id ── --}}
+            {{-- (no se renderiza ningún input de microregión) --}}
+
+            {{-- ── Por municipio (scope = municipios): multiselect de municipios ── --}}
+            @if ($regScope === 'municipios')
+                @php
+                    $oldMunsEntry = old('_municipios_captura', $editingEntry->data['_municipios_captura'] ?? []);
+                    if (is_string($oldMunsEntry)) {
+                        $oldMunsEntry = json_decode($oldMunsEntry, true) ?? [];
+                    }
+                @endphp
+                <div class="tm-col-full">
+                    <label style="display:block;font-weight:600;margin-bottom:6px;">
+                        Municipio(s) de captura *
+                        <small style="font-weight:400;color:#888;">Selecciona uno o varios</small>
+                    </label>
+
+                    @if (!empty($targetMuns))
+                        {{-- Buscador rápido --}}
+                        <input type="text" id="tmShowMunicipioSearch" placeholder="Buscar municipio…"
+                               style="width:100%;max-width:340px;padding:5px 8px;border:1px solid #ccc;border-radius:4px;margin-bottom:8px;font-size:.875rem;">
+
+                        <div id="tmShowMunicipiosList"
+                             style="max-height:220px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:4px;">
+                            @foreach ($targetMuns as $mun)
+                                <label style="display:flex;align-items:center;gap:5px;font-size:.85rem;cursor:pointer;"
+                                       class="tm-show-mun-item" data-mun="{{ mb_strtolower($mun) }}">
+                                    <input type="checkbox" name="_municipios_captura[]" value="{{ $mun }}"
+                                           @checked(in_array($mun, (array) $oldMunsEntry, true))>
+                                    {{ $mun }}
+                                </label>
+                            @endforeach
+                        </div>
+                        <small style="color:#888;margin-top:4px;display:block;">
+                            <span id="tmShowMunsCount">0</span> seleccionados
+                        </small>
+                    @else
+                        <p class="inline-alert inline-alert-error" style="margin:0;">
+                            Este módulo no tiene municipios configurados. Contacta al administrador.
+                        </p>
                     @endif
-                </label>
-            @else
-                <input type="hidden" name="selected_microrregion_id" value="{{ $microrregionId }}">
+                </div>
             @endif
 
             <div class="tm-grid tm-grid-2">
@@ -475,6 +530,36 @@ iv>
         </div>
     </div>
 </section>
+
+@push('scripts')
+<script>
+(function () {
+    'use strict';
+    var search    = document.getElementById('tmShowMunicipioSearch');
+    var countSpan = document.getElementById('tmShowMunsCount');
+
+    function updateCount() {
+        if (!countSpan) return;
+        countSpan.textContent = document.querySelectorAll('#tmShowMunicipiosList input[type="checkbox"]:checked').length;
+    }
+
+    if (search) {
+        search.addEventListener('input', function () {
+            var q = search.value.toLowerCase().trim();
+            document.querySelectorAll('#tmShowMunicipiosList .tm-show-mun-item').forEach(function (el) {
+                el.style.display = (!q || el.dataset.mun.includes(q)) ? '' : 'none';
+            });
+        });
+    }
+
+    document.querySelectorAll('#tmShowMunicipiosList input[type="checkbox"]').forEach(function (cb) {
+        cb.addEventListener('change', updateCount);
+    });
+
+    updateCount();
+})();
+</script>
+@endpush
 @endsection
 
 @push('scripts')

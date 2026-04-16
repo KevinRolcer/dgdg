@@ -8026,6 +8026,12 @@ body.tm-bulk-col-resizing .tm-bulk-sheet-resizer::after {
     height: 100%;
     object-fit: cover;
     display: block;
+    cursor: zoom-in;
+    transition: opacity 0.15s;
+}
+
+.tm-bulk-sheet-img:hover {
+    opacity: 0.88;
 }
 
 .tm-bulk-sheet-files-count {
@@ -8076,6 +8082,19 @@ body.tm-bulk-col-resizing .tm-bulk-sheet-resizer::after {
 .tm-bulk-sheet-ctx-item:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+}
+
+.tm-bulk-sheet-ctx-sep {
+    border: none;
+    border-top: 1px solid rgba(0,0,0,0.1);
+    margin: 4px 0;
+}
+
+.tm-ctx-icon {
+    display: inline-block;
+    width: 1.4em;
+    font-size: 1em;
+    line-height: 1;
 }
 
 .tm-bulk-edit-main {

@@ -22,6 +22,8 @@ class TemporaryModule extends Model
         'expires_at',
         'is_active',
         'applies_to_all',
+        'registration_scope',
+        'target_municipios',
         'created_by',
         'exported_at',
         'seed_discard_log',
@@ -33,6 +35,7 @@ class TemporaryModule extends Model
         'expires_at' => 'datetime',
         'exported_at' => 'datetime',
         'seed_discard_log' => 'array',
+        'target_municipios' => 'array',
     ];
 
     public function targetUsers(): BelongsToMany
