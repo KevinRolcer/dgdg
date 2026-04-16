@@ -4288,8 +4288,13 @@
                 const headerHtml = '<tr class="tm-bulk-sheet-header-row">' + cols.map(function (c) {
                     const cls = c.key === '__row' ? ' class="row-num"' : '';
                     const key = tmBulkEsc(String(c.key));
-                    const resizer = c.key === '__row' ? '' : '<span class="tm-bulk-sheet-resizer" data-tm-bulk-col-resize="' + key + '" aria-hidden="true"></span>';
-                    return '<th' + cls + ' data-col-key="' + key + '">' + tmBulkEsc(String(c.label || '')) + resizer + '</th>';
+                    if (c.key === '__row') {
+                        return '<th' + cls + ' data-col-key="' + key + '"><div class="tm-bulk-sheet-th-inner tm-bulk-sheet-th-inner--row">' + tmBulkEsc(String(c.label || '')) + '</div></th>';
+                    }
+                    return '<th' + cls + ' data-col-key="' + key + '"><div class="tm-bulk-sheet-th-inner">' +
+                        '<span class="tm-bulk-sheet-th-label">' + tmBulkEsc(String(c.label || '')) + '</span>' +
+                        '<span class="tm-bulk-sheet-resizer" data-tm-bulk-col-resize="' + key + '" title="Arrastrar para ancho de columna" role="separator" aria-orientation="vertical"></span>' +
+                        '</div></th>';
                 }).join('') + '</tr>';
 
                 const filterHtml = '<tr class="tm-bulk-sheet-filter-row">' + cols.map(function (c) {
@@ -4327,7 +4332,33 @@
                 modal.__bulkSheetBatchSize = 10;
                 modal.__bulkSheetCursor = 0;
                 const entries = Array.isArray(st.entries) ? st.entries : [];
-                const container = modal.querySelector('[data-tm-bulk-sheet] .tm-bulk-sheet-container');
+                modal.__bulkSheetTotalEntries = entries.length;
+
+                function bulkSheetRemoveSentinelAndStopInfinite() {
+                    if ((modal.__bulkSheetCursor || 0) < (modal.__bulkSheetTotalEntries || 0)) {
+                        return;
+                    }
+                    if (tbody) {
+                        const s = tbody.querySelector('tr.tm-bulk-sheet-sentinel');
+                        if (s && s.parentNode) {
+                            s.parentNode.removeChild(s);
+                        }
+                    }
+                    if (modal.__bulkSheetObserver) {
+                        try {
+                            modal.__bulkSheetObserver.disconnect();
+                        } catch (e) {}
+                        modal.__bulkSheetObserver = null;
+                    }
+                    if (inner) {
+                        requestAnimationFrame(function () {
+                            const maxScroll = Math.max(0, inner.scrollHeight - inner.clientHeight);
+                            if (inner.scrollTop > maxScroll + 1) {
+                                inner.scrollTop = maxScroll;
+                            }
+                        });
+                    }
+                }
 
                 function ensureSentinel() {
                     let s = tbody.querySelector('tr.tm-bulk-sheet-sentinel');
@@ -4387,6 +4418,12 @@
 
                     // Reaplicar filtros actuales a las filas nuevas.
                     applySheetFilters(modal);
+                    bulkSheetRemoveSentinelAndStopInfinite();
+                    if (modal.__bulkSheetColWidths && Object.keys(modal.__bulkSheetColWidths).length) {
+                        bulkApplyStoredColumnWidths(modal);
+                    } else {
+                        bulkRecalcTableWidthFromCols(modal);
+                    }
                     return true;
                 };
 
@@ -4394,12 +4431,12 @@
                 modal.__bulkSheetAppendNextBatch = appendNextBatch;
 
                 const maybeAppendMore = function () {
-                    if (!container) {
+                    if (!inner) {
                         return;
                     }
                     let guard = 0;
                     while (guard < 50 && (modal.__bulkSheetCursor || 0) < entries.length) {
-                        const remaining = container.scrollHeight - (container.scrollTop + container.clientHeight);
+                        const remaining = inner.scrollHeight - (inner.scrollTop + inner.clientHeight);
                         if (remaining > 260) {
                             break;
                         }
@@ -4436,14 +4473,18 @@
                     });
                 }
 
-                // Scroll infinito dentro del contenedor (requiere overflow en .tm-bulk-sheet-container).
-                if (container && !container.__bulkSheetScrollBound) {
-                    container.__bulkSheetScrollBound = true;
-                    container.addEventListener('scroll', function () {
+                // Scroll infinito y tope vertical: el scrollport es .tm-bulk-sheet-inner (sin transform).
+                if (inner && !inner.__bulkSheetScrollBound) {
+                    inner.__bulkSheetScrollBound = true;
+                    inner.addEventListener('scroll', function () {
                         if (modal.getAttribute('data-tm-bulk-view') !== 'sheet') {
                             return;
                         }
-                        const nearBottom = (container.scrollTop + container.clientHeight) >= (container.scrollHeight - 160);
+                        const maxScroll = Math.max(0, inner.scrollHeight - inner.clientHeight);
+                        if (inner.scrollTop > maxScroll + 2) {
+                            inner.scrollTop = maxScroll;
+                        }
+                        const nearBottom = (inner.scrollTop + inner.clientHeight) >= (inner.scrollHeight - 160);
                         if (nearBottom) {
                             if (typeof modal.__bulkSheetMaybeAppendMore === 'function') {
                                 modal.__bulkSheetMaybeAppendMore();
@@ -4455,7 +4496,7 @@
                 }
 
                 // IntersectionObserver (más confiable que scroll en algunos layouts).
-                if (container && typeof IntersectionObserver !== 'undefined') {
+                if (inner && typeof IntersectionObserver !== 'undefined') {
                     const sentinel = ensureSentinel();
                     if (modal.__bulkSheetObserver) {
                         try { modal.__bulkSheetObserver.disconnect(); } catch (e) {}
@@ -4472,21 +4513,26 @@
                                 modal.__bulkSheetAppendNextBatch();
                             }
                         }
-                    }, { root: container, threshold: 0.1 });
+                    }, { root: inner, threshold: 0.1 });
                     modal.__bulkSheetObserver.observe(sentinel);
                 }
 
                 // Si el primer lote no alcanza para scrollear, rellenar automáticamente.
-                if (container) {
+                if (inner) {
                     requestAnimationFrame(function () {
                         let guard = 0;
-                        while (guard < 50 && (modal.__bulkSheetCursor || 0) < entries.length && container.scrollHeight <= (container.clientHeight + 24)) {
+                        while (guard < 50 && (modal.__bulkSheetCursor || 0) < entries.length && inner.scrollHeight <= (inner.clientHeight + 24)) {
                             guard++;
                             if (typeof modal.__bulkSheetAppendNextBatch === 'function') {
                                 modal.__bulkSheetAppendNextBatch();
                             } else {
                                 break;
                             }
+                        }
+                        bulkSheetRemoveSentinelAndStopInfinite();
+                        const maxScroll = Math.max(0, inner.scrollHeight - inner.clientHeight);
+                        if (inner.scrollTop > maxScroll + 2) {
+                            inner.scrollTop = maxScroll;
                         }
                     });
                 }
@@ -4580,6 +4626,8 @@
                     const inner = modal.querySelector('[data-tm-bulk-sheet-inner]');
                     if (inner) {
                         inner.style.transform = '';
+                        inner.style.zoom = '';
+                        inner.style.minWidth = '';
                     }
                     const st = modal.__bulkState;
                     if (st && st.selectedId) {
@@ -4615,8 +4663,10 @@
                     return;
                 }
                 const z = typeof modal.__bulkSheetZoom === 'number' ? modal.__bulkSheetZoom : 1;
-                inner.style.transform = 'scale(' + z.toFixed(2) + ')';
-                inner.style.minWidth = (z > 1 ? (100 * z).toFixed(0) : 100) + '%';
+                /* transform en el inner rompe position:sticky de la columna # respecto al scroll horizontal */
+                inner.style.transform = '';
+                inner.style.minWidth = '';
+                inner.style.zoom = z === 1 ? '' : String(z);
                 if (valEl) {
                     valEl.textContent = Math.round(z * 100) + '%';
                 }
@@ -5096,6 +5146,64 @@
                 return inner ? inner.querySelector('table.tm-bulk-sheet-table') : null;
             }
 
+            function bulkSyncColumnWidthToCells(modal, colKey, w) {
+                const table = bulkGetSheetTable(modal);
+                if (!table || !colKey) {
+                    return;
+                }
+                const wpx = Math.round(clamp(parseInt(String(w), 10) || 0, 72, 2400));
+                table.querySelectorAll('thead th[data-col-key], tbody td[data-col-key]').forEach(function (cell) {
+                    if (String(cell.getAttribute('data-col-key') || '') !== String(colKey)) {
+                        return;
+                    }
+                    cell.style.width = wpx + 'px';
+                    cell.style.minWidth = wpx + 'px';
+                    cell.style.boxSizing = 'border-box';
+                });
+            }
+
+            function bulkRecalcTableWidthFromCols(modal) {
+                const table = bulkGetSheetTable(modal);
+                if (!table) {
+                    return;
+                }
+                const cols = Array.from(table.querySelectorAll('col[data-col-key]'));
+                let sum = 0;
+                cols.forEach(function (c) {
+                    const raw = String((c.style && c.style.width) || '').replace('px', '').trim();
+                    const px = parseInt(raw, 10) || 0;
+                    sum += px;
+                });
+                if (sum > 0) {
+                    table.style.width = sum + 'px';
+                    table.style.minWidth = sum + 'px';
+                }
+            }
+
+            function bulkApplyStoredColumnWidths(modal) {
+                const widths = modal && modal.__bulkSheetColWidths;
+                const table = bulkGetSheetTable(modal);
+                if (!widths || typeof widths !== 'object' || !table) {
+                    return;
+                }
+                Object.keys(widths).forEach(function (k) {
+                    const w = widths[k];
+                    const wNum = typeof w === 'number' ? w : parseInt(String(w), 10);
+                    if (!isFinite(wNum)) {
+                        return;
+                    }
+                    const clamped = clamp(wNum, 72, 2400);
+                    const col = Array.from(table.querySelectorAll('col[data-col-key]')).find(function (c) {
+                        return String(c.getAttribute('data-col-key') || '') === String(k);
+                    });
+                    if (col) {
+                        col.style.width = clamped + 'px';
+                    }
+                    bulkSyncColumnWidthToCells(modal, k, clamped);
+                });
+                bulkRecalcTableWidthFromCols(modal);
+            }
+
             function bulkSetColWidth(modal, colKey, px) {
                 if (!modal || !colKey) return;
                 const table = bulkGetSheetTable(modal);
@@ -5103,12 +5211,14 @@
                 const cols = Array.from(table.querySelectorAll('col[data-col-key]'));
                 const col = cols.find(function (c) { return String(c.getAttribute('data-col-key') || '') === String(colKey); });
                 if (!col) return;
-                const w = clamp(parseInt(px, 10) || 0, 80, 800);
+                const w = clamp(parseInt(px, 10) || 0, 72, 2400);
                 col.style.width = w + 'px';
                 if (!modal.__bulkSheetColWidths) {
                     modal.__bulkSheetColWidths = {};
                 }
                 modal.__bulkSheetColWidths[colKey] = w;
+                bulkSyncColumnWidthToCells(modal, colKey, w);
+                bulkRecalcTableWidthFromCols(modal);
             }
 
             function bulkEnableColumnResizeOnce() {
@@ -5131,11 +5241,23 @@
                     document.body.classList.remove('tm-bulk-col-resizing');
                     document.body.style.cursor = '';
                     resizing = null;
+                    window.removeEventListener('pointermove', onMove, true);
+                    window.removeEventListener('pointerup', onUp, true);
+                    window.removeEventListener('pointercancel', onUp, true);
                     window.removeEventListener('mousemove', onMove, true);
                     window.removeEventListener('mouseup', onUp, true);
                 };
 
-                document.addEventListener('mousedown', function (e) {
+                function bulkTryBeginColumnResize(e) {
+                    if (resizing) {
+                        return;
+                    }
+                    if (e.button != null && e.button !== 0) {
+                        return;
+                    }
+                    if (typeof e.isPrimary === 'boolean' && !e.isPrimary) {
+                        return;
+                    }
                     let key = '';
                     let th = null;
                     const handle = e.target.closest('[data-tm-bulk-col-resize]');
@@ -5146,15 +5268,17 @@
                         th = e.target.closest('th[data-col-key]');
                         if (th && th.closest('.tm-bulk-sheet-header-row')) {
                             const rect = th.getBoundingClientRect();
-                            const nearRight = (rect.right - e.clientX) <= 8;
-                            const notTooLeft = (e.clientX - rect.left) >= 24;
+                            const nearRight = (rect.right - e.clientX) <= 18;
+                            const notTooLeft = (e.clientX - rect.left) >= 12;
                             if (nearRight && notTooLeft) {
                                 key = String(th.getAttribute('data-col-key') || '');
                             }
                         }
                     }
 
-                    if (!key || key === '__row') return;
+                    if (!key || key === '__row') {
+                        return;
+                    }
 
                     const modal = th ? th.closest('.tm-bulk-edit-modal') : null;
                     const sheet = modal ? modal.querySelector('[data-tm-bulk-sheet]') : null;
@@ -5162,7 +5286,6 @@
                         return;
                     }
 
-                    // Preferir ancho actual del <col> si existe.
                     const table = bulkGetSheetTable(modal);
                     let startW = th ? th.getBoundingClientRect().width : 200;
                     if (table) {
@@ -5179,9 +5302,21 @@
                     resizing = { modal: modal, key: key, startX: e.clientX, startW: startW };
                     document.body.classList.add('tm-bulk-col-resizing');
                     document.body.style.cursor = 'col-resize';
-                    window.addEventListener('mousemove', onMove, true);
-                    window.addEventListener('mouseup', onUp, true);
-                }, true);
+                    if (e.type === 'pointerdown') {
+                        window.addEventListener('pointermove', onMove, true);
+                        window.addEventListener('pointerup', onUp, true);
+                        window.addEventListener('pointercancel', onUp, true);
+                    } else {
+                        window.addEventListener('mousemove', onMove, true);
+                        window.addEventListener('mouseup', onUp, true);
+                    }
+                }
+
+                if (typeof window.PointerEvent !== 'undefined') {
+                    document.addEventListener('pointerdown', bulkTryBeginColumnResize, true);
+                } else {
+                    document.addEventListener('mousedown', bulkTryBeginColumnResize, true);
+                }
             }
 
             function syncDraftFromSheetCell(modal, el) {

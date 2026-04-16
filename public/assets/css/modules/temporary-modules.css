@@ -7624,13 +7624,24 @@ html.theme-dark .tm-date-input {
     background: #b71c1c !important;
 }
 
-/* Edición múltiple (delegado) */
-.tm-modal-dialog-bulk-edit {
-    max-width: min(1024px, 100vw - 2rem);
-    width: 100%;
+/* Edición múltiple (delegado): ancho amplio en pantallas grandes (≥90% del viewport) */
+.tm-modal-dialog.tm-modal-dialog-bulk-edit {
+    width: min(96vw, calc(100vw - 1.5rem));
+    max-width: min(96vw, calc(100vw - 1.5rem));
     display: flex;
     flex-direction: column;
-    max-height: min(92vh, 900px);
+    max-height: min(92vh, 920px);
+}
+
+@media (min-width: 1200px) {
+    .tm-modal-dialog.tm-modal-dialog-bulk-edit {
+        width: min(96vw, calc(100vw - 2rem));
+        max-width: min(96vw, calc(100vw - 2rem));
+    }
+
+    .tm-bulk-sheet-container {
+        max-height: min(70vh, 680px);
+    }
 }
 
 .tm-bulk-edit-body {
@@ -7699,10 +7710,33 @@ html.theme-dark .tm-date-input {
     flex: 1;
     min-height: 0;
     max-height: min(60vh, 560px);
-    /* Sin overflow, el scroll ocurre en un ancestro y no disparan scroll/IntersectionObserver del loteo (10 en 10). */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+/* El scroll va en el inner (no en el contenedor): así position:sticky de la columna # funciona
+   aunque exista zoom; un ancestro con transform entre sticky y scrollport rompe sticky horizontal. */
+.tm-bulk-sheet-container > .tm-excel-sheet-inner.tm-bulk-sheet-inner,
+.tm-bulk-sheet-container > .tm-bulk-sheet-inner {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
     overflow: auto;
     position: relative;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: none;
+    transform: none !important;
+    transition: none !important;
+}
+
+.tm-bulk-sheet-table {
+    table-layout: fixed;
+    /* collapse + <col> suele ignorar anchos al redimensionar en algunos navegadores */
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 .tm-bulk-sheet-table thead th {
@@ -7734,28 +7768,57 @@ html.theme-dark .tm-date-input {
     position: sticky;
     top: 0;
     z-index: 20;
-    padding-right: 16px;
+    padding: 6px 4px 6px 8px;
     user-select: none;
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+
+.tm-bulk-sheet-th-inner {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 4px;
+    width: 100%;
+    min-height: 30px;
+}
+
+.tm-bulk-sheet-th-inner--row {
+    justify-content: center;
+    align-items: center;
+    min-height: 28px;
+}
+
+.tm-bulk-sheet-th-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: left;
+    line-height: 1.25;
+    align-self: center;
 }
 
 .tm-bulk-sheet-resizer {
-    position: absolute;
-    top: 0;
-    right: -4px;
-    width: 10px;
-    height: 100%;
+    flex: 0 0 16px;
+    width: 16px;
+    min-height: 28px;
+    align-self: stretch;
+    position: relative;
     cursor: col-resize;
-    z-index: 40;
     touch-action: none;
+    z-index: 41;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .tm-bulk-sheet-resizer::after {
     content: '';
     position: absolute;
-    top: 0;
-    left: 4px;
-    width: 2px;
-    height: 100%;
+    top: 2px;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    border-radius: 2px;
     background: rgba(255, 255, 255, 0);
     transition: background 0.12s ease;
 }
@@ -7768,18 +7831,63 @@ body.tm-bulk-col-resizing .tm-bulk-sheet-resizer::after {
     background: rgba(255, 255, 255, 0.85);
 }
 
-.tm-bulk-sheet-table thead tr.tm-bulk-sheet-filter-row th.row-num,
+/* Columna #: sticky respecto al scroll del .tm-bulk-sheet-inner (sin transform en ancestros). */
 .tm-bulk-sheet-table thead tr.tm-bulk-sheet-header-row th.row-num {
     position: sticky;
     left: 0;
-    z-index: 30;
+    z-index: 42;
     width: 64px;
     min-width: 64px;
+    background-color: var(--clr-primary);
+    background-clip: padding-box;
 }
 
+.tm-bulk-sheet-table thead tr.tm-bulk-sheet-filter-row th.row-num {
+    position: sticky;
+    left: 0;
+    z-index: 41;
+    width: 64px;
+    min-width: 64px;
+    background-color: #f8f9fa;
+    background-clip: padding-box;
+}
+
+.tm-bulk-sheet-table tbody td.row-num {
+    position: sticky;
+    left: 0;
+    z-index: 32;
+    width: 64px;
+    min-width: 64px;
+    background-color: #ffffff;
+    background-clip: padding-box;
+    border-right: 1px solid #ddd;
+    color: #444;
+}
+
+/* Estados de fila: fondos opacos en # (evita transparencia al hacer scroll horizontal) */
+.tm-bulk-sheet-row.is-dirty td.row-num {
+    background-color: #f2f8f6;
+    border-left: 3px solid rgba(36, 98, 87, 0.5);
+}
+
+.tm-bulk-sheet-row.is-edited td.row-num {
+    background-color: #fff6cc !important;
+}
+
+.tm-bulk-sheet-row.is-pending td.row-num {
+    background-color: #fdeaea !important;
+}
+
+.tm-bulk-sheet-row.is-active td.row-num {
+    background-color: #d9eee8 !important;
+    color: #0b3d34 !important;
+    box-shadow: inset 0 0 0 2px rgba(36, 98, 87, 0.35);
+}
+
+/* El ancho lo fija <col> + JS al redimensionar; min-width fijo competía y la columna no crecía */
 .tm-bulk-sheet-table th[data-col-key="__mr"],
 .tm-bulk-sheet-table td[data-col-key="__mr"] {
-    min-width: 280px;
+    min-width: 0;
 }
 
 .tm-bulk-sheet-filter-input,
@@ -7795,13 +7903,15 @@ body.tm-bulk-col-resizing .tm-bulk-sheet-resizer::after {
 
 .tm-bulk-sheet-cell {
     width: 100%;
-    min-width: 120px;
+    min-width: 0;
+    max-width: 100%;
     border: 0;
     background: transparent;
     padding: 2px 0;
     font: inherit;
     color: inherit;
     outline: none;
+    box-sizing: border-box;
 }
 
 .tm-bulk-sheet-multi {
@@ -7840,7 +7950,7 @@ body.tm-bulk-col-resizing .tm-bulk-sheet-resizer::after {
 }
 
 .tm-bulk-sheet-table td:not(.row-num) {
-    min-width: 160px;
+    min-width: 0;
 }
 
 .tm-bulk-sheet-cell.tm-bulk-textarea {
@@ -7862,25 +7972,20 @@ body.tm-bulk-col-resizing .tm-bulk-sheet-resizer::after {
     background: rgba(255, 235, 59, 0.20);
 }
 
-.tm-bulk-sheet-row.is-dirty td {
+.tm-bulk-sheet-row.is-dirty td:not(.row-num) {
     border-left-color: rgba(36, 98, 87, 0.35);
 }
 
-.tm-bulk-sheet-row.is-edited td {
+.tm-bulk-sheet-row.is-edited td:not(.row-num) {
     background: rgba(255, 235, 59, 0.16);
 }
 
-.tm-bulk-sheet-row.is-pending td {
+.tm-bulk-sheet-row.is-pending td:not(.row-num) {
     background: rgba(198, 40, 40, 0.10);
 }
 
-.tm-bulk-sheet-row.is-active td {
+.tm-bulk-sheet-row.is-active td:not(.row-num) {
     box-shadow: inset 0 0 0 2px rgba(36, 98, 87, 0.25);
-}
-
-.tm-bulk-sheet-row.is-active td.row-num {
-    background: rgba(36, 98, 87, 0.18) !important;
-    color: #0b3d34 !important;
 }
 
 .tm-bulk-sheet-row.is-active:not(.is-edited):not(.is-pending) td:not(.row-num) {
