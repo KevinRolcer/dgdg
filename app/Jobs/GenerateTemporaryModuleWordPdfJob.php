@@ -32,6 +32,12 @@ class GenerateTemporaryModuleWordPdfJob implements ShouldQueue
             return;
         }
 
+        Log::info('[Export] Iniciando generación de ' . strtoupper($this->format), [
+            'request_id' => $this->exportRequestId,
+            'module_id' => $this->moduleId,
+            'user' => $user->email
+        ]);
+
         try {
             $result = $exportService->export($this->moduleId, $this->format, $this->exportConfig);
 
