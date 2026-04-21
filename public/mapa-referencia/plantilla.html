@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mapa (plantilla)</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <div class="title">
+          <div class="h1">Mapa (idéntico a imagen)</div>
+          <div class="h2">Usa una imagen base (plantilla) y posiciona los 6 puntos por píxeles</div>
+        </div>
+        <div class="actions">
+          <button id="btnExportTemplate" type="button">Exportar PNG</button>
+          <a class="link" href="./index.html">Volver a mapa</a>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="frame">
+          <canvas id="tplCanvas" class="tpl-canvas"></canvas>
+          <div class="status" id="tplStatus" role="status" aria-live="polite"></div>
+        </div>
+
+        <details class="help" open>
+          <summary>Cómo dejarlo idéntico</summary>
+          <ol>
+            <li>
+              Guarda tu imagen de referencia como
+              <code>C:\laragon\www\segob\public\mapa-referencia\template.png</code>
+              (puede ser PNG/JPG; ajusta en <code>data.js</code> si cambia el nombre).
+            </li>
+            <li>
+              Abre esta página y arrastra los puntos hasta que coincidan con la referencia.
+            </li>
+            <li>
+              Exporta a PNG.
+            </li>
+          </ol>
+          <div class="note">
+            Este modo no “recalcula” la cartografía: es para reproducir un diseño exactamente igual usando la imagen base.
+          </div>
+        </details>
+      </main>
+    </div>
+
+    <script src="./data.js"></script>
+    <script src="./plantilla.js"></script>
+  </body>
+</html>
+

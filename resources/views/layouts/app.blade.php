@@ -23,8 +23,8 @@
     @can('Modulos-Temporales-Admin')
     @php
         $__exportStatusUrlTemplates = array_values(array_unique([
-            route('temporary-modules.export-poll', ['exportRequest' => '0'], false),
             route('temporary-modules.admin.export-status', ['exportRequest' => 0], false),
+            route('temporary-modules.export-poll', ['exportRequest' => '0'], false),
         ]));
     @endphp
     data-export-status-url="{{ $__exportStatusUrlTemplates[0] ?? '' }}"
