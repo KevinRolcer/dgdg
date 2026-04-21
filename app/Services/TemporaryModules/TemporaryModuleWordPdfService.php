@@ -2938,11 +2938,8 @@ class TemporaryModuleWordPdfService
                                     $dims = @getimagesizefromstring($binary) ?: null;
                                     $width = is_array($dims) && isset($dims[0]) ? (int) $dims[0] : null;
                                     $height = is_array($dims) && isset($dims[1]) ? (int) $dims[1] : null;
-                                    $mime = is_array($dims) && isset($dims['mime']) && is_string($dims['mime']) && $dims['mime'] !== ''
-                                        ? $dims['mime']
-                                        : (@mime_content_type($localFromUrl) ?: 'image/jpeg');
-                                    $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
-                                    $payload = ['src' => $dataUri, 'w' => $width, 'h' => $height];
+                                    // Optimización: Usar ruta física en vez de Base64 para ahorrar RAM
+                                    $payload = ['src' => $localFromUrl, 'w' => $width, 'h' => $height];
                                     $payloadByFullPath[$localFromUrl] = $payload;
                                 }
                             }
