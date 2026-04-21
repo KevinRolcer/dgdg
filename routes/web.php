@@ -58,6 +58,10 @@ Route::middleware('auth')->group(function () {
         ->where('exportRequest', '[a-f0-9\-]+')
         ->middleware('can:Modulos-Temporales-Admin')
         ->name('temporary-modules.export-poll');
+    Route::get('/q/st/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
+        ->where('exportRequest', '[a-f0-9\-]+')
+        ->middleware('can:Modulos-Temporales-Admin')
+        ->name('temporary-modules.export-st');
     Route::get('/mi-perfil', [ProfileController::class, 'show'])->name('profile.show');
     Route::get('/ajustes', [SettingsController::class, 'index'])->name('settings.index');
     Route::get('/ajustes/apariencia', [SettingsController::class, 'apariencia'])->name('settings.apariencia');
