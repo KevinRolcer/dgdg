@@ -2669,6 +2669,13 @@ class TemporaryModuleController extends Controller
 
     public function exportStatus(Request $request, string $exportRequest): \Illuminate\Http\JsonResponse
     {
+        // El usuario debe estar autenticado (garantizado por el grupo 'auth').
+        // No se requiere el gate Modulos-Temporales-Admin aquí porque la consulta
+        // ya está acotada a las notificaciones del propio usuario autenticado.
+        if (! $request->user()) {
+            return response()->json(['status' => 'gone']);
+        }
+
         $notification = $request->user()->notifications()
             ->where('data->export_request_id', $exportRequest)
             ->first();

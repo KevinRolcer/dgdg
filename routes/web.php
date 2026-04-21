@@ -54,21 +54,20 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:120,1')
         ->name('microregiones.search-post');
 
+    // Rutas de polling para estado de exportación.
+    // Solo requieren 'auth' (ya heredado del grupo padre); el controlador
+    // restringe los resultados a las notificaciones del usuario autenticado.
     Route::get('/poller/export/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
         ->where('exportRequest', '[a-f0-9\-]+')
-        ->middleware('can:Modulos-Temporales-Admin')
         ->name('temporary-modules.export-poll');
     Route::get('/exportacion/estado/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
         ->where('exportRequest', '[a-f0-9\-]+')
-        ->middleware('can:Modulos-Temporales-Admin')
         ->name('temporary-modules.export-st');
-    // Alias de compatibilidad — mantener mientras haya peticiones cacheadas con la ruta antigua
+    // Alias de compatibilidad — mantener mientras haya peticiones cacheadas con rutas anteriores
     Route::get('/q/st/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
-        ->where('exportRequest', '[a-f0-9\-]+')
-        ->middleware('can:Modulos-Temporales-Admin');
+        ->where('exportRequest', '[a-f0-9\-]+');
     Route::get('/exp-status/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
-        ->where('exportRequest', '[a-f0-9\-]+')
-        ->middleware('can:Modulos-Temporales-Admin');
+        ->where('exportRequest', '[a-f0-9\-]+');
     Route::get('/mi-perfil', [ProfileController::class, 'show'])->name('profile.show');
     Route::get('/ajustes', [SettingsController::class, 'index'])->name('settings.index');
     Route::get('/ajustes/apariencia', [SettingsController::class, 'apariencia'])->name('settings.apariencia');
@@ -167,7 +166,6 @@ Route::middleware('auth')->group(function () {
             Route::post('/semilla-guardar', [TemporaryModuleController::class, 'seedStore'])->middleware('can:Modulos-Temporales-Admin')->name('temporary-modules.admin.seed-store');
             Route::get('/export-status/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
                 ->where('exportRequest', '[a-f0-9\-]+')
-                ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.export-status');
             Route::get('/exportaciones/{file}', [TemporaryModuleController::class, 'downloadExport'])
                 ->where('file', '[A-Za-z0-9_\-.]+\.(xlsx|docx|pdf)')
