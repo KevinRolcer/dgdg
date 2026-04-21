@@ -23,12 +23,16 @@
     @can('Modulos-Temporales-Admin')
     @php
         $__exportStatusUrlTemplates = array_values(array_unique([
-            route('temporary-modules.export-st', ['exportRequest' => '0'], false),
-            route('temporary-modules.export-st-short', ['exportRequest' => '0'], false),
-            route('temporary-modules.admin.export-status', ['exportRequest' => '0'], false),
-            route('temporary-modules.export-st-alt', ['exportRequest' => '0'], false),
-            route('temporary-modules.export-poll', ['exportRequest' => '0'], false),
+            url('/exportacion/estado/0'),
+            url('/q/st/0'),
+            url('/modulos-temporales/admin/export-status/0'),
+            url('/exp-status/0'),
+            url('/poller/export/0'),
         ]));
+        // Convert to paths (relative to domain root) for consistency with JS expectation
+        $__exportStatusUrlTemplates = array_map(function($u) {
+            return parse_url($u, PHP_URL_PATH);
+        }, $__exportStatusUrlTemplates);
     @endphp
     data-export-status-url="{{ $__exportStatusUrlTemplates[0] ?? '' }}"
     data-export-status-urls="{{ e(json_encode($__exportStatusUrlTemplates)) }}"
