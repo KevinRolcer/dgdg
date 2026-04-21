@@ -322,9 +322,7 @@ class TemporaryModuleWordPdfService
         $entries = $this->sortEntriesByMicrorregion($entries, $microrregionMeta, $sortDirection);
 
         $exportDir = storage_path('app/public/temporary-exports');
-        if (!is_dir($exportDir)) {
-            mkdir($exportDir, 0755, true);
-        }
+        $this->ensureExportDirectoryIsWritable($exportDir);
 
         $titleUppercase = !empty($exportConfig['title_uppercase']);
         $headersUppercase = !empty($exportConfig['headers_uppercase']);
@@ -1497,7 +1495,10 @@ class TemporaryModuleWordPdfService
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper($paperSize, $orientationConfig === 'landscape' ? 'landscape' : 'portrait');
         $dompdf->render();
-        file_put_contents($fullPdfPath, $dompdf->output());
+        $bytesWritten = @file_put_contents($fullPdfPath, $dompdf->output());
+        if ($bytesWritten === false || ! is_file($fullPdfPath)) {
+            throw new \RuntimeException('No se pudo guardar el PDF exportado en: '.$fullPdfPath);
+        }
 
         return [
             'name' => $pdfFileName,
@@ -2968,16 +2969,11 @@ class TemporaryModuleWordPdfService
                     } elseif (array_key_exists($fullPath, $payloadByFullPath)) {
                         $payload = $payloadByFullPath[$fullPath];
                     } else {
-                        $binary = @file_get_contents($fullPath);
-                        if ($binary === false || $binary === '') continue;
-                        $dims = @getimagesizefromstring($binary) ?: null;
+                        // Evita data-uri/base64 para imágenes locales: con lotes grandes dispara RAM en Dompdf.
+                        $dims = @getimagesize($fullPath) ?: null;
                         $width = is_array($dims) && isset($dims[0]) ? (int) $dims[0] : null;
                         $height = is_array($dims) && isset($dims[1]) ? (int) $dims[1] : null;
-                        $mime = is_array($dims) && isset($dims['mime']) && is_string($dims['mime']) && $dims['mime'] !== ''
-                            ? $dims['mime']
-                            : (@mime_content_type($fullPath) ?: 'image/jpeg');
-                        $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
-                        $payload = ['src' => $dataUri, 'w' => $width, 'h' => $height];
+                        $payload = ['src' => $fullPath, 'w' => $width, 'h' => $height];
                         $payloadByFullPath[$fullPath] = $payload;
                     }
 
@@ -3054,6 +3050,20 @@ class TemporaryModuleWordPdfService
         }
 
         return false;
+    }
+
+    private function ensureExportDirectoryIsWritable(string $exportDir): void
+    {
+        if (! is_dir($exportDir)) {
+            $created = @mkdir($exportDir, 0755, true);
+            if (! $created && ! is_dir($exportDir)) {
+                throw new \RuntimeException('No se pudo crear el directorio de exportación: '.$exportDir);
+            }
+        }
+
+        if (! is_writable($exportDir)) {
+            throw new \RuntimeException('El directorio de exportación no tiene permisos de escritura: '.$exportDir);
+        }
     }
 
     /**

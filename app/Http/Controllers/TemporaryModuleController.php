@@ -2042,7 +2042,7 @@ class TemporaryModuleController extends Controller
         $dataStartRow = (int) ($request->input('data_start_row') ?: $headerRow + 1);
         $sheetIndex = (int) ($request->input('sheet_index') ?: 0);
         $file = $request->file('archivo_excel');
-        $isPdf = $file->getClientOriginalExtension() === 'pdf';
+        $isPdf = strtolower((string) $file->getClientOriginalExtension()) === 'pdf';
 
         try {
             $options = [
