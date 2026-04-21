@@ -65,9 +65,11 @@ Route::middleware('auth')->group(function () {
         ->name('temporary-modules.export-st');
     // Alias de compatibilidad — mantener mientras haya peticiones cacheadas con rutas anteriores
     Route::get('/q/st/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
-        ->where('exportRequest', '[a-f0-9\-]+');
+        ->where('exportRequest', '[a-f0-9\-]+')
+        ->name('temporary-modules.export-st-short');
     Route::get('/exp-status/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
-        ->where('exportRequest', '[a-f0-9\-]+');
+        ->where('exportRequest', '[a-f0-9\-]+')
+        ->name('temporary-modules.export-st-alt');
     Route::get('/mi-perfil', [ProfileController::class, 'show'])->name('profile.show');
     Route::get('/ajustes', [SettingsController::class, 'index'])->name('settings.index');
     Route::get('/ajustes/apariencia', [SettingsController::class, 'apariencia'])->name('settings.apariencia');
