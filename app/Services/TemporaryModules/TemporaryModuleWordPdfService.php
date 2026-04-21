@@ -1487,9 +1487,41 @@ class TemporaryModuleWordPdfService
             'rowHighlightStyles' => $rowHighlightStyles,
         ])->render();
 
+        // chroot: Dompdf 3 restringe por defecto el acceso a archivos fuera del document root.
+        // Autorizamos los discos donde viven las imágenes de registros (secure_shared y public)
+        // más el public/ del proyecto para logos/CSS.
+        $dompdfChrootCandidates = [
+            public_path(),
+            storage_path('app'),
+            storage_path('app/public'),
+            storage_path('app/shared_uploads'),
+        ];
+
+        foreach (['secure_shared', 'public'] as $diskName) {
+            try {
+                $diskRoot = (string) config('filesystems.disks.'.$diskName.'.root', '');
+                if ($diskRoot !== '') {
+                    $dompdfChrootCandidates[] = $diskRoot;
+                }
+            } catch (\Throwable $e) {
+                // ignoramos errores de config, el default ya cubre la ruta habitual
+            }
+        }
+
+        $dompdfChroot = [];
+        foreach ($dompdfChrootCandidates as $path) {
+            if (!is_string($path) || $path === '' || !is_dir($path)) {
+                continue;
+            }
+            $real = realpath($path) ?: $path;
+            $dompdfChroot[$real] = true;
+        }
+        $dompdfChroot = array_keys($dompdfChroot);
+
         $dompdf = new Dompdf([
             'defaultPaperSize' => $paperSize,
             'isRemoteEnabled' => true,
+            'chroot' => $dompdfChroot,
             'defaultFont' => strtolower($exportFontName) === 'gilroy' ? 'gilroy' : 'Arial',
         ]);
         $dompdf->loadHtml($html, 'UTF-8');
@@ -2964,17 +2996,21 @@ class TemporaryModuleWordPdfService
                     $fullPath = $this->entryDataService->resolveStoredFilePath($raw);
                     if (!is_string($fullPath) || !is_file($fullPath)) continue;
 
+                    // Normaliza la ruta (Windows suele devolver slashes mixtos) para que Dompdf la valide contra chroot.
+                    $normalizedPath = realpath($fullPath) ?: $fullPath;
+                    $normalizedPath = str_replace('\\', '/', $normalizedPath);
+
                     if (array_key_exists($original, $payloadByOriginal)) {
                         $payload = $payloadByOriginal[$original];
-                    } elseif (array_key_exists($fullPath, $payloadByFullPath)) {
-                        $payload = $payloadByFullPath[$fullPath];
+                    } elseif (array_key_exists($normalizedPath, $payloadByFullPath)) {
+                        $payload = $payloadByFullPath[$normalizedPath];
                     } else {
                         // Evita data-uri/base64 para imágenes locales: con lotes grandes dispara RAM en Dompdf.
                         $dims = @getimagesize($fullPath) ?: null;
                         $width = is_array($dims) && isset($dims[0]) ? (int) $dims[0] : null;
                         $height = is_array($dims) && isset($dims[1]) ? (int) $dims[1] : null;
-                        $payload = ['src' => $fullPath, 'w' => $width, 'h' => $height];
-                        $payloadByFullPath[$fullPath] = $payload;
+                        $payload = ['src' => $normalizedPath, 'w' => $width, 'h' => $height];
+                        $payloadByFullPath[$normalizedPath] = $payload;
                     }
 
                     $payloadByOriginal[$original] = $payload;
@@ -3022,13 +3058,9 @@ class TemporaryModuleWordPdfService
             return false;
         }
 
-        $imageCells = $entryCount * $imageColumnsCount;
-
-        // En documentos grandes, los data-uri de imágenes disparan el uso de RAM de Dompdf.
-        if ($entryCount > 700 || $imageCells > 1200) {
-            return false;
-        }
-
+        // Ahora sólo guardamos rutas en el mapa (no base64) así que el costo en RAM es mínimo.
+        // Sin mapa, el blade no puede resolver la imagen y el PDF saldría sin fotografías,
+        // por eso construimos siempre el lookup cuando hay columnas de imagen.
         return true;
     }
 
