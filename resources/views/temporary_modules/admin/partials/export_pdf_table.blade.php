@@ -1259,7 +1259,8 @@
                             $fillMode = strtolower(trim((string) ($col['fill_empty_mode'] ?? 'none')));
                             $fillValue = (string) ($col['fill_empty_value'] ?? '');
                             $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
-                            $isImageType = $fieldType === 'image' || $fieldType === 'file' || $fieldType === 'foto';
+                            $fieldTypeLower = strtolower(trim($fieldType));
+                            $isImageType = in_array($fieldTypeLower, ['image', 'file', 'foto', 'file_image', 'image_upload', 'imageupload'], true);
                             if (!$isImageType && !in_array((string) $key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true) && in_array($fillMode, ['auto', 'custom'], true) && $operationsValueIsEmpty($val)) {
                                 if ($fillMode === 'custom') {
                                     $val = $fillValue;
@@ -1350,6 +1351,12 @@
                                 $imageFallbackLabel = count($rawMediaValues) > 1 ? 'Imágenes adjuntas' : 'Imagen adjunta';
                             }
                             $tdAlign = 'text-align: center; vertical-align: middle;';
+                            // Dompdf se degrada (RAM/tiempo) cuando hay demasiadas imagenes; limitar por celda.
+                            $maxImagesPerCell = 6;
+                            $extraImagesCount = max(0, count($imageSources) - $maxImagesPerCell);
+                            if ($extraImagesCount > 0) {
+                                $imageSources = array_slice($imageSources, 0, $maxImagesPerCell);
+                            }
                             $thumbWidth = count($imageSources) > 1 ? 52 : 110;
                             $thumbHeight = count($imageSources) > 1 ? 52 : 85;
                             $applyBreakdownPdf = ! $isImageType && empty($imageSources) && $imageFallbackLabel === '';
@@ -1385,6 +1392,9 @@
                                         @endif
                                     @endforeach
                                 </div>
+                                @if(($extraImagesCount ?? 0) > 0)
+                                    <div style="font-size:8px; color:#6b7280; margin-top: 2px;">+{{ (int) $extraImagesCount }} mas</div>
+                                @endif
                             @elseif($imageFallbackLabel !== '')
                                 <span style="font-size:8px; color:#6b7280;">{{ $imageFallbackLabel }}</span>
                             @else

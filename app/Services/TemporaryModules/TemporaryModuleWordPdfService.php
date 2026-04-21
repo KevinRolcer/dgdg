@@ -2911,6 +2911,12 @@ class TemporaryModuleWordPdfService
             return null;
         }
 
+        $dims = @getimagesizefromstring($bin) ?: null;
+        $mime = is_array($dims) ? strtolower((string) ($dims['mime'] ?? '')) : '';
+        if (!str_starts_with($mime, 'image/')) {
+            return null;
+        }
+
         $tmpRel = 'temporary-exports/tmp/'.Str::random(18).'.img';
         Storage::disk('local')->put($tmpRel, $bin);
         $tmpAbs = storage_path('app/'.$tmpRel);
@@ -2964,17 +2970,41 @@ class TemporaryModuleWordPdfService
                         }
 
                         if ($localFromUrl !== null) {
-                            $payload = $payloadByFullPath[$localFromUrl] ?? null;
+                            $normalizedLocalFromUrl = realpath($localFromUrl) ?: $localFromUrl;
+                            $normalizedLocalFromUrl = str_replace('\\', '/', $normalizedLocalFromUrl);
+                            $payload = $payloadByFullPath[$normalizedLocalFromUrl] ?? null;
                             if ($payload === null) {
-                                $binary = @file_get_contents($localFromUrl);
+                                $binary = @file_get_contents($normalizedLocalFromUrl);
                                 if ($binary !== false && $binary !== '') {
                                     $dims = @getimagesizefromstring($binary) ?: null;
                                     $width = is_array($dims) && isset($dims[0]) ? (int) $dims[0] : null;
                                     $height = is_array($dims) && isset($dims[1]) ? (int) $dims[1] : null;
                                     // Optimización: Usar ruta física en vez de Base64 para ahorrar RAM
-                                    $payload = ['src' => $localFromUrl, 'w' => $width, 'h' => $height];
-                                    $payloadByFullPath[$localFromUrl] = $payload;
+                                    $payload = ['src' => $normalizedLocalFromUrl, 'w' => $width, 'h' => $height];
+                                    $payloadByFullPath[$normalizedLocalFromUrl] = $payload;
                                 }
+                            }
+
+                            if (is_array($payload) && is_string($payload['src'] ?? null) && $payload['src'] !== '') {
+                                $payloadByUrl[$raw] = $payload;
+                                foreach ($this->pdfImageLookupKeys($original) as $lookupKey) {
+                                    $map[$lookupKey] = $payload;
+                                }
+                                continue;
+                            }
+                        }
+
+                        $downloaded = $this->tryDownloadImageFromSameHostUrl($raw);
+                        if ($downloaded !== null) {
+                            $normalizedDownloaded = realpath($downloaded) ?: $downloaded;
+                            $normalizedDownloaded = str_replace('\\', '/', $normalizedDownloaded);
+                            $payload = $payloadByFullPath[$normalizedDownloaded] ?? null;
+                            if ($payload === null) {
+                                $dims = @getimagesize($normalizedDownloaded) ?: null;
+                                $width = is_array($dims) && isset($dims[0]) ? (int) $dims[0] : null;
+                                $height = is_array($dims) && isset($dims[1]) ? (int) $dims[1] : null;
+                                $payload = ['src' => $normalizedDownloaded, 'w' => $width, 'h' => $height];
+                                $payloadByFullPath[$normalizedDownloaded] = $payload;
                             }
 
                             if (is_array($payload) && is_string($payload['src'] ?? null) && $payload['src'] !== '') {
