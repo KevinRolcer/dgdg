@@ -2563,8 +2563,10 @@
 
             function buildColumns(st) {
                 const cols = [{ key: '__row', label: '#', kind: 'rownum' }];
+                // Siempre mostrar la microrregion (solo lectura) para diferenciar filas.
+                cols.push({ key: '__mr_label', label: 'Microregión', kind: 'mr_label' });
                 if (st.showMrSelect) {
-                    cols.push({ key: '__mr', label: 'Microrregion', kind: 'mr' });
+                    cols.push({ key: '__mr', label: 'Cambiar MR', kind: 'mr' });
                 }
 
                 (st.fields || []).forEach(function (f) {
@@ -2576,6 +2578,50 @@
 
                 cols.push({ key: '__del', label: '', kind: 'del' });
                 return cols;
+            }
+
+            function mrLabelForId(mrId) {
+                const parsed = tmParseMicrorregionId(mrId);
+                if (parsed === null) return '';
+                const meta = Array.isArray(microrregionesMeta) ? microrregionesMeta : [];
+                for (let i = 0; i < meta.length; i++) {
+                    const m = meta[i];
+                    if (m && String(m.id) === String(parsed)) {
+                        return String(m.label || ('MR ' + parsed));
+                    }
+                }
+                return 'MR ' + parsed;
+            }
+
+            function ensureMrColorMap(st) {
+                if (!st.__mrColorMap) {
+                    st.__mrColorMap = {};
+                }
+                const isDark = document.documentElement && document.documentElement.classList
+                    ? document.documentElement.classList.contains('theme-dark')
+                    : false;
+
+                function pastelColorFromId(id) {
+                    const n = Number(id);
+                    if (!Number.isFinite(n)) {
+                        return isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
+                    }
+                    // Distribución "golden angle" para diferenciar muchas microrregiones sin repetir rápido.
+                    const hue = (Math.abs(n) * 137.508) % 360;
+                    const sat = isDark ? 35 : 55;
+                    const light = isDark ? 18 : 92;
+                    const alpha = isDark ? 0.45 : 0.75;
+                    return 'hsla(' + hue.toFixed(1) + ', ' + sat + '%, ' + light + '%, ' + alpha + ')';
+                }
+
+                st.rows.forEach(function (r) {
+                    const id = tmParseMicrorregionId(r.microrregion_id);
+                    if (id === null) return;
+                    const key = String(id);
+                    if (!st.__mrColorMap[key]) {
+                        st.__mrColorMap[key] = pastelColorFromId(id);
+                    }
+                });
             }
 
             function getMunicipiosForRow(st, rowMrId, allMunicipios) {
@@ -2593,6 +2639,10 @@
             function renderCell(st, row, col) {
                 if (col.kind === 'rownum') {
                     return '<td class=\"tm-bulk-insert-rownum\">' + tmBulkEsc(String(row.__index)) + '</td>';
+                }
+                if (col.kind === 'mr_label') {
+                    const label = mrLabelForId(row.microrregion_id) || '—';
+                    return '<td><span class=\"tm-bulk-insert-mr-pill\">' + tmBulkEsc(label) + '</span></td>';
                 }
                 if (col.kind === 'mr') {
                     const current = String(row.microrregion_id || '');
@@ -2729,9 +2779,11 @@
                 if (!st || !host) return;
 
                 const cols = buildColumns(st);
+                ensureMrColorMap(st);
                 const thead = '<thead><tr>' + cols.map(function (c) {
                     if (c.kind === 'del') return '<th style=\"width:56px;\"></th>';
                     if (c.kind === 'rownum') return '<th style=\"width:64px;\">#</th>';
+                    if (c.kind === 'mr_label') return '<th style=\"width:280px;\">Microregión</th>';
                     const label = tmBulkEsc(String(c.label || ''));
                     if (c.kind === 'field' && c.field && c.field.is_required) {
                         return '<th>' + label + '<span class=\"tm-req\">*</span></th>';
@@ -2741,7 +2793,10 @@
 
                 const tbody = '<tbody>' + st.rows.map(function (row, idx) {
                     row.__index = idx + 1;
-                    return '<tr>' + cols.map(function (c) { return renderCell(st, row, c); }).join('') + '</tr>';
+                    const mrKey = tmParseMicrorregionId(row.microrregion_id);
+                    const bg = mrKey !== null ? (st.__mrColorMap[String(mrKey)] || '') : '';
+                    const style = bg ? (' style=\"--tm-bulk-insert-row-bg:' + tmBulkEsc(bg) + '\"') : '';
+                    return '<tr class=\"tm-bulk-insert-row\"' + style + '>' + cols.map(function (c) { return renderCell(st, row, c); }).join('') + '</tr>';
                 }).join('') + '</tbody>';
 
                 host.innerHTML = '<table class=\"tm-bulk-insert-table\">' + thead + tbody + '</table>';
@@ -3199,6 +3254,18 @@
                         };
                     })
                     .filter(function (x) { return x.municipio !== ''; });
+ 
+                // Ordenar por microrregión y municipio para agrupar filas y facilitar la identificación visual.
+                selected.sort(function (a, b) {
+                    const am = a.mrId === null ? 999999 : Number(a.mrId);
+                    const bm = b.mrId === null ? 999999 : Number(b.mrId);
+                    if (am !== bm) return am - bm;
+                    const an = normalizeMunicipioLabel(a.municipio);
+                    const bn = normalizeMunicipioLabel(b.municipio);
+                    if (an < bn) return -1;
+                    if (an > bn) return 1;
+                    return 0;
+                });
                 const munKey = getMunicipioFieldKey(st);
                 if (!munKey) {
                     closeModal(munModal);
@@ -4521,6 +4588,9 @@
                 if (!orig || !draft) {
                     return false;
                 }
+                if (state.deletedIds && state.deletedIds.has(Number(eid))) {
+                    return false;
+                }
                 for (const f of state.fields) {
                     if (f.type === 'image' || f.type === 'file' || f.type === 'document') {
                         continue;
@@ -4544,11 +4614,15 @@
             function countDirty(state) {
                 let fieldCount = 0;
                 const entryIds = new Set();
+                const deleteIds = state.deletedIds instanceof Set ? Array.from(state.deletedIds) : [];
                 for (const eidStr of Object.keys(state.drafts)) {
                     const eid = parseInt(eidStr, 10);
                     const orig = state.originals[eid];
                     const draft = state.drafts[eid];
                     if (!orig || !draft) {
+                        continue;
+                    }
+                    if (state.deletedIds && state.deletedIds.has(Number(eid))) {
                         continue;
                     }
                     for (const f of state.fields) {
@@ -4573,7 +4647,8 @@
                         entryIds.add(eid);
                     }
                 }
-                return { fieldCount, entryCount: entryIds.size };
+                deleteIds.forEach(function (id) { entryIds.add(Number(id)); });
+                return { fieldCount, entryCount: entryIds.size, deleteCount: deleteIds.length };
             }
 
             function updateBulkRowVisualState(modal, st, entryId) {
@@ -4587,12 +4662,14 @@
                 if (listRow) {
                     listRow.classList.toggle('tm-bulk-edit-row--edited', edited && !pending);
                     listRow.classList.toggle('tm-bulk-edit-row--pending', pending);
+                    listRow.classList.toggle('tm-bulk-edit-row--deleted', st.deletedIds && st.deletedIds.has(Number(entryId)));
                 }
 
                 const sheetRow = modal.querySelector('.tm-bulk-sheet-row[data-entry-id="' + entryId + '"]');
                 if (sheetRow) {
                     sheetRow.classList.toggle('is-edited', edited && !pending);
                     sheetRow.classList.toggle('is-pending', pending);
+                    sheetRow.classList.toggle('is-deleted', st.deletedIds && st.deletedIds.has(Number(entryId)));
                 }
 
                 const filesBox = modal.querySelector('.tm-bulk-sheet-files[data-sheet-entry-id="' + entryId + '"][data-sheet-field-key]');
@@ -4608,11 +4685,12 @@
                 const c = countDirty(st);
                 const el = modal.querySelector('[data-tm-bulk-counter]');
                 if (el) {
-                    el.textContent = c.fieldCount + ' campo(s) editado(s) en ' + c.entryCount + ' registro(s)';
+                    const deletes = c.deleteCount ? (' • ' + c.deleteCount + ' eliminación(es)') : '';
+                    el.textContent = c.fieldCount + ' campo(s) editado(s) en ' + c.entryCount + ' registro(s)' + deletes;
                 }
                 const saveExit = modal.querySelector('[data-tm-bulk-save-exit]');
                 if (saveExit) {
-                    saveExit.classList.toggle('tm-hidden', c.fieldCount === 0);
+                    saveExit.classList.toggle('tm-hidden', c.fieldCount === 0 && (c.deleteCount || 0) === 0);
                 }
                 modal.querySelectorAll('[data-tm-bulk-row-save]').forEach(function (btn) {
                     const id = parseInt(btn.getAttribute('data-entry-id'), 10);
@@ -4881,6 +4959,10 @@
                 if (col.key === '__title') {
                     return '<th data-col-key="__title"><input type="search" class="tm-bulk-sheet-filter-input"' + keyAttr + ' placeholder="Filtrar…"></th>';
                 }
+ 
+                if (col.key === '__delete') {
+                    return '<th data-col-key="__delete"></th>';
+                }
 
                 if (col.key === '__mr') {
                     let opts = '<option value="">Todas</option>';
@@ -4942,6 +5024,7 @@
             function buildSheetCellHtml(col, st, entry, rowIndex, previewTpl) {
                 const entryId = entry.id;
                 const draft = st.drafts[entryId] || {};
+                const isDeleted = st.deletedIds && st.deletedIds.has(Number(entryId));
 
                 function wrap(inner, isDirty) {
                     return '<div class="tm-bulk-sheet-cell-wrap' + (isDirty ? ' is-dirty' : '') + '">' + inner + '</div>';
@@ -4964,7 +5047,14 @@
                         opts += '<option value="' + tmBulkEsc(String(m.id)) + '"' + sel + '>' + tmBulkEsc(String(m.label || m.id)) + '</option>';
                     });
                     const dirty = st.showMrSelect ? (mr !== (entry.microrregion_id || null)) : false;
-                    return '<td data-col-key="__mr">' + wrap('<select class="tm-bulk-sheet-cell" data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-mr="1">' + opts + '</select>', dirty) + '</td>';
+                    return '<td data-col-key="__mr">' + wrap('<select class="tm-bulk-sheet-cell" data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-mr="1"' + (isDeleted ? ' disabled' : '') + '>' + opts + '</select>', dirty) + '</td>';
+                }
+ 
+                if (col.key === '__delete') {
+                    const icon = isDeleted ? 'fa-rotate-left' : 'fa-trash-can';
+                    const title = isDeleted ? 'Restaurar' : 'Eliminar';
+                    const cls = 'tm-bulk-sheet-row-delete-btn' + (isDeleted ? ' is-restore' : '');
+                    return '<td data-col-key="__delete"><button type="button" class="' + cls + '" data-tm-bulk-sheet-row-delete="1" data-entry-id="' + tmBulkEsc(String(entryId)) + '" title="' + tmBulkEsc(title) + '" aria-label="' + tmBulkEsc(title) + '"><i class="fa-solid ' + icon + '" aria-hidden="true"></i></button></td>';
                 }
 
                 const field = col.field;
@@ -4977,21 +5067,22 @@
                 const dirty = (type === 'image' || type === 'file' || type === 'document') ? false : !valEqual(v, orig);
 
                 const baseAttrs = ' data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-field-key="' + tmBulkEsc(String(k)) + '"';
+                const dis = isDeleted ? ' disabled' : '';
 
                 if (type === 'textarea') {
-                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<textarea class="tm-bulk-sheet-cell tm-bulk-textarea"' + baseAttrs + ' rows="1">' + tmBulkEsc(String(v)) + '</textarea>', dirty) + '</td>';
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<textarea class="tm-bulk-sheet-cell tm-bulk-textarea"' + baseAttrs + dis + ' rows="1">' + tmBulkEsc(String(v)) + '</textarea>', dirty) + '</td>';
                 }
 
                 if (type === 'number') {
-                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<input class="tm-bulk-sheet-cell" type="number" step="any"' + baseAttrs + ' value="' + tmBulkEsc(String(v)) + '">', dirty) + '</td>';
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<input class="tm-bulk-sheet-cell" type="number" step="any"' + baseAttrs + dis + ' value="' + tmBulkEsc(String(v)) + '">', dirty) + '</td>';
                 }
 
                 if (type === 'date') {
-                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<input class="tm-bulk-sheet-cell" type="date"' + baseAttrs + ' value="' + tmBulkEsc(String(v)) + '">', dirty) + '</td>';
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<input class="tm-bulk-sheet-cell" type="date"' + baseAttrs + dis + ' value="' + tmBulkEsc(String(v)) + '">', dirty) + '</td>';
                 }
 
                 if (type === 'datetime') {
-                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<input class="tm-bulk-sheet-cell" type="datetime-local"' + baseAttrs + ' value="' + tmBulkEsc(String(v)) + '">', dirty) + '</td>';
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<input class="tm-bulk-sheet-cell" type="datetime-local"' + baseAttrs + dis + ' value="' + tmBulkEsc(String(v)) + '">', dirty) + '</td>';
                 }
 
                 if (type === 'select') {
@@ -5002,7 +5093,7 @@
                         const sel = String(opt) === String(v) ? ' selected' : '';
                         html += '<option value="' + tmBulkEsc(String(opt)) + '"' + sel + '>' + tmBulkEsc(String(opt)) + '</option>';
                     });
-                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell"' + baseAttrs + '>' + html + '</select>', dirty) + '</td>';
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell"' + baseAttrs + dis + '>' + html + '</select>', dirty) + '</td>';
                 }
 
                 if (type === 'multiselect') {
@@ -5032,7 +5123,7 @@
                     const html = '<option value="">Selecciona</option>' +
                         '<option value="1"' + (boolYes ? ' selected' : '') + '>Si</option>' +
                         '<option value="0"' + (boolNo && !boolYes ? ' selected' : '') + '>No</option>';
-                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell"' + baseAttrs + '>' + html + '</select>', dirty) + '</td>';
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell"' + baseAttrs + dis + '>' + html + '</select>', dirty) + '</td>';
                 }
 
                 if (type === 'semaforo') {
@@ -5041,7 +5132,7 @@
                         const sel = String(v) === String(semVal) ? ' selected' : '';
                         html += '<option value="' + tmBulkEsc(String(semVal)) + '"' + sel + '>' + tmBulkEsc(String(tmSemaforoLabels[semVal])) + '</option>';
                     });
-                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell tm-semaforo-select"' + baseAttrs + '>' + html + '</select>', dirty) + '</td>';
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell tm-semaforo-select"' + baseAttrs + dis + '>' + html + '</select>', dirty) + '</td>';
                 }
 
                 if (type === 'categoria') {
@@ -5058,12 +5149,12 @@
                             html += '<option value="' + tmBulkEsc(subVal) + '"' + sel2 + '>' + tmBulkEsc(subVal) + '</option>';
                         });
                     });
-                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell"' + baseAttrs + '>' + html + '</select>', dirty) + '</td>';
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell"' + baseAttrs + dis + '>' + html + '</select>', dirty) + '</td>';
                 }
 
                 if (type === 'municipio') {
                     const cur = String(v || '');
-                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell tm-municipio-select"' + baseAttrs + '><option value="">Selecciona un municipio</option></select>' +
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<select class="tm-bulk-sheet-cell tm-municipio-select"' + baseAttrs + dis + '><option value="">Selecciona un municipio</option></select>' +
                         (cur ? '<span class="tm-hidden" data-sheet-mun-initial="' + tmBulkEsc(cur) + '"></span>' : ''), dirty) + '</td>';
                 }
 
@@ -5083,24 +5174,24 @@
 
                     let pHtml = '';
                     if (pt === 'select') {
-                        pHtml = '<select class="tm-bulk-sheet-cell"' + pAttr + '><option value="">Selecciona</option>' +
+                        pHtml = '<select class="tm-bulk-sheet-cell"' + pAttr + (isDeleted ? ' disabled' : '') + '><option value="">Selecciona</option>' +
                             pOpts.map(function (opt) {
                                 const sel = String(pv) === String(opt) ? ' selected' : '';
                                 return '<option value="' + tmBulkEsc(String(opt)) + '"' + sel + '>' + tmBulkEsc(String(opt)) + '</option>';
                             }).join('') + '</select>';
                     } else {
-                        pHtml = '<input class="tm-bulk-sheet-cell" type="text"' + pAttr + ' value="' + tmBulkEsc(String(pv)) + '" placeholder="Principal">';
+                        pHtml = '<input class="tm-bulk-sheet-cell" type="text"' + pAttr + (isDeleted ? ' disabled' : '') + ' value="' + tmBulkEsc(String(pv)) + '" placeholder="Principal">';
                     }
 
                     let sHtml = '';
                     if (st2 === 'select') {
-                        sHtml = '<select class="tm-bulk-sheet-cell"' + sAttr + (showSec ? '' : ' disabled') + '><option value="">Selecciona</option>' +
+                        sHtml = '<select class="tm-bulk-sheet-cell"' + sAttr + (showSec && !isDeleted ? '' : ' disabled') + '><option value="">Selecciona</option>' +
                             sOpts.map(function (opt) {
                                 const sel = String(sv) === String(opt) ? ' selected' : '';
                                 return '<option value="' + tmBulkEsc(String(opt)) + '"' + sel + '>' + tmBulkEsc(String(opt)) + '</option>';
                             }).join('') + '</select>';
                     } else {
-                        sHtml = '<input class="tm-bulk-sheet-cell" type="text"' + sAttr + (showSec ? '' : ' disabled') + ' value="' + tmBulkEsc(String(sv)) + '" placeholder="Secundario">';
+                        sHtml = '<input class="tm-bulk-sheet-cell" type="text"' + sAttr + (showSec && !isDeleted ? '' : ' disabled') + ' value="' + tmBulkEsc(String(sv)) + '" placeholder="Secundario">';
                     }
 
                     const html = '<div style="display:flex; flex-direction:column; gap:6px;">' +
@@ -5111,7 +5202,7 @@
                 }
 
                 if (type === 'geopoint') {
-                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<textarea class="tm-bulk-sheet-cell tm-bulk-textarea"' + baseAttrs + ' rows="1" placeholder="lat,lng o JSON">' + tmBulkEsc(String(v)) + '</textarea>', dirty) + '</td>';
+                    return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<textarea class="tm-bulk-sheet-cell tm-bulk-textarea"' + baseAttrs + dis + ' rows="1" placeholder="lat,lng o JSON">' + tmBulkEsc(String(v)) + '</textarea>', dirty) + '</td>';
                 }
 
                 if (type === 'image' || type === 'file' || type === 'document') {
@@ -5160,7 +5251,7 @@
                 }
 
                 // Default: texto multilinea para que el contenido se vea completo.
-                return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<textarea class="tm-bulk-sheet-cell tm-bulk-textarea"' + baseAttrs + ' rows="1">' + tmBulkEsc(String(v)) + '</textarea>', dirty) + '</td>';
+                return '<td data-col-key="' + tmBulkEsc(String(k)) + '">' + wrap('<textarea class="tm-bulk-sheet-cell tm-bulk-textarea"' + baseAttrs + dis + ' rows="1">' + tmBulkEsc(String(v)) + '</textarea>', dirty) + '</td>';
             }
 
             function renderBulkSheet(modal) {
@@ -5174,16 +5265,21 @@
                 const previewTpl = modal.getAttribute('data-preview-url-template') || '';
                 bulkEnableColumnResizeOnce();
 
+                const hasMunicipioField = (st.fields || []).some(function (f) { return f && String(f.type || '') === 'municipio'; });
+                var cols = [{ key: '__row', label: '#', kind: 'rownum' }];
                 if (st.showMrSelect) {
-                    // Order: #, Microrregión, Municipio
-                    var cols = [{ key: '__row', label: '#', kind: 'rownum' }, { key: '__mr', label: 'Microrregión', kind: 'mr' }, { key: '__title', label: 'Municipio', kind: 'title' }];
-                } else {
-                    var cols = [{ key: '__row', label: '#', kind: 'rownum' }, { key: '__title', label: 'Municipio', kind: 'title' }];
+                    cols.push({ key: '__mr', label: 'Microrregión', kind: 'mr' });
+                }
+                // Si el módulo ya tiene campo "municipio", no duplicar el título como columna "Municipio".
+                if (!hasMunicipioField) {
+                    cols.push({ key: '__title', label: 'Municipio', kind: 'title' });
                 }
                 st.fields.forEach(function (f) {
                     if (!f || f.type === 'seccion') return;
                     cols.push({ key: f.key, label: f.label, kind: 'field', field: f });
                 });
+                // Acciones por fila (eliminar/restaurar).
+                cols.push({ key: '__delete', label: '', kind: 'delete' });
 
                 const colgroupHtml = '<colgroup>' + cols.map(function (c) {
                     const widths = modal.__bulkSheetColWidths || {};
@@ -5192,6 +5288,7 @@
                         if (c.key === '__row') w = 64;
                         else if (c.key === '__mr') w = 280;
                         else if (c.key === '__title') w = 260;
+                        else if (c.key === '__delete') w = 56;
                         else w = 220;
                     }
                     return '<col data-col-key="' + tmBulkEsc(String(c.key)) + '" style="width:' + tmBulkEsc(String(Math.round(w))) + 'px">';
@@ -5217,8 +5314,9 @@
                     const eid = e.id;
                     const edited = entryIsDirty(st, eid);
                     const pending = entryHasPendingFileChanges(st, eid);
+                    const deleted = st.deletedIds && st.deletedIds.has(Number(eid));
                     const tds = cols.map(function (c) { return buildSheetCellHtml(c, st, e, globalIndex + 1, previewTpl); }).join('');
-                    return '<tr class="tm-bulk-sheet-row' + (edited || pending ? ' is-dirty' : '') + (pending ? ' is-pending' : (edited ? ' is-edited' : '')) + '" data-entry-id="' + tmBulkEsc(String(eid)) + '">' + tds + '</tr>';
+                    return '<tr class="tm-bulk-sheet-row' + (edited || pending || deleted ? ' is-dirty' : '') + (pending ? ' is-pending' : (edited ? ' is-edited' : '')) + (deleted ? ' is-deleted' : '') + '" data-entry-id="' + tmBulkEsc(String(eid)) + '">' + tds + '</tr>';
                 }
 
                 inner.innerHTML = '<table class="tm-excel-preview-table tm-bulk-sheet-table">' +
@@ -7030,6 +7128,9 @@
                 if (!st || !st.drafts[entryId]) {
                     return Promise.resolve(false);
                 }
+                if (st.deletedIds && st.deletedIds.has(Number(entryId))) {
+                    return Promise.reject(new Error('Este registro está marcado para eliminar. Restaúralo para poder guardarlo.'));
+                }
                 syncDraftFromForm(modal);
                 const fd = new FormData();
                 fd.append('_token', csrfToken);
@@ -7084,13 +7185,13 @@
             function tryCloseBulkModal(modal) {
                 const st = modal.__bulkState;
                 const c = st ? countDirty(st) : { fieldCount: 0, entryCount: 0 };
-                if (c.fieldCount === 0) {
+                if (c.fieldCount === 0 && (c.deleteCount || 0) === 0) {
                     closeModal(modal);
                     return;
                 }
                 Swal.fire({
                     title: 'Cambios sin guardar',
-                    text: 'Tienes ' + c.fieldCount + ' campo(s) editado(s). ¿Qué deseas hacer?',
+                    text: 'Tienes ' + c.fieldCount + ' campo(s) editado(s)' + ((c.deleteCount || 0) ? (' y ' + c.deleteCount + ' eliminación(es)') : '') + '. ¿Qué deseas hacer?',
                     icon: 'warning',
                     showDenyButton: true,
                     showCancelButton: true,
@@ -7114,19 +7215,83 @@
                 }
                 syncDraftFromForm(modal);
                 const c = countDirty(st);
-                if (c.fieldCount === 0) {
+                if (c.fieldCount === 0 && (c.deleteCount || 0) === 0) {
                     Swal.fire({ title: 'Sin cambios', text: 'No hay modificaciones pendientes para guardar.', icon: 'info', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false });
                     return Promise.resolve();
                 }
                 modal.__tmDeferRecordsReload = true;
-                const ids = [];
+                const idsToDelete = st.deletedIds instanceof Set ? Array.from(st.deletedIds) : [];
+                const idsToSave = [];
                 st.entries.forEach(function (e) {
+                    if (idsToDelete.indexOf(e.id) !== -1) return;
                     if (entryIsDirty(st, e.id)) {
-                        ids.push(e.id);
+                        idsToSave.push(e.id);
                     }
                 });
+
+                function bulkDeleteRequest(entryIds) {
+                    const panel = document.getElementById('module-records-' + st.moduleId);
+                    const deleteUrlFromPanel = panel ? String(panel.getAttribute('data-bulk-delete-url') || '').trim() : '';
+                    const delUrl = deleteUrlFromPanel !== ''
+                        ? deleteUrlFromPanel
+                        : ('/modulos-temporales/' + encodeURIComponent(String(st.moduleId)) + '/registros-masivo');
+                    return csrfFetch(delUrl, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                            Accept: 'application/json',
+                        },
+                        body: JSON.stringify({ entry_ids: entryIds.map(function (x) { return Number(x); }) }),
+                    }).then(function (res) { return safeJsonParse(res); }).then(function (j) {
+                        if (j && j.success) return true;
+                        throw new Error((j && j.message) ? String(j.message) : 'No se pudo eliminar');
+                    });
+                }
+
                 let chain = Promise.resolve();
-                ids.forEach(function (id) {
+                if (idsToDelete.length) {
+                    chain = chain.then(function () {
+                        return Swal.fire({
+                            title: 'Eliminar ' + idsToDelete.length + ' registro(s)',
+                            text: 'Se eliminarán los registros marcados (incluyendo evidencias). Esta acción no se puede deshacer.',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonText: 'Sí, eliminar',
+                            cancelButtonText: 'Cancelar',
+                        }).then(function (r) {
+                            if (!r.isConfirmed) {
+                                throw new Error('Cancelado');
+                            }
+                            return bulkDeleteRequest(idsToDelete);
+                        });
+                    }).then(function () {
+                        idsToDelete.forEach(function (id) {
+                            const eid = Number(id);
+                            st.entries = (st.entries || []).filter(function (e) { return Number(e.id) !== eid; });
+                            delete st.entryById[eid];
+                            delete st.originals[eid];
+                            delete st.drafts[eid];
+                            delete st.draftMicrorregion[eid];
+                            delete st.pendingFiles[eid];
+                            delete st.removeExisting[eid];
+                            if (st.deletedIds) st.deletedIds.delete(eid);
+                            modal.querySelectorAll('.tm-bulk-edit-row[data-entry-id="' + eid + '"], .tm-bulk-sheet-row[data-entry-id="' + eid + '"]').forEach(function (el) {
+                                if (el && el.parentNode) el.parentNode.removeChild(el);
+                            });
+                            if (st.selectedId === eid) {
+                                st.selectedId = null;
+                            }
+                        });
+                        if (st.selectedId == null && Array.isArray(st.entries) && st.entries.length) {
+                            selectEntry(modal, st.entries[0].id);
+                        }
+                        refreshBulkCounter(modal);
+                    });
+                }
+
+                idsToSave.forEach(function (id) {
                     chain = chain.then(function () {
                         return saveEntryRequest(modal, id);
                     });
@@ -7143,6 +7308,9 @@
                     Swal.fire({ title: 'Listo', text: 'Registros actualizados.', icon: 'success', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false });
                 }).catch(function (e) {
                     modal.__tmDeferRecordsReload = false;
+                    if (e && String(e.message || '') === 'Cancelado') {
+                        return Promise.resolve();
+                    }
                     Swal.fire('Error', e.message || 'No se pudo guardar', 'error');
                     return Promise.reject(e);
                 });
@@ -7238,11 +7406,43 @@
                     }
                     return;
                 }
+                const rowDelBtn = e.target.closest('[data-tm-bulk-sheet-row-delete="1"]');
+                if (rowDelBtn) {
+                    e.preventDefault();
+                    const modal = rowDelBtn.closest('.tm-bulk-edit-modal');
+                    const st = modal && modal.__bulkState ? modal.__bulkState : null;
+                    const eid = parseInt(rowDelBtn.getAttribute('data-entry-id') || '0', 10);
+                    if (!modal || !st || !eid) return;
+                    if (!(st.deletedIds instanceof Set)) {
+                        st.deletedIds = new Set();
+                    }
+                    if (st.deletedIds.has(Number(eid))) {
+                        st.deletedIds.delete(Number(eid));
+                    } else {
+                        st.deletedIds.add(Number(eid));
+                    }
+                    const isDeleted = st.deletedIds.has(Number(eid));
+                    rowDelBtn.classList.toggle('is-restore', isDeleted);
+                    rowDelBtn.title = isDeleted ? 'Restaurar' : 'Eliminar';
+                    rowDelBtn.setAttribute('aria-label', isDeleted ? 'Restaurar' : 'Eliminar');
+                    const icon = rowDelBtn.querySelector('i.fa-solid');
+                    if (icon) {
+                        icon.className = 'fa-solid ' + (isDeleted ? 'fa-rotate-left' : 'fa-trash-can');
+                    }
+                    updateBulkRowVisualState(modal, st, eid);
+                    refreshBulkCounter(modal);
+                    return;
+                }
                 const chip = e.target.closest('[data-sheet-multi-chip="1"]');
                 if (chip) {
                     const modal = chip.closest('.tm-bulk-edit-modal');
                     const sheet = modal ? modal.querySelector('[data-tm-bulk-sheet]') : null;
                     if (modal && sheet && !sheet.classList.contains('tm-hidden') && modal.__bulkState) {
+                        const st = modal.__bulkState;
+                        const eid = parseInt(chip.getAttribute('data-sheet-entry-id') || '0', 10);
+                        if (eid && st.deletedIds && st.deletedIds.has(Number(eid))) {
+                            return;
+                        }
                         e.preventDefault();
                         syncDraftFromSheetMultiChip(modal, chip);
                     }
@@ -7386,6 +7586,7 @@
                                 draftMicrorregion: {},
                                 pendingFiles: {},
                                 removeExisting: {},
+                                deletedIds: new Set(),
                                 selectedId: null,
                                 entryById: {},
                                 showMrSelect: modal.getAttribute('data-show-mr-select') === '1',

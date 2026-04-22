@@ -7897,6 +7897,12 @@ body.tm-bulk-col-resizing .tm-bulk-sheet-resizer::after {
 .tm-bulk-sheet-row.is-pending td.row-num {
     background-color: #fdeaea !important;
 }
+ 
+/* Marcado para eliminar (no se quita hasta guardar). */
+.tm-bulk-sheet-row.is-deleted td.row-num {
+    background-color: rgba(220, 38, 38, 0.20) !important;
+    border-left: 3px solid rgba(220, 38, 38, 0.75);
+}
 
 .tm-bulk-sheet-row.is-active td.row-num {
     background-color: #d9eee8 !important;
@@ -8002,6 +8008,44 @@ body.tm-bulk-col-resizing .tm-bulk-sheet-resizer::after {
 
 .tm-bulk-sheet-row.is-pending td:not(.row-num) {
     background: rgba(198, 40, 40, 0.10);
+}
+ 
+.tm-bulk-sheet-row.is-deleted td:not(.row-num) {
+    background: rgba(220, 38, 38, 0.22) !important;
+}
+ 
+.tm-bulk-sheet-row.is-deleted .tm-bulk-sheet-cell,
+.tm-bulk-sheet-row.is-deleted .tm-bulk-sheet-multi,
+.tm-bulk-sheet-row.is-deleted .tm-bulk-sheet-img-slot,
+.tm-bulk-sheet-row.is-deleted .tm-bulk-sheet-files {
+    opacity: 0.72;
+    pointer-events: none;
+}
+ 
+.tm-bulk-sheet-row.is-deleted td[data-col-key="__delete"] {
+    background: rgba(220, 38, 38, 0.28) !important;
+}
+ 
+.tm-bulk-sheet-row-delete-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: rgba(255,255,255,0.65);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.tm-bulk-sheet-row-delete-btn:hover {
+    background: rgba(220, 38, 38, 0.10);
+    border-color: rgba(220, 38, 38, 0.35);
+    transform: translateY(-1px);
+}
+.tm-bulk-sheet-row-delete-btn.is-restore:hover {
+    background: rgba(16, 185, 129, 0.10);
+    border-color: rgba(16, 185, 129, 0.35);
 }
 
 .tm-bulk-sheet-row.is-active td:not(.row-num) {
@@ -8265,6 +8309,15 @@ body.tm-bulk-col-resizing .tm-bulk-sheet-resizer::after {
 .tm-bulk-edit-row.tm-bulk-edit-row--pending {
     background: rgba(198, 40, 40, 0.10);
     border-color: rgba(198, 40, 40, 0.35);
+}
+ 
+/* Marcado para eliminar (se elimina al guardar). */
+.tm-bulk-edit-row.tm-bulk-edit-row--deleted {
+    background: rgba(220, 38, 38, 0.18);
+    border-color: rgba(220, 38, 38, 0.55);
+}
+.tm-bulk-edit-row.tm-bulk-edit-row--deleted .tm-bulk-edit-row-title {
+    text-decoration: line-through;
 }
 
 .tm-bulk-edit-row.is-active {
