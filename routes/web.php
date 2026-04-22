@@ -218,6 +218,10 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('module')
                 ->middleware(['can:Modulos-Temporales-Admin', 'throttle:60,1'])
                 ->name('temporary-modules.admin.seed-discard-register');
+            Route::post('/{module}/resolver-log-opciones', [TemporaryModuleController::class, 'resolveOptionNormalizationLog'])
+                ->whereNumber('module')
+                ->middleware(['can:Modulos-Temporales-Admin', 'throttle:120,1'])
+                ->name('temporary-modules.admin.option-normalization.resolve');
             Route::get('/{module}/buscar-municipios-log-semilla', [TemporaryModuleController::class, 'searchSeedDiscardMunicipios'])
                 ->whereNumber('module')
                 ->middleware(['can:Modulos-Temporales-Admin', 'throttle:120,1'])

@@ -492,6 +492,7 @@
                 let hasMunicipioConflict = false;
                 let hasSelectToMultiselect = false;
                 let hasBooleanToSelect = false;
+                let hasTextToSelect = false;
                 let hasInvalidBooleanToSelectOptions = false;
 
                 existingRows.forEach(function (row) {
@@ -529,6 +530,11 @@
                         }
 
                         hasInvalidBooleanToSelectOptions = true;
+                    }
+
+                    if (!isDeleted && newKey === oldKey && oldType === 'text' && newType === 'select') {
+                        hasTextToSelect = true;
+                        return;
                     }
 
                     const rowHasConflict = isDeleted || newKey !== oldKey || newType !== oldType;
@@ -573,6 +579,28 @@
                         text: 'Para convertir un campo de Sí/No a Lista de opciones y conservar respuestas, debes incluir claramente Si (o Sí) y No en las opciones.',
                         icon: 'error',
                         confirmButtonText: 'Entendido'
+                    });
+                    return;
+                }
+
+                if (hasTextToSelect && !hasConflict) {
+                    event.preventDefault();
+                    if (!templateSwal) {
+                        submitWithAction('normalize_text_select');
+                        return;
+                    }
+                    templateSwal.fire({
+                        title: 'Normalizar texto a lista de opciones',
+                        html: 'Se intentará normalizar automáticamente las respuestas existentes que coincidan con las nuevas opciones.<br><br>Las respuestas que no coincidan quedarán registradas en un <b>log</b> para que puedas reasignarlas manualmente a una de las opciones configuradas.',
+                        icon: 'info',
+                        showCancelButton: true,
+                        confirmButtonText: 'Normalizar y guardar',
+                        cancelButtonText: 'Cancelar',
+                        reverseButtons: true
+                    }).then(function (result) {
+                        if (result.isConfirmed) {
+                            submitWithAction('normalize_text_select');
+                        }
                     });
                     return;
                 }
@@ -704,6 +732,150 @@
             btn.addEventListener('click', openLog);
             modal.querySelectorAll('[data-tm-seed-log-close-edit]').forEach(function (el) { el.addEventListener('click', closeLog); });
             if (window.TM_ADMIN_EDIT_BOOT && window.TM_ADMIN_EDIT_BOOT.showSeedLog) {
+                openLog();
+            }
+        })();
+        }
+
+        if (window.TM_ADMIN_EDIT_BOOT && window.TM_ADMIN_EDIT_BOOT.hasOptionNormalizationLog) {
+        (function () {
+            var btn = document.getElementById('tmEditOptionNormalizationLogBtn');
+            var modal = document.getElementById('tmOptionNormalizationLogModalEdit');
+            var jsonEl = document.getElementById('tm-option-normalization-log-edit');
+            if (!btn || !modal || !jsonEl) return;
+
+            var currentList = [];
+
+            function closeLog() {
+                modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+            }
+
+            function setRows(tbody, rows) {
+                tbody.innerHTML = '';
+                rows.forEach(function (row) {
+                    var tr = document.createElement('tr');
+                    tr.dataset.logUid = row.log_uid || '';
+
+                    var tdEntry = document.createElement('td');
+                    tdEntry.textContent = row.entry_id ? ('#' + row.entry_id) : '—';
+                    tr.appendChild(tdEntry);
+
+                    var tdField = document.createElement('td');
+                    tdField.textContent = row.field_label || row.field_key || '—';
+                    tr.appendChild(tdField);
+
+                    var tdOriginal = document.createElement('td');
+                    tdOriginal.textContent = row.original_value || '—';
+                    tr.appendChild(tdOriginal);
+
+                    var tdReason = document.createElement('td');
+                    tdReason.textContent = row.reason || 'Sin detalle';
+                    tr.appendChild(tdReason);
+
+                    var tdAction = document.createElement('td');
+                    var select = document.createElement('select');
+                    select.className = 'tm-seed-log-muni-select';
+                    var placeholder = document.createElement('option');
+                    placeholder.value = '';
+                    placeholder.textContent = 'Selecciona una opción';
+                    select.appendChild(placeholder);
+                    (Array.isArray(row.options) ? row.options : []).forEach(function (optionValue) {
+                        var opt = document.createElement('option');
+                        opt.value = String(optionValue || '');
+                        opt.textContent = String(optionValue || '');
+                        select.appendChild(opt);
+                    });
+
+                    var saveBtn = document.createElement('button');
+                    saveBtn.type = 'button';
+                    saveBtn.className = 'tm-btn tm-btn-sm tm-btn-primary';
+                    saveBtn.textContent = 'Guardar';
+                    saveBtn.addEventListener('click', function () {
+                        var selectedOption = String(select.value || '').trim();
+                        if (!selectedOption) {
+                            if (typeof window.Swal !== 'undefined') {
+                                window.Swal.fire({ icon: 'warning', title: 'Selecciona una opción', text: 'Debes elegir una opción válida antes de guardar.' });
+                            }
+                            return;
+                        }
+
+                        select.disabled = true;
+                        saveBtn.disabled = true;
+                        fetch(modal.getAttribute('data-resolve-url') || '', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Accept: 'application/json',
+                                'X-CSRF-TOKEN': modal.getAttribute('data-csrf-token') || '',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({
+                                log_uid: row.log_uid,
+                                selected_option: selectedOption,
+                            }),
+                        })
+                            .then(function (response) {
+                                return response.json().then(function (payload) {
+                                    return { ok: response.ok, payload: payload };
+                                });
+                            })
+                            .then(function (result) {
+                                if (!result.ok) {
+                                    throw new Error((result.payload && result.payload.message) || 'No se pudo actualizar la respuesta.');
+                                }
+
+                                currentList = Array.isArray(result.payload.seed_discard_log)
+                                    ? result.payload.seed_discard_log.filter(function (item) {
+                                        return item && item.log_type === 'field_option_normalization';
+                                    })
+                                    : [];
+                                jsonEl.textContent = JSON.stringify(currentList);
+                                openLog();
+                            })
+                            .catch(function (error) {
+                                if (typeof window.Swal !== 'undefined') {
+                                    window.Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo actualizar la respuesta.' });
+                                }
+                                select.disabled = false;
+                                saveBtn.disabled = false;
+                            });
+                    });
+
+                    tdAction.appendChild(select);
+                    tdAction.appendChild(document.createTextNode(' '));
+                    tdAction.appendChild(saveBtn);
+                    tr.appendChild(tdAction);
+                    tbody.appendChild(tr);
+                });
+            }
+
+            function openLog() {
+                try { currentList = JSON.parse(jsonEl.textContent || '[]'); } catch (e) { currentList = []; }
+                if (!Array.isArray(currentList)) currentList = [];
+                document.getElementById('tmOptionNormalizationLogModuleEdit').textContent = btn.getAttribute('data-module-name') || '';
+                var tbody = document.getElementById('tmOptionNormalizationLogTbodyEdit');
+                var empty = document.getElementById('tmOptionNormalizationLogEmptyEdit');
+                var wrap = document.getElementById('tmOptionNormalizationLogTableWrapEdit');
+                if (currentList.length === 0) {
+                    empty.hidden = false;
+                    wrap.hidden = true;
+                    tbody.innerHTML = '';
+                } else {
+                    empty.hidden = true;
+                    wrap.hidden = false;
+                    setRows(tbody, currentList);
+                }
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+
+            btn.addEventListener('click', openLog);
+            modal.querySelectorAll('[data-tm-option-log-close-edit]').forEach(function (el) { el.addEventListener('click', closeLog); });
+            if (window.TM_ADMIN_EDIT_BOOT && window.TM_ADMIN_EDIT_BOOT.showOptionNormalizationLog) {
                 openLog();
             }
         })();

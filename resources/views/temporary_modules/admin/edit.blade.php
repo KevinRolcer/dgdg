@@ -21,15 +21,19 @@
                 <p>Actualiza vigencia, alcance y agrega datos extra requeridos.</p>
             </div>
             <div class="tm-inline-actions">
-                @if (!is_null($temporaryModule->seed_discard_log))
-                    <script type="application/json" id="tm-seed-discard-edit">{!! json_encode($temporaryModule->seed_discard_log ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}</script>
+                @if (!empty($seedDiscardLog))
+                    <script type="application/json" id="tm-seed-discard-edit">{!! json_encode($seedDiscardLog, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}</script>
                     <button type="button" class="tm-btn tm-btn-secondary" id="tmEditSeedLogBtn" data-module-name="{{ e($temporaryModule->name) }}">Log (filas omitidas)</button>
+                @endif
+                @if (!empty($optionNormalizationLog))
+                    <script type="application/json" id="tm-option-normalization-log-edit">{!! json_encode($optionNormalizationLog, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}</script>
+                    <button type="button" class="tm-btn tm-btn-secondary" id="tmEditOptionNormalizationLogBtn" data-module-name="{{ e($temporaryModule->name) }}">Log (normalización de opciones)</button>
                 @endif
                 <a href="{{ route('temporary-modules.admin.index') }}" class="tm-btn">Volver</a>
             </div>
         </div>
 
-        @if (!is_null($temporaryModule->seed_discard_log))
+        @if (!empty($seedDiscardLog))
         <div
             class="tm-modal"
             id="tmSeedDiscardLogModalEdit"
@@ -53,6 +57,36 @@
                         <table class="tm-table tm-table-sm">
                             <thead><tr><th>Fila</th><th>Motivo</th><th>MR</th><th>Municipio</th><th>Acción</th><th>Enlazar municipio</th></tr></thead>
                             <tbody id="tmSeedDiscardLogTbodyEdit"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
+
+        @if (!empty($optionNormalizationLog))
+        <div
+            class="tm-modal"
+            id="tmOptionNormalizationLogModalEdit"
+            aria-hidden="true"
+            role="dialog"
+            aria-modal="true"
+            data-resolve-url="{{ route('temporary-modules.admin.option-normalization.resolve', $temporaryModule->id) }}"
+            data-csrf-token="{{ csrf_token() }}"
+        >
+            <div class="tm-modal-backdrop" data-tm-option-log-close-edit></div>
+            <div class="tm-modal-dialog tm-seed-log-dialog">
+                <div class="tm-modal-head">
+                    <h3>Log — normalización de opciones</h3>
+                    <button type="button" class="tm-modal-close" data-tm-option-log-close-edit aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="tm-modal-body tm-seed-log-body">
+                    <p class="tm-seed-log-module" id="tmOptionNormalizationLogModuleEdit"></p>
+                    <p class="tm-muted" id="tmOptionNormalizationLogEmptyEdit" hidden>Sin respuestas pendientes por revisar.</p>
+                    <div class="tm-table-wrap tm-seed-log-table-wrap" id="tmOptionNormalizationLogTableWrapEdit" hidden>
+                        <table class="tm-table tm-table-sm">
+                            <thead><tr><th>Registro</th><th>Campo</th><th>Respuesta original</th><th>Motivo</th><th>Asignar a opción</th></tr></thead>
+                            <tbody id="tmOptionNormalizationLogTbodyEdit"></tbody>
                         </table>
                     </div>
                 </div>
@@ -385,8 +419,10 @@
 <script src="{{ asset('assets/js/modules/temporary-modules-seed-discard-log.js') }}?v={{ @filemtime(public_path('assets/js/modules/temporary-modules-seed-discard-log.js')) ?: time() }}"></script>
 <script>
 window.TM_ADMIN_EDIT_BOOT = {
-    hasSeedDiscardLog: @json(!is_null($temporaryModule->seed_discard_log)),
+    hasSeedDiscardLog: @json(!empty($seedDiscardLog)),
     showSeedLog: @json((bool) session('show_seed_log')),
+    hasOptionNormalizationLog: @json(!empty($optionNormalizationLog)),
+    showOptionNormalizationLog: @json((bool) session('show_option_normalization_log')),
 };
 </script>
 <script src="{{ asset('assets/js/modules/temporary-modules-admin-edit.js') }}?v={{ @filemtime(public_path('assets/js/modules/temporary-modules-admin-edit.js')) ?: time() }}"></script>

@@ -565,6 +565,13 @@ class TemporaryModuleController extends Controller
             ->with(['fields', 'targetUsers:id'])
             ->findOrFail($module);
         $fieldUsage = $this->fieldService->countFieldDataUsage((int) $temporaryModule->id);
+        $rawLog = is_array($temporaryModule->seed_discard_log ?? null) ? $temporaryModule->seed_discard_log : [];
+        $seedDiscardLog = array_values(array_filter($rawLog, function ($item): bool {
+            return is_array($item) && (($item['log_type'] ?? 'seed_discard') === 'seed_discard');
+        }));
+        $optionNormalizationLog = array_values(array_filter($rawLog, function ($item): bool {
+            return is_array($item) && (($item['log_type'] ?? '') === 'field_option_normalization');
+        }));
 
         return view('temporary_modules.admin.edit', [
             'pageTitle' => 'Editar modulo temporal',
@@ -575,6 +582,8 @@ class TemporaryModuleController extends Controller
             'temporaryModule' => $temporaryModule,
             'selectedDelegates' => $temporaryModule->targetUsers->pluck('id')->all(),
             'fieldUsage' => $fieldUsage,
+            'seedDiscardLog' => $seedDiscardLog,
+            'optionNormalizationLog' => $optionNormalizationLog,
         ]);
     }
 
@@ -688,7 +697,7 @@ class TemporaryModuleController extends Controller
             'applies_to' => ['required', Rule::in(['all', 'selected'])],
             'delegate_ids' => ['nullable', 'array'],
             'delegate_ids.*' => ['integer', Rule::exists('users', 'id')],
-            'conflict_action' => ['nullable', Rule::in(['none', 'clear_module', 'clear_field_data', 'normalize_municipio', 'migrate_to_multiselect', 'normalize_boolean_select'])],
+            'conflict_action' => ['nullable', Rule::in(['none', 'clear_module', 'clear_field_data', 'normalize_municipio', 'migrate_to_multiselect', 'normalize_boolean_select', 'normalize_text_select'])],
             'existing_fields' => ['nullable', 'array'],
             'existing_fields.*.id' => ['required_with:existing_fields', 'integer'],
             'existing_fields.*.label' => ['nullable', 'required_unless:existing_fields.*.delete,1', 'string', 'max:120'],
@@ -743,6 +752,7 @@ class TemporaryModuleController extends Controller
         $destructiveKeys = [];
         $invalidMainImageKeys = [];
         $booleanToSelectMigrations = [];
+        $textToSelectMigrations = [];
         $usedKeys = [];
         $nextSortOrder = 1;
         $fieldUsage = $this->fieldService->countFieldDataUsage((int) $temporaryModule->id);
@@ -816,6 +826,9 @@ class TemporaryModuleController extends Controller
             $isBooleanToSelect = $oldType === 'boolean'
                 && $newType === 'select'
                 && $normalized['key'] === $oldKey;
+            $isTextToSelect = $oldType === 'text'
+                && $newType === 'select'
+                && $normalized['key'] === $oldKey;
             $siNoLabels = null;
 
             if ($isBooleanToSelect) {
@@ -833,6 +846,15 @@ class TemporaryModuleController extends Controller
                 ];
             }
 
+            if ($isTextToSelect) {
+                $textToSelectMigrations[] = [
+                    'key' => $oldKey,
+                    'field_id' => (int) $field->id,
+                    'field_label' => (string) ($normalized['label'] ?? $field->label),
+                    'options' => array_values(array_filter(array_map('strval', (array) ($normalized['options'] ?? [])), static fn (string $value): bool => trim($value) !== '')),
+                ];
+            }
+
             if ($hasData && ($normalized['key'] !== $oldKey || $newType !== $oldType)) {
                 // select → multiselect is a safe migration, not a destructive change
                 $isSelectToMultiselect = $oldType === 'select'
@@ -844,7 +866,8 @@ class TemporaryModuleController extends Controller
                     && $normalized['key'] === $oldKey;
                 // boolean → select: migración segura si conserva key e incluye opciones Sí/No
                 $isBooleanToSelectSafe = $isBooleanToSelect && $siNoLabels !== null;
-                if (! $isSelectToMultiselect && ! $isTextToTextarea && ! $isBooleanToSelectSafe) {
+                $isTextToSelectSafe = $isTextToSelect;
+                if (! $isSelectToMultiselect && ! $isTextToTextarea && ! $isBooleanToSelectSafe && ! $isTextToSelectSafe) {
                     $destructiveKeys[] = $oldKey;
                 }
             }
@@ -921,6 +944,10 @@ class TemporaryModuleController extends Controller
             $conflictAction = 'none';
         }
 
+        if ($conflictAction === 'normalize_text_select') {
+            $conflictAction = 'none';
+        }
+
         if (! empty($booleanToSelectMigrations)) {
             $temporaryModule->entries()->select(['id', 'data'])->chunkById(200, function ($entries) use ($booleanToSelectMigrations): void {
                 foreach ($entries as $entry) {
@@ -945,6 +972,86 @@ class TemporaryModuleController extends Controller
                     }
                 }
             });
+        }
+
+        $optionNormalizationLogCount = 0;
+        if (! empty($textToSelectMigrations)) {
+            $existingLog = is_array($temporaryModule->seed_discard_log ?? null) ? $temporaryModule->seed_discard_log : [];
+            $migrationKeys = array_values(array_unique(array_map(static fn (array $migration): string => (string) ($migration['key'] ?? ''), $textToSelectMigrations)));
+            $preservedLog = array_values(array_filter($existingLog, function ($item) use ($migrationKeys): bool {
+                if (! is_array($item)) {
+                    return false;
+                }
+
+                return ! (($item['log_type'] ?? '') === 'field_option_normalization'
+                    && in_array((string) ($item['field_key'] ?? ''), $migrationKeys, true));
+            }));
+            $generatedLog = [];
+
+            $temporaryModule->entries()->select(['id', 'data'])->chunkById(200, function ($entries) use ($textToSelectMigrations, &$generatedLog): void {
+                foreach ($entries as $entry) {
+                    $data = is_array($entry->data) ? $entry->data : [];
+                    $changed = false;
+
+                    foreach ($textToSelectMigrations as $migration) {
+                        $fieldKey = (string) ($migration['key'] ?? '');
+                        if ($fieldKey === '' || ! array_key_exists($fieldKey, $data)) {
+                            continue;
+                        }
+
+                        $currentValue = $data[$fieldKey];
+                        $mappedOption = $this->mapTextLikeValueToSelectOption($currentValue, (array) ($migration['options'] ?? []));
+                        if ($mappedOption !== null) {
+                            if ($mappedOption !== $currentValue) {
+                                $data[$fieldKey] = $mappedOption;
+                                $changed = true;
+                            }
+
+                            continue;
+                        }
+
+                        if ($this->isEmptyTextLikeValue($currentValue)) {
+                            if ($currentValue !== null) {
+                                $data[$fieldKey] = null;
+                                $changed = true;
+                            }
+
+                            continue;
+                        }
+
+                        $generatedLog[] = [
+                            'log_type' => 'field_option_normalization',
+                            'log_uid' => (string) Str::uuid(),
+                            'entry_id' => (int) $entry->id,
+                            'field_id' => (int) ($migration['field_id'] ?? 0),
+                            'field_key' => $fieldKey,
+                            'field_label' => (string) ($migration['field_label'] ?? $fieldKey),
+                            'original_value' => $this->stringifyTemporaryModuleValue($currentValue),
+                            'reason' => $this->stringifyTemporaryModuleValue($currentValue),
+                            'options' => array_values((array) ($migration['options'] ?? [])),
+                            'created_at' => now()->toIso8601String(),
+                        ];
+                        $data[$fieldKey] = null;
+                        $changed = true;
+                    }
+
+                    if ($changed) {
+                        $entry->update(['data' => $data]);
+                    }
+                }
+            });
+
+            if ($generatedLog !== []) {
+                Log::warning('Temporary module text-to-select normalization produced unresolved values.', [
+                    'module_id' => (int) $temporaryModule->id,
+                    'module_name' => (string) $temporaryModule->name,
+                    'items' => $generatedLog,
+                ]);
+            }
+
+            $temporaryModule->seed_discard_log = array_values(array_merge($preservedLog, $generatedLog));
+            $temporaryModule->save();
+            $optionNormalizationLogCount = count($generatedLog);
         }
 
         if (! empty($destructiveKeys)) {
@@ -1024,6 +1131,13 @@ class TemporaryModuleController extends Controller
                     ->update(['main_image_field_key' => null]);
             }
         });
+
+        if ($optionNormalizationLogCount > 0) {
+            return redirect()
+                ->route('temporary-modules.admin.edit', $temporaryModule->id)
+                ->with('status', 'Módulo temporal actualizado. Se normalizaron coincidencias y quedaron '.$optionNormalizationLogCount.' respuesta(s) en el log para revisión.')
+                ->with('show_option_normalization_log', true);
+        }
 
         return redirect()
             ->route('temporary-modules.admin.index')
@@ -1126,6 +1240,76 @@ class TemporaryModuleController extends Controller
         }
 
         return $value;
+    }
+
+    private function mapTextLikeValueToSelectOption(mixed $value, array $options): ?string
+    {
+        if ($this->isEmptyTextLikeValue($value)) {
+            return null;
+        }
+
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $normalizedValue = $this->normalizeGenericOptionToken((string) $value);
+        if ($normalizedValue === '') {
+            return null;
+        }
+
+        foreach ($options as $option) {
+            $label = trim((string) $option);
+            if ($label === '') {
+                continue;
+            }
+
+            if ($this->normalizeGenericOptionToken($label) === $normalizedValue) {
+                return $label;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeGenericOptionToken(string $value): string
+    {
+        $normalized = mb_strtolower(trim($value), 'UTF-8');
+        $normalized = str_replace(['á', 'é', 'í', 'ó', 'ú', 'ü'], ['a', 'e', 'i', 'o', 'u', 'u'], $normalized);
+        $normalized = preg_replace('/\s+/u', ' ', $normalized) ?? $normalized;
+
+        return trim($normalized);
+    }
+
+    private function isEmptyTextLikeValue(mixed $value): bool
+    {
+        if ($value === null) {
+            return true;
+        }
+
+        if (is_string($value)) {
+            return trim($value) === '';
+        }
+
+        return false;
+    }
+
+    private function stringifyTemporaryModuleValue(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'Sí' : 'No';
+        }
+
+        if (is_scalar($value)) {
+            return trim((string) $value);
+        }
+
+        $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        return is_string($json) ? $json : '';
     }
 
     /**
@@ -2467,6 +2651,85 @@ class TemporaryModuleController extends Controller
             'message' => 'Registro creado correctamente.',
             'entry_id' => $result['entry']->id,
             'seed_discard_log' => $result['seed_discard_log'],
+        ]);
+    }
+
+    public function resolveOptionNormalizationLog(Request $request, int $module): JsonResponse
+    {
+        abort_unless(auth()->user()?->can('Modulos-Temporales-Admin'), 403);
+
+        $temporaryModule = TemporaryModule::query()->with('fields:id,temporary_module_id,key,label,options,type')->findOrFail($module);
+        $validated = $request->validate([
+            'log_uid' => ['required', 'string', 'max:120'],
+            'selected_option' => ['required', 'string', 'max:255'],
+        ]);
+
+        $log = is_array($temporaryModule->seed_discard_log ?? null) ? $temporaryModule->seed_discard_log : [];
+        $foundIndex = null;
+        $foundItem = null;
+        foreach ($log as $index => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            if (($item['log_type'] ?? '') === 'field_option_normalization'
+                && (string) ($item['log_uid'] ?? '') === (string) $validated['log_uid']) {
+                $foundIndex = $index;
+                $foundItem = $item;
+                break;
+            }
+        }
+
+        if ($foundItem === null || $foundIndex === null) {
+            return response()->json([
+                'message' => 'La incidencia ya no está disponible. Recarga la página.',
+            ], 422);
+        }
+
+        $fieldKey = (string) ($foundItem['field_key'] ?? '');
+        $entryId = (int) ($foundItem['entry_id'] ?? 0);
+        $field = $temporaryModule->fields->firstWhere('key', $fieldKey);
+        if (! $field || $field->type !== 'select') {
+            return response()->json([
+                'message' => 'El campo ya no es una lista de opciones válida.',
+            ], 422);
+        }
+
+        $allowedOptions = array_values(array_filter(array_map('strval', (array) ($field->options ?? [])), static fn (string $value): bool => trim($value) !== ''));
+        $selectedOption = trim((string) ($validated['selected_option'] ?? ''));
+        if (! in_array($selectedOption, $allowedOptions, true)) {
+            return response()->json([
+                'message' => 'La opción seleccionada ya no forma parte del catálogo del campo.',
+            ], 422);
+        }
+
+        $entry = TemporaryModuleEntry::query()
+            ->where('temporary_module_id', $temporaryModule->id)
+            ->where('id', $entryId)
+            ->first();
+
+        if (! $entry) {
+            return response()->json([
+                'message' => 'El registro asociado ya no existe.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($entry, $fieldKey, $selectedOption, $temporaryModule, $log, $foundIndex): void {
+            $data = is_array($entry->data) ? $entry->data : [];
+            $data[$fieldKey] = $selectedOption;
+            $entry->update(['data' => $data]);
+
+            unset($log[$foundIndex]);
+            $temporaryModule->seed_discard_log = array_values($log);
+            $temporaryModule->save();
+        });
+
+        $freshModule = $temporaryModule->fresh();
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Respuesta actualizada correctamente.',
+            'seed_discard_log' => array_values(is_array($freshModule?->seed_discard_log ?? null) ? $freshModule->seed_discard_log : []),
         ]);
     }
 

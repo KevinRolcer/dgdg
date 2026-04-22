@@ -342,6 +342,10 @@
                         <div class="tm-export-count-by-wrap" id="tmExportCountByWrap" hidden>
                             <span class="tm-export-label-inline">Conteo por valor de:</span>
                             <div class="tm-export-count-by-fields" id="tmExportCountByFields" role="group"></div>
+                            <div class="tm-export-personalize-field" style="max-width: 320px; margin-top: 8px;">
+                                <label for="tmExportCountTotalLabel">Etiqueta de total</label>
+                                <input type="text" id="tmExportCountTotalLabel" class="tm-input" value="Total de registros" placeholder="Total de registros">
+                            </div>
                             <div class="tm-export-count-table-colors-collapsible" id="tmExportCountColorsCollapsible">
                                 <button type="button" class="tm-export-count-colors-header" id="tmExportCountColorsToggle" aria-expanded="false" aria-controls="tmExportCountTableColorListWrap">
                                     <span class="tm-export-count-colors-arrow" aria-hidden="true">▶</span>

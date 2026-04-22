@@ -466,6 +466,10 @@ class TemporaryModuleWordPdfService
         $countByFields = $includeCountTable && is_array($exportConfig['count_by_fields'] ?? null)
             ? array_values(array_filter(array_map('strval', $exportConfig['count_by_fields'])))
             : [];
+        $countTotalLabel = trim((string) ($exportConfig['count_total_label'] ?? ''));
+        if ($countTotalLabel === '') {
+            $countTotalLabel = 'Total de registros';
+        }
         $countTableColors = is_array($exportConfig['count_table_colors'] ?? null) ? $exportConfig['count_table_colors'] : [];
         $sumGroupBy = (string) ($exportConfig['sum_group_by'] ?? 'microrregion');
         $sumMetrics = $includeSumTable && is_array($exportConfig['sum_metrics'] ?? null)
@@ -482,7 +486,7 @@ class TemporaryModuleWordPdfService
             $fieldLabels[(string) ($column['key'] ?? '')] = (string) ($column['label'] ?? '');
         }
         if ($includeCountTable) {
-            $countTable = $this->buildCountTableData($entries, $countByFields, $fieldLabels, $countTableColors);
+            $countTable = $this->buildCountTableData($entries, $countByFields, $fieldLabels, $countTableColors, $countTotalLabel);
             $countTable = $this->transformCountTableLabels($countTable, $headersUppercase);
         }
         if ($includeSumTable && $sumMetrics !== []) {
@@ -1545,12 +1549,12 @@ class TemporaryModuleWordPdfService
      * @param array<string, mixed> $countTableColors key => personalization config
      * @return array{groups: list<array{label: string, values: list<array{label: string, count: int}>}>}
      */
-    private function buildCountTableData(Collection $entries, array $countByFields, array $fieldLabels = [], array $countTableColors = []): array
+    private function buildCountTableData(Collection $entries, array $countByFields, array $fieldLabels = [], array $countTableColors = [], string $countTotalLabel = 'Total de registros'): array
     {
         $total = $entries->count();
         $groups = [
             [
-                'label' => 'Total de registros',
+                'label' => trim($countTotalLabel) !== '' ? trim($countTotalLabel) : 'Total de registros',
                 'values' => [['label' => '', 'count' => $total]],
                 'color_key' => '_total',
             ],

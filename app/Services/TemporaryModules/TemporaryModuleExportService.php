@@ -834,12 +834,12 @@ class TemporaryModuleExportService
      * @param array<string, string> $fieldLabels map field key => display label (e.g. estatus => ESTATUS)
      * @return array{groups: list<array{label: string, values: list<array{label: string, count: int}>}>}
      */
-    private function buildCountTableData(Collection $entries, array $countByFields, array $fieldLabels = [], array $countTableColors = []): array
+    private function buildCountTableData(Collection $entries, array $countByFields, array $fieldLabels = [], array $countTableColors = [], string $countTotalLabel = 'Total de registros'): array
     {
         $total = $entries->count();
         $groups = [
             [
-                'label' => 'Total de registros',
+                'label' => trim($countTotalLabel) !== '' ? trim($countTotalLabel) : 'Total de registros',
                 'values' => [['label' => '', 'count' => $total]],
                 'color_key' => '_total',
             ],
@@ -1537,6 +1537,10 @@ class TemporaryModuleExportService
         $countByFields = $includeCountTable && is_array($this->exportConfig['count_by_fields'] ?? null)
             ? array_values(array_filter(array_map('strval', $this->exportConfig['count_by_fields'])))
             : [];
+        $countTotalLabel = trim((string) ($this->exportConfig['count_total_label'] ?? ''));
+        if ($countTotalLabel === '') {
+            $countTotalLabel = 'Total de registros';
+        }
         $countTableColors = is_array($this->exportConfig['count_table_colors'] ?? null) ? $this->exportConfig['count_table_colors'] : [];
         $countTableFontSizePx = max(7, min(24, (int) ($this->exportConfig['count_table_font_px'] ?? $this->exportConfig['count_table_font_size_px'] ?? $this->exportConfig['countTableFontPx'] ?? 9)));
         $sumGroupBy = (string) ($this->exportConfig['sum_group_by'] ?? 'microrregion');
@@ -1583,7 +1587,7 @@ class TemporaryModuleExportService
             $entriesForCount = $entriesForSummary instanceof Collection
                 ? $entriesForSummary
                 : (clone $entriesQuery)->get(['id', 'data', 'microrregion_id']);
-            $countData = $this->buildCountTableData($entriesForCount, $countByFields, $fieldLabels, $countTableColors);
+            $countData = $this->buildCountTableData($entriesForCount, $countByFields, $fieldLabels, $countTableColors, $countTotalLabel);
             $countData = $this->transformCountTableLabels($countData, $headersUppercase);
             $groups = $countData['groups'];
             $colIdx = 1;

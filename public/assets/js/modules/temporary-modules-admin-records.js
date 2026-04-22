@@ -2064,7 +2064,11 @@
             totalRow.className = 'tm-export-count-table-color-item tm-export-personalize-col';
             totalRow.setAttribute('role', 'listitem');
             totalRow.dataset.key = '_total';
-            totalRow.innerHTML = oneColorBlock('_total', 'Total de registros', savedColors['_total'], null);
+            var countTotalLabelEl = document.getElementById('tmExportCountTotalLabel');
+            var countTotalLabel = (countTotalLabelEl && String(countTotalLabelEl.value || '').trim() !== '')
+                ? String(countTotalLabelEl.value).trim()
+                : 'Total de registros';
+            totalRow.innerHTML = oneColorBlock('_total', countTotalLabel, savedColors['_total'], null);
             container.appendChild(totalRow);
             if (countByFieldsEl) {
                 countByFieldsEl.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
@@ -3164,7 +3168,7 @@
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sectionLabel: 'Desglose', sectionLabelAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumShowItem: true, sumItemLabel: '#', sumShowDelegation: true, sumDelegationLabel: 'Delegación', sumShowCabecera: true, sumCabeceraLabel: 'Cabecera', sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTableCellWidth: 12, countTableHeaderFontPx: 8, countTableCellFontPx: 10, recordsCellFontPx: 12, recordsHeaderFontPx: 12, recordsGroupHeaderFontPx: 12, sumCellFontPx: 12, sumHeaderFontPx: 12, sumGroupHeaderFontPx: 12, totalsCellFontPx: 12, totalsHeaderFontPx: 12, totalsGroupHeaderFontPx: 12, cellFontPx: 12, headerFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', includeCalculatedColumns: false, calculatedColumns: [], includeOperationsColumn: false, operationsLabel: 'Operaciones', operationsReferenceField: '', operationsIncludePercent: true, operationsFields: [], sumMetrics: [], sumFormulas: [] };
+                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sectionLabel: 'Desglose', sectionLabelAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumShowItem: true, sumItemLabel: '#', sumShowDelegation: true, sumDelegationLabel: 'Delegación', sumShowCabecera: true, sumCabeceraLabel: 'Cabecera', sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTotalLabel: 'Total de registros', countTableCellWidth: 12, countTableHeaderFontPx: 8, countTableCellFontPx: 10, recordsCellFontPx: 12, recordsHeaderFontPx: 12, recordsGroupHeaderFontPx: 12, sumCellFontPx: 12, sumHeaderFontPx: 12, sumGroupHeaderFontPx: 12, totalsCellFontPx: 12, totalsHeaderFontPx: 12, totalsGroupHeaderFontPx: 12, cellFontPx: 12, headerFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', includeSumTable: false, sumGroupBy: 'microrregion', includeCalculatedColumns: false, calculatedColumns: [], includeOperationsColumn: false, operationsLabel: 'Operaciones', operationsReferenceField: '', operationsIncludePercent: true, operationsFields: [], sumMetrics: [], sumFormulas: [] };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
             const titleUppercaseEl = modal ? modal.querySelector('#tmExportTitleUppercase') : document.getElementById('tmExportTitleUppercase');
@@ -3305,6 +3309,10 @@
                 });
             }
             var countTableCellWidthEl = modal ? modal.querySelector('#tmExportCountTableCellWidth') : document.getElementById('tmExportCountTableCellWidth');
+            var countTotalLabelEl = modal ? modal.querySelector('#tmExportCountTotalLabel') : document.getElementById('tmExportCountTotalLabel');
+            var countTotalLabel = (countTotalLabelEl && String(countTotalLabelEl.value || '').trim() !== '')
+                ? String(countTotalLabelEl.value).trim()
+                : 'Total de registros';
             var countTableCellWidth = (countTableCellWidthEl && countTableCellWidthEl.value) ? (parseInt(countTableCellWidthEl.value, 10) || 12) : 12;
             var countTableHeaderFontEl = modal ? modal.querySelector('#tmExportCountTableHeaderFontSize') : document.getElementById('tmExportCountTableHeaderFontSize');
             var countTableCellFontEl = modal ? modal.querySelector('#tmExportCountTableCellFontSize') : document.getElementById('tmExportCountTableCellFontSize');
@@ -3382,6 +3390,7 @@
                 headersUppercase: !!(headersUppercaseEl && headersUppercaseEl.checked),
                 columns: columns,
                 countTableColors: countTableColors,
+                countTotalLabel: countTotalLabel,
                 countTableCellWidth: countTableCellWidth,
                 countTableHeaderFontPx: countTableHeaderFontPx,
                 countTableCellFontPx: countTableCellFontPx,
@@ -3905,7 +3914,10 @@
                 columns.forEach(function (col) {
                     if (col && col.key) { currentLabelsByKey[col.key] = col.label || col.key; }
                 });
-                var groups = [{ label: normalizeExportHeadingText('Total de registros', headersUppercase), values: [{ label: '', count: totalCount }], colorKey: '_total' }];
+                var totalGroupLabel = (state.countTotalLabel && String(state.countTotalLabel).trim() !== '')
+                    ? String(state.countTotalLabel).trim()
+                    : 'Total de registros';
+                var groups = [{ label: normalizeExportHeadingText(totalGroupLabel, headersUppercase), values: [{ label: '', count: totalCount }], colorKey: '_total' }];
                 countByFieldsEl.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
                     var key = cb.getAttribute('data-count-key') || cb.value;
                     if (!key) { return; }
@@ -4561,6 +4573,7 @@
             const includeCountTableEl = document.getElementById('tmExportIncludeCountTable');
             const countByWrapEl = document.getElementById('tmExportCountByWrap');
             const countByFieldsEl = document.getElementById('tmExportCountByFields');
+            const countTotalLabelEl = document.getElementById('tmExportCountTotalLabel');
             const countTableColorListEl = document.getElementById('tmExportCountTableColorList');
             const includeCalculatedColumnsEl = document.getElementById('tmExportIncludeCalculatedColumns');
             const calculatedColumnsWrapEl = document.getElementById('tmExportCalculatedColumnsWrap');
@@ -5330,6 +5343,11 @@
                                 cb.checked = draftCfg.count_by_fields.indexOf(ck) !== -1;
                             });
                         }
+                        if (countTotalLabelEl) {
+                            countTotalLabelEl.value = (draftCfg.count_total_label != null && String(draftCfg.count_total_label).trim() !== '')
+                                ? String(draftCfg.count_total_label)
+                                : 'Total de registros';
+                        }
                         if (personalizeModal) {
                             personalizeModal._exportGroups = normalizeExportGroups(Array.isArray(draftCfg.groups) ? draftCfg.groups : []);
                         }
@@ -5463,6 +5481,7 @@
                         });
                         if (sumTotalsBoldEl) { sumTotalsBoldEl.checked = true; }
                         setSumTotalsColor('var(--clr-primary)');
+                        if (countTotalLabelEl) { countTotalLabelEl.value = 'Total de registros'; }
                         applyExportPreviewPageLayout('portrait', 'letter');
                         var mrSortDefaultEl = document.getElementById('tmExportMicrorregionSort');
                         if (mrSortDefaultEl) { mrSortDefaultEl.value = data.microrregion_sort || 'asc'; }
@@ -6046,6 +6065,16 @@
                         totalsGroupHeaderFontEl.addEventListener('input', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                         totalsGroupHeaderFontEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
+                    if (countTotalLabelEl) {
+                        countTotalLabelEl.addEventListener('input', function () {
+                            buildCountTableColorList(countTableColorListEl, countByFieldsEl, personalizeModal._previewEntries);
+                            buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                        });
+                        countTotalLabelEl.addEventListener('change', function () {
+                            buildCountTableColorList(countTableColorListEl, countByFieldsEl, personalizeModal._previewEntries);
+                            buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                        });
+                    }
                     if (sumTotalsBoldEl) {
                         sumTotalsBoldEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
@@ -6176,6 +6205,7 @@
                             sum_totals_text_color: state.sumTotalsTextColor || 'var(--clr-primary)',
                             include_count_table: includeCountTable,
                             count_by_fields: countByFields,
+                            count_total_label: state.countTotalLabel || 'Total de registros',
                             count_table_colors: state.countTableColors || {},
                             count_table_cell_width: state.countTableCellWidth || 12,
                             count_table_header_font_size_px: state.countTableHeaderFontPx != null ? state.countTableHeaderFontPx : 8,
