@@ -707,6 +707,199 @@
             </div>
         @endif
 
+        @php
+            $bulkInsertFields = $module->fields
+                ->filter(fn ($f) => !in_array($f->type, ['seccion'], true))
+                ->values();
+            $bulkInsertHasMunicipio = $bulkInsertFields->contains(fn ($f) => $f->type === 'municipio');
+            $bulkInsertMunicipiosAll = $microsAsignadas
+                ->flatMap(function ($micro) {
+                    return collect($micro->municipios ?? [])->map(function ($item) {
+                        if (is_scalar($item)) {
+                            return trim((string) $item);
+                        }
+                        if (is_array($item)) {
+                            return trim((string) ($item['municipio'] ?? ''));
+                        }
+                        if (is_object($item)) {
+                            return trim((string) ($item->municipio ?? ''));
+                        }
+                        return '';
+                    });
+                })
+                ->filter(fn ($mun) => is_string($mun) && $mun !== '')
+                ->unique()
+                ->values()
+                ->all();
+            $bulkInsertFieldsJson = $bulkInsertFields->map(function ($f) {
+                return [
+                    'key' => (string) $f->key,
+                    'label' => (string) $f->label,
+                    'type' => (string) $f->type,
+                    'is_required' => (bool) $f->is_required,
+                    'options' => is_array($f->options) ? $f->options : [],
+                ];
+            })->values();
+        @endphp
+        @if ($bulkInsertFields->isNotEmpty())
+            <div
+                class="tm-modal tm-bulk-insert-modal"
+                id="tmBulkInsertModal-{{ $module->id }}"
+                aria-hidden="true"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="tmBulkInsertTitle-{{ $module->id }}"
+                data-module-id="{{ $module->id }}"
+                data-import-single-url="{{ route('temporary-modules.import-single-row', $module->id) }}"
+                data-submit-url="{{ route('temporary-modules.submit', $module->id) }}"
+                data-show-mr-select="{{ ($mostrarSelectorMicrorregion && !$bulkInsertHasMunicipio) ? '1' : '0' }}"
+                data-has-municipio="{{ $bulkInsertHasMunicipio ? '1' : '0' }}"
+            >
+                <div class="tm-modal-backdrop" data-tm-bulk-insert-dismiss></div>
+                <div class="tm-modal-dialog tm-modal-dialog-bulk-edit">
+                    <div class="tm-modal-head">
+                        <div class="tm-modal-head-stack">
+                            <h3 id="tmBulkInsertTitle-{{ $module->id }}">Registrar en hoja de calculo</h3>
+                            <p class="tm-modal-subtitle">{{ $module->name }}</p>
+                        </div>
+                        <div class="tm-modal-head-actions">
+                            <button type="button" class="tm-modal-close" data-tm-bulk-insert-dismiss aria-label="Cerrar">
+                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="tm-modal-body tm-bulk-insert-body">
+                        <script type="application/json" data-tm-bulk-insert-fields-json>@json($bulkInsertFieldsJson)</script>
+                        <script type="application/json" data-tm-bulk-insert-municipios-json>@json($bulkInsertMunicipiosAll)</script>
+
+                        <div class="tm-bulk-insert-toolbar">
+                            <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" data-tm-bulk-insert-add-row>
+                                <i class="fa-solid fa-plus" aria-hidden="true"></i> Agregar fila
+                            </button>
+                            <details class="tm-bulk-insert-fields-picker" data-tm-bulk-insert-fields-picker>
+                                <summary class="tm-btn tm-btn-outline tm-btn-sm">
+                                    <i class="fa-solid fa-columns" aria-hidden="true"></i> Campos
+                                </summary>
+                                <div class="tm-bulk-insert-fields-popover" data-tm-bulk-insert-fields-popover></div>
+                            </details>
+                            @if ($bulkInsertHasMunicipio)
+                                <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" data-tm-bulk-insert-open-municipios>
+                                    <i class="fa-solid fa-list-check" aria-hidden="true"></i> Registro para todos los municipios
+                                </button>
+                            @endif
+                            <div class="tm-bulk-insert-toolbar-spacer"></div>
+                            <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-tm-bulk-insert-submit>
+                                <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Registrar filas
+                            </button>
+                        </div>
+
+                        <div class="tm-excel-sheet-container tm-bulk-insert-sheet-wrap">
+                            <div class="tm-excel-sheet-inner tm-bulk-insert-sheet" data-tm-bulk-insert-sheet></div>
+                        </div>
+
+                        <div class="tm-bulk-insert-status tm-hidden" data-tm-bulk-insert-status></div>
+                    </div>
+                </div>
+            </div>
+
+            @if ($bulkInsertHasMunicipio)
+                <div
+                    class="tm-modal tm-bulk-insert-municipios-modal"
+                    id="tmBulkInsertMunicipiosModal-{{ $module->id }}"
+                    aria-hidden="true"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="tmBulkInsertMunicipiosTitle-{{ $module->id }}"
+                    data-module-id="{{ $module->id }}"
+                >
+                    <div class="tm-modal-backdrop" data-tm-bulk-insert-municipios-dismiss></div>
+                    <div class="tm-modal-dialog tm-modal-dialog-entry">
+                        <div class="tm-modal-head">
+                            <div class="tm-modal-head-stack">
+                                <h3 id="tmBulkInsertMunicipiosTitle-{{ $module->id }}">Mis municipios</h3>
+                                <p class="tm-modal-subtitle">Se creara una fila por municipio seleccionado.</p>
+                            </div>
+                            <div class="tm-modal-head-actions" style="display:flex; gap:8px; align-items:center;">
+                                <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" data-tm-bulk-insert-mr-toggle-all>
+                                    <i class="fa-solid fa-check-double" aria-hidden="true"></i> Marcar/Desmarcar todos
+                                </button>
+                                <button type="button" class="tm-modal-close" data-tm-bulk-insert-municipios-dismiss aria-label="Cerrar">
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="tm-modal-body">
+                            <div class="tm-bulk-insert-mr-tabs-wrap" data-tm-bulk-insert-mr-tabs-wrap>
+                                <button type="button" class="tm-bulk-insert-mr-arrow" data-tm-bulk-insert-mr-prev title="Anterior" aria-label="Microrregion anterior">
+                                    <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                                </button>
+                                <div class="tm-bulk-insert-mr-tabs" role="tablist" aria-label="Microrregiones" data-tm-bulk-insert-mr-tabs>
+                                    @foreach ($microsAsignadas as $micro)
+                                        <button type="button"
+                                                class="tm-bulk-insert-mr-tab {{ $loop->first ? 'is-active' : '' }}"
+                                                data-tm-bulk-insert-mr-tab
+                                                data-mr-id="{{ (int) $micro->id }}"
+                                                role="tab"
+                                                aria-selected="{{ $loop->first ? 'true' : 'false' }}">
+                                            MR {{ $micro->microrregion }} - {{ $micro->cabecera }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                                <button type="button" class="tm-bulk-insert-mr-arrow" data-tm-bulk-insert-mr-next title="Siguiente" aria-label="Microrregion siguiente">
+                                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <div class="tm-bulk-insert-mr-pages" data-tm-bulk-insert-mr-pages>
+                                @foreach ($microsAsignadas as $micro)
+                                    @php
+                                        $mrId = (int) $micro->id;
+                                        $munList = collect($micro->municipios ?? [])
+                                            ->map(function ($item) {
+                                                if (is_scalar($item)) {
+                                                    return trim((string) $item);
+                                                }
+                                                if (is_array($item)) {
+                                                    return trim((string) ($item['municipio'] ?? ''));
+                                                }
+                                                if (is_object($item)) {
+                                                    return trim((string) ($item->municipio ?? ''));
+                                                }
+                                                return '';
+                                            })
+                                            ->filter(fn ($s) => is_string($s) && $s !== '')
+                                            ->values()
+                                            ->all();
+                                    @endphp
+                                    <div class="tm-bulk-insert-mr-page {{ $loop->first ? '' : 'tm-hidden' }}"
+                                         data-tm-bulk-insert-mr-page
+                                         data-mr-id="{{ $mrId }}"
+                                         role="tabpanel"
+                                         aria-hidden="{{ $loop->first ? 'false' : 'true' }}">
+                                        <div class="tm-bulk-insert-municipios-list" data-tm-bulk-insert-municipios-list>
+                                            @foreach ($munList as $mun)
+                                                @php $mun = is_scalar($mun) ? (string) $mun : ''; @endphp
+                                                @if ($mun === '')
+                                                    @continue
+                                                @endif
+                                                <label class="tm-bulk-insert-mun-opt">
+                                                    <input type="checkbox" value="{{ $mun }}" data-mr-id="{{ $mrId }}" checked>
+                                                    <span>{{ $mun }}</span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                            <div class="tm-actions tm-bulk-insert-mun-footer">
+                                <button type="button" class="tm-btn tm-btn-outline" data-tm-bulk-insert-municipios-dismiss>Cancelar</button>
+                                <button type="button" class="tm-btn tm-btn-primary" data-tm-bulk-insert-municipios-apply>Cargar en hoja</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+        @endif
+
     @endforeach
 
     <section class="tm-section-panel {{ !$isUploadSection ? 'is-active' : '' }}" id="tmRecordsView" role="tabpanel" aria-hidden="{{ !$isUploadSection ? 'false' : 'true' }}" data-records-url="{{ route('temporary-modules.records') }}" data-fragment-records-url="{{ $fragmentRecordsUrl ?? '' }}">
@@ -753,6 +946,7 @@
                     <section
                         class="tm-module-records-panel {{ $isModuleActive ? 'is-active' : '' }}"
                         id="module-records-{{ $module->id }}"
+                        data-bulk-delete-url="{{ route('temporary-modules.entries.bulk-destroy', ['module' => $module->id]) }}"
                         role="tabpanel"
                         aria-hidden="{{ $isModuleActive ? 'false' : 'true' }}"
                     >

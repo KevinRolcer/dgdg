@@ -1488,6 +1488,29 @@
                 }, 200);
             }
 
+            // Al cerrar el modal de altas en hoja, refrescar si hubo registros creados
+            if (modal.classList.contains('tm-bulk-insert-modal') && modal.__bulkInsertImportedCount > 0) {
+                var bulkModuleId = String(modal.getAttribute('data-module-id') || '');
+                var bulkTotal = modal.__bulkInsertImportedCount;
+                modal.__bulkInsertImportedCount = 0;
+
+                var refreshBtn2 = bulkModuleId ? document.querySelector('[data-refresh-module="' + bulkModuleId + '"]') : null;
+                if (refreshBtn2) {
+                    refreshBtn2.click();
+                }
+
+                var recordsPanel2 = bulkModuleId ? document.getElementById('module-records-' + bulkModuleId) : null;
+                if (recordsPanel2 && typeof window.__tmReloadRecordsPanel === 'function') {
+                    window.__tmReloadRecordsPanel(recordsPanel2, { requireActive: false });
+                }
+
+                setTimeout(function () {
+                    if (typeof window.segobToast === 'function') {
+                        window.segobToast('success', bulkTotal + ' registro(s) agregado(s) desde hoja.');
+                    }
+                }, 200);
+            }
+
             const activeElement = document.activeElement;
             if (activeElement instanceof HTMLElement && modal.contains(activeElement)) {
                 activeElement.blur();
@@ -1520,6 +1543,20 @@
                 return;
             }
             const modalId = btn.getAttribute('data-open-module-preview');
+            const modal = modalId ? document.getElementById(modalId) : null;
+            if (!modal) {
+                return;
+            }
+            event.preventDefault();
+            openModal(modal, btn);
+        });
+
+        document.addEventListener('click', function (event) {
+            const btn = event.target.closest('[data-open-bulk-insert]');
+            if (!btn) {
+                return;
+            }
+            const modalId = btn.getAttribute('data-open-bulk-insert');
             const modal = modalId ? document.getElementById(modalId) : null;
             if (!modal) {
                 return;
@@ -2043,6 +2080,7 @@
                     const panel = deleteBtn.closest('.tm-module-records-panel');
                     const host = panel.querySelector('.tm-records-fragment-host');
                     const moduleId = host ? host.getAttribute('data-module-id') : null;
+                    const deleteUrlFromPanel = panel ? String(panel.getAttribute('data-bulk-delete-url') || '').trim() : '';
                     const set = getBulkSet(panel);
                     const selected = set ? Array.from(set) : [];
                     if (!selected.length || !moduleId) return;
@@ -2059,7 +2097,9 @@
                             const originalHtml = deleteBtn.innerHTML;
                             deleteBtn.disabled = true;
                             deleteBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-                            let delUrl = "{{ route('temporary-modules.entries.bulk-destroy', ['module' => ':moduleId']) }}".replace(':moduleId', moduleId);
+                            let delUrl = deleteUrlFromPanel !== ''
+                                ? deleteUrlFromPanel
+                                : ('/modulos-temporales/' + encodeURIComponent(String(moduleId)) + '/registros-masivo');
                             csrfFetch(delUrl, {
                                 method: 'DELETE',
                                 headers: {
@@ -2311,7 +2351,7 @@
         /* Cerrar modales por backdrop/botón X: delegación global (los modales de “Editar” se inyectan por AJAX
            y no existían en el DOM en el forEach inicial). */
         document.addEventListener('click', function (event) {
-            const closeEl = event.target.closest('[data-close-module-preview], [data-close-image-preview], [data-close-file-preview]');
+            const closeEl = event.target.closest('[data-close-module-preview], [data-close-image-preview], [data-close-file-preview], [data-tm-bulk-insert-dismiss], [data-tm-bulk-insert-municipios-dismiss]');
             if (!closeEl) {
                 return;
             }
@@ -2338,6 +2378,878 @@
                 closeModal(modal);
             });
         });
+
+        /* Altas multiples en hoja (tipo Google Sheets) */
+        (function initBulkInsertModals() {
+            const modals = Array.from(document.querySelectorAll('.tm-bulk-insert-modal'));
+            if (!modals.length) {
+                return;
+            }
+
+            let rowUid = 1;
+
+            function tmBulkEsc(s) {
+                const str = String(s ?? '');
+                return str
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/\"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function parseJsonScript(modal, selector) {
+                const el = modal.querySelector(selector);
+                if (!el) {
+                    return null;
+                }
+                try {
+                    return JSON.parse(String(el.textContent || 'null'));
+                } catch (_) {
+                    return null;
+                }
+            }
+
+            function getMunicipioFieldKey(st) {
+                const f = (st.fields || []).find(function (x) { return x && x.type === 'municipio'; });
+                return f ? String(f.key) : null;
+            }
+
+            function fieldTypeByKey(st, key) {
+                const k = String(key || '').trim();
+                const f = (st.fields || []).find(function (x) { return x && String(x.key || '') === k; });
+                return f ? normalizeFieldType(f.type) : '';
+            }
+
+            function normalizeMunicipioLabel(input) {
+                const raw = String(input ?? '').trim().toLowerCase();
+                if (!raw) return '';
+                // Quitar diacríticos (áéíóúñ -> aeioun) para comparar.
+                try {
+                    const noMarks = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    // Quitar puntuación/símbolos (mantener letras/números) para que "Z. Mena" === "Z Mena"
+                    const cleaned = noMarks.replace(/[^a-z0-9]+/g, ' ');
+                    return cleaned.replace(/\s+/g, ' ').trim();
+                } catch (_) {
+                    const cleaned2 = raw.replace(/[^a-z0-9]+/g, ' ');
+                    return cleaned2.replace(/\s+/g, ' ').trim();
+                }
+            }
+
+            function buildMunicipioNormMap(municipiosList) {
+                const map = {};
+                (Array.isArray(municipiosList) ? municipiosList : []).forEach(function (m) {
+                    const s = String(m ?? '').trim();
+                    if (!s) return;
+                    const key = normalizeMunicipioLabel(s);
+                    if (key && !map[key]) {
+                        map[key] = s;
+                    }
+                });
+                return map;
+            }
+
+            function resolveMunicipioCanonical(st, municipio) {
+                const raw = String(municipio ?? '').trim();
+                if (!raw) return '';
+                // Preferir match exacto en el catálogo del usuario
+                if (Array.isArray(st.municipios) && st.municipios.indexOf(raw) !== -1) {
+                    return raw;
+                }
+                const norm = normalizeMunicipioLabel(raw);
+                const map = st && st.__munNormMap ? st.__munNormMap : null;
+                if (map && norm && map[norm]) {
+                    return map[norm];
+                }
+                return raw;
+            }
+
+            function inferMrIdForMunicipio(municipio) {
+                const m = String(municipio || '').trim();
+                if (!m) return null;
+                const normM = normalizeMunicipioLabel(m);
+                const keys = Object.keys(microrregionesMunicipios || {});
+                for (let i = 0; i < keys.length; i++) {
+                    const mrId = keys[i];
+                    const list = Array.isArray(microrregionesMunicipios[mrId]) ? microrregionesMunicipios[mrId] : [];
+                    if (list.indexOf(m) !== -1) {
+                        const parsed = tmParseMicrorregionId(mrId);
+                        if (parsed !== null) return parsed;
+                    }
+                    // Fallback: comparación normalizada (case/acentos/espacios)
+                    for (let j = 0; j < list.length; j++) {
+                        if (normalizeMunicipioLabel(list[j]) === normM) {
+                            const parsed2 = tmParseMicrorregionId(mrId);
+                            if (parsed2 !== null) return parsed2;
+                            break;
+                        }
+                    }
+                }
+                return null;
+            }
+
+            function initMunicipiosModalState(munModal) {
+                if (!munModal) {
+                    return;
+                }
+                const selectedByMr = {};
+                Array.from(munModal.querySelectorAll('input[type="checkbox"][data-mr-id]')).forEach(function (cb) {
+                    const mrId = String(cb.getAttribute('data-mr-id') || '').trim();
+                    const val = String(cb.value || '').trim();
+                    if (!mrId || !val) return;
+                    if (!selectedByMr[mrId]) selectedByMr[mrId] = new Set();
+                    if (cb.checked) selectedByMr[mrId].add(val);
+                });
+                munModal.__tmBulkSelectedByMr = selectedByMr;
+            }
+
+            function isRowEmpty(st, row) {
+                const mr = String(row.microrregion_id || '').trim();
+                if (mr) return false;
+                const vals = row.values || {};
+                const keys = Object.keys(vals);
+                for (let i = 0; i < keys.length; i++) {
+                    const v = vals[keys[i]];
+                    if (Array.isArray(v)) {
+                        if (v.length) return false;
+                    } else if (String(v || '').trim() !== '') {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            function normalizeFieldType(type) {
+                return String(type || '').trim().toLowerCase();
+            }
+
+            function buildFieldPickerHtml(st) {
+                const requiredKeys = {};
+                (st.fields || []).forEach(function (f) {
+                    if (f && f.is_required) requiredKeys[String(f.key)] = true;
+                });
+
+                return (st.fields || []).map(function (f) {
+                    if (!f || !f.key || f.type === 'seccion') return '';
+                    const k = String(f.key);
+                    const isReq = !!requiredKeys[k];
+                    const checked = st.visibleKeys.has(k) || isReq;
+                    const dis = isReq ? ' disabled' : '';
+                    return '' +
+                        '<label class=\"tm-bulk-insert-field-opt\">' +
+                        '<input type=\"checkbox\" data-bulk-insert-col=\"1\" value=\"' + tmBulkEsc(k) + '\"' + (checked ? ' checked' : '') + dis + '>' +
+                        '<span>' + tmBulkEsc(String(f.label || k)) + (isReq ? ' <span class=\"tm-req\">*</span>' : '') + '</span>' +
+                        '<small>' + tmBulkEsc(String(f.type || '')) + '</small>' +
+                        '</label>';
+                }).join('');
+            }
+
+            function ensureDefaultVisibleKeys(st) {
+                const req = [];
+                const opt = [];
+                (st.fields || []).forEach(function (f) {
+                    if (!f || !f.key || f.type === 'seccion') return;
+                    const k = String(f.key);
+                    if (f.is_required) req.push(k);
+                    else opt.push(k);
+                });
+
+                req.forEach(function (k) { st.visibleKeys.add(k); });
+                // Mostrar algunas opcionales por defecto para que la hoja no quede vacia
+                for (let i = 0; i < Math.min(3, opt.length); i++) {
+                    st.visibleKeys.add(opt[i]);
+                }
+            }
+
+            function buildColumns(st) {
+                const cols = [{ key: '__row', label: '#', kind: 'rownum' }];
+                if (st.showMrSelect) {
+                    cols.push({ key: '__mr', label: 'Microrregion', kind: 'mr' });
+                }
+
+                (st.fields || []).forEach(function (f) {
+                    if (!f || !f.key || f.type === 'seccion') return;
+                    const k = String(f.key);
+                    if (!st.visibleKeys.has(k) && !f.is_required) return;
+                    cols.push({ key: k, label: String(f.label || k), kind: 'field', field: f });
+                });
+
+                cols.push({ key: '__del', label: '', kind: 'del' });
+                return cols;
+            }
+
+            function getMunicipiosForRow(st, rowMrId, allMunicipios) {
+                if (st && st.hasMunicipio && !st.showMrSelect) {
+                    return Array.isArray(allMunicipios) ? allMunicipios : [];
+                }
+                const mr = tmParseMicrorregionId(rowMrId);
+                if (mr !== null) {
+                    const list = Array.isArray(microrregionesMunicipios[String(mr)]) ? microrregionesMunicipios[String(mr)] : [];
+                    if (list.length) return list;
+                }
+                return Array.isArray(allMunicipios) ? allMunicipios : [];
+            }
+
+            function renderCell(st, row, col) {
+                if (col.kind === 'rownum') {
+                    return '<td class=\"tm-bulk-insert-rownum\">' + tmBulkEsc(String(row.__index)) + '</td>';
+                }
+                if (col.kind === 'mr') {
+                    const current = String(row.microrregion_id || '');
+                    let opts = '<option value=\"\">Selecciona MR</option>';
+                    (microrregionesMeta || []).forEach(function (m) {
+                        if (!m || m.id == null) return;
+                        const val = String(m.id);
+                        const sel = val === current ? ' selected' : '';
+                        opts += '<option value=\"' + tmBulkEsc(val) + '\"' + sel + '>' + tmBulkEsc(String(m.label || ('MR ' + val))) + '</option>';
+                    });
+                    return '<td>' +
+                        '<select class=\"tm-bulk-insert-cell\" data-bulk-insert-row-id=\"' + tmBulkEsc(row.id) + '\" data-bulk-insert-key=\"__mr\">' +
+                        opts +
+                        '</select>' +
+                        '</td>';
+                }
+                if (col.kind === 'del') {
+                    return '<td style=\"text-align:center;\">' +
+                        '<button type=\"button\" class=\"tm-bulk-insert-trash-btn\" title=\"Eliminar fila\" aria-label=\"Eliminar fila\" data-bulk-insert-delete-row=\"1\" data-bulk-insert-row-id=\"' + tmBulkEsc(row.id) + '\">' +
+                        '<i class=\"fa-solid fa-trash\" aria-hidden=\"true\"></i>' +
+                        '</button>' +
+                        '</td>';
+                }
+
+                const f = col.field || {};
+                const k = String(col.key);
+                const type = normalizeFieldType(f.type);
+                const v = (row.values && row.values[k] != null) ? row.values[k] : '';
+                const baseAttr = ' data-bulk-insert-row-id=\"' + tmBulkEsc(row.id) + '\" data-bulk-insert-key=\"' + tmBulkEsc(k) + '\"';
+
+                if (type === 'image' || type === 'file' || type === 'document') {
+                    const inputId = 'tmBulkInsertFile_' + tmBulkEsc(String(st.moduleId)) + '_' + tmBulkEsc(String(row.id)) + '_' + tmBulkEsc(String(k));
+                    const isDoc = type === 'document';
+                    const accept = isDoc ? '.pdf,.docx' : (type === 'image' ? 'image/*' : 'image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv');
+                    const maxFiles = (type === 'image') ? 2 : 1;
+                    const dropIcon = isDoc ? 'fa-file-arrow-up' : (type === 'image' ? 'fa-images' : 'fa-file-arrow-up');
+                    const placeholder = isDoc ? 'Suelta tu documento aqui (PDF/DOCX, Max. 1)' : (type === 'image' ? 'Suelta las imagenes aqui (Max. 2)' : 'Suelta tu archivo aqui (Max. 1)');
+                    return '' +
+                        '<td>' +
+                        '<div class=\"tm-upload-evidence\" style=\"min-width:220px;\">' +
+                        '<div class=\"tm-upload-evidence-toolbar\">' +
+                        '<button type=\"button\" class=\"tm-btn tm-btn-outline tm-btn-sm\" data-upload-trigger data-target-input=\"' + inputId + '\">' +
+                        '<i class=\"fa-solid fa-upload\" aria-hidden=\"true\"></i> Cargar</button>' +
+                        (type === 'image'
+                            ? ('<button type=\"button\" class=\"tm-btn tm-btn-outline tm-btn-sm\" data-paste-image-button data-target-input=\"' + inputId + '\" title=\"Pegar imagen\">' +
+                               '<i class=\"fa-solid fa-paste\" aria-hidden=\"true\"></i> Pegar</button>')
+                            : '') +
+                        '</div>' +
+                        '<div class=\"tm-upload-evidence-dropzone\" data-paste-upload-wrap style=\"padding:8px;\">' +
+                        '<input id=\"' + inputId + '\" type=\"file\" accept=\"' + tmBulkEsc(accept) + '\" class=\"d-none\" data-max-files=\"' + tmBulkEsc(String(maxFiles)) + '\" data-upload-kind=\"' + (isDoc ? 'document' : (type === 'image' ? 'image' : 'file')) + '\"' + (maxFiles > 1 ? ' multiple' : '') + '>' +
+                        '<div class=\"tm-upload-evidence-placeholder\" style=\"gap:6px;\">' +
+                        '<i class=\"fa-solid ' + tmBulkEsc(dropIcon) + '\" aria-hidden=\"true\"></i>' +
+                        '<p style=\"margin:0; font-size:0.8rem;\">' + tmBulkEsc(placeholder) + '</p>' +
+                        '</div>' +
+                        '<div class=\"tm-inline-image-preview-container\" data-inline-image-preview-container style=\"display:flex; flex-wrap:wrap; gap:8px; width:100%; justify-content:center;\"></div>' +
+                        '</div>' +
+                        '</div>' +
+                        '</td>';
+                }
+
+                if (type === 'number') {
+                    return '<td><input class=\"tm-bulk-insert-cell\" type=\"number\" step=\"any\"' + baseAttr + ' value=\"' + tmBulkEsc(String(v || '')) + '\"></td>';
+                }
+                if (type === 'date') {
+                    return '<td><input class=\"tm-bulk-insert-cell\" type=\"date\"' + baseAttr + ' value=\"' + tmBulkEsc(String(v || '')) + '\"></td>';
+                }
+                if (type === 'datetime') {
+                    return '<td><input class=\"tm-bulk-insert-cell\" type=\"datetime-local\"' + baseAttr + ' value=\"' + tmBulkEsc(String(v || '')) + '\"></td>';
+                }
+                if (type === 'boolean') {
+                    const cur = String(v || '');
+                    const opts = '' +
+                        '<option value=\"\"' + (cur === '' ? ' selected' : '') + '>Selecciona</option>' +
+                        '<option value=\"1\"' + (cur === '1' ? ' selected' : '') + '>Si</option>' +
+                        '<option value=\"0\"' + (cur === '0' ? ' selected' : '') + '>No</option>';
+                    return '<td><select class=\"tm-bulk-insert-cell\"' + baseAttr + '>' + opts + '</select></td>';
+                }
+                if (type === 'semaforo') {
+                    const cur = String(v || '');
+                    let opts = '<option value=\"\">Selecciona nivel</option>';
+                    Object.keys(tmSemaforoLabels || {}).forEach(function (semVal) {
+                        const sel = String(semVal) === cur ? ' selected' : '';
+                        opts += '<option value=\"' + tmBulkEsc(String(semVal)) + '\"' + sel + '>' + tmBulkEsc(String(tmSemaforoLabels[semVal])) + '</option>';
+                    });
+                    return '<td><select class=\"tm-bulk-insert-cell tm-semaforo-select\"' + baseAttr + '>' + opts + '</select></td>';
+                }
+                if (type === 'select') {
+                    const cur = String(v || '');
+                    const optsArr = Array.isArray(f.options) ? f.options : [];
+                    let opts = '<option value=\"\">Selecciona</option>';
+                    optsArr.forEach(function (o) {
+                        if (o === null || o === undefined) return;
+                        const s = String(o);
+                        const sel = s === cur ? ' selected' : '';
+                        opts += '<option value=\"' + tmBulkEsc(s) + '\"' + sel + '>' + tmBulkEsc(s) + '</option>';
+                    });
+                    return '<td><select class=\"tm-bulk-insert-cell\"' + baseAttr + '>' + opts + '</select></td>';
+                }
+                if (type === 'municipio') {
+                    const cur = String(v || '');
+                    const municipiosList = getMunicipiosForRow(st, row.microrregion_id, st.municipios);
+                    let opts = '<option value=\"\">Selecciona un municipio</option>';
+                    municipiosList.forEach(function (m) {
+                        const s = String(m);
+                        const sel = s === cur ? ' selected' : '';
+                        opts += '<option value=\"' + tmBulkEsc(s) + '\"' + sel + '>' + tmBulkEsc(s) + '</option>';
+                    });
+                    return '<td><select class=\"tm-bulk-insert-cell tm-municipio-select\"' + baseAttr + '>' + opts + '</select></td>';
+                }
+                if (type === 'textarea') {
+                    return '<td><textarea class=\"tm-bulk-insert-cell\" rows=\"1\"' + baseAttr + '>' + tmBulkEsc(String(v || '')) + '</textarea></td>';
+                }
+                if (type === 'multiselect') {
+                    const optsArr = Array.isArray(f.options) ? f.options : [];
+                    const selected = Array.isArray(v) ? v.map(String) : (String(v || '').trim() ? [String(v).trim()] : []);
+                    let chips = '';
+                    optsArr.forEach(function (o) {
+                        if (o === null || o === undefined) return;
+                        const s = String(o);
+                        const isOn = selected.indexOf(s) !== -1;
+                        chips += '<button type=\"button\" class=\"tm-bulk-sheet-chip' + (isOn ? ' is-on' : '') + '\" data-bulk-insert-chip=\"1\"' + baseAttr + ' data-chip-val=\"' + tmBulkEsc(s) + '\">' + tmBulkEsc(s) + '</button>';
+                    });
+                    return '<td>' +
+                        '<div class=\"tm-bulk-insert-multi\"' + baseAttr + '>' + (chips || '<span style=\"color:var(--clr-text-light); font-size:0.8rem;\">Sin opciones</span>') + '</div>' +
+                        '</td>';
+                }
+
+                return '<td><input class=\"tm-bulk-insert-cell\" type=\"text\"' + baseAttr + ' value=\"' + tmBulkEsc(String(v || '')) + '\"></td>';
+            }
+
+            function renderSheet(modal) {
+                const st = modal.__bulkInsertState;
+                const host = modal.querySelector('[data-tm-bulk-insert-sheet]');
+                if (!st || !host) return;
+
+                const cols = buildColumns(st);
+                const thead = '<thead><tr>' + cols.map(function (c) {
+                    if (c.kind === 'del') return '<th style=\"width:56px;\"></th>';
+                    if (c.kind === 'rownum') return '<th style=\"width:64px;\">#</th>';
+                    const label = tmBulkEsc(String(c.label || ''));
+                    if (c.kind === 'field' && c.field && c.field.is_required) {
+                        return '<th>' + label + '<span class=\"tm-req\">*</span></th>';
+                    }
+                    return '<th>' + label + '</th>';
+                }).join('') + '</tr></thead>';
+
+                const tbody = '<tbody>' + st.rows.map(function (row, idx) {
+                    row.__index = idx + 1;
+                    return '<tr>' + cols.map(function (c) { return renderCell(st, row, c); }).join('') + '</tr>';
+                }).join('') + '</tbody>';
+
+                host.innerHTML = '<table class=\"tm-bulk-insert-table\">' + thead + tbody + '</table>';
+
+                // Re-binds para inputs de evidencia (imagen/documento/etc.)
+                if (typeof bindImageUploadInteractions === 'function') {
+                    bindImageUploadInteractions(modal);
+                }
+            }
+
+            function showStatus(modal, html, kind) {
+                const stEl = modal.querySelector('[data-tm-bulk-insert-status]');
+                if (!stEl) return;
+                stEl.classList.remove('tm-hidden');
+                stEl.innerHTML = html || '';
+                stEl.setAttribute('data-kind', kind || '');
+            }
+
+            function hideStatus(modal) {
+                const stEl = modal.querySelector('[data-tm-bulk-insert-status]');
+                if (!stEl) return;
+                stEl.classList.add('tm-hidden');
+                stEl.innerHTML = '';
+                stEl.removeAttribute('data-kind');
+            }
+
+            function clearInvalid(modal) {
+                modal.querySelectorAll('.tm-bulk-insert-cell.is-invalid').forEach(function (el) {
+                    el.classList.remove('is-invalid');
+                });
+            }
+
+            function addRow(modal, preset) {
+                const st = modal.__bulkInsertState;
+                if (!st) return;
+                const row = {
+                    id: 'r' + (rowUid++),
+                    microrregion_id: preset && preset.microrregion_id ? preset.microrregion_id : '',
+                    values: Object.assign({}, (preset && preset.values) ? preset.values : {}),
+                };
+                st.rows.push(row);
+                renderSheet(modal);
+            }
+
+            async function submitRows(modal) {
+                const st = modal.__bulkInsertState;
+                if (!st) return;
+
+                clearInvalid(modal);
+                hideStatus(modal);
+
+                const requiredFields = (st.fields || []).filter(function (f) { return f && f.is_required; });
+                const rowsToSend = [];
+                const errors = [];
+
+                st.rows.forEach(function (row) {
+                    if (isRowEmpty(st, row)) {
+                        return;
+                    }
+                    requiredFields.forEach(function (f) {
+                        const k = String(f.key || '');
+                        const v = row.values ? row.values[k] : '';
+                        if (String(v || '').trim() === '') {
+                            errors.push({ rowId: row.id, key: k, label: String(f.label || k) });
+                        }
+                    });
+                    rowsToSend.push(row);
+                });
+
+                if (!rowsToSend.length) {
+                    showStatus(modal, 'No hay filas con datos para registrar.', 'warn');
+                    return;
+                }
+
+                if (errors.length) {
+                    errors.forEach(function (e) {
+                        const el = modal.querySelector('[data-bulk-insert-row-id=\"' + CSS.escape(e.rowId) + '\"][data-bulk-insert-key=\"' + CSS.escape(e.key) + '\"]');
+                        if (el) {
+                            el.classList.add('is-invalid');
+                        }
+                    });
+                    showStatus(modal, 'Faltan campos obligatorios en algunas filas. Revisa las celdas marcadas en rojo.', 'error');
+                    return;
+                }
+
+                const btn = modal.querySelector('[data-tm-bulk-insert-submit]');
+                const originalText = btn ? btn.textContent : '';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Registrando...';
+                }
+
+                let okCount = 0;
+                const failRows = [];
+                for (let i = 0; i < rowsToSend.length; i++) {
+                    const row = rowsToSend[i];
+                    showStatus(modal, 'Registrando fila ' + (i + 1) + ' de ' + rowsToSend.length + '...', 'info');
+                    try {
+                        const fd = new FormData();
+                        fd.set('_token', csrfToken);
+                        fd.set('entry_id', '');
+                        const mrParsed = tmParseMicrorregionId(row.microrregion_id);
+                        if (mrParsed !== null) {
+                            fd.set('selected_microrregion_id', String(mrParsed));
+                        }
+
+                        // values: incluir todos los keys del row
+                        const vals = row.values || {};
+                        Object.keys(vals).forEach(function (k) {
+                            const v = vals[k];
+                            if (Array.isArray(v)) {
+                                v.forEach(function (item) {
+                                    fd.append('values[' + k + '][]', String(item));
+                                });
+                            } else if (v !== null && v !== undefined && String(v).trim() !== '') {
+                                fd.append('values[' + k + ']', String(v));
+                            }
+                        });
+
+                        // Files: leer de inputs en la tabla (image/file/document)
+                        (st.fields || []).forEach(function (f) {
+                            if (!f || !f.key) return;
+                            const t = normalizeFieldType(f.type);
+                            if (t !== 'image' && t !== 'file' && t !== 'document') return;
+                            const inputId = 'tmBulkInsertFile_' + String(st.moduleId) + '_' + String(row.id) + '_' + String(f.key);
+                            const input = document.getElementById(inputId);
+                            if (!(input instanceof HTMLInputElement)) return;
+                            const files = Array.from(input.files || []);
+                            files.forEach(function (file) {
+                                fd.append('values[' + String(f.key) + '][]', file);
+                            });
+                        });
+
+                        const res = await csrfFetch(st.submitUrl || st.importSingleUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': csrfToken
+                            },
+                            body: fd,
+                            credentials: 'same-origin'
+                        });
+                        const j = await safeJsonParse(res);
+                        if (j && j.success) {
+                            okCount++;
+                            modal.__bulkInsertImportedCount = (modal.__bulkInsertImportedCount || 0) + 1;
+                        } else {
+                            failRows.push({ idx: i + 1, message: (j && (j.message || j.error)) ? String(j.message || j.error) : 'Error al registrar.' });
+                        }
+                    } catch (err) {
+                        failRows.push({ idx: i + 1, message: String(err && err.message ? err.message : err) });
+                    }
+                }
+
+                const parts = [];
+                parts.push('<strong>' + okCount + '</strong> fila(s) registrada(s).');
+                if (failRows.length) {
+                    parts.push('<div style=\"margin-top:6px;\"><strong>' + failRows.length + '</strong> con error:</div>');
+                    parts.push('<ul style=\"margin:6px 0 0 18px;\">' + failRows.map(function (x) {
+                        return '<li>Fila ' + x.idx + ': ' + tmBulkEsc(x.message) + '</li>';
+                    }).join('') + '</ul>');
+                }
+                showStatus(modal, parts.join(''), failRows.length ? 'warn' : 'success');
+
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = originalText || 'Registrar filas';
+                }
+            }
+
+            function initModal(modal) {
+                if (modal.__bulkInsertInit) {
+                    return;
+                }
+                modal.__bulkInsertInit = true;
+                modal.__bulkInsertImportedCount = 0;
+
+                const fields = parseJsonScript(modal, '[data-tm-bulk-insert-fields-json]');
+                const municipios = parseJsonScript(modal, '[data-tm-bulk-insert-municipios-json]');
+                const importSingleUrl = String(modal.getAttribute('data-import-single-url') || '').trim();
+                const submitUrl = String(modal.getAttribute('data-submit-url') || '').trim();
+                const hasMunicipio = String(modal.getAttribute('data-has-municipio') || '') === '1';
+                const showMrSelect = (String(modal.getAttribute('data-show-mr-select') || '') === '1') && !hasMunicipio;
+
+                const st = {
+                    moduleId: String(modal.getAttribute('data-module-id') || ''),
+                    fields: Array.isArray(fields) ? fields : [],
+                    municipios: Array.isArray(municipios) ? municipios : [],
+                    rows: [],
+                    visibleKeys: new Set(),
+                    showMrSelect: showMrSelect,
+                    hasMunicipio: hasMunicipio,
+                    importSingleUrl: importSingleUrl,
+                    submitUrl: submitUrl
+                };
+                st.__munNormMap = buildMunicipioNormMap(st.municipios);
+
+                ensureDefaultVisibleKeys(st);
+                modal.__bulkInsertState = st;
+
+                const pop = modal.querySelector('[data-tm-bulk-insert-fields-popover]');
+                if (pop) {
+                    pop.innerHTML = buildFieldPickerHtml(st);
+                }
+
+                const addBtn = modal.querySelector('[data-tm-bulk-insert-add-row]');
+                if (addBtn) {
+                    addBtn.addEventListener('click', function () {
+                        addRow(modal, {});
+                    });
+                }
+
+                const submitBtn = modal.querySelector('[data-tm-bulk-insert-submit]');
+                if (submitBtn) {
+                    submitBtn.addEventListener('click', function () {
+                        submitRows(modal);
+                    });
+                }
+
+                const fieldsPicker = modal.querySelector('[data-tm-bulk-insert-fields-picker]');
+                if (fieldsPicker) {
+                    fieldsPicker.addEventListener('change', function (e) {
+                        const cb = e.target && e.target.matches && e.target.matches('input[type=\"checkbox\"][data-bulk-insert-col]') ? e.target : null;
+                        if (!cb) return;
+                        const key = String(cb.value || '').trim();
+                        if (!key) return;
+                        if (cb.checked) st.visibleKeys.add(key);
+                        else st.visibleKeys.delete(key);
+                        renderSheet(modal);
+                    });
+                }
+
+                modal.addEventListener('input', function (e) {
+                    const el = e.target;
+                    if (!(el instanceof HTMLElement)) return;
+                    if (!el.hasAttribute('data-bulk-insert-row-id')) return;
+                    const rowId = String(el.getAttribute('data-bulk-insert-row-id') || '');
+                    const key = String(el.getAttribute('data-bulk-insert-key') || '');
+                    const row = st.rows.find(function (r) { return r.id === rowId; });
+                    if (!row) return;
+
+                    if (key === '__mr') {
+                        row.microrregion_id = String(el.value || '');
+                        // Actualizar municipios para esa fila (sin rerender completo)
+                        const munKey = getMunicipioFieldKey(st);
+                        if (munKey) {
+                            const munSel = modal.querySelector('[data-bulk-insert-row-id=\"' + CSS.escape(rowId) + '\"][data-bulk-insert-key=\"' + CSS.escape(munKey) + '\"]');
+                            if (munSel && munSel.tagName === 'SELECT') {
+                                const current = String(munSel.value || '');
+                                const list = getMunicipiosForRow(st, row.microrregion_id, st.municipios);
+                                munSel.innerHTML = '';
+                                munSel.appendChild(new Option('Selecciona un municipio', ''));
+                                list.forEach(function (m) {
+                                    const opt = new Option(String(m), String(m), false, String(m) === current);
+                                    munSel.appendChild(opt);
+                                });
+                            }
+                        }
+                        return;
+                    }
+
+                    if (!row.values) row.values = {};
+                    row.values[key] = el.value;
+                    if (el.classList.contains('is-invalid') && String(el.value || '').trim() !== '') {
+                        el.classList.remove('is-invalid');
+                    }
+                });
+
+                modal.addEventListener('change', function (e) {
+                    const el = e.target;
+                    if (!(el instanceof HTMLElement)) return;
+                    if (!el.hasAttribute('data-bulk-insert-row-id')) return;
+                    const rowId = String(el.getAttribute('data-bulk-insert-row-id') || '');
+                    const key = String(el.getAttribute('data-bulk-insert-key') || '');
+                    const row = st.rows.find(function (r) { return r.id === rowId; });
+                    if (!row) return;
+
+                    if (key === '__mr') {
+                        row.microrregion_id = String(el.value || '');
+                        const munKey = getMunicipioFieldKey(st);
+                        if (munKey) {
+                            const munSel = modal.querySelector('[data-bulk-insert-row-id=\"' + CSS.escape(rowId) + '\"][data-bulk-insert-key=\"' + CSS.escape(munKey) + '\"]');
+                            if (munSel && munSel.tagName === 'SELECT') {
+                                const current = String(munSel.value || '');
+                                const list = getMunicipiosForRow(st, row.microrregion_id, st.municipios);
+                                munSel.innerHTML = '';
+                                munSel.appendChild(new Option('Selecciona un municipio', ''));
+                                list.forEach(function (m) {
+                                    const opt = new Option(String(m), String(m), false, String(m) === current);
+                                    munSel.appendChild(opt);
+                                });
+                            }
+                        }
+                        return;
+                    }
+
+                    if (!row.values) row.values = {};
+                    row.values[key] = el.value;
+
+                    // Si cambia el municipio, actualizar microrregion_id (no editable; viene enlazado)
+                    if (st.hasMunicipio && fieldTypeByKey(st, key) === 'municipio') {
+                        const canonical = resolveMunicipioCanonical(st, String(el.value || ''));
+                        if (canonical !== String(el.value || '')) {
+                            el.value = canonical;
+                        }
+                        const inferred = inferMrIdForMunicipio(canonical);
+                        row.microrregion_id = inferred !== null ? inferred : '';
+                    }
+                    if (el.classList.contains('is-invalid') && String(el.value || '').trim() !== '') {
+                        el.classList.remove('is-invalid');
+                    }
+                });
+
+                modal.addEventListener('click', function (e) {
+                    const delBtn = e.target.closest && e.target.closest('[data-bulk-insert-delete-row]');
+                    if (delBtn) {
+                        const rowId = String(delBtn.getAttribute('data-bulk-insert-row-id') || '');
+                        st.rows = st.rows.filter(function (r) { return r.id !== rowId; });
+                        modal.__bulkInsertState.rows = st.rows;
+                        renderSheet(modal);
+                        return;
+                    }
+                    const chip = e.target.closest && e.target.closest('[data-bulk-insert-chip="1"]');
+                    if (chip) {
+                        e.preventDefault();
+                        const rowId = String(chip.getAttribute('data-bulk-insert-row-id') || '');
+                        const key = String(chip.getAttribute('data-bulk-insert-key') || '');
+                        const val = String(chip.getAttribute('data-chip-val') || '');
+                        if (!rowId || !key || !val) return;
+                        const row = st.rows.find(function (r) { return r.id === rowId; });
+                        if (!row) return;
+                        if (!row.values) row.values = {};
+                        const cur = row.values[key];
+                        const arr = Array.isArray(cur) ? cur.map(String) : [];
+                        const idx = arr.indexOf(val);
+                        if (idx === -1) arr.push(val);
+                        else arr.splice(idx, 1);
+                        row.values[key] = arr;
+                        chip.classList.toggle('is-on', idx === -1);
+                        return;
+                    }
+                });
+
+                // Municipios: abrir selector
+                const openMunBtn = modal.querySelector('[data-tm-bulk-insert-open-municipios]');
+                if (openMunBtn) {
+                    openMunBtn.addEventListener('click', function () {
+                        const mm = document.getElementById('tmBulkInsertMunicipiosModal-' + st.moduleId);
+                        if (!mm) return;
+                        mm.__tmBulkInsertTarget = modal;
+                        initMunicipiosModalState(mm);
+                        openModal(mm, openMunBtn);
+                    });
+                }
+
+                // Inicial: una fila vacia
+                addRow(modal, {});
+            }
+
+            modals.forEach(function (modal) {
+                modal.addEventListener('modal:open', function () {
+                    initModal(modal);
+                    hideStatus(modal);
+                    renderSheet(modal);
+                });
+            });
+
+            // Municipios modal: aplicar seleccion
+            document.addEventListener('click', function (e) {
+                const mrTabBtn = e.target.closest('[data-tm-bulk-insert-mr-tab]');
+                if (mrTabBtn) {
+                    const modal = mrTabBtn.closest('.tm-bulk-insert-municipios-modal');
+                    if (!modal) return;
+                    const mrId = String(mrTabBtn.getAttribute('data-mr-id') || '').trim();
+                    if (!mrId) return;
+
+                    modal.querySelectorAll('[data-tm-bulk-insert-mr-tab]').forEach(function (b) {
+                        const isActive = String(b.getAttribute('data-mr-id') || '') === mrId;
+                        b.classList.toggle('is-active', isActive);
+                        b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    });
+                    modal.querySelectorAll('[data-tm-bulk-insert-mr-page]').forEach(function (p) {
+                        const isActive = String(p.getAttribute('data-mr-id') || '') === mrId;
+                        p.classList.toggle('tm-hidden', !isActive);
+                        p.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+                    });
+
+                    const tabs = modal.querySelector('[data-tm-bulk-insert-mr-tabs]');
+                    if (tabs && typeof mrTabBtn.scrollIntoView === 'function') {
+                        mrTabBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    }
+                    return;
+                }
+
+                const prevBtn = e.target.closest('[data-tm-bulk-insert-mr-prev]');
+                const nextBtn = e.target.closest('[data-tm-bulk-insert-mr-next]');
+                if (prevBtn || nextBtn) {
+                    const modal = (prevBtn || nextBtn).closest('.tm-bulk-insert-municipios-modal');
+                    if (!modal) return;
+                    const tabs = modal.querySelector('[data-tm-bulk-insert-mr-tabs]');
+                    if (!tabs) return;
+                    const delta = (nextBtn ? 1 : -1) * Math.max(220, Math.floor(tabs.clientWidth * 0.65));
+                    tabs.scrollBy({ left: delta, behavior: 'smooth' });
+                    return;
+                }
+
+                const toggleAllBtn = e.target.closest('[data-tm-bulk-insert-mr-toggle-all]');
+                if (toggleAllBtn) {
+                    const modal = toggleAllBtn.closest('.tm-bulk-insert-municipios-modal');
+                    if (!modal) return;
+                    const activeTab = modal.querySelector('[data-tm-bulk-insert-mr-tab].is-active');
+                    const mrId = activeTab ? String(activeTab.getAttribute('data-mr-id') || '').trim() : '';
+                    if (!mrId) return;
+
+                    const page = modal.querySelector('[data-tm-bulk-insert-mr-page][data-mr-id=\"' + CSS.escape(mrId) + '\"]');
+                    const checks = page ? Array.from(page.querySelectorAll('input[type=\"checkbox\"]')) : [];
+                    if (!checks.length) return;
+
+                    const allChecked = checks.every(function (c) { return c.checked; });
+                    checks.forEach(function (c) { c.checked = !allChecked; });
+                    if (!modal.__tmBulkSelectedByMr) initMunicipiosModalState(modal);
+                    if (modal.__tmBulkSelectedByMr) {
+                        if (!modal.__tmBulkSelectedByMr[mrId]) modal.__tmBulkSelectedByMr[mrId] = new Set();
+                        const set = modal.__tmBulkSelectedByMr[mrId];
+                        checks.forEach(function (c) {
+                            const val = String(c.value || '').trim();
+                            if (!val) return;
+                            if (c.checked) set.add(val);
+                            else set.delete(val);
+                        });
+                    }
+                    return;
+                }
+
+                const applyBtn = e.target.closest('[data-tm-bulk-insert-municipios-apply]');
+                if (!applyBtn) return;
+                const munModal = applyBtn.closest('.tm-bulk-insert-municipios-modal');
+                if (!munModal) return;
+                const target = munModal.__tmBulkInsertTarget;
+                if (!target || !target.__bulkInsertState) {
+                    closeModal(munModal);
+                    return;
+                }
+                const st = target.__bulkInsertState;
+
+                // Tomar selecciones directamente del DOM (incluye todas las microrregiones, aunque esten ocultas).
+                const checks = Array.from(munModal.querySelectorAll('input[type="checkbox"][data-mr-id]'));
+                const selected = checks
+                    .filter(function (c) { return c.checked; })
+                    .map(function (c) {
+                        return {
+                            municipio: String(c.value || '').trim(),
+                            mrId: tmParseMicrorregionId(String(c.getAttribute('data-mr-id') || '')),
+                        };
+                    })
+                    .filter(function (x) { return x.municipio !== ''; });
+                const munKey = getMunicipioFieldKey(st);
+                if (!munKey) {
+                    closeModal(munModal);
+                    return;
+                }
+
+                // Asegurar que la columna municipio este visible
+                st.visibleKeys.add(munKey);
+                const pop = target.querySelector('[data-tm-bulk-insert-fields-popover]');
+                if (pop) pop.innerHTML = buildFieldPickerHtml(st);
+
+                const shouldReplace = st.rows.length === 0 || st.rows.every(function (r) { return isRowEmpty(st, r); });
+                if (shouldReplace) {
+                    st.rows = [];
+                }
+
+                selected.forEach(function (item) {
+                    const mun = resolveMunicipioCanonical(st, item.municipio);
+                    const preset = { values: {} };
+                    preset.values[munKey] = mun;
+                    const inferred = item.mrId !== null ? item.mrId : inferMrIdForMunicipio(mun);
+                    if (inferred !== null) preset.microrregion_id = inferred;
+                    st.rows.push({
+                        id: 'r' + (rowUid++),
+                        microrregion_id: preset.microrregion_id || '',
+                        values: preset.values
+                    });
+                });
+
+                target.__bulkInsertState = st;
+                renderSheet(target);
+                closeModal(munModal);
+            });
+
+            // Mantener selección por microrregión aunque cambies de pestaña
+            document.addEventListener('change', function (e) {
+                const cb = e.target && e.target.closest
+                    ? e.target.closest('.tm-bulk-insert-municipios-modal input[type="checkbox"][data-mr-id]')
+                    : null;
+                if (!cb) return;
+                const munModal = cb.closest('.tm-bulk-insert-municipios-modal');
+                if (!munModal) return;
+                const mrId = String(cb.getAttribute('data-mr-id') || '').trim();
+                const val = String(cb.value || '').trim();
+                if (!mrId || !val) return;
+                if (!munModal.__tmBulkSelectedByMr) initMunicipiosModalState(munModal);
+                if (!munModal.__tmBulkSelectedByMr[mrId]) munModal.__tmBulkSelectedByMr[mrId] = new Set();
+                if (cb.checked) munModal.__tmBulkSelectedByMr[mrId].add(val);
+                else munModal.__tmBulkSelectedByMr[mrId].delete(val);
+            });
+        })();
 
         /* Importar Excel (eventos temporales) - Premium Logic */
 

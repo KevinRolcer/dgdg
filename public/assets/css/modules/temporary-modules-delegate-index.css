@@ -41,6 +41,291 @@ html.theme-dark {
     margin-inline: -5px;
 }
 
+/* --- Bulk insert (hoja para altas multiples) --- */
+.tm-bulk-insert-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.tm-bulk-insert-toolbar-spacer {
+    flex: 1;
+}
+
+.tm-bulk-insert-fields-picker {
+    position: relative;
+}
+
+.tm-bulk-insert-fields-picker > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.tm-bulk-insert-fields-picker > summary::-webkit-details-marker {
+    display: none;
+}
+
+.tm-bulk-insert-fields-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: min(360px, 85vw);
+    max-height: 320px;
+    overflow: auto;
+    background: var(--clr-card);
+    border: 1px solid var(--clr-border);
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    z-index: 30;
+}
+
+.tm-bulk-insert-field-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 6px;
+    border-radius: 10px;
+}
+
+.tm-bulk-insert-field-opt:hover {
+    background: rgba(0,0,0,0.03);
+}
+
+html.theme-dark .tm-bulk-insert-field-opt:hover {
+    background: rgba(255,255,255,0.04);
+}
+
+.tm-bulk-insert-field-opt small {
+    color: var(--clr-text-light);
+    font-size: 0.75rem;
+}
+
+.tm-bulk-insert-sheet-wrap {
+    border: 1px solid var(--clr-border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+}
+
+html.theme-dark .tm-bulk-insert-sheet-wrap {
+    background: var(--clr-card);
+}
+
+.tm-bulk-insert-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.tm-bulk-insert-table th,
+.tm-bulk-insert-table td {
+    border: 1px solid var(--clr-border);
+    padding: 6px;
+    vertical-align: top;
+}
+
+.tm-bulk-insert-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--clr-bg);
+    font-weight: 700;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.tm-bulk-insert-table th .tm-req {
+    color: var(--clr-primary);
+    margin-left: 4px;
+}
+
+.tm-bulk-insert-cell {
+    width: 100%;
+    min-width: 160px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 6px 8px;
+    background: transparent;
+    color: var(--clr-text-main);
+    outline: none;
+}
+
+.tm-bulk-insert-cell:focus {
+    border-color: rgba(36, 98, 87, 0.4);
+    background: rgba(36, 98, 87, 0.05);
+}
+
+.tm-bulk-insert-cell.is-invalid {
+    border-color: rgba(134, 30, 52, 0.55);
+    background: rgba(134, 30, 52, 0.06);
+}
+
+.tm-bulk-insert-rownum {
+    min-width: 52px;
+    text-align: center;
+    color: var(--clr-text-light);
+    font-weight: 700;
+}
+
+.tm-bulk-insert-trash-btn {
+    min-width: 36px;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 1px solid var(--clr-border);
+    background: transparent;
+    cursor: pointer;
+}
+
+.tm-bulk-insert-trash-btn:hover {
+    border-color: rgba(134, 30, 52, 0.55);
+    color: rgba(134, 30, 52, 1);
+    background: rgba(134, 30, 52, 0.06);
+}
+
+.tm-bulk-insert-status {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--clr-border);
+    background: rgba(0,0,0,0.02);
+    font-size: 0.85rem;
+}
+
+html.theme-dark .tm-bulk-insert-status {
+    background: rgba(255,255,255,0.03);
+}
+
+.tm-bulk-insert-municipios-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 10px;
+    max-height: 55vh;
+    overflow: auto;
+    padding-right: 4px;
+}
+
+@media (max-width: 700px) {
+    .tm-bulk-insert-municipios-list {
+        grid-template-columns: 1fr;
+    }
+}
+
+.tm-bulk-insert-mr-tabs {
+    display: flex;
+    gap: 8px;
+    overflow: auto;
+    padding: 6px 0;
+    margin: 0;
+    scrollbar-width: none;
+}
+.tm-bulk-insert-mr-tabs::-webkit-scrollbar { display: none; }
+
+.tm-bulk-insert-mr-tabs-wrap {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--clr-border);
+    padding-bottom: 6px;
+    background: var(--clr-card, #fff);
+}
+
+.tm-bulk-insert-mr-arrow {
+    width: 40px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--clr-border);
+    border-radius: 10px;
+    background: var(--clr-bg);
+    color: var(--clr-text-main);
+    cursor: pointer;
+}
+
+.tm-bulk-insert-mr-arrow:hover {
+    border-color: rgba(36, 98, 87, 0.55);
+    background: rgba(36, 98, 87, 0.06);
+    color: #246257;
+}
+
+html.theme-dark .tm-bulk-insert-mr-arrow:hover {
+    border-color: rgba(46, 204, 113, 0.55);
+    background: rgba(46, 204, 113, 0.08);
+    color: #b9e2d8;
+}
+
+.tm-bulk-insert-mr-tab {
+    white-space: nowrap;
+    border: 1px solid var(--clr-border);
+    border-radius: 999px;
+    padding: 6px 10px;
+    background: var(--clr-bg);
+    color: var(--clr-text-main);
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.tm-bulk-insert-mr-tab.is-active {
+    border-color: rgba(36, 98, 87, 0.55);
+    background: rgba(36, 98, 87, 0.08);
+    color: #246257;
+}
+
+html.theme-dark .tm-bulk-insert-mr-tab.is-active {
+    color: #b9e2d8;
+    border-color: rgba(46, 204, 113, 0.55);
+    background: rgba(46, 204, 113, 0.08);
+}
+
+html.theme-dark .tm-bulk-insert-mr-tabs {
+    background: var(--clr-card);
+}
+
+.tm-bulk-insert-municipios-modal .tm-modal-body {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.tm-bulk-insert-mr-pages {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.tm-bulk-insert-mun-footer {
+    flex: 0 0 auto;
+    margin-top: 6px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.tm-bulk-insert-mun-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border: 1px solid var(--clr-border);
+    border-radius: 10px;
+    background: var(--clr-bg);
+}
+
+html.theme-dark .tm-bulk-insert-mun-opt {
+    background: var(--clr-card);
+}
+
 .tm-records-hscroll-btn {
     --tm-hscroll-btn-size: 34px;
     width: var(--tm-hscroll-btn-size);

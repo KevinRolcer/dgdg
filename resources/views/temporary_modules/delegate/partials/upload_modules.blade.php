@@ -25,6 +25,13 @@
             </div>
             <div class="tm-upload-card-foot">
                 <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-open-module-preview="delegate-preview-{{ $module->id }}">Registrar</button>
+                <button type="button"
+                        class="tm-btn tm-btn-outline tm-btn-sm tm-btn-excel-inline"
+                        data-open-bulk-insert="tmBulkInsertModal-{{ $module->id }}"
+                        title="Registrar en hoja de calculo"
+                        aria-label="Registrar en hoja de calculo">
+                    <i class="fa-regular fa-file-excel" aria-hidden="true"></i>
+                </button>
                 <a href="{{ route('temporary-modules.records') }}?module={{ $module->id }}" class="tm-btn tm-btn-outline tm-btn-sm" title="Historial de registros">
                     <i class="fa-solid fa-clock" aria-hidden="true"></i>
                 </a>

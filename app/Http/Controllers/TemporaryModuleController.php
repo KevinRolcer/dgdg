@@ -642,7 +642,11 @@ class TemporaryModuleController extends Controller
 
         $preparedFields = $this->fieldService->prepareFields($validated['fields']);
 
-        DB::transaction(function () use ($request, $validated, $preparedFields, $selectedDelegateIds): void {
+        $targetMunicipios = ($regScope === 'municipios')
+            ? array_values(array_unique(array_filter(array_map('strval', $validated['target_municipios'] ?? []))))
+            : null;
+
+        DB::transaction(function () use ($request, $validated, $preparedFields, $selectedDelegateIds, $regScope, $targetMunicipios): void {
             $slug = Str::slug($validated['name']);
             $this->slugService->forcePurgeTrashedBySlug($slug);
             $baseSlug = $slug;
@@ -655,10 +659,6 @@ class TemporaryModuleController extends Controller
                     break;
                 }
             }
-
-            $targetMunicipios = ($regScope === 'municipios')
-                ? array_values(array_unique(array_filter(array_map('strval', $validated['target_municipios'] ?? []))))
-                : null;
 
             $module = TemporaryModule::query()->create([
                 'name' => $validated['name'],

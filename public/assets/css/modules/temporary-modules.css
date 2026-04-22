@@ -508,6 +508,26 @@
     gap: 10px;
 }
 
+.tm-btn-excel-inline {
+    min-width: 38px !important;
+    width: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tm-btn-excel-inline i {
+    font-size: 1.05rem;
+}
+
+.tm-btn-excel-inline:hover,
+.tm-btn-excel-inline:focus {
+    border-color: #1d6f42;
+    color: #1d6f42;
+    background: rgba(29, 111, 66, 0.08);
+}
+
 .tm-module-card .tm-btn {
     width: auto;
     min-width: 190px;
