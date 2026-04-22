@@ -1383,7 +1383,6 @@
             const existingFiles = Array.from(input.files || []);
             const existingServerImages = getActiveExistingImageCount(input);
             if ((existingFiles.length + existingServerImages) >= maxFiles) {
-                notify('Aviso', 'Solo puedes adjuntar hasta ' + maxFiles + ' archivo(s).', 'warning');
                 return false;
             }
 
@@ -5221,13 +5220,17 @@
                         const visible = paths.map(function (p, idx) { return { path: p, idx: idx }; }).filter(function (x) { return !removedSet.has(x.path); });
                         const slot0 = visible[0] ? (base ? (base + sep + 'i=' + visible[0].idx) : '') : '';
                         const slot1 = visible[1] ? (base ? (base + sep + 'i=' + visible[1].idx) : '') : '';
+                        const src0 = slot0 ? (' src="' + tmBulkEsc(slot0) + '"') : '';
+                        const src1 = slot1 ? (' src="' + tmBulkEsc(slot1) + '"') : '';
 
                         const cell = '<div class="tm-bulk-sheet-images" data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-field-key="' + tmBulkEsc(String(k)) + '">' +
                             '<div class="tm-bulk-sheet-img-slot" data-img-slot="0" data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-field-key="' + tmBulkEsc(String(k)) + '">' +
-                            '<img class="tm-bulk-sheet-img" alt="Imagen" src="' + tmBulkEsc(slot0) + '"' + (visible[0] ? (' data-existing="' + tmBulkEsc(visible[0].path) + '" data-existing-idx="' + tmBulkEsc(String(visible[0].idx)) + '"') : '') + '>' +
+                            '<img class="tm-bulk-sheet-img" alt="Imagen"' + src0 + (visible[0] ? (' data-existing="' + tmBulkEsc(visible[0].path) + '" data-existing-idx="' + tmBulkEsc(String(visible[0].idx)) + '"') : '') + '>' +
+                            '<span class="tm-bulk-sheet-img-hint">Click derecho para agregar imagen</span>' +
                             '</div>' +
                             '<div class="tm-bulk-sheet-img-slot" data-img-slot="1" data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-field-key="' + tmBulkEsc(String(k)) + '">' +
-                            '<img class="tm-bulk-sheet-img" alt="Imagen" src="' + tmBulkEsc(slot1) + '"' + (visible[1] ? (' data-existing="' + tmBulkEsc(visible[1].path) + '" data-existing-idx="' + tmBulkEsc(String(visible[1].idx)) + '"') : '') + '>' +
+                            '<img class="tm-bulk-sheet-img" alt="Imagen"' + src1 + (visible[1] ? (' data-existing="' + tmBulkEsc(visible[1].path) + '" data-existing-idx="' + tmBulkEsc(String(visible[1].idx)) + '"') : '') + '>' +
+                            '<span class="tm-bulk-sheet-img-hint">Click derecho para agregar imagen</span>' +
                             '</div>' +
                             '</div>';
                         const dirtyMedia = pendingCount > 0 || removedSet.size > 0;
@@ -5887,7 +5890,7 @@
                         return;
                     }
                     if (img) {
-                        img.src = '';
+                        img.removeAttribute('src');
                         img.removeAttribute('data-existing');
                         img.removeAttribute('data-existing-idx');
                         img.removeAttribute('data-pending');
@@ -6937,16 +6940,22 @@
                         const selected = Array.from(input.files || []);
                         if (available === 0) {
                             input.value = '';
-                            Swal.fire('Aviso', 'Ya tienes el máximo de ' + maxFiles + ' imagen(es). Elimina alguna antes de agregar más.', 'warning');
                             return;
                         }
+                        let take = selected;
                         if (selected.length > available) {
-                            input.value = '';
-                            Swal.fire('Aviso', 'Solo puedes subir ' + available + ' archivo(s) más (límite total: ' + maxFiles + ').', 'warning');
-                            st.pendingFiles[entryId][key] = selected.slice(0, available);
-                        } else {
-                            st.pendingFiles[entryId][key] = selected.slice(0, available);
+                            take = selected.slice(0, available);
+                            // Mantener previsualización nativa (input.files) sin abrir modales.
+                            if (typeof DataTransfer !== 'undefined') {
+                                try {
+                                    const dt = new DataTransfer();
+                                    take.forEach(function (f) { dt.items.add(f); });
+                                    input.files = dt.files;
+                                    take = Array.from(input.files || []);
+                                } catch (e) {}
+                            }
                         }
+                        st.pendingFiles[entryId][key] = take;
                         syncDraftFromForm(modal);
                         refreshBulkCounter(modal);
                     });
