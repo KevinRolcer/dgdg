@@ -847,17 +847,88 @@
         };
         window.openModal = openModal;
 
-        const setMunicipiosForForm = function (form, microrregionId) {
-            if (!form || !microrregionId) {
+        const setMunicipiosForForm = function (form, microrregionId, preferredMunicipio) {
+            if (!form) {
                 return;
             }
 
-            const municipios = Array.isArray(microrregionesMunicipios[String(microrregionId)])
-                ? microrregionesMunicipios[String(microrregionId)]
+            const getAllMunicipios = function () {
+                const bag = [];
+                Object.keys(microrregionesMunicipios || {}).forEach(function (mrId) {
+                    const list = Array.isArray(microrregionesMunicipios[mrId]) ? microrregionesMunicipios[mrId] : [];
+                    list.forEach(function (m) {
+                        const s = String(m || '').trim();
+                        if (s !== '') {
+                            bag.push(s);
+                        }
+                    });
+                });
+                return Array.from(new Set(bag));
+            };
+
+            const normalizeMunicipio = function (value) {
+                const raw = String(value || '').trim().toLowerCase();
+                if (raw === '') {
+                    return '';
+                }
+                try {
+                    return raw
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/[^a-z0-9]+/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                } catch (_) {
+                    return raw.replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+                }
+            };
+
+            const resolveMrFromMunicipio = function (municipio) {
+                const target = normalizeMunicipio(municipio);
+                if (target === '') {
+                    return null;
+                }
+                const keys = Object.keys(microrregionesMunicipios || {});
+                for (let i = 0; i < keys.length; i += 1) {
+                    const mrId = keys[i];
+                    const list = Array.isArray(microrregionesMunicipios[mrId]) ? microrregionesMunicipios[mrId] : [];
+                    for (let j = 0; j < list.length; j += 1) {
+                        if (normalizeMunicipio(list[j]) === target) {
+                            return tmParseMicrorregionId(mrId);
+                        }
+                    }
+                }
+                return null;
+            };
+
+            const parsedMrId = tmParseMicrorregionId(microrregionId);
+            let municipios = parsedMrId !== null && Array.isArray(microrregionesMunicipios[String(parsedMrId)])
+                ? microrregionesMunicipios[String(parsedMrId)]
                 : [];
 
+            if (!municipios.length) {
+                const anySelect = form.querySelector('.tm-municipio-select');
+                const currentMunicipio = anySelect ? String(anySelect.value || '').trim() : '';
+                const inferredMr = resolveMrFromMunicipio(currentMunicipio);
+                if (inferredMr !== null && Array.isArray(microrregionesMunicipios[String(inferredMr)])) {
+                    municipios = microrregionesMunicipios[String(inferredMr)];
+                }
+            }
+
+            if (!municipios.length) {
+                const mrKeys = Object.keys(microrregionesMunicipios || {});
+                if (mrKeys.length === 1 && Array.isArray(microrregionesMunicipios[mrKeys[0]])) {
+                    municipios = microrregionesMunicipios[mrKeys[0]];
+                } else {
+                    municipios = getAllMunicipios();
+                }
+            }
+
             Array.from(form.querySelectorAll('.tm-municipio-select')).forEach(function (select) {
-                const currentValue = String(select.value || '');
+                const preferredValue = preferredMunicipio === undefined || preferredMunicipio === null
+                    ? ''
+                    : String(preferredMunicipio).trim();
+                const currentValue = preferredValue !== '' ? preferredValue : String(select.value || '');
                 select.innerHTML = '';
                 select.appendChild(new Option('Selecciona un municipio', ''));
 
@@ -865,6 +936,25 @@
                     const option = new Option(municipio, municipio, false, currentValue === municipio);
                     select.appendChild(option);
                 });
+
+                if (currentValue !== '') {
+                    const exact = Array.from(select.options).find(function (opt) {
+                        return String(opt.value) === currentValue;
+                    });
+                    if (exact) {
+                        exact.selected = true;
+                    } else {
+                        const normalizedCurrent = normalizeMunicipio(currentValue);
+                        const normalizedMatch = Array.from(select.options).find(function (opt) {
+                            return String(opt.value) !== '' && normalizeMunicipio(opt.value) === normalizedCurrent;
+                        });
+                        if (normalizedMatch) {
+                            normalizedMatch.selected = true;
+                        } else {
+                            select.appendChild(new Option(currentValue, currentValue, false, true));
+                        }
+                    }
+                }
             });
         };
 
@@ -3253,7 +3343,7 @@
                         };
                     })
                     .filter(function (x) { return x.municipio !== ''; });
- 
+
                 // Ordenar por microrregión y municipio para agrupar filas y facilitar la identificación visual.
                 selected.sort(function (a, b) {
                     const am = a.mrId === null ? 999999 : Number(a.mrId);
@@ -4940,6 +5030,41 @@
                 return String(v);
             }
 
+            function normalizeMunicipioForInfer(value) {
+                const raw = String(value || '').trim().toLowerCase();
+                if (raw === '') {
+                    return '';
+                }
+                try {
+                    return raw
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/[^a-z0-9]+/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                } catch (_) {
+                    return raw.replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+                }
+            }
+
+            function inferMicrorregionIdFromMunicipio(municipio) {
+                const target = normalizeMunicipioForInfer(municipio);
+                if (target === '') {
+                    return null;
+                }
+                const keys = Object.keys(microrregionesMunicipios || {});
+                for (let i = 0; i < keys.length; i += 1) {
+                    const mrId = keys[i];
+                    const list = Array.isArray(microrregionesMunicipios[mrId]) ? microrregionesMunicipios[mrId] : [];
+                    for (let j = 0; j < list.length; j += 1) {
+                        if (normalizeMunicipioForInfer(list[j]) === target) {
+                            return tmParseMicrorregionId(mrId);
+                        }
+                    }
+                }
+                return null;
+            }
+
             function getMrForEntry(st, entryId) {
                 const entry = st.entryById[entryId];
                 const mrOrig = entry ? entry.microrregion_id : null;
@@ -4958,7 +5083,7 @@
                 if (col.key === '__title') {
                     return '<th data-col-key="__title"><input type="search" class="tm-bulk-sheet-filter-input"' + keyAttr + ' placeholder="Filtrar…"></th>';
                 }
- 
+
                 if (col.key === '__delete') {
                     return '<th data-col-key="__delete"></th>';
                 }
@@ -5048,7 +5173,7 @@
                     const dirty = st.showMrSelect ? (mr !== (entry.microrregion_id || null)) : false;
                     return '<td data-col-key="__mr">' + wrap('<select class="tm-bulk-sheet-cell" data-sheet-entry-id="' + tmBulkEsc(String(entryId)) + '" data-sheet-mr="1"' + (isDeleted ? ' disabled' : '') + '>' + opts + '</select>', dirty) + '</td>';
                 }
- 
+
                 if (col.key === '__delete') {
                     const icon = isDeleted ? 'fa-rotate-left' : 'fa-trash-can';
                     const title = isDeleted ? 'Restaurar' : 'Eliminar';
@@ -5345,7 +5470,28 @@
                 modal.__bulkSheetBatchSize = 10;
                 modal.__bulkSheetCursor = 0;
                 const entries = Array.isArray(st.entries) ? st.entries : [];
+                const munField = st.fields.find(function (f) { return f && f.type === 'municipio'; });
                 modal.__bulkSheetTotalEntries = entries.length;
+
+                function hydrateMunicipioForRow(row, eid) {
+                    if (!munField || !(row instanceof Element)) {
+                        return;
+                    }
+                    const mr = getMrForEntry(st, eid);
+                    const init = row.querySelector('[data-sheet-mun-initial]');
+                    const initValue = init && init.getAttribute('data-sheet-mun-initial')
+                        ? String(init.getAttribute('data-sheet-mun-initial'))
+                        : '';
+                    const ms = row.querySelector('[data-sheet-field-key="' + munField.key + '"]');
+                    const mv = (st.drafts[eid] || {})[munField.key];
+                    const preferredMunicipio = mv != null && String(mv) !== '' ? String(mv) : initValue;
+                    setMunicipiosForForm(row, mr != null ? String(mr) : '', preferredMunicipio);
+                    if (ms && mv != null && String(mv) !== '') {
+                        ms.value = String(mv);
+                    } else if (ms && initValue !== '') {
+                        ms.value = initValue;
+                    }
+                }
 
                 function bulkSheetRemoveSentinelAndStopInfinite() {
                     if ((modal.__bulkSheetCursor || 0) < (modal.__bulkSheetTotalEntries || 0)) {
@@ -5421,6 +5567,10 @@
                     for (let i = cursor; i < end; i++) {
                         const e = entries[i];
                         if (!e || !e.id) continue;
+                        const row = tbody.querySelector('tr.tm-bulk-sheet-row[data-entry-id="' + String(e.id) + '"]');
+                        if (row) {
+                            hydrateMunicipioForRow(row, e.id);
+                        }
                         st.fields.forEach(function (f) {
                             if (f && f.type === 'image') {
                                 bulkRenderImagesCell(modal, e.id, f.key);
@@ -5465,24 +5615,10 @@
                 appendNextBatch();
 
                 // Municipios: poblar selects por microrregión.
-                const munField = st.fields.find(function (f) { return f && f.type === 'municipio'; });
                 if (munField) {
                     inner.querySelectorAll('.tm-bulk-sheet-row').forEach(function (row) {
                         const eid = parseInt(row.getAttribute('data-entry-id'), 10);
-                        const mr = getMrForEntry(st, eid);
-                        if (mr != null) {
-                            setMunicipiosForForm(row, String(mr));
-                        }
-                        const ms = row.querySelector('[data-sheet-field-key="' + munField.key + '"]');
-                        const mv = (st.drafts[eid] || {})[munField.key];
-                        if (ms && mv != null && String(mv) !== '') {
-                            ms.value = String(mv);
-                        } else if (ms) {
-                            const init = row.querySelector('[data-sheet-mun-initial]');
-                            if (init && init.getAttribute('data-sheet-mun-initial')) {
-                                ms.value = String(init.getAttribute('data-sheet-mun-initial'));
-                            }
-                        }
+                        hydrateMunicipioForRow(row, eid);
                     });
                 }
 
@@ -6464,7 +6600,8 @@
                     st.draftMicrorregion[eid] = mrVal;
                     if (row) {
                         if (mrVal != null) {
-                            setMunicipiosForForm(row, String(mrVal));
+                            const currentMun = munField ? (draft[munField.key] == null ? '' : String(draft[munField.key])) : '';
+                            setMunicipiosForForm(row, String(mrVal), currentMun);
                         }
                         const munField = st.fields.find(function (f) { return f && f.type === 'municipio'; });
                         if (munField) {
@@ -6548,6 +6685,26 @@
                 }
 
                 draft[key] = nextVal;
+
+                if (field.type === 'municipio') {
+                    const inferredMr = inferMicrorregionIdFromMunicipio(nextVal);
+                    if (inferredMr !== null) {
+                        st.draftMicrorregion[eid] = inferredMr;
+                        if (row) {
+                            setMunicipiosForForm(row, String(inferredMr), nextVal);
+                            const municipioSelect = row.querySelector('[data-sheet-field-key="' + key + '"]');
+                            if (municipioSelect && nextVal !== null && nextVal !== undefined) {
+                                municipioSelect.value = String(nextVal);
+                            }
+                            if (st.showMrSelect) {
+                                const mrSelect = row.querySelector('[data-sheet-mr="1"]');
+                                if (mrSelect) {
+                                    mrSelect.value = String(inferredMr);
+                                }
+                            }
+                        }
+                    }
+                }
 
                 const orig = (st.originals[eid] || {})[key];
                 const wrap = el.closest('.tm-bulk-sheet-cell-wrap');
@@ -6902,6 +7059,12 @@
                     if (inp) {
                         if (f.type === 'boolean') {
                             draft[f.key] = inp.value === '' ? null : (inp.value === '1' || inp.value === 'true');
+                        } else if (f.type === 'municipio') {
+                            draft[f.key] = inp.value === '' ? null : inp.value;
+                            const inferredMr = inferMicrorregionIdFromMunicipio(draft[f.key]);
+                            if (inferredMr !== null) {
+                                st.draftMicrorregion[eid] = inferredMr;
+                            }
                         } else {
                             draft[f.key] = inp.value === '' ? null : inp.value;
                         }
@@ -7059,8 +7222,8 @@
                     mrWrap.classList.add('tm-hidden');
                 }
                 const mrForMun = st.draftMicrorregion[entryId] !== undefined ? st.draftMicrorregion[entryId] : entry.microrregion_id;
-                setMunicipiosForForm(form, String(mrForMun));
                 const munField = st.fields.find(function (f) { return f.type === 'municipio'; });
+                setMunicipiosForForm(form, String(mrForMun), st.drafts[entryId][munField ? munField.key : '']);
                 if (munField && form) {
                     const ms = form.querySelector('[data-field-key="' + munField.key + '"]');
                     const mv = st.drafts[entryId][munField.key];
