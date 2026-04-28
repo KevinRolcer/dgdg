@@ -23,6 +23,8 @@ class Agenda extends Model
         'descripcion',
         'tipo',
         'subtipo',
+        'ficha_titulo',
+        'ficha_fondo',
         'microrregion',
         'municipio',
         'lugar',

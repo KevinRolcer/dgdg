@@ -48,6 +48,31 @@
             background-color: #fdf2f2;
             background-image: url('images/Texturas_1C-Tlaloc_rojo.png');
         }
+        .ficha--personalizada,
+        .ficha--bg-rojo {
+            background-color: #fdf2f2;
+            background-image: url('images/Texturas_1C-Tlaloc_rojo.png');
+        }
+        .ficha--bg-beige {
+            background-color: #f8f8f8;
+            background-image: url('images/Texturas_1C-Tlaloc_beige.png');
+        }
+        .ficha--bg-tlaloc_a_beige {
+            background-color: #f8f8f8;
+            background-image: url('images/Texturas_1C-Tlaloc_beige.png');
+        }
+        .ficha--bg-verde {
+            background-color: #f0f7f4;
+            background-image: url('images/Texturas_1C-Tlaloc_verde.png');
+        }
+        .ficha--bg-tlaloc_a_rojo {
+            background-color: #fdf2f2;
+            background-image: url('images/Texturas_1C-Tlaloc_rojo.png');
+        }
+        .ficha--bg-tlaloc_a_verde {
+            background-color: #f0f7f4;
+            background-image: url('images/Texturas_1C-Tlaloc_verde.png');
+        }
 
         .ficha__body-wrap {
             position: absolute;
@@ -112,7 +137,8 @@
         }
 
         .ficha--gira .eyebrow,
-        .ficha--agenda .eyebrow {
+        .ficha--agenda .eyebrow,
+        .ficha--personalizada .eyebrow {
             color: #eee;
         }
 
@@ -131,7 +157,8 @@
 
         .ficha--pre_gira .title { color: #3a3a3a; }
         .ficha--gira .title,
-        .ficha--agenda .title { color: #f0c38e; }
+        .ficha--agenda .title,
+        .ficha--personalizada .title { color: #f0c38e; }
 
         .ficha--sparse .eyebrow {
             font-size: 15pt;
@@ -169,7 +196,8 @@
             margin: 0 0 1.2mm;
         }
         .ficha--gira .label,
-        .ficha--agenda .label {
+        .ficha--agenda .label,
+        .ficha--personalizada .label {
             color: #ccc;
         }
 
@@ -182,7 +210,8 @@
             word-wrap: break-word;
         }
         .ficha--gira .value,
-        .ficha--agenda .value {
+        .ficha--agenda .value,
+        .ficha--personalizada .value {
             color: #fff;
         }
 
@@ -197,7 +226,8 @@
             word-wrap: break-word;
         }
         .ficha--gira .description,
-        .ficha--agenda .description {
+        .ficha--agenda .description,
+        .ficha--personalizada .description {
             color: #eee;
         }
 
@@ -210,7 +240,8 @@
             min-width: 180px;
         }
         .ficha--gira .date-box,
-        .ficha--agenda .date-box {
+        .ficha--agenda .date-box,
+        .ficha--personalizada .date-box {
             border-color: rgba(255, 255, 255, 0.22);
         }
 
@@ -230,11 +261,13 @@
             margin-top: 1.8mm;
         }
         .ficha--gira .date-text,
-        .ficha--agenda .date-text {
+        .ficha--agenda .date-text,
+        .ficha--personalizada .date-text {
             color: #fff;
         }
         .ficha--gira .date-time,
-        .ficha--agenda .date-time {
+        .ficha--agenda .date-time,
+        .ficha--personalizada .date-time {
             color: rgba(255, 255, 255, 0.92);
         }
 
@@ -246,9 +279,37 @@
             text-transform: uppercase;
         }
         .ficha--gira .aforo-line,
-        .ficha--agenda .aforo-line {
+        .ficha--agenda .aforo-line,
+        .ficha--personalizada .aforo-line {
             color: rgba(255, 255, 255, 0.85);
         }
+        .ficha--bg-beige .eyebrow,
+        .ficha--bg-tlaloc_a_beige .eyebrow { color: #6b6a6a; }
+        .ficha--bg-beige .title,
+        .ficha--bg-tlaloc_a_beige .title { color: #3a3a3a; }
+        .ficha--bg-beige .label,
+        .ficha--bg-tlaloc_a_beige .label { color: #888; }
+        .ficha--bg-beige .value,
+        .ficha--bg-beige .description,
+        .ficha--bg-beige .date-text,
+        .ficha--bg-beige .date-time,
+        .ficha--bg-tlaloc_a_beige .value,
+        .ficha--bg-tlaloc_a_beige .description,
+        .ficha--bg-tlaloc_a_beige .date-text,
+        .ficha--bg-tlaloc_a_beige .date-time { color: #444; }
+        .ficha--bg-beige .date-box,
+        .ficha--bg-tlaloc_a_beige .date-box { border-color: rgba(0, 0, 0, 0.1); }
+        .ficha--bg-beige .aforo-line,
+        .ficha--bg-tlaloc_a_beige .aforo-line { color: #777; }
+        .ficha--bg-blanco .eyebrow { color: #6b6a6a; }
+        .ficha--bg-blanco .title { color: #5f1b2d; }
+        .ficha--bg-blanco .label { color: #888; }
+        .ficha--bg-blanco .value,
+        .ficha--bg-blanco .description,
+        .ficha--bg-blanco .date-text,
+        .ficha--bg-blanco .date-time { color: #444; }
+        .ficha--bg-blanco .date-box { border-color: rgba(0, 0, 0, 0.1); }
+        .ficha--bg-blanco .aforo-line { color: #777; }
     </style>
 </head>
 <body>
@@ -256,11 +317,13 @@
     @foreach ($row as $card)
         @php
             $kind = $card['kind'] ?? 'agenda';
-            $kindLabel = match ($kind) {
+            $kindLabel = $card['kind_label'] ?? match ($kind) {
                 'pre_gira' => 'Pre-Gira',
                 'gira' => 'Gira',
+                'personalizada' => 'Ficha personalizada',
                 default => 'Agenda',
             };
+            $fichaBg = $kind === 'personalizada' && in_array(($card['ficha_bg'] ?? 'beige'), ['tlaloc_a_beige', 'tlaloc_a_rojo', 'tlaloc_a_verde', 'beige', 'blanco', 'rojo', 'verde'], true) ? $card['ficha_bg'] : '';
             $logoVersion = ($kind === 'pre_gira') ? '1' : '2';
             $logoFile = "Gobierno de Puebla_{$logoVersion}-Versión vertical.png";
             $textBulk = mb_strlen(trim((string) ($card['title'] ?? '')))
@@ -268,7 +331,7 @@
                 + mb_strlen(trim((string) ($card['descripcion'] ?? '')));
             $sparseContent = $textBulk < 220;
         @endphp
-        <div class="ficha ficha--{{ $kind }}{{ $sparseContent ? ' ficha--sparse' : '' }}">
+        <div class="ficha ficha--{{ $kind }}{{ $fichaBg !== '' ? ' ficha--bg-'.$fichaBg : '' }}{{ $sparseContent ? ' ficha--sparse' : '' }}">
             <div class="ficha__body-wrap">
                 <div class="ficha__body-inner">
                     <div class="ficha__body-cell">

@@ -439,6 +439,11 @@ html.theme-dark .agenda-cal-dow {
     border-color: color-mix(in srgb, var(--clr-accent) 40%, transparent);
 }
 
+.agenda-cal-event-chip--personalizada {
+    background: color-mix(in srgb, var(--clr-primary) 10%, var(--clr-accent) 10%);
+    border-color: color-mix(in srgb, var(--clr-accent) 45%, transparent);
+}
+
 .agenda-cal-event-link,
 .agenda-cal-event-text {
     display: block;
@@ -462,6 +467,11 @@ html.theme-dark .agenda-cal-dow {
     color: var(--clr-accent);
 }
 
+.agenda-cal-event-chip--personalizada .agenda-cal-event-link,
+.agenda-cal-event-chip--personalizada .agenda-cal-event-text {
+    color: var(--clr-primary-dark);
+}
+
 .agenda-cal-event-chip--agenda .agenda-cal-event-link:hover,
 .agenda-cal-event-chip--gira .agenda-cal-event-link:hover {
     color: var(--clr-primary-dark);
@@ -478,13 +488,16 @@ html.theme-dark .agenda-cal-event-chip--agenda .agenda-cal-event-text,
 html.theme-dark .agenda-cal-event-chip--gira .agenda-cal-event-link,
 html.theme-dark .agenda-cal-event-chip--gira .agenda-cal-event-text,
 html.theme-dark .agenda-cal-event-chip--pre_gira .agenda-cal-event-link,
-html.theme-dark .agenda-cal-event-chip--pre_gira .agenda-cal-event-text {
+html.theme-dark .agenda-cal-event-chip--pre_gira .agenda-cal-event-text,
+html.theme-dark .agenda-cal-event-chip--personalizada .agenda-cal-event-link,
+html.theme-dark .agenda-cal-event-chip--personalizada .agenda-cal-event-text {
     color: #fff;
 }
 
 html.theme-dark .agenda-cal-event-chip--agenda .agenda-cal-event-time,
 html.theme-dark .agenda-cal-event-chip--gira .agenda-cal-event-time,
-html.theme-dark .agenda-cal-event-chip--pre_gira .agenda-cal-event-time {
+html.theme-dark .agenda-cal-event-chip--pre_gira .agenda-cal-event-time,
+html.theme-dark .agenda-cal-event-chip--personalizada .agenda-cal-event-time {
     color: rgba(255, 255, 255, 0.92);
 }
 
@@ -515,6 +528,10 @@ html.theme-dark .agenda-cal-event-chip--pre_gira .agenda-cal-event-link:hover {
 
 .agenda-cal-event-chip--pre_gira .agenda-cal-event-time {
     color: color-mix(in srgb, var(--clr-accent) 55%, var(--clr-text-light));
+}
+
+.agenda-cal-event-chip--personalizada .agenda-cal-event-time {
+    color: color-mix(in srgb, var(--clr-primary) 60%, var(--clr-text-light));
 }
 
 .agenda-cal-more {
@@ -963,36 +980,97 @@ html.theme-dark .agenda-cal-card {
         url('../../../images/Texturas_1A-Tlaloc_verde.png');
 }
 
+.agenda-cal-card-head--personalizada,
+.agenda-cal-card-head--bg-rojo {
+    background-color: #4a1f28;
+    background-image: linear-gradient(180deg, rgba(40, 22, 28, 0.5), rgba(40, 22, 28, 0.35)),
+        url('../../../images/Texturas_1C-Tlaloc_rojo.png');
+}
+
+.agenda-cal-card-head--bg-tlaloc_a_rojo {
+    background-color: #4a1f28;
+    background-image: linear-gradient(180deg, rgba(40, 22, 28, 0.5), rgba(40, 22, 28, 0.35)),
+        url('../../../images/Texturas_1A-Tlaloc_rojo.png');
+}
+
+.agenda-cal-card-head--bg-beige {
+    background-color: #3d3528;
+    background-image: linear-gradient(180deg, rgba(45, 38, 28, 0.5), rgba(45, 38, 28, 0.35)),
+        url('../../../images/Texturas_1C-Tlaloc_beige.png');
+}
+
+.agenda-cal-card-head--bg-tlaloc_a_beige {
+    background-color: #3d3528;
+    background-image: linear-gradient(180deg, rgba(45, 38, 28, 0.5), rgba(45, 38, 28, 0.35)),
+        url('../../../images/Texturas_1A-Tlaloc_beige.png');
+}
+
+.agenda-cal-card-head--bg-blanco {
+    background-color: #f4f4f4;
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.16)),
+        url('../../../images/Texturas_1C-Tlaloc_blanco.png');
+}
+
+.agenda-cal-card-head--bg-verde {
+    background-color: #1e3d32;
+    background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)),
+        url('../../../images/Texturas_1C-Tlaloc_verde.png');
+}
+
+.agenda-cal-card-head--bg-tlaloc_a_verde {
+    background-color: #1e3d32;
+    background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)),
+        url('../../../images/Texturas_1A-Tlaloc_verde.png');
+}
+
 .agenda-cal-card-head--gira .agenda-cal-card-eyebrow,
 .agenda-cal-card-head--pre_gira .agenda-cal-card-eyebrow,
-.agenda-cal-card-head--agenda .agenda-cal-card-eyebrow {
+.agenda-cal-card-head--agenda .agenda-cal-card-eyebrow,
+.agenda-cal-card-head--personalizada .agenda-cal-card-eyebrow {
     color: #fff;
     text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
 .agenda-cal-card-head--gira .agenda-cal-card-head-dateline,
 .agenda-cal-card-head--pre_gira .agenda-cal-card-head-dateline,
-.agenda-cal-card-head--agenda .agenda-cal-card-head-dateline {
+.agenda-cal-card-head--agenda .agenda-cal-card-head-dateline,
+.agenda-cal-card-head--personalizada .agenda-cal-card-head-dateline {
     color: #fff;
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
 .agenda-cal-card-head--gira .agenda-cal-card-head-time,
 .agenda-cal-card-head--pre_gira .agenda-cal-card-head-time,
-.agenda-cal-card-head--agenda .agenda-cal-card-head-time {
+.agenda-cal-card-head--agenda .agenda-cal-card-head-time,
+.agenda-cal-card-head--personalizada .agenda-cal-card-head-time {
     color: rgba(255, 255, 255, 0.9);
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
 .agenda-cal-card-head--gira .agenda-cal-card-head-daynum,
-.agenda-cal-card-head--agenda .agenda-cal-card-head-daynum {
+.agenda-cal-card-head--agenda .agenda-cal-card-head-daynum,
+.agenda-cal-card-head--personalizada .agenda-cal-card-head-daynum {
     color: var(--clr-accent);
     text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
 
-.agenda-cal-card-head--pre_gira .agenda-cal-card-head-daynum {
+.agenda-cal-card-head--pre_gira .agenda-cal-card-head-daynum,
+.agenda-cal-card-head--bg-beige .agenda-cal-card-head-daynum,
+.agenda-cal-card-head--bg-tlaloc_a_beige .agenda-cal-card-head-daynum {
     color: var(--clr-primary-dark);
     text-shadow: 0 1px 3px rgba(255, 255, 255, 0.22);
+}
+
+.agenda-cal-card-head--bg-blanco .agenda-cal-card-eyebrow,
+.agenda-cal-card-head--bg-blanco .agenda-cal-card-head-dateline,
+.agenda-cal-card-head--bg-blanco .agenda-cal-card-head-time {
+    color: var(--clr-primary-dark);
+    text-shadow: 0 1px 3px rgba(255, 255, 255, 0.6);
+}
+
+.agenda-cal-card-head--bg-blanco .agenda-cal-card-head-daynum {
+    color: var(--clr-accent);
+    text-shadow: 0 1px 3px rgba(255, 255, 255, 0.7);
 }
 
 
@@ -1284,6 +1362,27 @@ html.theme-dark .agenda-cal-print-modal__dialog {
     font-size: 0.8rem;
     color: var(--clr-text-light);
     line-height: 1.4;
+}
+
+.agenda-cal-print-input-label {
+    display: grid;
+    gap: 5px;
+    margin-bottom: 10px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--clr-text-light);
+}
+
+.agenda-cal-print-text-input {
+    width: 100%;
+    min-height: 36px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--clr-border);
+    background: var(--clr-card);
+    color: var(--clr-text-main);
+    font: inherit;
+    font-size: 0.86rem;
 }
 
 .agenda-cal-print-check-row {

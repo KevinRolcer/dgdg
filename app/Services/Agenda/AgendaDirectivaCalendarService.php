@@ -128,6 +128,85 @@ class AgendaDirectivaCalendarService
     }
 
     /**
+     * Calendario mensual para PDF: conserva todos los eventos del día para que la vista impresa sea completa.
+     *
+     * @param  array{clasificacion?: string, buscar?: string}  $filters
+     * @param  list<array{0: int, 1: int}>|null  $customMonths
+     * @param  list<string>  $allowedKinds
+     * @return list<array<string, mixed>>
+     */
+    public function buildMonthCalendarPagesForPdf(User $viewer, array $filters, string $scope, ?int $year = null, ?int $month = null, ?array $customMonths = null, array $allowedKinds = []): array
+    {
+        $tz = config('app.timezone', 'UTC');
+        $pairs = [];
+
+        if ($scope === 'current_month' && $year !== null && $month !== null) {
+            $pairs[] = [(int) $year, (int) $month];
+        } elseif ($scope === 'custom_months' && is_array($customMonths)) {
+            foreach ($customMonths as $pair) {
+                $y = (int) ($pair[0] ?? 0);
+                $m = (int) ($pair[1] ?? 0);
+                if ($y >= 2000 && $y <= 2100 && $m >= 1 && $m <= 12) {
+                    $pairs[] = [$y, $m];
+                }
+            }
+        }
+
+        $pages = [];
+        foreach ($pairs as [$y, $m]) {
+            $monthStart = Carbon::create($y, $m, 1, 0, 0, 0, $tz)->startOfMonth()->locale('es');
+            $monthEnd = $monthStart->copy()->endOfMonth();
+            $agendas = $this->queryAgendasForMonth($viewer, $monthStart, $monthEnd, $filters);
+            $preparedAgendaMonthData = $this->prepareAgendaMonthData($agendas, $y, $m);
+
+            $byDay = [];
+            foreach ($preparedAgendaMonthData as $item) {
+                $agenda = $item['agenda'];
+                $kind = $this->cardKindForFicha($agenda);
+                if ($allowedKinds !== [] && ! in_array($kind, $allowedKinds, true)) {
+                    continue;
+                }
+
+                $lugarClean = trim(Agenda::textoParaPdfSinMetaUsuarios(trim((string) ($agenda->lugar ?? ''))));
+                $lugar = $lugarClean !== '' ? $this->sentenceCaseIfAllCaps($lugarClean) : '';
+
+                foreach ($item['occurrences'] as $occ) {
+                    $key = $occ['date']->format('Y-m-d');
+                    $byDay[$key] ??= [];
+                    $byDay[$key][] = [
+                        'agenda_id' => $agenda->id,
+                        'title' => $this->sentenceCaseIfAllCaps((string) $item['display_title']),
+                        'lugar' => $lugar,
+                        'time' => $occ['time_label'],
+                        'kind' => $kind,
+                    ];
+                }
+            }
+
+            foreach ($byDay as $k => $items) {
+                usort($items, function (array $a, array $b): int {
+                    $time = strcmp((string) ($a['time'] ?? ''), (string) ($b['time'] ?? ''));
+                    if ($time !== 0) {
+                        return $time;
+                    }
+
+                    return strcmp((string) ($a['title'] ?? ''), (string) ($b['title'] ?? ''));
+                });
+                $byDay[$k] = $items;
+            }
+
+            $pages[] = [
+                'year' => $y,
+                'month' => $m,
+                'month_label' => mb_convert_case($monthStart->translatedFormat('F Y'), MB_CASE_TITLE, 'UTF-8'),
+                'weeks' => $this->buildPdfGridWeeks($y, $m, $byDay, $tz),
+            ];
+        }
+
+        return $pages;
+    }
+
+    /**
      * @param  Collection<int, Agenda>  $agendas
      * @return list<array{agenda: Agenda, occurrences: list<array{date: \Carbon\Carbon, starts_at: \Carbon\Carbon, ends_at: \Carbon\Carbon, time_label: string}>, display_title: string}>
      */
@@ -186,6 +265,8 @@ class AgendaDirectivaCalendarService
                 'descripcion' => $desc,
                 'aforo_label' => $agenda->aforoEtiquetaTarjeta(),
                 'kind' => $this->cardKindForFicha($agenda),
+                'kind_label' => $this->cardKindLabelForFicha($agenda),
+                'ficha_bg' => $this->cardBackgroundForFicha($agenda),
             ];
         }
 
@@ -199,7 +280,7 @@ class AgendaDirectivaCalendarService
     private function queryAgendasForMonth(User $viewer, Carbon $monthStart, Carbon $monthEnd, array $filters): Collection
     {
         $clasificacion = $filters['clasificacion'] ?? '';
-        if (! in_array($clasificacion, ['', 'gira', 'pre_gira', 'agenda'], true)) {
+        if (! in_array($clasificacion, ['', 'gira', 'pre_gira', 'agenda', 'personalizada'], true)) {
             $clasificacion = '';
         }
         $buscar = trim((string) ($filters['buscar'] ?? ''));
@@ -220,6 +301,8 @@ class AgendaDirectivaCalendarService
             $query->where(function ($q) {
                 $q->where('tipo', 'asunto')->orWhereNull('tipo');
             });
+        } elseif ($clasificacion === 'personalizada') {
+            $query->where('tipo', 'personalizado');
         }
 
         if ($buscar !== '') {
@@ -271,6 +354,37 @@ class AgendaDirectivaCalendarService
     }
 
     /**
+     * @param  array<string, list<array<string, mixed>>>  $byDay
+     * @return list<list<array<string, mixed>>>
+     */
+    private function buildPdfGridWeeks(int $year, int $month, array $byDay, string $tz): array
+    {
+        $monthStart = Carbon::create($year, $month, 1, 0, 0, 0, $tz)->startOfMonth();
+        $pad = (int) $monthStart->format('N') - 1;
+        $cur = $monthStart->copy()->subDays($pad);
+
+        $weeks = [];
+        for ($w = 0; $w < 6; $w++) {
+            $row = [];
+            for ($d = 0; $d < 7; $d++) {
+                $key = $cur->format('Y-m-d');
+                $events = $byDay[$key] ?? [];
+                $row[] = [
+                    'date' => $key,
+                    'in_month' => (int) $cur->month === $month,
+                    'day' => $cur->day,
+                    'events' => $events,
+                    'event_count' => count($events),
+                ];
+                $cur->addDay();
+            }
+            $weeks[] = $row;
+        }
+
+        return $weeks;
+    }
+
+    /**
      * Si el texto parece escrito todo en mayúsculas (sin letras minúsculas), pasarlo a oración:
      * primera letra en mayúscula y el resto en minúsculas (UTF-8).
      */
@@ -298,23 +412,51 @@ class AgendaDirectivaCalendarService
     }
 
     /**
-     * Tipo de ficha para textura de encabezado: agenda (asuntos) | pre_gira | gira.
+     * Tipo de ficha para textura de encabezado: agenda (asuntos) | pre_gira | gira | personalizada.
      */
     private function cardKindForFicha(Agenda $agenda): string
     {
         if ($agenda->tipo === 'gira') {
             return strtolower((string) ($agenda->subtipo ?? '')) === 'pre-gira' ? 'pre_gira' : 'gira';
         }
+        if ($agenda->tipo === 'personalizado') {
+            return 'personalizada';
+        }
 
         return 'agenda';
     }
 
+    private function cardKindLabelForFicha(Agenda $agenda): string
+    {
+        if ($agenda->tipo === 'personalizado') {
+            $label = trim((string) ($agenda->ficha_titulo ?? ''));
+
+            return $label !== '' ? $this->sentenceCaseIfAllCaps($label) : 'Ficha personalizada';
+        }
+        if ($agenda->tipo === 'gira') {
+            return strtolower((string) ($agenda->subtipo ?? '')) === 'pre-gira' ? 'Pre-gira' : 'Gira';
+        }
+
+        return 'Agenda';
+    }
+
+    private function cardBackgroundForFicha(Agenda $agenda): string
+    {
+        if ($agenda->tipo !== 'personalizado') {
+            return '';
+        }
+
+        $bg = strtolower(trim((string) ($agenda->ficha_fondo ?? '')));
+
+        return in_array($bg, ['tlaloc_a_beige', 'tlaloc_a_rojo', 'tlaloc_a_verde', 'beige', 'blanco', 'rojo', 'verde'], true) ? $bg : 'beige';
+    }
+
     /**
-     * Hora en 12 h (p. ej. 06:00 pm) solo para giras y pre-giras con hora habilitada.
+     * Hora en 12 h (p. ej. 06:00 pm) para fichas con hora habilitada.
      */
     private function fichaHoraLabel12hForGira(Agenda $agenda): ?string
     {
-        if ($agenda->tipo !== 'gira') {
+        if (! in_array($agenda->tipo, ['gira', 'personalizado'], true)) {
             return null;
         }
         if (! $agenda->habilitar_hora) {
@@ -466,6 +608,8 @@ class AgendaDirectivaCalendarService
             'descripcion' => $desc,
             'aforo_label' => $agenda->aforoEtiquetaTarjeta(),
             'kind' => $this->cardKindForFicha($agenda),
+            'kind_label' => $this->cardKindLabelForFicha($agenda),
+            'ficha_bg' => $this->cardBackgroundForFicha($agenda),
             'sort_key' => $anchor->format('Y-m-d'),
         ];
     }

@@ -9,22 +9,24 @@
     @forelse ($cards as $card)
         @php
             $fichaKind = $card['kind'] ?? 'agenda';
-            $fichaKindLabel = match ($fichaKind) {
+            $fichaKindLabel = $card['kind_label'] ?? match ($fichaKind) {
                 'pre_gira' => 'Pre-gira',
                 'gira' => 'Gira',
+                'personalizada' => 'Ficha personalizada',
                 default => 'Agenda',
             };
+            $fichaBg = $fichaKind === 'personalizada' && in_array(($card['ficha_bg'] ?? 'beige'), ['tlaloc_a_beige', 'tlaloc_a_rojo', 'tlaloc_a_verde', 'beige', 'blanco', 'rojo', 'verde'], true) ? $card['ficha_bg'] : '';
             $fichaShowUrl = route('agenda.show', ['agenda' => $card['agenda_id'], 'return' => $previewReturn, 'preview' => 'ficha']);
         @endphp
         <article class="agenda-cal-card">
-            <div class="agenda-cal-card-head agenda-cal-card-head--{{ $fichaKind }}">
+            <div class="agenda-cal-card-head agenda-cal-card-head--{{ $fichaKind }}{{ $fichaBg !== '' ? ' agenda-cal-card-head--bg-'.$fichaBg : '' }}">
                 <div class="agenda-cal-card-head-inner">
                     <span class="agenda-cal-card-eyebrow">{{ $fichaKindLabel }}</span>
                 </div>
                 <div class="agenda-cal-card-head-date" aria-hidden="true">
                     <span class="agenda-cal-card-head-daynum">{{ $card['badge_day'] }}</span>
                     <span class="agenda-cal-card-head-dateline">{{ e($card['month_year_label'] ?? '') }}</span>
-                    @if (in_array($fichaKind, ['gira', 'pre_gira'], true) && ! empty($card['hora_ficha']))
+                    @if (! empty($card['hora_ficha']))
                         <span class="agenda-cal-card-head-time">{{ e($card['hora_ficha']) }}</span>
                     @endif
                 </div>

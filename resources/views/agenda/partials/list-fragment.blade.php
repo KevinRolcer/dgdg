@@ -20,7 +20,9 @@
                         <p class="ag-card-subtitle">
                             <i class="fa-regular fa-file" aria-hidden="true"></i>
                             {{ ucfirst(str_replace('_', '-', $item->tipo)) }}
-                            @if($item->subtipo && $item->tipo != 'agenda')
+                            @if($item->tipo === 'personalizado' && $item->ficha_titulo)
+                                - {{ $item->ficha_titulo }}
+                            @elseif($item->subtipo && $item->tipo != 'agenda')
                                 — {{ ucfirst($item->subtipo) }}
                             @endif
                             @if (!empty($item->es_actualizacion))
@@ -74,6 +76,8 @@
                                 data-id="{{ $item->id }}"
                                 data-tipo="{{ $item->tipo }}"
                                 data-subtipo="{{ $item->subtipo ?? 'gira' }}"
+                                data-ficha-titulo="{{ e($item->ficha_titulo) }}"
+                                data-ficha-fondo="{{ e($item->ficha_fondo) }}"
                                 data-asunto="{{ e($item->asunto) }}"
                                 data-microrregion="{{ e($item->microrregion) }}"
                                 data-municipio="{{ e($item->municipio) }}"

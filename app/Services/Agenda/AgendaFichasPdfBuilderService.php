@@ -29,7 +29,10 @@ class AgendaFichasPdfBuilderService
      *   buscar: string,
      *   kind_gira: bool,
      *   kind_pre_gira: bool,
-     *   kind_agenda: bool
+     *   kind_agenda: bool,
+     *   kind_personalizada: bool,
+     *   pdf_title?: string,
+     *   pdf_subtitle?: string
      * }  $params
      */
     public function renderPdfToFile(User $user, array $params, string $absolutePath): void
@@ -44,15 +47,6 @@ class AgendaFichasPdfBuilderService
             'buscar' => $params['buscar'],
         ];
 
-        $cards = $this->agendaDirectivaCalendar->buildCardsForFichasPdf(
-            $user,
-            $filters,
-            $params['scope'],
-            $params['year'],
-            $params['month'],
-            $params['custom_months']
-        );
-
         $allowedKinds = [];
         if ($params['kind_gira']) {
             $allowedKinds[] = 'gira';
@@ -63,6 +57,84 @@ class AgendaFichasPdfBuilderService
         if ($params['kind_agenda']) {
             $allowedKinds[] = 'agenda';
         }
+        if ($params['kind_personalizada']) {
+            $allowedKinds[] = 'personalizada';
+        }
+
+        $template = $params['template'] ?? 'summary';
+        $monthLabel = $this->fichasPdfPeriodLabel(
+            $params['scope'],
+            $params['year'],
+            $params['month'],
+            $params['custom_months']
+        );
+        $allKindsSelected = $params['kind_gira'] && $params['kind_pre_gira'] && $params['kind_agenda'] && $params['kind_personalizada'];
+        $filtersNote = $this->fichasPdfFiltersNote(
+            $params['clasificacion'],
+            $params['buscar'],
+            $allKindsSelected
+        );
+        $kindsNote = $this->fichasPdfSelectedKindsLabel(
+            $params['kind_gira'],
+            $params['kind_pre_gira'],
+            $params['kind_agenda'],
+            $params['kind_personalizada']
+        );
+        $documentTitle = $params['pdf_title'] !== ''
+            ? $params['pdf_title']
+            : $this->fichasPdfDocumentTitle($monthLabel, $kindsNote, $template);
+        $documentSubtitle = $params['pdf_subtitle'] !== '' ? $params['pdf_subtitle'] : $filtersNote;
+
+        /** @var \Barryvdh\DomPDF\PDF $pdf */
+        $pdf = app('dompdf.wrapper');
+        $pdf->getDomPDF()->setBasePath(public_path());
+        $pdfFontFamily = $this->registerDompdfAgendaFichasFonts($pdf->getDomPDF());
+
+        if ($template === 'calendar') {
+            $calendarPages = $this->agendaDirectivaCalendar->buildMonthCalendarPagesForPdf(
+                $user,
+                $filters,
+                $params['scope'],
+                $params['year'],
+                $params['month'],
+                $params['custom_months'],
+                $allowedKinds
+            );
+
+
+            // Pass allowedKinds for legend logic
+            $allowedKinds = array_filter([
+                'agenda' => $params['kind_agenda'],
+                'gira' => $params['kind_gira'],
+                'pre_gira' => $params['kind_pre_gira'],
+                'personalizada' => $params['kind_personalizada'],
+            ]);
+            $binary = $pdf
+                ->loadView('agenda.pdf.calendario-mes', [
+                    'documentTitle' => $documentTitle,
+                    'documentSubtitle' => $documentSubtitle,
+                    'calendarPages' => $calendarPages,
+                    'filtersNote' => $filtersNote,
+                    'pdfFontFamily' => $pdfFontFamily,
+                    'personalizadaLabel' => $params['personalizada_label'] !== '' ? $params['personalizada_label'] : 'Personalizada',
+                    'allowedKinds' => array_keys(array_filter($allowedKinds)),
+                ])
+                ->setPaper('a4', 'landscape')
+                ->output();
+
+            File::put($absolutePath, $binary);
+
+            return;
+        }
+
+        $cards = $this->agendaDirectivaCalendar->buildCardsForFichasPdf(
+            $user,
+            $filters,
+            $params['scope'],
+            $params['year'],
+            $params['month'],
+            $params['custom_months']
+        );
 
         $cards = array_values(array_filter($cards, function (array $c) use ($allowedKinds): bool {
             $k = $c['kind'] ?? 'agenda';
@@ -70,7 +142,6 @@ class AgendaFichasPdfBuilderService
             return in_array($k, $allowedKinds, true);
         }));
 
-        $template = $params['template'] ?? 'summary';
         $view = $template === 'individual' ? 'agenda.pdf.ficha-individual' : 'agenda.pdf.fichas-calendario';
 
         // Individual cards are always portrait, summary can be either
@@ -89,32 +160,10 @@ class AgendaFichasPdfBuilderService
             }
         }
 
-        $monthLabel = $this->fichasPdfPeriodLabel(
-            $params['scope'],
-            $params['year'],
-            $params['month'],
-            $params['custom_months']
-        );
-        $allKindsSelected = $params['kind_gira'] && $params['kind_pre_gira'] && $params['kind_agenda'];
-        $filtersNote = $this->fichasPdfFiltersNote(
-            $params['clasificacion'],
-            $params['buscar'],
-            $allKindsSelected
-        );
-        $kindsNote = $this->fichasPdfSelectedKindsLabel(
-            $params['kind_gira'],
-            $params['kind_pre_gira'],
-            $params['kind_agenda']
-        );
-        $documentTitle = $this->fichasPdfDocumentTitle($monthLabel, $kindsNote);
-
-        /** @var \Barryvdh\DomPDF\PDF $pdf */
-        $pdf = app('dompdf.wrapper');
-        $pdfFontFamily = $this->registerDompdfAgendaFichasFonts($pdf->getDomPDF());
-
         $binary = $pdf
             ->loadView($view, [
                 'documentTitle' => $documentTitle,
+                'documentSubtitle' => $documentSubtitle,
                 'rows' => $rows,
                 'cols' => $cols,
                 'filtersNote' => $filtersNote,
@@ -169,14 +218,21 @@ class AgendaFichasPdfBuilderService
      *   buscar: string,
      *   kind_gira: bool,
      *   kind_pre_gira: bool,
-     *   kind_agenda: bool
+     *   kind_agenda: bool,
+     *   kind_personalizada: bool,
+     *   pdf_title: string,
+     *   pdf_subtitle: string
      * }
      */
     private function normalizeQueuedFichasPdfParams(array $params): array
     {
         $clas = (string) ($params['clasificacion'] ?? '');
-        if (! in_array($clas, ['', 'gira', 'pre_gira', 'agenda'], true)) {
+        if (! in_array($clas, ['', 'gira', 'pre_gira', 'agenda', 'personalizada'], true)) {
             $clas = '';
+        }
+        $template = (string) ($params['template'] ?? 'summary');
+        if (! in_array($template, ['summary', 'individual', 'calendar'], true)) {
+            $template = 'summary';
         }
 
         return [
@@ -190,7 +246,11 @@ class AgendaFichasPdfBuilderService
             'kind_gira' => filter_var($params['kind_gira'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'kind_pre_gira' => filter_var($params['kind_pre_gira'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'kind_agenda' => filter_var($params['kind_agenda'] ?? false, FILTER_VALIDATE_BOOLEAN),
-            'template' => (string) ($params['template'] ?? 'summary'),
+            'kind_personalizada' => filter_var($params['kind_personalizada'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'template' => $template,
+            'pdf_title' => trim((string) ($params['pdf_title'] ?? '')),
+            'pdf_subtitle' => trim((string) ($params['pdf_subtitle'] ?? '')),
+            'personalizada_label' => trim((string) ($params['personalizada_label'] ?? '')),
         ];
     }
 
@@ -321,6 +381,7 @@ class AgendaFichasPdfBuilderService
         bool $kindGira,
         bool $kindPreGira,
         bool $kindAgenda,
+        bool $kindPersonalizada = false,
         string $template = 'summary',
         string $buscar = '',
     ): string {
@@ -334,10 +395,11 @@ class AgendaFichasPdfBuilderService
             'gira' => 'list-giras',
             'pre_gira' => 'list-pregiras',
             'agenda' => 'list-agenda',
+            'personalizada' => 'list-personalizadas',
             default => 'list-todos',
         };
 
-        $slugKinds = self::slugKindsForFileName($kindGira, $kindPreGira, $kindAgenda);
+        $slugKinds = self::slugKindsForFileName($kindGira, $kindPreGira, $kindAgenda, $kindPersonalizada);
 
         $parts = ['fichas', $template, $slugPeriod, $slugList, $slugKinds];
         if (trim($buscar) !== '') {
@@ -378,7 +440,7 @@ class AgendaFichasPdfBuilderService
         return $n.'meses-'.$from.'-a-'.$to;
     }
 
-    private static function slugKindsForFileName(bool $kindGira, bool $kindPreGira, bool $kindAgenda): string
+    private static function slugKindsForFileName(bool $kindGira, bool $kindPreGira, bool $kindAgenda, bool $kindPersonalizada = false): string
     {
         $bits = [];
         if ($kindGira) {
@@ -390,13 +452,16 @@ class AgendaFichasPdfBuilderService
         if ($kindAgenda) {
             $bits[] = 'agenda';
         }
+        if ($kindPersonalizada) {
+            $bits[] = 'personalizadas';
+        }
 
         return $bits === [] ? 'inc-ninguno' : 'inc-'.implode('-', $bits);
     }
 
-    private function fichasPdfDocumentTitle(string $periodLine, string $kindsLine): string
+    private function fichasPdfDocumentTitle(string $periodLine, string $kindsLine, string $template = 'summary'): string
     {
-        $parts = ['Fichas de agenda'];
+        $parts = [$template === 'calendar' ? 'Calendario mensual' : 'Fichas de agenda'];
         if ($periodLine !== '') {
             $parts[] = $periodLine;
         }
@@ -410,9 +475,9 @@ class AgendaFichasPdfBuilderService
     /**
      * Sufijo corto para el título del PDF (sin texto cuando están los tres tipos).
      */
-    private function fichasPdfSelectedKindsLabel(bool $kindGira, bool $kindPreGira, bool $kindAgenda): string
+    private function fichasPdfSelectedKindsLabel(bool $kindGira, bool $kindPreGira, bool $kindAgenda, bool $kindPersonalizada): string
     {
-        if ($kindGira && $kindPreGira && $kindAgenda) {
+        if ($kindGira && $kindPreGira && $kindAgenda && $kindPersonalizada) {
             return '';
         }
 
@@ -426,6 +491,9 @@ class AgendaFichasPdfBuilderService
         if ($kindAgenda) {
             $labels[] = 'Agenda';
         }
+        if ($kindPersonalizada) {
+            $labels[] = 'Fichas personalizadas';
+        }
 
         if (count($labels) === 1) {
             return $labels[0];
@@ -433,6 +501,11 @@ class AgendaFichasPdfBuilderService
 
         if (count($labels) === 2) {
             return $labels[0].' y '.$labels[1];
+        }
+        if (count($labels) > 2) {
+            $last = array_pop($labels);
+
+            return implode(', ', $labels).' y '.$last;
         }
 
         return '';
@@ -453,6 +526,7 @@ class AgendaFichasPdfBuilderService
                 'gira' => 'solo giras',
                 'pre_gira' => 'solo pre-giras',
                 'agenda' => 'solo agenda (asuntos)',
+                'personalizada' => 'solo fichas personalizadas',
                 default => $clasificacion,
             };
         } elseif (! $allKindsSelected) {

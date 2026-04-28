@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>{{ $documentTitle }}</title>
-    {{-- Imágenes: rutas relativas a public/ (Dompdf::setBasePath(public_path())). Fuentes: FontMetrics::registerFont en AgendaController. --}}
     <style>
         {{-- @@ escapa @ para Blade; @page en CSS no debe interpretarse como directiva @page --}}
         @@page { margin: 14mm 17mm; }
@@ -16,10 +15,10 @@
             color: #484747;
             margin: 0;
         }
-        /* Dompdf aplica estilos de agente a h1/h2… (suele forzar serif); forzar la misma familia que body. */
         .pdf-head,
         .pdf-head h1,
         .pdf-head .sub,
+        .pdf-logo,
         .empty-note,
         .card,
         .card table,
@@ -31,10 +30,19 @@
             font-family: '{{ $pdfFontFamily }}', DejaVu Sans, Helvetica, sans-serif;
         }
         .pdf-head {
+            position: relative;
             text-align: center;
             margin-bottom: 5mm;
-            padding: 0 2mm 3mm;
+            min-height: 17mm;
+            padding: 1mm 2mm 4mm 58mm;
             border-bottom: 0.4pt solid rgba(72, 71, 71, 0.2);
+        }
+        .pdf-logo {
+            position: absolute;
+            left: 0;
+            top: 1mm;
+            width: 104mm;
+            height: auto;
         }
         .pdf-head h1 {
             margin: 0 0 1.2mm;
@@ -51,7 +59,6 @@
             font-weight: 500;
             letter-spacing: 0.02em;
         }
-        /* Tabla fija: Dompdf maneja mal floats + %; evita desbordes a la derecha */
         .pdf-row-table {
             width: 100%;
             border-collapse: separate;
@@ -104,6 +111,42 @@
             background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)),
                 url('images/Texturas_1A-Tlaloc_verde.png');
         }
+        .card-h--personalizada,
+        .card-h--bg-rojo {
+            background-color: #4a1f28;
+            background-image: linear-gradient(180deg, rgba(40, 22, 28, 0.5), rgba(40, 22, 28, 0.35)),
+                url('images/Texturas_1C-Tlaloc_rojo.png');
+        }
+        .card-h--bg-tlaloc_a_rojo {
+            background-color: #4a1f28;
+            background-image: linear-gradient(180deg, rgba(40, 22, 28, 0.5), rgba(40, 22, 28, 0.35)),
+                url('images/Texturas_1A-Tlaloc_rojo.png');
+        }
+        .card-h--bg-beige {
+            background-color: #3d3528;
+            background-image: linear-gradient(180deg, rgba(45, 38, 28, 0.5), rgba(45, 38, 28, 0.35)),
+                url('images/Texturas_1C-Tlaloc_beige.png');
+        }
+        .card-h--bg-tlaloc_a_beige {
+            background-color: #3d3528;
+            background-image: linear-gradient(180deg, rgba(45, 38, 28, 0.5), rgba(45, 38, 28, 0.35)),
+                url('images/Texturas_1A-Tlaloc_beige.png');
+        }
+        .card-h--bg-blanco {
+            background-color: #f4f4f4;
+            background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.16)),
+                url('images/Texturas_1C-Tlaloc_blanco.png');
+        }
+        .card-h--bg-verde {
+            background-color: #1e3d32;
+            background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)),
+                url('images/Texturas_1C-Tlaloc_verde.png');
+        }
+        .card-h--bg-tlaloc_a_verde {
+            background-color: #1e3d32;
+            background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)),
+                url('images/Texturas_1A-Tlaloc_verde.png');
+        }
         .card-h-top {
             display: table;
             width: 100%;
@@ -134,11 +177,22 @@
             letter-spacing: -0.045em;
         }
         .card-h--gira .card-daynum,
-        .card-h--agenda .card-daynum {
+        .card-h--agenda .card-daynum,
+        .card-h--personalizada .card-daynum {
             color: #c79b66;
         }
-        .card-h--pre_gira .card-daynum {
+        .card-h--pre_gira .card-daynum,
+        .card-h--bg-beige .card-daynum,
+        .card-h--bg-tlaloc_a_beige .card-daynum {
             color: #5f1b2d;
+        }
+        .card-h--bg-blanco .card-kind,
+        .card-h--bg-blanco .card-my,
+        .card-h--bg-blanco .card-time {
+            color: #5f1b2d;
+        }
+        .card-h--bg-blanco .card-daynum {
+            color: #c79b66;
         }
         .card-my {
             font-size: 7pt;
@@ -174,7 +228,9 @@
             background-position: center;
             background-repeat: no-repeat;
         }
-        /* Título: más presencia (Black 900); interlineado ajustado para caber en A4 */
+        .card-body--white-bg {
+            box-shadow: 0 -7mm 14mm rgba(0, 0, 0, 0.08);
+        }
         .card-title {
             font-size: 11.35pt;
             font-weight: 900;
@@ -208,24 +264,14 @@
         .card-loc-body {
             padding: 0;
         }
-        /* Etiqueta: .agenda-cal-card-desc-label */
-        .card-lbl {
-            font-size: 5.75pt;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            color: #6b6a6a;
-            margin: 0 0 0.45mm;
-        }
         /* Lugar: .agenda-cal-card-address */
         .card-address {
             font-size: 10pt;
             font-weight: 600;
             color: #484747;
-            margin: 0 0 0.85mm;
+            margin: 0 0 0.7mm;
             line-height: 1.36;
         }
-        /* Detalle: .agenda-cal-card-desc */
         .card-desc {
             font-size: 8.35pt;
             font-weight: 400;
@@ -254,9 +300,10 @@
 </head>
 <body>
     <div class="pdf-head">
+        <img src="images/LogoSegobHorizontal.png" class="pdf-logo" alt="">
         <h1>{{ $documentTitle }}</h1>
-        @if(!empty($filtersNote))
-            <div class="sub">{{ $filtersNote }}</div>
+        @if(!empty($documentSubtitle ?? ''))
+            <div class="sub">{{ $documentSubtitle }}</div>
         @endif
     </div>
 
@@ -269,15 +316,18 @@
                 @foreach($row as $card)
                     @php
                         $kind = $card['kind'] ?? 'agenda';
-                        $kindLabel = match ($kind) {
+                        $kindLabel = $card['kind_label'] ?? match ($kind) {
                             'pre_gira' => 'Pre-gira',
                             'gira' => 'Gira',
+                            'personalizada' => 'Ficha personalizada',
                             default => 'Agenda',
                         };
+                        $fichaBg = $kind === 'personalizada' && in_array(($card['ficha_bg'] ?? 'beige'), ['tlaloc_a_beige', 'tlaloc_a_rojo', 'tlaloc_a_verde', 'beige', 'blanco', 'rojo', 'verde'], true) ? $card['ficha_bg'] : '';
+                        $isWhiteFichaBg = $fichaBg === 'blanco';
                     @endphp
                     <td class="pdf-cell" style="width: {{ 100 / $cols }}%;">
                         <div class="card">
-                            <div class="card-h card-h--{{ $kind }}">
+                            <div class="card-h card-h--{{ $kind }}{{ $fichaBg !== '' ? ' card-h--bg-'.$fichaBg : '' }}">
                                 <div class="card-h-top">
                                     <div class="card-h-left">
                                         <span class="card-kind">{{ $kindLabel }}</span>
@@ -287,13 +337,13 @@
                                         @if(!empty($card['month_year_label']))
                                             <div class="card-my">{{ strtoupper($card['month_year_label']) }}</div>
                                         @endif
-                                        @if(!empty($card['hora_ficha']) && in_array($kind, ['gira', 'pre_gira'], true))
+                                        @if(!empty($card['hora_ficha']))
                                             <div class="card-time">{{ $card['hora_ficha'] }}</div>
                                         @endif
                                     </div>
                                 </div>
                             </div>
-                            <div class="card-body">
+                            <div class="card-body{{ $isWhiteFichaBg ? ' card-body--white-bg' : '' }}">
                                 <p class="card-title">{{ $card['title'] }}</p>
                                 @if(!empty($card['lugar']) || !empty($card['descripcion']))
                                     <table class="card-loc" role="presentation">
@@ -302,7 +352,6 @@
                                                 <img src="images/agenda-pin-ubicacion.svg" class="card-loc-img" alt="">
                                             </td>
                                             <td class="card-loc-body">
-                                                <p class="card-lbl">Ubicación y detalle</p>
                                                 @if(!empty($card['lugar']))
                                                     <p class="card-address">{{ $card['lugar'] }}</p>
                                                 @endif

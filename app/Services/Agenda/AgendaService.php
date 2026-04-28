@@ -24,7 +24,7 @@ class AgendaService
     public function paginateAgendas(array $filters, ?User $viewer = null): LengthAwarePaginator
     {
         $clasificacion = $filters['clasificacion'] ?? '';
-        if (! in_array($clasificacion, ['', 'gira', 'pre_gira', 'agenda'], true)) {
+        if (! in_array($clasificacion, ['', 'gira', 'pre_gira', 'agenda', 'personalizada'], true)) {
             $clasificacion = '';
         }
         $buscar = trim((string) ($filters['buscar'] ?? ''));
@@ -48,6 +48,8 @@ class AgendaService
             $query->where(function ($q) {
                 $q->where('tipo', 'asunto')->orWhereNull('tipo');
             });
+        } elseif ($clasificacion === 'personalizada') {
+            $query->where('tipo', 'personalizado');
         }
 
         if ($buscar !== '') {
@@ -170,6 +172,8 @@ class AgendaService
                 'repite' => $request->has('repite'),
                 'tipo' => $request->input('tipo', 'asunto'),
                 'subtipo' => $request->input('tipo') === 'gira' ? $request->input('subtipo', 'gira') : null,
+                'ficha_titulo' => $request->input('tipo') === 'personalizado' ? trim((string) $request->input('ficha_titulo', '')) : null,
+                'ficha_fondo' => $request->input('tipo') === 'personalizado' ? $request->input('ficha_fondo', 'beige') : null,
                 'direcciones_adicionales' => array_values(array_filter(array_map('trim', $request->input('direcciones_adicionales', [])))),
             ]);
             // Si es gira/pre-gira, agregar delegado encargado a la descripción
@@ -202,6 +206,8 @@ class AgendaService
                 'habilitar_hora' => $request->has('habilitar_hora'),
                 'repite' => $request->has('repite'),
                 'subtipo' => $request->input('tipo') === 'gira' ? $request->input('subtipo', 'gira') : null,
+                'ficha_titulo' => $request->input('tipo') === 'personalizado' ? trim((string) $request->input('ficha_titulo', '')) : null,
+                'ficha_fondo' => $request->input('tipo') === 'personalizado' ? $request->input('ficha_fondo', 'beige') : null,
                 'dias_repeticion' => $request->input('dias_repeticion', []),
                 'direcciones_adicionales' => array_values(array_filter(array_map('trim', $request->input('direcciones_adicionales', [])))),
             ]);

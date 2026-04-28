@@ -31,7 +31,7 @@
     <p class="agenda-cal-filter-note">
         Filtros activos desde el listado:
         @if($clasificacion !== '')
-            <strong>{{ match($clasificacion) { 'gira' => 'Giras', 'pre_gira' => 'Pre-giras', 'agenda' => 'Agenda', default => $clasificacion } }}</strong>
+            <strong>{{ match($clasificacion) { 'gira' => 'Giras', 'pre_gira' => 'Pre-giras', 'agenda' => 'Agenda', 'personalizada' => 'Fichas personalizadas', default => $clasificacion } }}</strong>
         @endif
         @if($buscar !== '')
             @if($clasificacion !== '') · @endif
@@ -58,7 +58,7 @@
                                 @foreach ($cell['events'] as $ev)
                                     @php
                                         $evKind = $ev['kind'] ?? 'agenda';
-                                        $evKind = in_array($evKind, ['agenda', 'gira', 'pre_gira'], true) ? $evKind : 'agenda';
+                                        $evKind = in_array($evKind, ['agenda', 'gira', 'pre_gira', 'personalizada'], true) ? $evKind : 'agenda';
                                     @endphp
                                     <div class="agenda-cal-event-chip agenda-cal-event-chip--{{ $evKind }}" title="{{ e($ev['title']) }}">
                                         <a href="{{ route('agenda.show', ['agenda' => $ev['agenda_id'], 'return' => $previewReturn]) }}" class="agenda-cal-event-link">{{ e(\Illuminate\Support\Str::limit($ev['title'], 28)) }}</a>

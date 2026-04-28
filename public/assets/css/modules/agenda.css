@@ -1009,6 +1009,72 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     align-items: flex-end;
 }
 
+.agenda-custom-ficha-box {
+    margin-bottom: 0.65rem;
+}
+
+.agenda-custom-title-col {
+    flex: 1 1 60%;
+    min-width: 0;
+}
+
+.agenda-custom-bg-col {
+    flex: 0 0 220px;
+    min-width: 160px;
+}
+
+.agenda-ficha-bg-preview {
+    display: flex;
+    align-items: center;
+    min-height: 38px;
+    margin: 0.35rem 0 0.65rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 8px;
+    background-size: cover;
+    background-position: center;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.agenda-ficha-bg-preview.is-rojo {
+    background-color: #4a1f28;
+    background-image: linear-gradient(180deg, rgba(40, 22, 28, 0.5), rgba(40, 22, 28, 0.35)), url('../../../images/Texturas_1C-Tlaloc_rojo.png');
+}
+
+.agenda-ficha-bg-preview.is-tlaloc_a_rojo {
+    background-color: #4a1f28;
+    background-image: linear-gradient(180deg, rgba(40, 22, 28, 0.5), rgba(40, 22, 28, 0.35)), url('../../../images/Texturas_1A-Tlaloc_rojo.png');
+}
+
+.agenda-ficha-bg-preview.is-beige {
+    background-color: #7a6445;
+    background-image: linear-gradient(180deg, rgba(70, 56, 38, 0.35), rgba(70, 56, 38, 0.25)), url('../../../images/Texturas_1C-Tlaloc_beige.png');
+}
+
+.agenda-ficha-bg-preview.is-tlaloc_a_beige {
+    background-color: #7a6445;
+    background-image: linear-gradient(180deg, rgba(70, 56, 38, 0.35), rgba(70, 56, 38, 0.25)), url('../../../images/Texturas_1A-Tlaloc_beige.png');
+}
+
+.agenda-ficha-bg-preview.is-blanco {
+    background-color: #f6f6f6;
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.18)), url('../../../images/Texturas_1C-Tlaloc_blanco.png');
+    color: #5f1b2d;
+}
+
+.agenda-ficha-bg-preview.is-verde {
+    background-color: #1e3d32;
+    background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)), url('../../../images/Texturas_1C-Tlaloc_verde.png');
+}
+
+.agenda-ficha-bg-preview.is-tlaloc_a_verde {
+    background-color: #1e3d32;
+    background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)), url('../../../images/Texturas_1A-Tlaloc_verde.png');
+}
+
 .agenda-fecha-hora-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(170px, 1fr);
@@ -1235,9 +1301,12 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
 
     .agenda-col-40,
     .agenda-col-municipio,
-    .agenda-col-semaforo {
+    .agenda-col-semaforo,
+    .agenda-custom-title-col,
+    .agenda-custom-bg-col {
         flex: 1 1 auto;
         max-width: 100%;
+        width: 100%;
     }
 
     .modal-agenda-footer {
@@ -1857,4 +1926,3 @@ html.theme-dark .ag-badge-inline {
     background: rgba(199, 155, 102, 0.15);
     color: var(--clr-accent);
 }
-

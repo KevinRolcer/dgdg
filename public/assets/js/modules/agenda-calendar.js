@@ -509,12 +509,51 @@
     function updatePrintScopeUi() {
         var form = document.getElementById('agendaCalFichasPrintForm');
         var box = document.getElementById('agendaCalPrintCustomMonthsBox');
+        var scopeFieldset = document.getElementById('agendaCalPrintScopeFieldset');
+        var calSection = document.getElementById('agendaCalPrintCalendarSection');
         if (!form || !box) {
             return;
         }
-        var scopeEl = form.querySelector('input[name="scope"]:checked');
-        var v = scopeEl ? scopeEl.value : '';
-        box.hidden = v !== 'custom_months';
+        var templateEl = form.querySelector('input[name="template"]:checked');
+        var t = templateEl ? templateEl.value : '';
+        var isCalendar = t === 'calendar';
+
+        if (isCalendar) {
+            if (scopeFieldset) {
+                scopeFieldset.hidden = true;
+            }
+            if (calSection) {
+                calSection.hidden = false;
+            }
+            // Force scope to custom_months for calendar template
+            var customMonthsRadio = form.querySelector('input[name="scope"][value="custom_months"]');
+            if (customMonthsRadio) {
+                customMonthsRadio.checked = true;
+            }
+            box.hidden = false;
+            // Pre-add current month if list is empty
+            var ul = document.getElementById('agendaCalPrintMonthList');
+            if (ul && ul.querySelectorAll('li').length === 0) {
+                var meta = getStateMeta();
+                if (meta) {
+                    var py = parseInt(meta.getAttribute('data-agenda-cal-year') || '0', 10);
+                    var pm = parseInt(meta.getAttribute('data-agenda-cal-month') || '0', 10);
+                    if (py && pm) {
+                        addCustomMonthToList(py, pm);
+                    }
+                }
+            }
+        } else {
+            if (scopeFieldset) {
+                scopeFieldset.hidden = false;
+            }
+            if (calSection) {
+                calSection.hidden = true;
+            }
+            var scopeEl = form.querySelector('input[name="scope"]:checked');
+            var v = scopeEl ? scopeEl.value : '';
+            box.hidden = v !== 'custom_months';
+        }
     }
 
     function syncPrintMonthInputFromCalendar() {
@@ -561,14 +600,25 @@
         var kg = form.querySelector('input[name="kind_gira"]');
         var kp = form.querySelector('input[name="kind_pre_gira"]');
         var ka = form.querySelector('input[name="kind_agenda"]');
-        if (errEl && kg && kp && ka && !kg.checked && !kp.checked && !ka.checked) {
-            errEl.textContent = 'Selecciona al menos un tipo: Gira, Pre-gira o Agenda.';
+        var kc = form.querySelector('input[name="kind_personalizada"]');
+        if (errEl && kg && kp && ka && kc && !kg.checked && !kp.checked && !ka.checked && !kc.checked) {
+            errEl.textContent = 'Selecciona al menos un tipo: Gira, Pre-gira, Agenda o Fichas personalizadas.';
             errEl.hidden = false;
             return;
         }
 
         var scopeEl = form.querySelector('input[name="scope"]:checked');
         var scope = scopeEl ? scopeEl.value : 'current_month';
+        var templateEl = form.querySelector('input[name="template"]:checked');
+        var template = templateEl ? templateEl.value : 'summary';
+
+        if (template === 'calendar' && scope === 'all') {
+            if (errEl) {
+                errEl.textContent = 'El calendario mensual se genera por mes. Elige el mes actual o varios meses.';
+                errEl.hidden = false;
+            }
+            return;
+        }
 
         syncCustomMonthsHiddenFromList();
 
@@ -685,7 +735,7 @@
         if (form) {
             form.addEventListener('submit', onPrintFormSubmit);
             form.addEventListener('change', function (ev) {
-                if (ev.target && ev.target.name === 'scope') {
+                if (ev.target && (ev.target.name === 'scope' || ev.target.name === 'template')) {
                     updatePrintScopeUi();
                 }
             });

@@ -36,7 +36,7 @@ class AgendaController extends Controller
         }
 
         $clasificacionRaw = (string) $request->query('clasificacion', '');
-        $clasificacion = in_array($clasificacionRaw, ['', 'gira', 'pre_gira', 'agenda'], true)
+        $clasificacion = in_array($clasificacionRaw, ['', 'gira', 'pre_gira', 'agenda', 'personalizada'], true)
             ? $clasificacionRaw
             : '';
         $buscar = trim((string) $request->query('buscar', ''));
@@ -123,11 +123,14 @@ class AgendaController extends Controller
             'orientation' => ['required', 'string', 'in:portrait,landscape'],
             'clasificacion' => ['nullable', 'string', 'max:32'],
             'buscar' => ['nullable', 'string', 'max:500'],
-            'template' => ['nullable', 'string', 'in:summary,individual'],
+            'template' => ['nullable', 'string', 'in:summary,individual,calendar'],
+            'pdf_title' => ['nullable', 'string', 'max:120'],
+            'pdf_subtitle' => ['nullable', 'string', 'max:180'],
+            'personalizada_label' => ['nullable', 'string', 'max:80'],
         ]);
 
         $clasificacionRaw = (string) ($validated['clasificacion'] ?? '');
-        $clasificacion = in_array($clasificacionRaw, ['', 'gira', 'pre_gira', 'agenda'], true)
+        $clasificacion = in_array($clasificacionRaw, ['', 'gira', 'pre_gira', 'agenda', 'personalizada'], true)
             ? $clasificacionRaw
             : '';
         $buscar = trim((string) ($validated['buscar'] ?? ''));
@@ -135,14 +138,20 @@ class AgendaController extends Controller
         $kindGira = $request->boolean('kind_gira');
         $kindPreGira = $request->boolean('kind_pre_gira');
         $kindAgenda = $request->boolean('kind_agenda');
-        if (! $kindGira && ! $kindPreGira && ! $kindAgenda) {
-            return response()->json(['message' => 'Selecciona al menos un tipo: Gira, Pre-gira o Agenda.'], 422);
+        $kindPersonalizada = $request->boolean('kind_personalizada');
+        if (! $kindGira && ! $kindPreGira && ! $kindAgenda && ! $kindPersonalizada) {
+            return response()->json(['message' => 'Selecciona al menos un tipo: Gira, Pre-gira, Agenda o Fichas personalizadas.'], 422);
         }
 
         $scope = $validated['scope'];
+        $template = (string) ($validated['template'] ?? 'summary');
         $year = isset($validated['year']) ? (int) $validated['year'] : null;
         $month = isset($validated['month']) ? (int) $validated['month'] : null;
         $customMonths = null;
+
+        if ($template === 'calendar' && $scope === 'all') {
+            return response()->json(['message' => 'El calendario mensual se genera por mes. Elige el mes actual o varios meses.'], 422);
+        }
 
         if ($scope === 'current_month') {
             if ($year === null || $month === null || $year < 2000 || $year > 2100 || $month < 1 || $month > 12) {
@@ -191,7 +200,8 @@ class AgendaController extends Controller
             $kindGira,
             $kindPreGira,
             $kindAgenda,
-            $validated['template'] ?? 'summary',
+            $kindPersonalizada,
+            $template,
             $buscar
         );
 
@@ -209,7 +219,11 @@ class AgendaController extends Controller
             'kind_gira' => $kindGira,
             'kind_pre_gira' => $kindPreGira,
             'kind_agenda' => $kindAgenda,
-            'template' => $validated['template'] ?? 'summary',
+            'kind_personalizada' => $kindPersonalizada,
+            'template' => $template,
+            'pdf_title' => trim((string) ($validated['pdf_title'] ?? '')),
+            'pdf_subtitle' => trim((string) ($validated['pdf_subtitle'] ?? '')),
+            'personalizada_label' => trim((string) ($validated['personalizada_label'] ?? '')),
         ];
 
         $user->notify(new ExcelExportPending($exportRequestId, 'Fichas agenda', 'pdf_fichas'));
@@ -267,7 +281,7 @@ class AgendaController extends Controller
             ]);
         }
 
-        $clasificacion = in_array($filters['clasificacion'], ['', 'gira', 'pre_gira', 'agenda'], true)
+        $clasificacion = in_array($filters['clasificacion'], ['', 'gira', 'pre_gira', 'agenda', 'personalizada'], true)
             ? $filters['clasificacion']
             : '';
         $buscar = trim((string) $filters['buscar']);
@@ -465,8 +479,10 @@ class AgendaController extends Controller
         return [
             'asunto' => 'required|string|max:255',
             'descripcion' => 'nullable|string',
-            'tipo' => 'nullable|string|in:asunto,gira',
+            'tipo' => 'nullable|string|in:asunto,gira,personalizado',
             'subtipo' => 'nullable|string|in:gira,pre-gira',
+            'ficha_titulo' => 'nullable|string|max:80|required_if:tipo,personalizado',
+            'ficha_fondo' => 'nullable|string|in:tlaloc_a_beige,tlaloc_a_rojo,tlaloc_a_verde,beige,blanco,rojo,verde|required_if:tipo,personalizado',
             'microrregion' => 'nullable|string|max:255',
             'municipio' => 'nullable|string|max:255',
             'lugar' => 'nullable|string',

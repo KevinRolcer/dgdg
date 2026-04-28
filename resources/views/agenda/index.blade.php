@@ -29,6 +29,9 @@
                 <button type="button" class="agenda-btn agenda-btn-secondary" onclick="openAgendaModal(null, 'gira')" title="Agregar Gira o Pre-Gira">
                     <i class="fa-solid fa-map-location-dot"></i> Gira/Pre-Gira
                 </button>
+                <button type="button" class="agenda-btn agenda-btn-secondary" onclick="openAgendaModal(null, 'personalizado')" title="Agregar ficha personalizada">
+                    <i class="fa-solid fa-palette"></i> Ficha personalizada
+                </button>
                 <button type="button" class="agenda-btn agenda-btn-primary" onclick="openAgendaModal(null, 'asunto')" title="Agregar nuevo asunto">
                     <i class="fa-solid fa-plus"></i> Nuevo Asunto
                 </button>
@@ -50,6 +53,7 @@
                         <button type="button" class="tm-module-chip {{ $clasificacion === 'gira' ? 'is-active' : '' }}" data-agenda-clasificacion="gira">Giras</button>
                         <button type="button" class="tm-module-chip {{ $clasificacion === 'pre_gira' ? 'is-active' : '' }}" data-agenda-clasificacion="pre_gira">Pre-giras</button>
                         <button type="button" class="tm-module-chip {{ $clasificacion === 'agenda' ? 'is-active' : '' }}" data-agenda-clasificacion="agenda">Agenda</button>
+                        <button type="button" class="tm-module-chip {{ $clasificacion === 'personalizada' ? 'is-active' : '' }}" data-agenda-clasificacion="personalizada">Personalizadas</button>
                         <a href="{{ route('agenda.index') }}" class="tm-module-chip tm-btn-clear agenda-filter-clear" data-agenda-clear-filters title="Quitar clasificación y filtros extra">
                             <i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i> Borrar filtro
                         </a>

@@ -37,6 +37,16 @@ function agendaMergeAforoIntoDescripcion(baseText, aforoInput) {
     return base ? base + '\n\n' + line : line;
 }
 
+function updateAgendaFichaBgPreview() {
+    var select = document.getElementById('modalFichaFondo');
+    var preview = document.getElementById('agendaFichaBgPreview');
+    if (!select || !preview) return;
+    preview.classList.remove('is-tlaloc_a_beige', 'is-tlaloc_a_rojo', 'is-tlaloc_a_verde', 'is-beige', 'is-blanco', 'is-rojo', 'is-verde');
+    var allowed = ['tlaloc_a_beige', 'tlaloc_a_rojo', 'tlaloc_a_verde', 'beige', 'blanco', 'rojo', 'verde'];
+    var bg = allowed.indexOf(select.value) !== -1 ? select.value : 'beige';
+    preview.classList.add('is-' + bg);
+}
+
 function openAgendaModal(id = null, tipo = 'asunto') {
     const modal = document.getElementById('agendaModal');
     const form = document.getElementById('agendaForm');
@@ -45,9 +55,14 @@ function openAgendaModal(id = null, tipo = 'asunto') {
     const tipoInput = document.getElementById('modalTipo');
     const subTipoInput = document.getElementById('modalSubtipo');
     const assignModal = document.getElementById('agendaAssignModal');
+    const fichaTituloInput = document.getElementById('modalFichaTitulo');
+    const fichaFondoInput = document.getElementById('modalFichaFondo');
+    const lugarPersonalizadoInput = document.getElementById('modalLugarPersonalizado');
+    const lugarGiraInput = document.getElementById('modalLugar');
 
     // Elements to toggle
     const fieldsGira = document.getElementById('fieldsGira');
+    const fieldsFichaPersonalizada = document.getElementById('fieldsFichaPersonalizada');
     const rowDescripcion = document.getElementById('rowDescripcion');
 
     // Reset form
@@ -84,7 +99,7 @@ function openAgendaModal(id = null, tipo = 'asunto') {
                     pill.classList.toggle('is-active', (pill.dataset.subtipo || 'gira') === subTipoInput.value);
                 });
             }
-            title.innerText = itemTipo === 'gira' ? 'Editar Gira/Pre-Gira' : 'Editar Asunto';
+            title.innerText = itemTipo === 'gira' ? 'Editar Gira/Pre-Gira' : (itemTipo === 'personalizado' ? 'Editar Ficha personalizada' : 'Editar Asunto');
             form.action = agendaUrlBase() + '/' + id;
             document.getElementById('formMethod').value = 'PUT';
 
@@ -112,6 +127,19 @@ function openAgendaModal(id = null, tipo = 'asunto') {
                 document.getElementById('modalDescripcion').value = rawDesc;
                 var aforoEl2 = document.getElementById('modalAforo');
                 if (aforoEl2) aforoEl2.value = '';
+            }
+            if (fichaTituloInput) fichaTituloInput.value = btn.dataset.fichaTitulo || '';
+            if (fichaFondoInput) fichaFondoInput.value = btn.dataset.fichaFondo || 'beige';
+            if (lugarPersonalizadoInput) lugarPersonalizadoInput.value = btn.dataset.lugar || '';
+            updateAgendaFichaBgPreview();
+            if (itemTipo === 'personalizado' && btnOpenDescRef) {
+                if (rawDesc.trim().length > 0) {
+                    btnOpenDescRef.innerHTML = '<i class="fa-solid fa-align-left" style="color: var(--clr-accent, #c79b66);"></i> Ver o Editar Descripción';
+                    btnOpenDescRef.classList.add('is-active');
+                } else {
+                    btnOpenDescRef.innerHTML = '<i class="fa-solid fa-align-left" style="color: var(--clr-accent, #c79b66);"></i> Añadir Descripción';
+                    btnOpenDescRef.classList.remove('is-active');
+                }
             }
             document.getElementById('modalFecha').value = btn.dataset.fecha || '';
             document.getElementById('modalRecordatorio').value = btn.dataset.recordatorio || '30';
@@ -152,23 +180,38 @@ function openAgendaModal(id = null, tipo = 'asunto') {
             // addresses.forEach(addr => addAddressRow(addr));
         }
     } else {
-        title.innerText = tipo === 'gira' ? 'Nueva Gira/Pre-Gira' : 'Nuevo Asunto';
+        title.innerText = tipo === 'gira' ? 'Nueva Gira/Pre-Gira' : (tipo === 'personalizado' ? 'Nueva Ficha personalizada' : 'Nuevo Asunto');
         form.action = agendaUrlStore();
         document.getElementById('formMethod').value = 'POST';
+        if (fichaTituloInput) fichaTituloInput.value = '';
+        if (fichaFondoInput) fichaFondoInput.value = 'beige';
+        if (lugarPersonalizadoInput) lugarPersonalizadoInput.value = '';
+        updateAgendaFichaBgPreview();
     }
 
     // Toggle fields based on type
     const isGira = tipoInput.value === 'gira';
+    const isPersonalizado = tipoInput.value === 'personalizado';
     if(fieldsGira) fieldsGira.style.display = isGira ? 'block' : 'none';
-    /* Descripción oculta en Gira/Pre-Gira (aforo sigue yendo a descripción al guardar). Solo Asunto. */
+    if(fieldsFichaPersonalizada) fieldsFichaPersonalizada.style.display = isPersonalizado ? 'block' : 'none';
+    if (fichaTituloInput) {
+        fichaTituloInput.required = isPersonalizado;
+        fichaTituloInput.disabled = !isPersonalizado;
+    }
+    if (fichaFondoInput) fichaFondoInput.disabled = !isPersonalizado;
+    if (lugarPersonalizadoInput) lugarPersonalizadoInput.disabled = !isPersonalizado;
+    if (lugarGiraInput) lugarGiraInput.disabled = !isGira;
+    /* Gira y ficha personalizada usan botón + modal para la descripción. */
     if (rowDescripcion) {
-        rowDescripcion.style.display = isGira ? 'none' : 'block';
+        rowDescripcion.style.display = (isGira || isPersonalizado) ? 'none' : 'block';
         var lbl = rowDescripcion.querySelector('.form-label-agenda');
         if (lbl) lbl.textContent = 'Descripción';
     }
     const tipoSelector = document.getElementById('agendaTipoSelector');
     if (tipoSelector) {
-        tipoSelector.style.display = isGira ? 'flex' : 'none';
+        tipoSelector.style.display = (isGira || isPersonalizado) ? 'flex' : 'none';
+        const tipoSelectorMain = tipoSelector.querySelector('.agenda-type-switch-main');
+        if (tipoSelectorMain) tipoSelectorMain.style.display = isGira ? 'block' : 'none';
     }
     const delegadoWrap = document.getElementById('agendaDelegadoLabelWrap');
     if (delegadoWrap) {
@@ -179,7 +222,7 @@ function openAgendaModal(id = null, tipo = 'asunto') {
         aforoWrap.style.display = isGira ? 'flex' : 'none';
         aforoWrap.setAttribute('aria-hidden', isGira ? 'false' : 'true');
     }
-    if (!id && isGira) {
+    if (!id && (isGira || isPersonalizado)) {
         var aforoNew = document.getElementById('modalAforo');
         if (aforoNew) aforoNew.value = '';
 
@@ -350,6 +393,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 closeDescModal();
             }
         });
+    }
+
+    const fichaFondo = document.getElementById('modalFichaFondo');
+    if (fichaFondo) {
+        fichaFondo.addEventListener('change', updateAgendaFichaBgPreview);
+        updateAgendaFichaBgPreview();
     }
 
     const microrregionSelect = document.getElementById('modalMicrorregion');

@@ -35,6 +35,34 @@
                     <input type="text" name="asunto" id="modalAsunto" class="form-control-agenda" required placeholder="Título del evento">
                 </div>
 
+                <div id="fieldsFichaPersonalizada" class="agenda-custom-ficha-box" style="display: none;">
+                    <div class="agenda-row-two-cols mb-3">
+                        <div class="agenda-custom-title-col">
+                            <label class="form-label-agenda">Título de ficha <span class="text-red-500">*</span></label>
+                            <input type="text" name="ficha_titulo" id="modalFichaTitulo" class="form-control-agenda" placeholder="Cumpleaños, Asamblea, Reunión...">
+                        </div>
+                        <div class="agenda-custom-bg-col">
+                            <label class="form-label-agenda">Fondo de ficha</label>
+                            <select name="ficha_fondo" id="modalFichaFondo" class="form-control-agenda">
+                                <option value="tlaloc_a_beige">Tlaloc A beige</option>
+                                <option value="tlaloc_a_rojo">Tlaloc A rojo</option>
+                                <option value="tlaloc_a_verde">Tlaloc A verde</option>
+                                <option value="beige">Tlaloc C beige</option>
+                                <option value="blanco">Tlaloc C blanco</option>
+                                <option value="rojo">Tlaloc C rojo</option>
+                                <option value="verde">Tlaloc C verde</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="agenda-ficha-bg-preview" id="agendaFichaBgPreview" aria-hidden="true">
+                        <span>Vista del fondo</span>
+                    </div>
+                    <div class="form-group-agenda">
+                        <label class="form-label-agenda">Ubicación</label>
+                        <input type="text" name="lugar" id="modalLugarPersonalizado" class="form-control-agenda" placeholder="Lugar, dirección o enlace de Google Maps" disabled>
+                    </div>
+                </div>
+
                 <div class="form-group-agenda" id="rowDescripcion">
                     <label class="form-label-agenda">Descripción</label>
                     <textarea name="descripcion" id="modalDescripcion" rows="1" class="form-control-agenda agenda-descripcion-textarea" placeholder="Detalles..."></textarea>
