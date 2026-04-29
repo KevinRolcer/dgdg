@@ -1,3 +1,15 @@
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-all-template-options-toggle]').forEach(function (toggle) {
+            toggle.addEventListener('click', function (e) {
+                e.preventDefault();
+                var modalBody = toggle.closest('.tm-modal-body');
+                var options = modalBody ? modalBody.querySelector('[data-all-template-options]') : null;
+                if (options) {
+                    options.hidden = !options.hidden;
+                }
+            });
+        });
+    });
     const DELEGATE_BOOT = typeof window.TM_DELEGATE_BOOT !== 'undefined' && window.TM_DELEGATE_BOOT !== null ? window.TM_DELEGATE_BOOT : {};
     let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || DELEGATE_BOOT.csrfToken;
 

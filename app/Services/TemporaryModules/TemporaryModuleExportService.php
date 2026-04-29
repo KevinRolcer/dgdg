@@ -82,6 +82,24 @@ class TemporaryModuleExportService
             ->select('temporary_module_entries.*');
     }
 
+    /**
+     * @param  array<int>|null  $microrregionIds
+     */
+    private function entriesQueryForExportScope(TemporaryModule $temporaryModule, ?array $microrregionIds)
+    {
+        $query = $temporaryModule->entries()->withoutGlobalScopes();
+
+        if (is_array($microrregionIds)) {
+            if ($microrregionIds === []) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            $query->whereIn('microrregion_id', $microrregionIds);
+        }
+
+        return $query;
+    }
+
     public function exportExcel(int $moduleId, string $mode = 'single', bool $includeAnalysis = true, ?array $exportConfig = null): array
     {
         set_time_limit(0);
@@ -91,8 +109,12 @@ class TemporaryModuleExportService
             ->with(['fields' => fn ($q) => $q->orderBy('sort_order')])
             ->findOrFail($moduleId);
 
-        $entries = \Cache::remember("temporary_module_entries_{$moduleId}", 600, function () use ($temporaryModule) {
-            return $temporaryModule->entries()->withoutGlobalScopes()->get();
+        $microrregionIds = $exportConfig['microrregion_ids'] ?? null;
+        $scopedMicrorregionIds = is_array($microrregionIds)
+            ? array_values(array_unique(array_filter(array_map('intval', $microrregionIds), fn ($id) => $id > 0)))
+            : null;
+        $entries = \Cache::remember("temporary_module_entries_{$moduleId}_".md5(json_encode($scopedMicrorregionIds)), 600, function () use ($temporaryModule, $scopedMicrorregionIds) {
+            return $this->entriesQueryForExportScope($temporaryModule, $scopedMicrorregionIds)->get();
         });
 
         $fileName = $this->buildStandardDocumentName($temporaryModule, 'xlsx');
@@ -130,15 +152,27 @@ class TemporaryModuleExportService
         $usedDataSheet = false;
         $spreadsheet->getActiveSheet()->setTitle('Registros');
 
-        $microrregionIds = $temporaryModule->entries()
-            ->withoutGlobalScopes()
-            ->reorder()
-            ->select('microrregion_id')
-            ->distinct()
-            ->pluck('microrregion_id')
-            ->filter()
-            ->values()
-            ->all();
+        if (is_array($scopedMicrorregionIds)) {
+            $microrregionIds = $scopedMicrorregionIds;
+        } elseif ($mode === 'municipios') {
+            $microrregionIds = DB::table('municipios')
+                ->select('microrregion_id')
+                ->distinct()
+                ->pluck('microrregion_id')
+                ->filter()
+                ->values()
+                ->all();
+        } else {
+            $microrregionIds = $temporaryModule->entries()
+                ->withoutGlobalScopes()
+                ->reorder()
+                ->select('microrregion_id')
+                ->distinct()
+                ->pluck('microrregion_id')
+                ->filter()
+                ->values()
+                ->all();
+        }
 
         $microrregionMeta = DB::table('microrregiones')
             ->select(['id', 'cabecera', 'microrregion'])
@@ -156,6 +190,107 @@ class TemporaryModuleExportService
                 ]];
             });
 
+        if ($mode === 'municipios') {
+            $templateFields = $this->templateFields($temporaryModule);
+            $municipioField = $templateFields->first(fn ($field) => $this->fieldService->canonicalFieldType((string) $field->type) === 'municipio');
+            $fixedMunicipioField = $municipioField ?: (object) [
+                'key' => '_municipio_reporte',
+                'label' => 'Municipio',
+                'type' => 'municipio',
+                'options' => [],
+                'comment' => '',
+            ];
+            $fields = collect([
+                (object) [
+                    'key' => '_numero_registro',
+                    'label' => 'No.',
+                    'type' => 'number',
+                    'options' => [],
+                    'comment' => '',
+                ],
+                (object) [
+                    'key' => '_microrregion_reporte',
+                    'label' => 'Microregión',
+                    'type' => 'text',
+                    'options' => [],
+                    'comment' => '',
+                ],
+                $fixedMunicipioField,
+            ])
+                ->merge($templateFields->reject(fn ($field) => in_array((string) $field->key, [
+                    '_numero_registro',
+                    '_microrregion_reporte',
+                    (string) $fixedMunicipioField->key,
+                ], true)))
+                ->values();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Municipios asignados');
+            $this->fillTemplateHeader($sheet, $fields);
+
+            $municipioRows = DB::table('municipios as mu')
+                ->join('microrregiones as mr', 'mr.id', '=', 'mu.microrregion_id')
+                ->whereIn('mu.microrregion_id', $microrregionIds)
+                ->select([
+                    'mu.id',
+                    'mu.municipio',
+                    'mu.microrregion_id',
+                    'mr.microrregion',
+                    'mr.cabecera',
+                ])
+                ->orderByRaw('CAST(mr.microrregion AS UNSIGNED)')
+                ->orderBy('mu.municipio')
+                ->get();
+
+            $normalizarMunicipio = fn ($value) => mb_strtolower(trim((string) Str::ascii((string) $value)), 'UTF-8');
+            $entriesByMunicipio = [];
+
+            foreach ($entries as $entry) {
+                $data = is_array($entry->data ?? null) ? $entry->data : [];
+                $municipioValue = trim((string) ($data['_municipio_reporte'] ?? ''));
+                if ($municipioValue === '' && $municipioField) {
+                    $municipioValue = trim((string) ($data[$municipioField->key] ?? ''));
+                }
+                if ($municipioValue === '') {
+                    continue;
+                }
+                $key = ((int) ($entry->microrregion_id ?? 0)).'|'.$normalizarMunicipio($municipioValue);
+                $entriesByMunicipio[$key] ??= $entry;
+            }
+
+            $templateRows = collect();
+            $numeroRegistro = 1;
+            foreach ($municipioRows as $municipio) {
+                $key = ((int) $municipio->microrregion_id).'|'.$normalizarMunicipio($municipio->municipio);
+                $entry = $entriesByMunicipio[$key] ?? null;
+                $data = $entry ? (array) ($entry->data ?? []) : [];
+
+                $microNumber = trim((string) ($municipio->microrregion ?? ''));
+                $microCabecera = trim((string) ($municipio->cabecera ?? ''));
+                $data['_numero_registro'] = $numeroRegistro;
+                $data['_microrregion_reporte'] = $this->buildMicrorregionLabel($microNumber, $microCabecera);
+
+                foreach ($fields as $field) {
+                    if ($this->fieldService->canonicalFieldType((string) $field->type) === 'municipio') {
+                        $data[$field->key] = (string) $municipio->municipio;
+                        break;
+                    }
+                }
+
+                $templateRows->push((object) ['data' => $data]);
+                $numeroRegistro++;
+            }
+
+            $this->fillTemplateDataRows($sheet, $fields, $templateRows, 3);
+            $writer = new Xlsx($spreadsheet);
+            $writer->save($tempFilePath);
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+            return [
+                'name' => $fileName,
+                'url' => route('temporary-modules.plantilla.download', ['file' => $fileName], false),
+            ];
+        }
+
         $createDataSheet = function () use (&$usedDataSheet, $spreadsheet) {
             if (!$usedDataSheet) {
                 $usedDataSheet = true;
@@ -171,6 +306,11 @@ class TemporaryModuleExportService
             $groups = $temporaryModule->entries()
                 ->withoutGlobalScopes()
                 ->reorder() // evitamos ordenar por submitted_at en una consulta DISTINCT
+                ->when(is_array($scopedMicrorregionIds), function ($query) use ($scopedMicrorregionIds) {
+                    $scopedMicrorregionIds === []
+                        ? $query->whereRaw('1 = 0')
+                        : $query->whereIn('temporary_module_entries.microrregion_id', $scopedMicrorregionIds);
+                })
                 ->select([
                     'temporary_module_entries.microrregion_id',
                     'microrregiones.microrregion as microrregion_sort',
@@ -227,8 +367,7 @@ class TemporaryModuleExportService
 
                     $catKey = $categoriaField->key;
                     $entriesQuery = $this->orderEntriesByMicrorregion(
-                        $temporaryModule->entries()
-                            ->withoutGlobalScopes()
+                        $this->entriesQueryForExportScope($temporaryModule, $scopedMicrorregionIds)
                             ->where(function ($q) use ($catKey, $catName) {
                                 $q->where('data->'.$catKey, $catName)
                                     ->orWhere('data->'.$catKey, 'like', $catName.' > %');
@@ -240,14 +379,13 @@ class TemporaryModuleExportService
 
                 $totalsSheet = $createDataSheet();
                 $totalsSheet->setTitle('Totales por categoría');
-                $this->fillTotalesPorCategoriaSheet($totalsSheet, $temporaryModule, $categoriaField);
+                $this->fillTotalesPorCategoriaSheet($totalsSheet, $temporaryModule, $categoriaField, $scopedMicrorregionIds);
                 $this->applyPrintSetup($totalsSheet, $orientation);
             } else {
                 $targetSheet = $createDataSheet();
                 $targetSheet->setTitle('Registros');
                 $entriesQuery = $this->orderEntriesByMicrorregion(
-                    $temporaryModule->entries()
-                        ->withoutGlobalScopes()
+                    $this->entriesQueryForExportScope($temporaryModule, $scopedMicrorregionIds)
                 );
 
                 $this->fillSheet($targetSheet, $temporaryModule, $entriesQuery, $microrregionMeta, $fechaCorte);
@@ -747,11 +885,13 @@ class TemporaryModuleExportService
         return $map;
     }
 
-    private function fillTotalesPorCategoriaSheet(Worksheet $sheet, TemporaryModule $temporaryModule, $categoriaField): void
+    /**
+     * @param  array<int>|null  $microrregionIds
+     */
+    private function fillTotalesPorCategoriaSheet(Worksheet $sheet, TemporaryModule $temporaryModule, $categoriaField, ?array $microrregionIds = null): void
     {
         $catKey = $categoriaField->key;
-        $counts = $temporaryModule->entries()
-            ->withoutGlobalScopes()
+        $counts = $this->entriesQueryForExportScope($temporaryModule, $microrregionIds)
             ->get()
             ->groupBy(fn ($e) => (string) ($e->data[$catKey] ?? ''))
             ->map(fn($g) => $g->count());

@@ -190,9 +190,7 @@ class TemporaryModuleController extends Controller
             return redirect($result['url']);
         }
 
-        $allowedMicrorregionIds = $isAdmin
-            ? []
-            : $this->accessService->microrregionIdsPorUsuario((int) $user->id);
+        $allowedMicrorregionIds = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
 
         if ($scope === 'microrregion') {
             $requestedMicrorregionId = $request->filled('selected_microrregion_id')
@@ -222,8 +220,15 @@ class TemporaryModuleController extends Controller
             if (!$isAdmin && !$this->accessService->userCanAccessModule($temporaryModule, (int) $user->id)) {
                 abort(403, 'No tiene permiso para acceder a este recurso');
             }
+            $mode = (string) $request->query('mode', 'single'); // 'single' (solo registros) o 'municipios' (todos los municipios asignados)
+            if (! in_array($mode, ['single', 'municipios'], true)) {
+                $mode = 'single';
+            }
+            $microrregionIds = ($isAdmin && $allowedMicrorregionIds === []) ? null : $allowedMicrorregionIds;
             $result = app(\App\Services\TemporaryModules\TemporaryModuleExportService::class)
-                ->exportExcel($temporaryModule->id, 'single', true);
+                ->exportExcel($temporaryModule->id, $mode, true, [
+                    'microrregion_ids' => $microrregionIds,
+                ]);
             return redirect($result['url']);
         }
 

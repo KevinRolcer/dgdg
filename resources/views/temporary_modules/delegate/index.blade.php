@@ -470,7 +470,21 @@
                             <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                         </button>
                     </div>
-                    <div class="tm-modal-body">
+                    <div class="tm-modal-body" style="position:relative;">
+                        <div class="tm-template-dropdown"
+                             data-all-template-options
+                             hidden
+                             style="position:absolute;z-index:120;top:8px;left:18px;right:18px;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,0.14);padding:18px 18px 12px 18px;">
+                            <div style="font-weight:600;margin-bottom:8px;">¿Qué deseas descargar?</div>
+                            <div class="tm-modal-actions" style="display:flex;flex-direction:column;gap:8px;">
+                                <a href="{{ route('temporary-modules.download-template', ['module' => $module->id, 'scope' => 'all', 'mode' => 'single']) }}" class="tm-btn tm-btn-outline tm-btn-block">
+                                    Solo registros existentes
+                                </a>
+                                <a href="{{ route('temporary-modules.download-template', ['module' => $module->id, 'scope' => 'all', 'mode' => 'municipios']) }}" class="tm-btn tm-btn-outline tm-btn-block">
+                                    Listado de todos mis municipios asignados
+                                </a>
+                            </div>
+                        </div>
                         <div class="tm-template-download-grid">
                             <a class="tm-template-download-card tm-template-download-card--blank"
                                href="{{ route('temporary-modules.download-template', ['module' => $module->id, 'scope' => 'blank']) }}">
@@ -505,15 +519,16 @@
                                 </span>
                                 <span class="tm-template-download-action">Descargar</span>
                             </button>
-                            <a class="tm-template-download-card tm-template-download-card--all"
-                               href="{{ route('temporary-modules.download-template', ['module' => $module->id, 'scope' => 'all']) }}">
-                                <span class="tm-template-download-icon" aria-hidden="true"><i class="fa-solid fa-file-excel"></i></span>
-                                <span class="tm-template-download-copy">
-                                    <span class="tm-template-download-title">Todas las microregiones</span>
-                                    <span class="tm-template-download-desc">1 archivo para todas</span>
-                                </span>
-                                <span class="tm-template-download-action">Descargar</span>
-                            </a>
+                            <div class="tm-template-download-card tm-template-download-card--all tm-template-download-card--dropdown">
+                                <a href="#" data-all-template-options-toggle style="display:block;width:100%;text-decoration:none;">
+                                    <span class="tm-template-download-icon" aria-hidden="true"><i class="fa-solid fa-file-excel"></i></span>
+                                    <span class="tm-template-download-copy">
+                                        <span class="tm-template-download-title">Todas las microregiones</span>
+                                        <span class="tm-template-download-desc">1 archivo para todas</span>
+                                    </span>
+                                    <span class="tm-template-download-action">Descargar</span>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
