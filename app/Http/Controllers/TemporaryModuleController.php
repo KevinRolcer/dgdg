@@ -187,7 +187,6 @@ class TemporaryModuleController extends Controller
 
         if ($scope === 'blank') {
             $result = $this->exportService->generateTemplate($temporaryModule);
-
             return redirect($result['url']);
         }
 
@@ -214,7 +213,17 @@ class TemporaryModuleController extends Controller
                 'with_data' => true,
                 'microrregion_id' => $requestedMicrorregionId,
             ]);
+            return redirect($result['url']);
+        }
 
+        // NUEVO: Si scope es 'all', genera un solo archivo con todos los datos
+        if ($scope === 'all') {
+            // Validar acceso a todas las microregiones permitidas
+            if (!$isAdmin && !$this->accessService->userCanAccessModule($temporaryModule, (int) $user->id)) {
+                abort(403, 'No tiene permiso para acceder a este recurso');
+            }
+            $result = app(\App\Services\TemporaryModules\TemporaryModuleExportService::class)
+                ->exportExcel($temporaryModule->id, 'single', true);
             return redirect($result['url']);
         }
 

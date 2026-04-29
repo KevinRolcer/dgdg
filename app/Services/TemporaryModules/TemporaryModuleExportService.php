@@ -263,9 +263,10 @@ class TemporaryModuleExportService
         $spreadsheet->disconnectWorksheets();
         unset($spreadsheet);
 
+        // Usar la ruta protegida por permisos de usuario
         return [
             'name' => $fileName,
-            'url' => route('temporary-modules.admin.exports.download', ['file' => $fileName]),
+            'url' => route('temporary-modules.plantilla.download', ['file' => $fileName], false),
         ];
     }
 

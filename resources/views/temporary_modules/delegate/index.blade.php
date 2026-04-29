@@ -505,6 +505,15 @@
                                 </span>
                                 <span class="tm-template-download-action">Descargar</span>
                             </button>
+                            <a class="tm-template-download-card tm-template-download-card--all"
+                               href="{{ route('temporary-modules.download-template', ['module' => $module->id, 'scope' => 'all']) }}">
+                                <span class="tm-template-download-icon" aria-hidden="true"><i class="fa-solid fa-file-excel"></i></span>
+                                <span class="tm-template-download-copy">
+                                    <span class="tm-template-download-title">Todas las microregiones</span>
+                                    <span class="tm-template-download-desc">1 archivo para todas</span>
+                                </span>
+                                <span class="tm-template-download-action">Descargar</span>
+                            </a>
                         </div>
                     </div>
                 </div>
