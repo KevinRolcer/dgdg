@@ -462,7 +462,7 @@ class TemporaryModuleWordPdfService
                         'title' => trim((string) ($imageRaw['title'] ?? '')),
                         'placement' => $placement,
                         'target_group' => $targetGroup,
-                        'width' => max(80, min(700, (int) ($imageRaw['width'] ?? 680))),
+                        'width' => max(80, min(700, (int) ($imageRaw['width'] ?? 520))),
                         'collage_columns' => $cols,
                         'items' => $items,
                     ];
@@ -3294,25 +3294,26 @@ class TemporaryModuleWordPdfService
         }
 
         $cols = max(1, min(6, (int) ($image['collage_columns'] ?? 2)));
-        $blockWidth = max(80, min(700, (int) ($image['width'] ?? 680)));
-        $cellWidthPx = (int) max(40, floor($blockWidth / $cols) - 14);
+        $blockWidth = max(80, min(700, (int) ($image['width'] ?? 520)));
+        $cellSlotPx = (int) max(48, floor($blockWidth / $cols) - 10);
+        $cellWidthPx = (int) max(40, min(120, round($cellSlotPx * 0.92)));
         $title = trim((string) ($image['title'] ?? ''));
 
         $section->addTextBreak(1);
         if ($title !== '') {
-            $section->addText($title, ['name' => $fontName, 'bold' => true, 'size' => 11], ['alignment' => Jc::CENTER, 'spaceAfter' => 80]);
+            $section->addText($title, ['name' => $fontName, 'bold' => true, 'size' => 10], ['alignment' => Jc::CENTER, 'spaceAfter' => 60]);
         }
 
         $table = $section->addTable([
             'borderSize' => 0,
             'borderColor' => 'FFFFFF',
-            'cellMarginTop' => 40,
-            'cellMarginBottom' => 40,
-            'cellMarginLeft' => 50,
-            'cellMarginRight' => 50,
+            'cellMarginTop' => 20,
+            'cellMarginBottom' => 20,
+            'cellMarginLeft' => 24,
+            'cellMarginRight' => 24,
         ]);
         $totalTwips = $this->pxToTwips($blockWidth);
-        $cellTwips = (int) max(720, round($totalTwips / $cols));
+        $cellTwips = (int) max(560, round($totalTwips / $cols));
 
         foreach (array_chunk($resolved, $cols) as $chunk) {
             $row = $table->addRow();
@@ -3322,9 +3323,6 @@ class TemporaryModuleWordPdfService
                     'width' => $cellWidthPx,
                     'alignment' => Jc::CENTER,
                 ]);
-                if ($entry['caption'] !== '') {
-                    $cell->addText($entry['caption'], ['name' => $fontName, 'size' => 8], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
-                }
             }
             $pad = $cols - count($chunk);
             for ($i = 0; $i < $pad; $i++) {

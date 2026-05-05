@@ -322,28 +322,25 @@
                     continue;
                 }
                 $cols = max(1, min(6, (int) ($image['collage_columns'] ?? 2)));
-                $cWidth = max(80, min(700, (int) ($image['width'] ?? 680)));
+                $cWidth = max(80, min(700, (int) ($image['width'] ?? 520)));
                 $imgTitle = trim((string) ($image['title'] ?? ''));
                 $pct = round(100 / $cols, 4);
-                $html .= '<div style="max-width:'.$cWidth.'px;margin:8px auto 12px;text-align:center;page-break-inside:avoid;">';
+                $html .= '<div style="max-width:'.$cWidth.'px;margin:4px auto 8px;text-align:center;">';
+                $html .= '<table class="report-collage-table" style="max-width:'.$cWidth.'px;border-spacing:3px;margin:0 auto;">';
                 if ($imgTitle !== '') {
-                    $html .= '<p style="font-weight:bold;margin:0 0 4px 0;">'.e($imgTitle).'</p>';
+                    $html .= '<thead><tr class="report-collage-title-row"><td colspan="'.$cols.'">'.e($imgTitle).'</td></tr></thead>';
                 }
-                $html .= '<table style="width:100%;border-collapse:separate;border-spacing:6px;table-layout:fixed;margin:0 auto;"><tbody>';
+                $html .= '<tbody>';
                 $nCell = count($validCollage);
                 for ($r = 0; $r < $nCell; $r += $cols) {
                     $html .= '<tr>';
                     for ($c = 0; $c < $cols; $c++) {
                         $idx = $r + $c;
-                        $html .= '<td style="width:'.$pct.'%;vertical-align:top;text-align:center;padding:2px;">';
+                        $html .= '<td class="report-collage-cell" style="width:'.$pct.'%;">';
                         if ($idx < $nCell) {
                             $cell = $validCollage[$idx];
                             $cSrc = e(trim((string) ($cell['src'] ?? '')));
-                            $cap = trim((string) ($cell['caption'] ?? ''));
-                            $html .= '<img src="'.$cSrc.'" style="width:100%;height:auto;max-width:100%;display:block;margin:0 auto;" alt="">';
-                            if ($cap !== '') {
-                                $html .= '<div style="font-size:8px;line-height:1.2;margin-top:3px;">'.e($cap).'</div>';
-                            }
+                            $html .= '<img src="'.$cSrc.'" alt="">';
                         } else {
                             $html .= '&nbsp;';
                         }
@@ -444,6 +441,42 @@
         }
         table.data-table tbody {
             display: table-row-group;
+        }
+        /* Collage de imágenes del informe: sin bordes, encabezado repetido al saltar de página */
+        table.report-collage-table {
+            width: 100%;
+            border: none;
+            border-collapse: separate;
+            table-layout: fixed;
+        }
+        table.report-collage-table thead {
+            display: table-header-group;
+        }
+        table.report-collage-table tbody {
+            display: table-row-group;
+        }
+        table.report-collage-table td,
+        table.report-collage-table th {
+            border: none;
+            vertical-align: top;
+        }
+        table.report-collage-table .report-collage-title-row td {
+            font-weight: bold;
+            font-size: 9px;
+            padding: 0 0 3px 0;
+            text-align: center;
+        }
+        table.report-collage-table .report-collage-cell {
+            padding: 1px 2px;
+            text-align: center;
+        }
+        table.report-collage-table .report-collage-cell img {
+            max-width: 100%;
+            max-height: 88px;
+            width: auto;
+            height: auto;
+            display: block;
+            margin: 0 auto;
         }
         .pdf-thumb-wrap {
             display: block;

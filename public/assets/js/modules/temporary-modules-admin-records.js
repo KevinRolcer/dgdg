@@ -1652,6 +1652,22 @@
             return personalizeModal._reportImages;
         }
 
+        function tmExportMoveReportImageInList(imageId, delta) {
+            var arr = tmExportGetReportImages();
+            var i = arr.findIndex(function (x) { return String(x.id || '') === String(imageId || ''); });
+            if (i < 0) {
+                return false;
+            }
+            var j = i + delta;
+            if (j < 0 || j >= arr.length) {
+                return false;
+            }
+            var tmp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = tmp;
+            return true;
+        }
+
         function tmExportRenderReportImagesList() {
             var listEl = document.getElementById('tmExportReportImagesList');
             if (!listEl) { return; }
@@ -1660,7 +1676,12 @@
                 listEl.innerHTML = '<div class="tm-analysis-hint" style="margin:0;">No hay imágenes agregadas.</div>';
                 return;
             }
+            var last = images.length - 1;
             listEl.innerHTML = images.map(function (img, idx) {
+                var reorderHtml = '<div style="display:flex;flex-direction:column;gap:2px;justify-content:center;">'
+                    + '<button type="button" class="tm-btn tm-btn-outline tm-btn-sm" style="padding:2px 6px;line-height:1;min-height:auto;font-size:0.75rem;" data-report-image-move-up' + (idx === 0 ? ' disabled' : '') + ' title="Subir">&#8593;</button>'
+                    + '<button type="button" class="tm-btn tm-btn-outline tm-btn-sm" style="padding:2px 6px;line-height:1;min-height:auto;font-size:0.75rem;" data-report-image-move-down' + (idx >= last ? ' disabled' : '') + ' title="Bajar">&#8595;</button>'
+                    + '</div>';
                 var placementMap = {
                     after_count: 'Debajo de conteo',
                     after_sum: 'Debajo de sumatoria',
@@ -1674,27 +1695,29 @@
                     var items = Array.isArray(img.items) ? img.items : [];
                     var n = items.length;
                     var cols = Math.max(1, Math.min(6, parseInt(String(img.collage_columns != null ? img.collage_columns : 2), 10) || 2));
-                    var w = Math.max(80, Math.min(700, parseInt(String(img.width || 680), 10) || 680));
+                    var w = Math.max(80, Math.min(700, parseInt(String(img.width || 520), 10) || 520));
                     var title = String(img.title || ('Colección (' + n + ')')).trim();
                     var mosaicCells = '';
                     var mi;
                     for (mi = 0; mi < 4; mi++) {
                         if (items[mi] && items[mi].src) {
-                            mosaicCells += '<div style="min-height:0;overflow:hidden;line-height:0;"><img src="' + escapeHtml(String(items[mi].src)) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;max-height:26px;"></div>';
+                            mosaicCells += '<div style="min-height:0;overflow:hidden;line-height:0;background:#f1f5f9;"><img src="' + escapeHtml(String(items[mi].src)) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;max-height:26px;"></div>';
                         } else {
                             mosaicCells += '<div style="background:#e8edf3;min-height:12px;"></div>';
                         }
                     }
-                    return '<div class="tm-export-sum-item" data-report-image-id="' + escapeHtml(String(img.id || '')) + '" style="display:grid;grid-template-columns:52px 1fr auto;gap:8px;align-items:center;">'
-                        + '<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;width:52px;height:52px;gap:1px;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;background:#e2e8f0;">' + mosaicCells + '</div>'
+                    return '<div class="tm-export-sum-item" data-report-image-id="' + escapeHtml(String(img.id || '')) + '" style="display:grid;grid-template-columns:28px 52px 1fr auto;gap:8px;align-items:center;">'
+                        + reorderHtml
+                        + '<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;width:52px;height:52px;gap:1px;border-radius:6px;overflow:hidden;">' + mosaicCells + '</div>'
                         + '<div style="min-width:0;"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(title) + '</div>'
-                        + '<div class="tm-analysis-hint" style="margin:0;">' + escapeHtml('Collage · ' + n + ' imágenes · ' + cols + ' col · ' + placement + (target ? (' · ' + target) : '') + ' · ' + w + 'px') + '</div></div>'
+                        + '<div class="tm-analysis-hint" style="margin:0;">' + escapeHtml('Collage · ' + n + ' · ' + cols + ' col · ' + placement + (target ? (' · ' + target) : '') + ' · ' + w + 'px') + '</div></div>'
                         + '<button type="button" class="tm-btn tm-btn-sm tm-btn-outline" data-report-image-menu title="Opciones"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>'
                         + '</div>';
                 }
                 var title = String(img.title || img.name || ('Imagen ' + (idx + 1)));
-                return '<div class="tm-export-sum-item" data-report-image-id="' + escapeHtml(String(img.id || '')) + '" style="display:grid;grid-template-columns:42px 1fr auto;gap:8px;align-items:center;">'
-                    + '<img src="' + escapeHtml(String(img.src || '')) + '" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0;">'
+                return '<div class="tm-export-sum-item" data-report-image-id="' + escapeHtml(String(img.id || '')) + '" style="display:grid;grid-template-columns:28px 42px 1fr auto;gap:8px;align-items:center;">'
+                    + reorderHtml
+                    + '<img src="' + escapeHtml(String(img.src || '')) + '" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:6px;">'
                     + '<div style="min-width:0;"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(title) + '</div>'
                     + '<div class="tm-analysis-hint" style="margin:0;">' + escapeHtml(placement + (target ? (' · ' + target) : '') + ' · ' + (img.width || 320) + 'px') + '</div></div>'
                     + '<button type="button" class="tm-btn tm-btn-sm tm-btn-outline" data-report-image-menu title="Opciones"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>'
@@ -1723,7 +1746,7 @@
                 + '<label style="display:grid;gap:4px;"><span>Dato de tabla separada (opcional)</span><input id="tmRiTargetGroup" class="swal2-input" style="margin:0;" placeholder="Ej: Registro CTM" value="' + escapeHtml(String(img.target_group || '')) + '"></label>'
                 + (isCollage
                     ? '<label style="display:grid;gap:4px;"><span>Columnas en la malla (1–6)</span><select id="tmRiCollageCols" class="swal2-input" style="margin:0;">' + collageColsOptions + '</select></label>'
-                        + '<label style="display:grid;gap:4px;"><span>Ancho total del bloque (px)</span><input id="tmRiWidth" type="number" min="80" max="700" class="swal2-input" style="margin:0;" value="' + escapeHtml(String(img.width != null ? img.width : 680)) + '"></label>'
+                        + '<label style="display:grid;gap:4px;"><span>Ancho total del bloque (px)</span><input id="tmRiWidth" type="number" min="80" max="700" class="swal2-input" style="margin:0;" value="' + escapeHtml(String(img.width != null ? img.width : 520)) + '"></label>'
                         + '<p class="tm-analysis-hint" style="margin:0;">Cada celda usa una fracción del ancho; las imágenes escalan dentro de su celda sin encimar.</p>'
                     : '<label style="display:grid;gap:4px;"><span>Ancho PDF/Word (px)</span><input id="tmRiWidth" type="number" min="80" max="700" class="swal2-input" style="margin:0;" value="' + escapeHtml(String(img.width || 320)) + '"></label>')
                 + '</div>';
@@ -1741,12 +1764,12 @@
                         if (p) { p.value = String(img.placement || 'after_records'); }
                     },
                     preConfirm: function () {
-                        var w = parseInt(String((document.getElementById('tmRiWidth') || {}).value || (isCollage ? '680' : '320')), 10);
+                        var w = parseInt(String((document.getElementById('tmRiWidth') || {}).value || (isCollage ? '520' : '320')), 10);
                         var base = {
                             title: String((document.getElementById('tmRiTitle') || {}).value || '').trim(),
                             placement: String((document.getElementById('tmRiPlacement') || {}).value || 'after_records'),
                             target_group: String((document.getElementById('tmRiTargetGroup') || {}).value || '').trim(),
-                            width: Math.max(80, Math.min(700, Number.isNaN(w) ? (isCollage ? 680 : 320) : w))
+                            width: Math.max(80, Math.min(700, Number.isNaN(w) ? (isCollage ? 520 : 320) : w))
                         };
                         if (isCollage) {
                             var c = parseInt(String((document.getElementById('tmRiCollageCols') || {}).value || '2'), 10);
@@ -3438,7 +3461,7 @@
                         items: items,
                         placement: String(img.placement || 'after_records'),
                         target_group: String(img.target_group || ''),
-                        width: Math.max(80, Math.min(700, parseInt(String(img.width != null ? img.width : 680), 10) || 680))
+                        width: Math.max(80, Math.min(700, parseInt(String(img.width != null ? img.width : 520), 10) || 520))
                     };
                 }
                 return {
@@ -3784,13 +3807,14 @@
                 if (String(img.layout || '') === 'collage') {
                     var cItems = Array.isArray(img.items) ? img.items : [];
                     var cols = Math.max(1, Math.min(6, parseInt(String(img.collage_columns != null ? img.collage_columns : 2), 10) || 2));
-                    var cWidth = Math.max(80, Math.min(700, parseInt(String(img.width != null ? img.width : 680), 10) || 680));
+                    var cWidth = Math.max(80, Math.min(700, parseInt(String(img.width != null ? img.width : 520), 10) || 520));
                     var pct = (100 / cols).toFixed(4);
-                    html += '<div class="tm-export-preview-report-image tm-export-preview-report-collage" style="max-width:' + cWidth + 'px;margin:8px auto 12px;text-align:center;page-break-inside:avoid;">';
+                    html += '<div class="tm-export-preview-report-image tm-export-preview-report-collage" style="max-width:' + cWidth + 'px;margin:4px auto 8px;text-align:center;">';
+                    html += '<table style="width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed;margin:0 auto;border:none;">';
                     if (title) {
-                        html += '<p style="font-weight:700;margin:0 0 4px 0;">' + escapeHtml(title) + '</p>';
+                        html += '<thead style="display:table-header-group;"><tr><td colspan="' + cols + '" style="border:none;padding:0 0 4px 0;font-weight:700;text-align:center;font-size:0.85rem;">' + escapeHtml(title) + '</td></tr></thead>';
                     }
-                    html += '<table style="width:100%;border-collapse:separate;border-spacing:6px;table-layout:fixed;margin:0 auto;"><tbody>';
+                    html += '<tbody>';
                     var n = cItems.length;
                     var r;
                     var c;
@@ -3798,13 +3822,9 @@
                         html += '<tr>';
                         for (c = 0; c < cols; c++) {
                             var idx = r + c;
-                            html += '<td style="width:' + pct + '%;vertical-align:top;text-align:center;padding:2px;">';
+                            html += '<td style="width:' + pct + '%;vertical-align:top;text-align:center;padding:1px;border:none;">';
                             if (idx < n && cItems[idx] && cItems[idx].src) {
-                                var cap = String(cItems[idx].caption || '').trim();
-                                html += '<img src="' + escapeHtml(String(cItems[idx].src)) + '" alt="" style="width:100%;height:auto;max-width:100%;display:block;margin:0 auto;">';
-                                if (cap) {
-                                    html += '<div style="font-size:0.65rem;line-height:1.2;margin-top:3px;">' + escapeHtml(cap) + '</div>';
-                                }
+                                html += '<img src="' + escapeHtml(String(cItems[idx].src)) + '" alt="" style="max-width:100%;max-height:88px;width:auto;height:auto;display:block;margin:0 auto;">';
                             } else {
                                 html += '&nbsp;';
                             }
@@ -5878,6 +5898,24 @@
                                 if (collageInput) { collageInput.click(); }
                                 return;
                             }
+                            var moveReportUp = e.target.closest('[data-report-image-move-up]');
+                            if (moveReportUp && !moveReportUp.disabled) {
+                                var rowUp = moveReportUp.closest('[data-report-image-id]');
+                                if (rowUp && tmExportMoveReportImageInList(rowUp.getAttribute('data-report-image-id'), -1)) {
+                                    tmExportRenderReportImagesList();
+                                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                                }
+                                return;
+                            }
+                            var moveReportDown = e.target.closest('[data-report-image-move-down]');
+                            if (moveReportDown && !moveReportDown.disabled) {
+                                var rowDown = moveReportDown.closest('[data-report-image-id]');
+                                if (rowDown && tmExportMoveReportImageInList(rowDown.getAttribute('data-report-image-id'), 1)) {
+                                    tmExportRenderReportImagesList();
+                                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                                }
+                                return;
+                            }
                             var reportImageMenuBtn = e.target.closest('[data-report-image-menu]');
                             if (reportImageMenuBtn) {
                                 var row = reportImageMenuBtn.closest('[data-report-image-id]');
@@ -5996,8 +6034,7 @@
                                 cfiles.forEach(function (file, idx) {
                                     var reader = new FileReader();
                                     reader.onload = function () {
-                                        var cap = file.name ? String(file.name).replace(/\.[^.]+$/, '') : '';
-                                        itemsAcc[idx] = { src: String(reader.result || ''), caption: cap };
+                                        itemsAcc[idx] = { src: String(reader.result || ''), caption: '' };
                                         done++;
                                         if (done >= cfiles.length) {
                                             e.target.value = '';
@@ -6012,7 +6049,7 @@
                                                     items: items,
                                                     placement: 'after_records',
                                                     target_group: '',
-                                                    width: 680
+                                                    width: 520
                                                 });
                                             }
                                             tmExportRenderReportImagesList();

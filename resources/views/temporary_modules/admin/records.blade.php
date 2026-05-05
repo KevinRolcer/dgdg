@@ -333,7 +333,7 @@
                                 </button>
                             </div>
                             <div id="tmExportReportImagesList" class="tm-export-sum-list" style="display:grid;gap:8px;"></div>
-                            <p class="tm-analysis-hint" style="margin-top:0;">Usa el botón de tres puntos de cada elemento para título, posición, ancho y tabla separada. Las colecciones forman una malla (1–6 columnas) con espacio entre celdas.</p>
+                            <p class="tm-analysis-hint" style="margin-top:0;">Ordena con las flechas ↑↓. Tres puntos: título, posición, ancho y tabla separada. Las colecciones son una malla compacta (1–6 columnas), sin nombres de archivo bajo cada foto.</p>
                         </div>
                     </div>
                     <div class="tm-export-personalize-field">
