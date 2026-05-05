@@ -422,6 +422,18 @@ class TemporaryModuleWordPdfService
         if (! $splitTableByFieldAllowed) {
             $splitTableByField = '';
         }
+        $reportImageEnabled = !empty($exportConfig['include_report_image']);
+        $reportImageTitle = trim((string) ($exportConfig['report_image_title'] ?? ''));
+        $reportImageField = trim((string) ($exportConfig['report_image_field'] ?? ''));
+        $reportImagePlacement = trim((string) ($exportConfig['report_image_placement'] ?? 'after_records'));
+        if (!in_array($reportImagePlacement, ['after_count', 'after_sum', 'after_records', 'before_split_group', 'after_split_group'], true)) {
+            $reportImagePlacement = 'after_records';
+        }
+        $reportImageWidth = max(80, min(700, (int) ($exportConfig['report_image_width'] ?? 320)));
+        if ($reportImageField === '' || !in_array((string) ($fieldTypesByKey[$reportImageField] ?? ''), ['image', 'file', 'document'], true)) {
+            $reportImageEnabled = false;
+            $reportImageField = '';
+        }
         $cellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['records_cell_font_size_px'] ?? $exportConfig['cell_font_size_px'] ?? $exportConfig['cellFontPx'] ?? null);
         $cellFontSizePt = $this->cellPxToWordPt($cellFontSizePx);
         $countTableCellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['count_table_font_px'] ?? $exportConfig['count_table_font_size_px'] ?? $exportConfig['countTableFontPx'] ?? 9);
@@ -832,6 +844,9 @@ class TemporaryModuleWordPdfService
                 }
                 $section->addTextBreak(1);
                 $hasSummarySections = true;
+                if ($reportImageEnabled && $reportImagePlacement === 'after_count') {
+                    $this->addReportImageBlockToWord($section, $entries, $reportImageField, $fieldTypesByKey, $reportImageTitle, $reportImageWidth, $exportFontName);
+                }
 
                 if ($sumTable !== null && !empty($sumTable['rows']) && is_array($sumTable['rows'])) {
                     $section->addPageBreak();
@@ -1141,6 +1156,9 @@ class TemporaryModuleWordPdfService
 
                 $section->addTextBreak(1);
                 $hasSummarySections = true;
+                if ($reportImageEnabled && $reportImagePlacement === 'after_sum') {
+                    $this->addReportImageBlockToWord($section, $entries, $reportImageField, $fieldTypesByKey, $reportImageTitle, $reportImageWidth, $exportFontName);
+                }
             }
 
             if ($hasSummarySections) {
@@ -1420,6 +1438,9 @@ class TemporaryModuleWordPdfService
                 }
                 $rowHighlightEntryIdx++;
             }
+            if ($reportImageEnabled && in_array($reportImagePlacement, ['after_records', 'before_split_group', 'after_split_group'], true)) {
+                $this->addReportImageBlockToWord($section, $entries, $reportImageField, $fieldTypesByKey, $reportImageTitle, $reportImageWidth, $exportFontName);
+            }
 
             \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007')->save($fullPath);
 
@@ -1443,9 +1464,24 @@ class TemporaryModuleWordPdfService
         $columnWidthPercents = $this->fractionsToPercents($columnWidthFractions);
         $imageColumnsCount = $this->countPdfImageColumns($columns, $fieldTypesByKey);
         $shouldPreloadPdfImages = $this->shouldPreloadPdfImageData($entries->count(), $imageColumnsCount);
+        $pdfImageColumns = $columns;
+        if ($reportImageEnabled && $reportImageField !== '') {
+            $hasReportImageColumn = false;
+            foreach ($pdfImageColumns as $pdfImageColumn) {
+                if ((string) ($pdfImageColumn['key'] ?? '') === $reportImageField) {
+                    $hasReportImageColumn = true;
+                    break;
+                }
+            }
+            if (! $hasReportImageColumn) {
+                $pdfImageColumns[] = ['key' => $reportImageField];
+            }
+        }
         $pdfImageDataByPath = $shouldPreloadPdfImages
-            ? $this->buildPdfImageDataByPath($entries, $columns, $fieldTypesByKey)
-            : [];
+            ? $this->buildPdfImageDataByPath($entries, $pdfImageColumns, $fieldTypesByKey)
+            : ($reportImageEnabled && $reportImageField !== ''
+                ? $this->buildPdfImageDataByPath($entries, [['key' => $reportImageField]], $fieldTypesByKey)
+                : []);
 
         $html = view('temporary_modules.admin.partials.export_pdf_table', [
             'title' => $title,
@@ -1494,6 +1530,11 @@ class TemporaryModuleWordPdfService
             'columnWidthPercents' => $columnWidthPercents,
             'entries' => $entries,
             'splitTableByField' => $splitTableByField,
+            'reportImageEnabled' => $reportImageEnabled,
+            'reportImageTitle' => $reportImageTitle,
+            'reportImageField' => $reportImageField,
+            'reportImagePlacement' => $reportImagePlacement,
+            'reportImageWidth' => $reportImageWidth,
             'microrregionMeta' => $microrregionMeta,
             'stretch' => $stretch,
             'countTable' => $countTable,
@@ -2945,6 +2986,43 @@ class TemporaryModuleWordPdfService
         }
 
         return $resolved;
+    }
+
+    private function addReportImageBlockToWord(
+        \PhpOffice\PhpWord\Element\Section $section,
+        iterable $entries,
+        string $fieldKey,
+        array $fieldTypesByKey,
+        string $title,
+        int $widthPx,
+        string $fontName
+    ): void {
+        if ($fieldKey === '') {
+            return;
+        }
+        $fieldType = (string) ($fieldTypesByKey[$fieldKey] ?? 'image');
+        $imagePath = null;
+        foreach ($entries as $entry) {
+            $data = (array) ($entry->data ?? []);
+            $paths = $this->resolveImageAbsolutePaths($data[$fieldKey] ?? null, $fieldType);
+            if ($paths !== []) {
+                $imagePath = $paths[0];
+                break;
+            }
+        }
+        if (!is_string($imagePath) || !is_file($imagePath)) {
+            return;
+        }
+
+        $section->addTextBreak(1);
+        if ($title !== '') {
+            $section->addText($title, ['name' => $fontName, 'bold' => true, 'size' => 11], ['alignment' => Jc::CENTER, 'spaceAfter' => 80]);
+        }
+        $section->addImage($imagePath, [
+            'width' => max(80, min(700, $widthPx)),
+            'alignment' => Jc::CENTER,
+        ]);
+        $section->addTextBreak(1);
     }
 
     private function isImageTypeOrValue(string $fieldType, string $value): bool

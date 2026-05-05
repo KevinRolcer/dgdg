@@ -2,6 +2,70 @@
     $fieldTypesByKey = $fieldTypesByKey ?? [];
     $pdfImageDataByPath = $pdfImageDataByPath ?? [];
     $rowHighlightStyles = is_array($rowHighlightStyles ?? null) ? $rowHighlightStyles : [];
+    $reportImageEnabled = !empty($reportImageEnabled ?? false);
+    $reportImageField = trim((string) ($reportImageField ?? ''));
+    $reportImageTitle = trim((string) ($reportImageTitle ?? ''));
+    $reportImagePlacement = trim((string) ($reportImagePlacement ?? 'after_records'));
+    $reportImageWidth = max(80, min(700, (int) ($reportImageWidth ?? 320)));
+    $resolveReportImagePayload = function ($entriesScope) use (&$resolveReportImagePayload, $reportImageField, $fieldTypesByKey, $pdfImageDataByPath) {
+        if ($reportImageField === '') {
+            return null;
+        }
+        $scope = $entriesScope instanceof \Illuminate\Support\Collection ? $entriesScope->all() : (is_array($entriesScope) ? $entriesScope : []);
+        foreach ($scope as $entryScope) {
+            $dataScope = (array) ($entryScope->data ?? []);
+            $raw = $dataScope[$reportImageField] ?? null;
+            $rawValues = is_array($raw) && !array_key_exists('primary', $raw) && !array_key_exists('secondary', $raw)
+                ? array_values(array_filter($raw, fn ($item) => is_string($item) && trim($item) !== ''))
+                : ((is_string($raw) && trim($raw) !== '') ? [trim($raw)] : []);
+            foreach ($rawValues as $rawValue) {
+                $trimmed = trim((string) $rawValue);
+                $normalized = preg_replace('/[\x00-\x1F\x7F]+/u', '', $trimmed);
+                $normalized = is_string($normalized) ? preg_replace('/\s*\/\s*/u', '/', $normalized) : $trimmed;
+                $compact = is_string($normalized) ? preg_replace('/\s+/u', '', $normalized) : $trimmed;
+                $candidates = array_values(array_unique(array_filter([
+                    (string) $rawValue,
+                    $trimmed,
+                    $normalized,
+                    $compact,
+                    is_string($normalized) ? str_replace('temporary_modules/', 'temporary-modules/', $normalized) : '',
+                    is_string($normalized) ? str_replace('temporary-modules/', 'temporary_modules/', $normalized) : '',
+                    is_string($compact) ? str_replace('temporary_modules/', 'temporary-modules/', $compact) : '',
+                    is_string($compact) ? str_replace('temporary-modules/', 'temporary_modules/', $compact) : '',
+                ], static fn ($v) => is_string($v) && $v !== '')));
+                foreach ($candidates as $candidate) {
+                    $payload = $pdfImageDataByPath[$candidate] ?? null;
+                    if (is_array($payload) && (string) ($payload['src'] ?? '') !== '') {
+                        return $payload;
+                    }
+                    if (is_string($payload) && $payload !== '') {
+                        return ['src' => $payload, 'w' => null, 'h' => null];
+                    }
+                }
+            }
+        }
+
+        return null;
+    };
+    $renderReportImageBlock = function ($entriesScope, ?string $scopeLabel = null) use ($reportImageEnabled, $reportImageTitle, $reportImageWidth, $resolveReportImagePayload): string {
+        if (!$reportImageEnabled) {
+            return '';
+        }
+        $payload = $resolveReportImagePayload($entriesScope);
+        if (!is_array($payload) || trim((string) ($payload['src'] ?? '')) === '') {
+            return '';
+        }
+        $title = $reportImageTitle !== '' ? $reportImageTitle : trim((string) ($scopeLabel ?? ''));
+        $src = (string) ($payload['src'] ?? '');
+        $html = '<div style="text-align:center;margin:8px 0 12px 0;page-break-inside:avoid;">';
+        if ($title !== '') {
+            $html .= '<p style="font-weight:bold;margin:0 0 4px 0;">'.e($title).'</p>';
+        }
+        $html .= '<img src="'.e($src).'" style="width: '.$reportImageWidth.'px; height:auto; display:inline-block;" alt="Imagen">';
+        $html .= '</div>';
+
+        return $html;
+    };
     $operationsValueIsEmpty = function ($value) use (&$operationsValueIsEmpty): bool {
         if ($value === null) {
             return true;
@@ -756,6 +820,9 @@
 </table>
 @endif
 @endif
+@if($reportImagePlacement === 'after_count')
+    {!! $renderReportImageBlock($entries) !!}
+@endif
 
 @if(!empty($sumTable) && !empty($sumTable['rows']) && is_array($sumTable['rows']))
 @php
@@ -1041,6 +1108,9 @@
     @endif
 @endforeach
 @endif
+@if($reportImagePlacement === 'after_sum')
+    {!! $renderReportImageBlock($entries) !!}
+@endif
 
 @php
     $hasSummaryContent = (!empty($includeTotalsTable) && !empty($totalsTable) && is_array($totalsTable) && !empty($totalsTable['columns']))
@@ -1170,6 +1240,9 @@
     @foreach ($dataTableGroups as $dataGroupIndex => $dataGroup)
         @if (($dataGroup['label'] ?? '') !== '')
             <p style="font-weight: bold; margin: {{ $dataGroupIndex > 0 ? '0' : '8px' }} 0 4px 0; padding-top: {{ $dataGroupIndex > 0 ? '4px' : '0' }}; page-break-before: {{ $dataGroupIndex > 0 ? 'always' : 'auto' }}; break-before: {{ $dataGroupIndex > 0 ? 'page' : 'auto' }}; text-align: {{ $sectionLabelAlign }};">{{ $dataGroup['label'] }}</p>
+        @endif
+        @if($reportImagePlacement === 'before_split_group')
+            {!! $renderReportImageBlock($dataGroup['entries'] ?? [], (string) ($dataGroup['label'] ?? '')) !!}
         @endif
     <table class="data-table" style="{{ $dataTableStyle }}">
         <thead>
@@ -1492,7 +1565,13 @@
         @endforeach
         </tbody>
     </table>
+        @if($reportImagePlacement === 'after_split_group')
+            {!! $renderReportImageBlock($dataGroup['entries'] ?? [], (string) ($dataGroup['label'] ?? '')) !!}
+        @endif
     @endforeach
+    @if($reportImagePlacement === 'after_records')
+        {!! $renderReportImageBlock($tempEntries) !!}
+    @endif
 @endif
 </body>
 </html>

@@ -1495,6 +1495,7 @@
                 tmExportRenderSumConfigurator(personalizeModal._countableColumns);
                 tmExportRenderCalculatedColumnsConfigurator(personalizeModal._countableColumns);
                 tmExportRefreshSplitTableSelect(personalizeModal._countableColumns);
+                tmExportRefreshReportImageFieldSelect(personalizeModal._personalizeColumns || []);
             }
         }
 
@@ -1584,7 +1585,9 @@
             });
             tmExportRefreshRowHighlightColumnSelect(columns);
             tmExportRefreshSplitTableSelect(columns);
+            tmExportRefreshReportImageFieldSelect(columns);
             tmExportSyncRowHighlightPanel();
+            tmExportSyncReportImagePanel();
         }
 
         function tmExportRefreshSplitTableSelect(columnsList) {
@@ -1615,6 +1618,39 @@
         function tmExportSyncRowHighlightPanel() {
             var en = document.getElementById('tmExportRowHighlightEnabled');
             var wrap = document.getElementById('tmExportRowHighlightWrap');
+            if (wrap && en) {
+                wrap.hidden = !en.checked;
+            }
+        }
+
+        function tmExportRefreshReportImageFieldSelect(columnsList) {
+            var sel = document.getElementById('tmExportReportImageField');
+            if (!sel) {
+                return;
+            }
+            var cur = String(sel.value || '');
+            sel.innerHTML = '';
+            (Array.isArray(columnsList) ? columnsList : []).forEach(function (c) {
+                if (!c || !c.is_image) {
+                    return;
+                }
+                var k = String(c.key || '');
+                if (!k) {
+                    return;
+                }
+                var opt = document.createElement('option');
+                opt.value = k;
+                opt.textContent = (c.label && String(c.label).trim() !== '') ? String(c.label).trim() : k;
+                sel.appendChild(opt);
+            });
+            if (cur && Array.from(sel.options).some(function (o) { return o.value === cur; })) {
+                sel.value = cur;
+            }
+        }
+
+        function tmExportSyncReportImagePanel() {
+            var en = document.getElementById('tmExportIncludeReportImage');
+            var wrap = document.getElementById('tmExportReportImageWrap');
             if (wrap && en) {
                 wrap.hidden = !en.checked;
             }
@@ -3204,7 +3240,7 @@
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sectionLabel: 'Desglose', sectionLabelAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumShowItem: true, sumItemLabel: '#', sumShowDelegation: true, sumDelegationLabel: 'Delegación', sumShowCabecera: true, sumCabeceraLabel: 'Cabecera', sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTotalLabel: 'Total de registros', countTableCellWidth: 12, countTableHeaderFontPx: 8, countTableCellFontPx: 10, recordsCellFontPx: 12, recordsHeaderFontPx: 12, recordsGroupHeaderFontPx: 12, sumCellFontPx: 12, sumHeaderFontPx: 12, sumGroupHeaderFontPx: 12, totalsCellFontPx: 12, totalsHeaderFontPx: 12, totalsGroupHeaderFontPx: 12, cellFontPx: 12, headerFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', splitTableByField: '', includeSumTable: false, sumGroupBy: 'microrregion', includeCalculatedColumns: false, calculatedColumns: [], includeOperationsColumn: false, operationsLabel: 'Operaciones', operationsReferenceField: '', operationsIncludePercent: true, operationsFields: [], sumMetrics: [], sumFormulas: [] };
+                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sectionLabel: 'Desglose', sectionLabelAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumShowItem: true, sumItemLabel: '#', sumShowDelegation: true, sumDelegationLabel: 'Delegación', sumShowCabecera: true, sumCabeceraLabel: 'Cabecera', sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTotalLabel: 'Total de registros', countTableCellWidth: 12, countTableHeaderFontPx: 8, countTableCellFontPx: 10, recordsCellFontPx: 12, recordsHeaderFontPx: 12, recordsGroupHeaderFontPx: 12, sumCellFontPx: 12, sumHeaderFontPx: 12, sumGroupHeaderFontPx: 12, totalsCellFontPx: 12, totalsHeaderFontPx: 12, totalsGroupHeaderFontPx: 12, cellFontPx: 12, headerFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', splitTableByField: '', includeReportImage: false, reportImageTitle: '', reportImageField: '', reportImagePlacement: 'after_records', reportImageWidth: 320, includeSumTable: false, sumGroupBy: 'microrregion', includeCalculatedColumns: false, calculatedColumns: [], includeOperationsColumn: false, operationsLabel: 'Operaciones', operationsReferenceField: '', operationsIncludePercent: true, operationsFields: [], sumMetrics: [], sumFormulas: [] };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
             const titleUppercaseEl = modal ? modal.querySelector('#tmExportTitleUppercase') : document.getElementById('tmExportTitleUppercase');
@@ -3214,6 +3250,11 @@
             const headerFontEl = modal ? modal.querySelector('#tmExportHeaderFontSize') : document.getElementById('tmExportHeaderFontSize');
             const microrregionSortEl = modal ? modal.querySelector('#tmExportMicrorregionSort') : document.getElementById('tmExportMicrorregionSort');
             const splitTableByFieldEl = modal ? modal.querySelector('#tmExportSplitTableByField') : document.getElementById('tmExportSplitTableByField');
+            const includeReportImageEl = modal ? modal.querySelector('#tmExportIncludeReportImage') : document.getElementById('tmExportIncludeReportImage');
+            const reportImageTitleEl = modal ? modal.querySelector('#tmExportReportImageTitle') : document.getElementById('tmExportReportImageTitle');
+            const reportImageFieldEl = modal ? modal.querySelector('#tmExportReportImageField') : document.getElementById('tmExportReportImageField');
+            const reportImagePlacementEl = modal ? modal.querySelector('#tmExportReportImagePlacement') : document.getElementById('tmExportReportImagePlacement');
+            const reportImageWidthEl = modal ? modal.querySelector('#tmExportReportImageWidth') : document.getElementById('tmExportReportImageWidth');
             const includeCalculatedColumnsEl = modal ? modal.querySelector('#tmExportIncludeCalculatedColumns') : document.getElementById('tmExportIncludeCalculatedColumns');
             const calculatedColumnsListEl = modal ? modal.querySelector('#tmExportCalculatedColumnsList') : document.getElementById('tmExportCalculatedColumnsList');
             const docMarginPresetEl = modal ? modal.querySelector('#tmExportDocMarginPreset') : document.getElementById('tmExportDocMarginPreset');
@@ -3268,6 +3309,7 @@
             const totalsCellFontPx = totalsCellFontEl && totalsCellFontEl.value ? Math.max(9, Math.min(24, parseInt(totalsCellFontEl.value, 10) || 12)) : 12;
             const totalsHeaderFontPx = totalsHeaderFontEl && totalsHeaderFontEl.value ? Math.max(9, Math.min(48, parseInt(totalsHeaderFontEl.value, 10) || 12)) : 12;
             const totalsGroupHeaderFontPx = totalsGroupHeaderFontEl && totalsGroupHeaderFontEl.value ? Math.max(9, Math.min(48, parseInt(totalsGroupHeaderFontEl.value, 10) || 12)) : totalsHeaderFontPx;
+            const reportImageWidth = reportImageWidthEl && reportImageWidthEl.value ? Math.max(80, Math.min(700, parseInt(reportImageWidthEl.value, 10) || 320)) : 320;
             const items = Array.from(container.children).filter(function (el) {
                 return el.classList && el.classList.contains('tm-export-personalize-col');
             });
@@ -3450,6 +3492,11 @@
                 groups: groups,
                 microrregionSort: (microrregionSortEl && microrregionSortEl.value === 'desc') ? 'desc' : 'asc',
                 splitTableByField: splitTableByFieldEl ? String(splitTableByFieldEl.value || '').trim() : '',
+                includeReportImage: !!(includeReportImageEl && includeReportImageEl.checked),
+                reportImageTitle: reportImageTitleEl ? String(reportImageTitleEl.value || '').trim() : '',
+                reportImageField: reportImageFieldEl ? String(reportImageFieldEl.value || '').trim() : '',
+                reportImagePlacement: reportImagePlacementEl ? String(reportImagePlacementEl.value || 'after_records') : 'after_records',
+                reportImageWidth: reportImageWidth,
                 includeSumTable: !!(includeSumTableEl && includeSumTableEl.checked),
                 sumGroupBy: (sumGroupByEl && sumGroupByEl.value === 'municipio') ? 'municipio' : 'microrregion',
                 includeCalculatedColumns: !!(includeCalculatedColumnsEl && includeCalculatedColumnsEl.checked),
@@ -3567,6 +3614,24 @@
 
         function escapeHtmlWithBreaks(val) {
             return escapeHtml(String(val == null ? '' : val)).replace(/\r?\n/g, '<br>');
+        }
+
+        function tmExportRenderReportImagePreview(state, scopeLabel) {
+            if (!state || !state.includeReportImage || !String(state.reportImageField || '').trim()) {
+                return '';
+            }
+            var title = String(state.reportImageTitle || '').trim();
+            if (!title && scopeLabel) {
+                title = String(scopeLabel);
+            }
+            var width = Math.max(80, Math.min(700, parseInt(String(state.reportImageWidth || 320), 10) || 320));
+            var html = '<div class="tm-export-preview-report-image" style="margin:8px 0 12px 0;text-align:center;page-break-inside:avoid;">';
+            if (title) {
+                html += '<p style="font-weight:700;margin:0 0 4px 0;">' + escapeHtml(title) + '</p>';
+            }
+            html += '<div style="display:inline-flex;align-items:center;justify-content:center;width:' + width + 'px;min-height:90px;border:1px dashed #94a3b8;background:#f8fafc;color:#64748b;font-size:12px;">Imagen: ' + escapeHtml(state.reportImageField) + '</div>';
+            html += '</div>';
+            return html;
         }
 
         function normalizeExportHeadingText(text, uppercase) {
@@ -4181,6 +4246,9 @@
 
             // Tabla de Conteo (Resumen)
             html += countTableHtml;
+            if (state.reportImagePlacement === 'after_count') {
+                html += tmExportRenderReportImagePreview(state, '');
+            }
 
             // Tabla de Sumatoria (agregados y cálculos)
             html += tmExportRenderSumPreviewTable(
@@ -4208,6 +4276,9 @@
                     cabeceraLabel: state.sumCabeceraLabel || 'Cabecera'
                 }
             );
+            if (state.reportImagePlacement === 'after_sum') {
+                html += tmExportRenderReportImagePreview(state, '');
+            }
 
             // Tabla de Datos (Desglose)
             var sectionLabelText = normalizeExportHeadingText((state.sectionLabel && String(state.sectionLabel).trim() !== '') ? String(state.sectionLabel) : 'Desglose', headersUppercase);
@@ -4282,10 +4353,16 @@
                         var splitGroupKey = String(splitVal).toLowerCase();
                         if (splitGroupKey !== lastSplitGroup) {
                             if (lastSplitGroup !== null) {
+                                if (state.reportImagePlacement === 'after_split_group') {
+                                    html += '<tr><td colspan="' + String(effectiveColumns.length) + '">' + tmExportRenderReportImagePreview(state, '') + '</td></tr>';
+                                }
                                 html += '</table>';
                                 html += dataTableOpenHtml + dataTableHeaderHtml;
                             }
                             html += '<tr class="tm-export-preview-row tm-export-preview-data"><td class="tm-export-preview-cell tm-export-preview-data-cell" colspan="' + String(effectiveColumns.length) + '" style="background:#eef2f7;font-weight:700;text-align:left;font-size:' + recordsHeaderFontPx + 'px;">' + escapeHtml(splitLabel + ': ' + splitVal) + '</td></tr>';
+                            if (state.reportImagePlacement === 'before_split_group') {
+                                html += '<tr><td colspan="' + String(effectiveColumns.length) + '">' + tmExportRenderReportImagePreview(state, splitVal) + '</td></tr>';
+                            }
                             lastSplitGroup = splitGroupKey;
                         }
                     }
@@ -4338,6 +4415,9 @@
                     });
                     html += '</tr>';
                 });
+                if (splitCol && state.reportImagePlacement === 'after_split_group') {
+                    html += '<tr><td colspan="' + String(effectiveColumns.length) + '">' + tmExportRenderReportImagePreview(state, '') + '</td></tr>';
+                }
             } else {
                 html += '<tr class="tm-export-preview-row tm-export-preview-data">';
                 effectiveColumns.forEach(function (col) {
@@ -4365,6 +4445,9 @@
                 html += '</tr>';
             }
             html += '</table>';
+            if (state.reportImagePlacement === 'after_records') {
+                html += tmExportRenderReportImagePreview(state, '');
+            }
             previewEl.innerHTML = html;
         }
 
@@ -5286,6 +5369,21 @@
                         if (mrSortEl) { mrSortEl.value = draftCfg.microrregion_sort === 'desc' ? 'desc' : (data.microrregion_sort || 'asc'); }
                         var splitTableByFieldEl = document.getElementById('tmExportSplitTableByField');
                         if (splitTableByFieldEl) { splitTableByFieldEl.value = draftCfg.split_table_by_field || ''; }
+                        var reportImgEn = document.getElementById('tmExportIncludeReportImage');
+                        var reportImgWrap = document.getElementById('tmExportReportImageWrap');
+                        var reportImgTitle = document.getElementById('tmExportReportImageTitle');
+                        var reportImgField = document.getElementById('tmExportReportImageField');
+                        var reportImgPlacement = document.getElementById('tmExportReportImagePlacement');
+                        var reportImgWidth = document.getElementById('tmExportReportImageWidth');
+                        if (reportImgEn) { reportImgEn.checked = !!draftCfg.include_report_image; }
+                        if (reportImgWrap) { reportImgWrap.hidden = !(reportImgEn && reportImgEn.checked); }
+                        if (reportImgTitle) { reportImgTitle.value = draftCfg.report_image_title != null ? String(draftCfg.report_image_title) : ''; }
+                        if (reportImgField) { reportImgField.value = draftCfg.report_image_field || ''; }
+                        if (reportImgPlacement) { reportImgPlacement.value = draftCfg.report_image_placement || 'after_records'; }
+                        if (reportImgWidth && draftCfg.report_image_width != null) {
+                            var riw = parseInt(draftCfg.report_image_width, 10);
+                            reportImgWidth.value = String(Number.isNaN(riw) ? 320 : Math.max(80, Math.min(700, riw)));
+                        }
                         var rowHlEnDraft = document.getElementById('tmExportRowHighlightEnabled');
                         var rowHlWrapDraft = document.getElementById('tmExportRowHighlightWrap');
                         if (personalizeModal) {
@@ -5552,6 +5650,16 @@
                         if (mrSortDefaultEl) { mrSortDefaultEl.value = data.microrregion_sort || 'asc'; }
                         var splitTableDefaultEl = document.getElementById('tmExportSplitTableByField');
                         if (splitTableDefaultEl) { splitTableDefaultEl.value = ''; }
+                        var reportImgEnDef = document.getElementById('tmExportIncludeReportImage');
+                        var reportImgWrapDef = document.getElementById('tmExportReportImageWrap');
+                        if (reportImgEnDef) { reportImgEnDef.checked = false; }
+                        if (reportImgWrapDef) { reportImgWrapDef.hidden = true; }
+                        var reportImgTitleDef = document.getElementById('tmExportReportImageTitle');
+                        var reportImgPlacementDef = document.getElementById('tmExportReportImagePlacement');
+                        var reportImgWidthDef = document.getElementById('tmExportReportImageWidth');
+                        if (reportImgTitleDef) { reportImgTitleDef.value = ''; }
+                        if (reportImgPlacementDef) { reportImgPlacementDef.value = 'after_records'; }
+                        if (reportImgWidthDef) { reportImgWidthDef.value = '320'; }
                         buildPersonalizeColumnsList(columns, columnsEl);
                     }
                     renderOmittedColumnsList(columnsEl, columns, omittedListEl, restoreWrap, omittedWrap, omittedToggle);
@@ -6153,6 +6261,13 @@
                     if (splitTableByFieldEl) {
                         splitTableByFieldEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
+                    ['tmExportIncludeReportImage', 'tmExportReportImageTitle', 'tmExportReportImageField', 'tmExportReportImagePlacement', 'tmExportReportImageWidth'].forEach(function (id) {
+                        var el = document.getElementById(id);
+                        if (el) {
+                            el.addEventListener('input', function () { tmExportSyncReportImagePanel(); buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                            el.addEventListener('change', function () { tmExportSyncReportImagePanel(); buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        }
+                    });
                     if (docMarginPresetEl) {
                         docMarginPresetEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
                     }
@@ -6334,6 +6449,11 @@
                             row_highlight_text_color: String(state.rowHighlightTextColor || '').trim(),
                             microrregion_sort: state.microrregionSort || 'asc',
                             split_table_by_field: state.splitTableByField || '',
+                            include_report_image: !!state.includeReportImage,
+                            report_image_title: state.reportImageTitle || '',
+                            report_image_field: state.reportImageField || '',
+                            report_image_placement: state.reportImagePlacement || 'after_records',
+                            report_image_width: state.reportImageWidth || 320,
                             groups: state.groups || [],
                             columns: orderedCols.map(function (col) {
                                 const colState = state.columns.find(function (c) { return c.key === col.key; }) || {};
