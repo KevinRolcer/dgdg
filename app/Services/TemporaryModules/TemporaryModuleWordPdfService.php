@@ -1454,9 +1454,19 @@ class TemporaryModuleWordPdfService
                 $rowHighlightEntryIdx++;
             }
             if ($reportImageEnabled) {
-                $this->addUploadedReportImagesToWord($section, $reportImages, 'after_records', '', $exportFontName, true);
+                $wordReportImageHeaderCtx = [
+                    'hasLogo' => $hasLogo,
+                    'logoPath' => $logoPath,
+                    'title' => $title,
+                    'exportFontName' => $exportFontName,
+                    'titleFontSizePt' => $titleFontSizePt,
+                    'jc' => $jc,
+                    'fechaCorteStr' => $fechaCorteStr,
+                    'usableTableTwips' => $usableTableTwips,
+                ];
+                $this->addUploadedReportImagesToWord($section, $reportImages, 'after_records', '', $exportFontName, true, $wordReportImageHeaderCtx);
                 $this->addUploadedReportImagesToWord($section, $reportImages, 'before_split_group', '', $exportFontName);
-                $this->addUploadedReportImagesToWord($section, $reportImages, 'after_split_group', '', $exportFontName, true);
+                $this->addUploadedReportImagesToWord($section, $reportImages, 'after_split_group', '', $exportFontName, true, $wordReportImageHeaderCtx);
             }
 
             \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007')->save($fullPath);
@@ -3086,17 +3096,63 @@ class TemporaryModuleWordPdfService
         return false;
     }
 
+    /**
+     * Logo + título + fecha (mismo criterio que el bloque previo al desglose de registros).
+     *
+     * @param  array<string, mixed>  $ctx  hasLogo, logoPath, title, exportFontName, titleFontSizePt, jc, fechaCorteStr, usableTableTwips
+     */
+    private function addWordExportDocHeaderTable(\PhpOffice\PhpWord\Element\Section $section, array $ctx): void
+    {
+        $hasLogo = !empty($ctx['hasLogo']);
+        $logoPath = (string) ($ctx['logoPath'] ?? '');
+        $docTitle = (string) ($ctx['title'] ?? '');
+        $exportFontName = (string) ($ctx['exportFontName'] ?? 'Arial');
+        $titleFontSizePt = max(8, min(36, (int) ($ctx['titleFontSizePt'] ?? 14)));
+        $jc = $ctx['jc'] ?? Jc::CENTER;
+        $fechaCorteStr = (string) ($ctx['fechaCorteStr'] ?? '');
+        $usableTableTwips = max(4000, (int) ($ctx['usableTableTwips'] ?? 9000));
+
+        $hdrTbl = $section->addTable([
+            'borderSize' => 0,
+            'borderColor' => 'FFFFFF',
+            'cellMarginTop' => 0,
+            'cellMarginBottom' => 0,
+            'cellMarginLeft' => 0,
+            'cellMarginRight' => 0,
+        ]);
+        if ($hasLogo && $logoPath !== '' && is_file($logoPath)) {
+            $hdrLogoRow = $hdrTbl->addRow(800);
+            $hdrLogoCell = $hdrLogoRow->addCell($usableTableTwips, ['gridSpan' => 2, 'valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
+            $hdrLogoRun = $hdrLogoCell->addTextRun(['alignment' => Jc::START]);
+            $hdrLogoRun->addImage($logoPath, ['height' => 52]);
+        }
+
+        $hdrTbl->addRow();
+        $hdrTitleCell = $hdrTbl->addCell($usableTableTwips, ['gridSpan' => 2, 'borderSize' => 0, 'borderColor' => 'FFFFFF', 'cellMarginTop' => 80]);
+        $hdrTitleCell->addText($docTitle, ['name' => $exportFontName, 'bold' => true, 'size' => $titleFontSizePt, 'color' => '861E34'], ['alignment' => $jc, 'spaceAfter' => 40]);
+
+        $hdrTbl->addRow();
+        $hdrDateCell = $hdrTbl->addCell($usableTableTwips, ['gridSpan' => 2, 'valign' => 'bottom', 'borderSize' => 0, 'borderColor' => 'FFFFFF']);
+        $hdrDateCell->addText('Fecha y hora de corte: '.$fechaCorteStr, ['name' => $exportFontName, 'size' => 9], ['alignment' => Jc::END, 'spaceAfter' => 120]);
+
+        $section->addTextBreak(1);
+    }
+
     private function addUploadedReportImagesToWord(
         \PhpOffice\PhpWord\Element\Section $section,
         array $images,
         string $placement,
         string $targetGroup,
         string $fontName,
-        bool $pageBreakBeforeIfAny = false
+        bool $pageBreakBeforeIfAny = false,
+        ?array $wordHeaderContext = null
     ): void {
         $targetNeedle = mb_strtolower(trim($targetGroup), 'UTF-8');
         if ($pageBreakBeforeIfAny && $this->hasUploadedReportImagesForPlacement($images, $placement, $targetGroup)) {
             $section->addPageBreak();
+            if ($wordHeaderContext !== null) {
+                $this->addWordExportDocHeaderTable($section, $wordHeaderContext);
+            }
         }
         $insertedAny = false;
         foreach ($images as $image) {
@@ -3120,9 +3176,6 @@ class TemporaryModuleWordPdfService
             $section->addImage($path, ['width' => $width, 'alignment' => Jc::CENTER]);
             $section->addTextBreak(1);
             $insertedAny = true;
-        }
-        if ($insertedAny) {
-            $section->addPageBreak();
         }
     }
 

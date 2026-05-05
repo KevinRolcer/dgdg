@@ -4,49 +4,6 @@
     $rowHighlightStyles = is_array($rowHighlightStyles ?? null) ? $rowHighlightStyles : [];
     $reportImageEnabled = !empty($reportImageEnabled ?? false);
     $reportImages = is_array($reportImages ?? null) ? $reportImages : [];
-    $renderReportImageBlock = function (string $placement, ?string $scopeLabel = null, bool $isLastSplitDataGroup = false) use ($reportImageEnabled, $reportImages): string {
-        if (!$reportImageEnabled) {
-            return '';
-        }
-        $scope = mb_strtolower(trim((string) ($scopeLabel ?? '')), 'UTF-8');
-        $html = '';
-        foreach ($reportImages as $image) {
-            if (!is_array($image) || (string) ($image['placement'] ?? 'after_records') !== $placement) {
-                continue;
-            }
-            $target = mb_strtolower(trim((string) ($image['target_group'] ?? '')), 'UTF-8');
-            /** Sin dato de grupo: solo debe repetirse al final de todas las mini-tablas, no tras cada grupo. */
-            if ($placement === 'after_split_group' && $target === '') {
-                if (! $isLastSplitDataGroup) {
-                    continue;
-                }
-            } elseif ($target !== '' && ($scope === '' || !str_contains($scope, $target))) {
-                continue;
-            }
-            $src = trim((string) ($image['src'] ?? ''));
-            if ($src === '') {
-                continue;
-            }
-            $title = trim((string) ($image['title'] ?? ''));
-            $width = max(80, min(700, (int) ($image['width'] ?? 320)));
-            $html .= '<div style="text-align:center;margin:8px 0 12px 0;page-break-inside:avoid;">';
-            if ($title !== '') {
-                $html .= '<p style="font-weight:bold;margin:0 0 4px 0;">'.e($title).'</p>';
-            }
-            $html .= '<img src="'.e($src).'" style="width: '.$width.'px; height:auto; display:inline-block;" alt="Imagen">';
-            $html .= '</div>';
-        }
-        if ($html !== '') {
-            $breakBefore = ($placement === 'after_records')
-                || ($placement === 'after_split_group' && $isLastSplitDataGroup);
-            if ($breakBefore) {
-                $html = '<div class="tm-report-images-page-break-before">&nbsp;</div>'.$html;
-            }
-            $html .= '<div class="tm-report-images-page-break-after">&nbsp;</div>';
-        }
-
-        return $html;
-    };
     $operationsValueIsEmpty = function ($value) use (&$operationsValueIsEmpty): bool {
         if ($value === null) {
             return true;
@@ -303,6 +260,75 @@
     $summaryCompactTitlePx = max(12, min($titleFontSizePx - 3, 16));
     $summaryCompactDatePx = max(8, min(10, $summaryCompactTitlePx - 5));
 
+    $buildPdfReportImagesDocHeadHtml = static function () use ($logoDataUri, $title, $titleAlign, $fechaCorteStr, $summaryCompactLogoHeightPx, $summaryCompactTitlePx, $summaryCompactDatePx): string {
+        $ta = ($titleAlign ?? 'center') === 'left' ? 'left' : (($titleAlign ?? 'center') === 'right' ? 'right' : 'center');
+        $h = '<table class="doc-head-table" role="presentation">';
+        if (! empty($logoDataUri)) {
+            $h .= '<tr><td colspan="2" style="text-align: left; vertical-align: bottom; padding-bottom: 2px;">';
+            $h .= '<img class="doc-head-logo" src="'.e($logoDataUri).'" alt="Gobierno de Puebla" style="max-height: '.(int) $summaryCompactLogoHeightPx.'px;">';
+            $h .= '</td></tr><tr><td colspan="2" style="padding-top: 6px; padding-bottom: 3px;">';
+            $h .= '<h1 style="text-align: '.$ta.'; margin-bottom: 0; font-size: '.(int) $summaryCompactTitlePx.'px;">'.e((string) $title).'</h1>';
+            $h .= '</td></tr><tr><td colspan="2" style="text-align: right; font-size: '.(int) $summaryCompactDatePx.'px; padding-bottom: 6px;">';
+            if (isset($fechaCorteStr) && (string) $fechaCorteStr !== '') {
+                $h .= 'Fecha y hora de corte: '.e((string) $fechaCorteStr);
+            }
+            $h .= '</td></tr>';
+        } else {
+            $h .= '<tr><td class="doc-head-title-cell" style="padding-bottom: 4px;">';
+            $h .= '<h1 style="text-align: '.$ta.'; margin-bottom: 0; font-size: '.(int) $summaryCompactTitlePx.'px;">'.e((string) $title).'</h1></td></tr>';
+            if (isset($fechaCorteStr) && (string) $fechaCorteStr !== '') {
+                $h .= '<tr><td style="text-align: right; font-size: '.(int) $summaryCompactDatePx.'px; padding-bottom: 6px;">Fecha y hora de corte: '.e((string) $fechaCorteStr).'</td></tr>';
+            }
+        }
+        $h .= '</table>';
+
+        return $h;
+    };
+
+    $renderReportImageBlock = function (string $placement, ?string $scopeLabel = null, bool $isLastSplitDataGroup = false) use ($reportImageEnabled, $reportImages, $buildPdfReportImagesDocHeadHtml): string {
+        if (!$reportImageEnabled) {
+            return '';
+        }
+        $scope = mb_strtolower(trim((string) ($scopeLabel ?? '')), 'UTF-8');
+        $html = '';
+        foreach ($reportImages as $image) {
+            if (!is_array($image) || (string) ($image['placement'] ?? 'after_records') !== $placement) {
+                continue;
+            }
+            $target = mb_strtolower(trim((string) ($image['target_group'] ?? '')), 'UTF-8');
+            /** Sin dato de grupo: solo debe repetirse al final de todas las mini-tablas, no tras cada grupo. */
+            if ($placement === 'after_split_group' && $target === '') {
+                if (! $isLastSplitDataGroup) {
+                    continue;
+                }
+            } elseif ($target !== '' && ($scope === '' || !str_contains($scope, $target))) {
+                continue;
+            }
+            $src = trim((string) ($image['src'] ?? ''));
+            if ($src === '') {
+                continue;
+            }
+            $imgTitle = trim((string) ($image['title'] ?? ''));
+            $width = max(80, min(700, (int) ($image['width'] ?? 320)));
+            $html .= '<div style="text-align:center;margin:8px 0 12px 0;page-break-inside:avoid;">';
+            if ($imgTitle !== '') {
+                $html .= '<p style="font-weight:bold;margin:0 0 4px 0;">'.e($imgTitle).'</p>';
+            }
+            $html .= '<img src="'.e($src).'" style="width: '.$width.'px; height:auto; display:inline-block;" alt="Imagen">';
+            $html .= '</div>';
+        }
+        if ($html !== '') {
+            $breakBefore = ($placement === 'after_records')
+                || ($placement === 'after_split_group' && $isLastSplitDataGroup);
+            if ($breakBefore) {
+                /* Misma página nueva + encabezado compacto que entre conteo/sumatoria y desglose; sin page-break-after para evitar hoja final en blanco. */
+                $html = '<div class="summary-page-break"></div>'.$buildPdfReportImagesDocHeadHtml().$html;
+            }
+        }
+
+        return $html;
+    };
+
     if ($forceFullWidthDataTable || $stretch || $dataTableAlign === 'left') {
         $dataTableStyle = 'width:100%; margin-top:10px;';
     } elseif ($dataTableAlign === 'center') {
@@ -491,26 +517,6 @@
         .summary-page-break {
             page-break-before: always;
             margin-top: 0;
-        }
-        .tm-report-images-page-break-before {
-            page-break-before: always;
-            break-before: page;
-            margin: 0;
-            padding: 0;
-            font-size: 0;
-            line-height: 0;
-            height: 0;
-            overflow: hidden;
-        }
-        .tm-report-images-page-break-after {
-            page-break-after: always;
-            break-after: page;
-            margin: 0;
-            padding: 0;
-            font-size: 0;
-            line-height: 0;
-            height: 0;
-            overflow: hidden;
         }
     </style>
 </head>
