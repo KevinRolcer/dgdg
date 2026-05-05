@@ -18,7 +18,7 @@
                         <input type="checkbox" class="tm-record-checkbox" data-tm-bulk-checkbox value="{{ $entry->id }}">
                     </span>
                     <span class="tm-record-card-title">{{ $cardTitle }}</span>
-                    <small>MR {{ $entry->microrregion->microrregion ?? '?' }}</small>
+                    <small>{{ $entry->microrregion ? 'MR '.$entry->microrregion->microrregion : 'Sin microrregiÃ³n' }}</small>
                 </summary>
                 <div class="tm-record-card-body">
                     @foreach ($module->fields as $field)
@@ -115,7 +115,7 @@
                         <td class="tm-bulk-col tm-hidden" style="text-align:center;">
                             <input type="checkbox" class="tm-record-checkbox" data-tm-bulk-checkbox value="{{ $entry->id }}">
                         </td>
-                        <td>MR {{ $entry->microrregion->microrregion ?? '-' }}</td>
+                        <td>{{ $entry->microrregion ? 'MR '.$entry->microrregion->microrregion : 'Sin microrregiÃ³n' }}</td>
                         @foreach ($module->fields as $field)
                             @php $cell = $entry->data[$field->key] ?? null; @endphp
                             <td>

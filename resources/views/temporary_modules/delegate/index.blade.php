@@ -964,7 +964,8 @@
                 $tmQueryBuscar = request()->query('buscar', '');
                 $tmBuscarFilterStr = is_array($tmQueryBuscar) ? '' : (string) $tmQueryBuscar;
                 $tmQueryMr = request()->query('microrregion_id');
-                $tmMicrorregionFilterId = is_array($tmQueryMr) ? 0 : (int) $tmQueryMr;
+                $tmMicrorregionFilterValue = is_array($tmQueryMr) ? '' : (string) $tmQueryMr;
+                $tmMicrorregionFilterId = (int) $tmMicrorregionFilterValue;
             @endphp
             <div class="tm-module-records-panels">
                 @foreach (($allModules ?? $modules) as $module)
@@ -1001,6 +1002,7 @@
                                     <span>Microregión</span>
                                     <select class="tm-records-filter-select" data-tm-filter-microrregion>
                                         <option value="">Todos</option>
+                                        <option value="sin_microrregion" @selected($isModuleActive && $tmMicrorregionFilterValue === 'sin_microrregion')>Sin microrregiÃ³n</option>
                                         @foreach ($microrregionesAsignadas ?? [] as $micro)
                                             <option value="{{ $micro->id }}" @selected($isModuleActive && $tmMicrorregionFilterId === (int) $micro->id)>
                                                 MR {{ $micro->microrregion }} — {{ $micro->cabecera }}
@@ -1049,7 +1051,7 @@
                             data-bulk-data-url="{{ route('temporary-modules.fragment.bulk-edit-data') }}"
                             data-submit-url="{{ route('temporary-modules.submit', $module->id) }}"
                             data-module-id="{{ $module->id }}"
-                            data-show-mr-select="{{ ($microrregionesAsignadas ?? collect())->count() > 1 ? '1' : '0' }}"
+                            data-show-mr-select="{{ $moduleMostrarSelectorMicrorregion ? '1' : '0' }}"
                             data-preview-url-template="{{ url('/modulos-temporales/'.$module->id.'/registros/__EID__/archivo/__FKEY__') }}"
                         >
                             <div class="tm-modal-backdrop" data-tm-bulk-edit-dismiss></div>

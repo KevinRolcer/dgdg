@@ -1350,9 +1350,15 @@ class TemporaryModuleController extends Controller
     private function applyDelegateMyRecordsFilters($query, Request $request, array $allowedMicrorregionIds): void
     {
         if ($request->filled('microrregion_id')) {
-            $mrId = (int) $request->query('microrregion_id');
-            if ($mrId > 0 && $allowedMicrorregionIds !== [] && in_array($mrId, $allowedMicrorregionIds, true)) {
-                $query->where('microrregion_id', $mrId);
+            $rawMicrorregionId = (string) $request->query('microrregion_id');
+            if ($rawMicrorregionId === 'sin_microrregion') {
+                $query->whereNull('microrregion_id')
+                    ->where('user_id', (int) $request->user()->id);
+            } else {
+                $mrId = (int) $rawMicrorregionId;
+                if ($mrId > 0 && $allowedMicrorregionIds !== [] && in_array($mrId, $allowedMicrorregionIds, true)) {
+                    $query->where('microrregion_id', $mrId);
+                }
             }
         }
 
@@ -1382,7 +1388,10 @@ class TemporaryModuleController extends Controller
             $appends['buscar'] = $buscar;
         }
         if ($request->filled('microrregion_id')) {
-            $appends['microrregion_id'] = (int) $request->query('microrregion_id');
+            $rawMicrorregionId = (string) $request->query('microrregion_id');
+            $appends['microrregion_id'] = $rawMicrorregionId === 'sin_microrregion'
+                ? 'sin_microrregion'
+                : (int) $rawMicrorregionId;
         }
 
         return $appends;
@@ -1564,11 +1573,18 @@ class TemporaryModuleController extends Controller
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $user->id), 403);
         $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
         $myEntries = $temporaryModule->entries()
-            ->when(
-                $microrregionIdsUsuario !== [],
-                fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
-                fn ($q) => $q->whereRaw('1 = 0')
-            )
+            ->where(function ($q) use ($microrregionIdsUsuario, $user): void {
+                if ($microrregionIdsUsuario !== []) {
+                    $q->whereIn('microrregion_id', $microrregionIdsUsuario);
+                } else {
+                    $q->whereRaw('1 = 0');
+                }
+
+                $q->orWhere(function ($ownQuery) use ($user): void {
+                    $ownQuery->where('user_id', (int) $user->id)
+                        ->whereNull('microrregion_id');
+                });
+            })
             ->tap(fn ($q) => $this->applyDelegateMyRecordsFilters($q, $request, $microrregionIdsUsuario))
             ->with('microrregion:id,microrregion,cabecera')
             ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
@@ -1608,11 +1624,18 @@ class TemporaryModuleController extends Controller
         $municipioField = $temporaryModule->fields->firstWhere('type', 'municipio');
 
         $entries = $temporaryModule->entries()
-            ->when(
-                $microrregionIdsUsuario !== [],
-                fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
-                fn ($q) => $q->whereRaw('1 = 0')
-            )
+            ->where(function ($q) use ($microrregionIdsUsuario, $user): void {
+                if ($microrregionIdsUsuario !== []) {
+                    $q->whereIn('microrregion_id', $microrregionIdsUsuario);
+                } else {
+                    $q->whereRaw('1 = 0');
+                }
+
+                $q->orWhere(function ($ownQuery) use ($user): void {
+                    $ownQuery->where('user_id', (int) $user->id)
+                        ->whereNull('microrregion_id');
+                });
+            })
             ->tap(fn ($q) => $this->applyDelegateMyRecordsFilters($q, $request, $microrregionIdsUsuario))
             ->with('microrregion:id,microrregion,cabecera')
             ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
