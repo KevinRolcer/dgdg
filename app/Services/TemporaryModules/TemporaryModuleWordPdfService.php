@@ -3071,6 +3071,7 @@ class TemporaryModuleWordPdfService
         string $fontName
     ): void {
         $targetNeedle = mb_strtolower(trim($targetGroup), 'UTF-8');
+        $insertedAny = false;
         foreach ($images as $image) {
             if (!is_array($image) || (string) ($image['placement'] ?? 'after_records') !== $placement) {
                 continue;
@@ -3091,6 +3092,10 @@ class TemporaryModuleWordPdfService
             }
             $section->addImage($path, ['width' => $width, 'alignment' => Jc::CENTER]);
             $section->addTextBreak(1);
+            $insertedAny = true;
+        }
+        if ($insertedAny) {
+            $section->addPageBreak();
         }
     }
 

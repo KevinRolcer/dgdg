@@ -31,6 +31,9 @@
             $html .= '<img src="'.e($src).'" style="width: '.$width.'px; height:auto; display:inline-block;" alt="Imagen">';
             $html .= '</div>';
         }
+        if ($html !== '') {
+            $html .= '<div class="tm-report-images-page-break-after">&nbsp;</div>';
+        }
 
         return $html;
     };
@@ -478,6 +481,16 @@
         .summary-page-break {
             page-break-before: always;
             margin-top: 0;
+        }
+        .tm-report-images-page-break-after {
+            page-break-after: always;
+            break-after: page;
+            margin: 0;
+            padding: 0;
+            font-size: 0;
+            line-height: 0;
+            height: 0;
+            overflow: hidden;
         }
     </style>
 </head>
