@@ -3685,15 +3685,22 @@
             return escapeHtml(String(val == null ? '' : val)).replace(/\r?\n/g, '<br>');
         }
 
-        function tmExportRenderReportImagePreview(state, placement, scopeLabel) {
+        function tmExportRenderReportImagePreview(state, placement, scopeLabel, opts) {
             if (!state || !state.includeReportImage || !Array.isArray(state.reportImages)) {
                 return '';
             }
+            opts = opts || {};
             var scope = String(scopeLabel || '').trim().toLowerCase();
             var selected = state.reportImages.filter(function (img) {
                 if (String(img.placement || 'after_records') !== String(placement || 'after_records')) { return false; }
                 var target = String(img.target_group || '').trim().toLowerCase();
-                return !target || !scope || scope.indexOf(target) !== -1;
+                if (String(placement || '') === 'after_split_group') {
+                    if (!target) {
+                        return !!opts.onlyAfterLastSplitGroup;
+                    }
+                    return scope === '' || scope.indexOf(target) !== -1;
+                }
+                return !target || scope === '' || scope.indexOf(target) !== -1;
             });
             var html = '';
             selected.forEach(function (img) {
@@ -4483,7 +4490,7 @@
                     html += '</tr>';
                 });
                 if (splitCol) {
-                    html += '<tr><td colspan="' + String(effectiveColumns.length) + '">' + tmExportRenderReportImagePreview(state, 'after_split_group', lastSplitGroup) + '</td></tr>';
+                    html += '<tr><td colspan="' + String(effectiveColumns.length) + '">' + tmExportRenderReportImagePreview(state, 'after_split_group', lastSplitGroup, { onlyAfterLastSplitGroup: true }) + '</td></tr>';
                 }
             } else {
                 html += '<tr class="tm-export-preview-row tm-export-preview-data">';

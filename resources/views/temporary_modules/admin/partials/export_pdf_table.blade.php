@@ -4,7 +4,7 @@
     $rowHighlightStyles = is_array($rowHighlightStyles ?? null) ? $rowHighlightStyles : [];
     $reportImageEnabled = !empty($reportImageEnabled ?? false);
     $reportImages = is_array($reportImages ?? null) ? $reportImages : [];
-    $renderReportImageBlock = function (string $placement, ?string $scopeLabel = null) use ($reportImageEnabled, $reportImages): string {
+    $renderReportImageBlock = function (string $placement, ?string $scopeLabel = null, bool $isLastSplitDataGroup = false) use ($reportImageEnabled, $reportImages): string {
         if (!$reportImageEnabled) {
             return '';
         }
@@ -15,7 +15,12 @@
                 continue;
             }
             $target = mb_strtolower(trim((string) ($image['target_group'] ?? '')), 'UTF-8');
-            if ($target !== '' && ($scope === '' || !str_contains($scope, $target))) {
+            /** Sin dato de grupo: solo debe repetirse al final de todas las mini-tablas, no tras cada grupo. */
+            if ($placement === 'after_split_group' && $target === '') {
+                if (! $isLastSplitDataGroup) {
+                    continue;
+                }
+            } elseif ($target !== '' && ($scope === '' || !str_contains($scope, $target))) {
                 continue;
             }
             $src = trim((string) ($image['src'] ?? ''));
@@ -1215,6 +1220,9 @@
     <p style="margin-top: 8px;">Sin registros.</p>
 @else
     @foreach ($dataTableGroups as $dataGroupIndex => $dataGroup)
+        @php
+            $tmIsLastSplitDataGroup = ($dataGroupIndex === count($dataTableGroups) - 1);
+        @endphp
         @if (($dataGroup['label'] ?? '') !== '')
             <p style="font-weight: bold; margin: {{ $dataGroupIndex > 0 ? '0' : '8px' }} 0 4px 0; padding-top: {{ $dataGroupIndex > 0 ? '4px' : '0' }}; page-break-before: {{ $dataGroupIndex > 0 ? 'always' : 'auto' }}; break-before: {{ $dataGroupIndex > 0 ? 'page' : 'auto' }}; text-align: {{ $sectionLabelAlign }};">{{ $dataGroup['label'] }}</p>
         @endif
@@ -1540,7 +1548,7 @@
         @endforeach
         </tbody>
     </table>
-        {!! $renderReportImageBlock('after_split_group', (string) ($dataGroup['label'] ?? '')) !!}
+        {!! $renderReportImageBlock('after_split_group', (string) ($dataGroup['label'] ?? ''), $tmIsLastSplitDataGroup) !!}
     @endforeach
     {!! $renderReportImageBlock('after_records') !!}
 @endif
