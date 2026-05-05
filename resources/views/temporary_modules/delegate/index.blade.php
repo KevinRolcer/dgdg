@@ -104,6 +104,11 @@
             });
             $templateModalId = 'tmTemplateDownloadModal-'.$module->id;
             $hasTemplateData = (int) ($module->my_entries_count ?? 0) > 0;
+            $moduleRegScope = in_array((string) ($module->registration_scope ?? ''), ['microrregion', 'free', 'municipios'], true)
+                ? (string) $module->registration_scope
+                : 'microrregion';
+            $moduleUsesMicrorregion = $moduleRegScope === 'microrregion' && (bool) ($module->show_microregion ?? true);
+            $moduleMostrarSelectorMicrorregion = $moduleUsesMicrorregion && $microsAsignadas->count() > 1;
         @endphp
         <div class="tm-modal" id="delegate-preview-{{ $module->id }}" aria-hidden="true" role="dialog" aria-modal="true">
             <div class="tm-modal-backdrop" data-close-module-preview></div>
@@ -157,13 +162,13 @@
 
                     <form action="{{ route('temporary-modules.submit', $module->id) }}" method="POST" enctype="multipart/form-data" class="tm-form tm-entry-form">
                         @csrf
-                        @if ($microsAsignadas->isNotEmpty() && !$mostrarSelectorMicrorregion)
+                        @if ($moduleUsesMicrorregion && $microsAsignadas->isNotEmpty() && !$moduleMostrarSelectorMicrorregion)
                             <input type="hidden" name="selected_microrregion_id" value="{{ $microsAsignadas->first()->id }}">
                         @endif
                         <input type="hidden" name="entry_id" value="">
 
                         <div class="tm-grid tm-grid-2 tm-entry-grid">
-                            @if ($mostrarSelectorMicrorregion)
+                            @if ($moduleMostrarSelectorMicrorregion)
                                 <label class="tm-entry-field">
                                     Microrregion de captura *
                                     <select name="selected_microrregion_id" class="tm-mr-selector" required>
@@ -606,14 +611,14 @@
                                             </label>
                                         </div>
 
-                                        @if ($microsAsignadas->count() > 0)
+                                        @if ($moduleUsesMicrorregion && $microsAsignadas->count() > 0)
                                             <label class="tm-excel-search-all-wrap tm-excel-search-all-wrap-el">
                                                 <input type="checkbox" class="tm-excel-search-all">
                                                 <span>Buscar en todos los municipios de mis microrregiones</span>
                                             </label>
                                         @endif
 
-                                        @if ($microsAsignadas->count() > 1)
+                                        @if ($moduleUsesMicrorregion && $microsAsignadas->count() > 1)
                                             <div class="tm-excel-mr-select-container-el">
                                                 <label style="margin-top:8px;">Microregión
                                                     <select class="tm-excel-mr-input tm-input" name="selected_microrregion_id">
@@ -626,12 +631,12 @@
                                                 </label>
                                             </div>
                                         @else
-                                            @if ($microsAsignadas->count() === 1)
+                                            @if ($moduleUsesMicrorregion && $microsAsignadas->count() === 1)
                                                 <input type="hidden" class="tm-excel-mr-input" name="selected_microrregion_id" value="{{ $microsAsignadas->first()->id }}">
                                             @endif
                                         @endif
 
-                                        @if ($microsAsignadas->count() > 0)
+                                        @if ($moduleUsesMicrorregion && $microsAsignadas->count() > 0)
                                             <label class="tm-excel-municipio-container-el" style="margin-top:8px;">
                                                 Municipio de destino (si no se mapea Municipio)
                                                 <select class="tm-excel-municipio-input tm-input">
@@ -776,7 +781,7 @@
                 data-module-id="{{ $module->id }}"
                 data-import-single-url="{{ route('temporary-modules.import-single-row', $module->id) }}"
                 data-submit-url="{{ route('temporary-modules.submit', $module->id) }}"
-                data-show-mr-select="{{ ($mostrarSelectorMicrorregion && !$bulkInsertHasMunicipio) ? '1' : '0' }}"
+                data-show-mr-select="{{ ($moduleMostrarSelectorMicrorregion && !$bulkInsertHasMunicipio) ? '1' : '0' }}"
                 data-has-municipio="{{ $bulkInsertHasMunicipio ? '1' : '0' }}"
             >
                 <div class="tm-modal-backdrop" data-tm-bulk-insert-dismiss></div>

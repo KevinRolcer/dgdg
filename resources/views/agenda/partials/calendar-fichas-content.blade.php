@@ -15,11 +15,14 @@
                 'personalizada' => 'Ficha personalizada',
                 default => 'Agenda',
             };
-            $fichaBg = $fichaKind === 'personalizada' && in_array(($card['ficha_bg'] ?? 'beige'), ['tlaloc_a_beige', 'tlaloc_a_rojo', 'tlaloc_a_verde', 'beige', 'blanco', 'rojo', 'verde'], true) ? $card['ficha_bg'] : '';
+            $fichaBg = $fichaKind === 'personalizada' ? (string) ($card['ficha_bg'] ?? '') : '';
+            $fichaBgFile = $fichaBg !== '' && preg_match('/^[A-Za-z0-9_-]+$/', $fichaBg) && File::exists(public_path('images/Texturas/'.$fichaBg.'.png')) ? $fichaBg : '';
+            $fichaBgTone = str_contains(strtolower($fichaBgFile), 'blanco') ? 'blanco' : 'color';
+            $fichaBgStyle = $fichaBgFile !== '' ? "background-image: url('".asset('images/Texturas/'.$fichaBgFile.'.png')."');" : '';
             $fichaShowUrl = route('agenda.show', ['agenda' => $card['agenda_id'], 'return' => $previewReturn, 'preview' => 'ficha']);
         @endphp
         <article class="agenda-cal-card">
-            <div class="agenda-cal-card-head agenda-cal-card-head--{{ $fichaKind }}{{ $fichaBg !== '' ? ' agenda-cal-card-head--bg-'.$fichaBg : '' }}">
+            <div class="agenda-cal-card-head agenda-cal-card-head--{{ $fichaKind }}{{ $fichaBgTone === 'blanco' ? ' agenda-cal-card-head--bg-blanco' : '' }}" style="{{ $fichaBgStyle }}">
                 <div class="agenda-cal-card-head-inner">
                     <span class="agenda-cal-card-eyebrow">{{ $fichaKindLabel }}</span>
                 </div>

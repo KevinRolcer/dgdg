@@ -112,6 +112,11 @@
                         <button type="button" class="tm-btn" id="tmIndefiniteBtn" aria-pressed="{{ old('is_indefinite', is_null($temporaryModule->expires_at) ? '1' : '0') ? 'true' : 'false' }}">Indefinido</button>
                     </div>
                 </label>
+                <label style="display:flex;align-items:center;gap:8px;">
+                    <input type="hidden" name="show_microregion" value="0">
+                    <input type="checkbox" name="show_microregion" value="1" {{ old('show_microregion', $temporaryModule->show_microregion ?? true) ? 'checked' : '' }}>
+                    Mostrar campo microregión
+                </label>
             </div>
             <input type="hidden" name="is_active" value="{{ old('is_active', $temporaryModule->is_active ? '1' : '0') ? '1' : '0' }}">
 

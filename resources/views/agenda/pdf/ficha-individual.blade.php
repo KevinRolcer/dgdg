@@ -38,40 +38,40 @@
 
         .ficha--pre_gira {
             background-color: #f8f8f8;
-            background-image: url('images/Texturas_1C-Tlaloc_blanco.png');
+            background-image: url('images/Texturas/Texturas_1C-Tlaloc_blanco.png');
         }
         .ficha--gira {
             background-color: #f0f7f4;
-            background-image: url('images/Texturas_1C-Tlaloc_verde.png');
+            background-image: url('images/Texturas/Texturas_1C-Tlaloc_verde.png');
         }
         .ficha--agenda {
             background-color: #fdf2f2;
-            background-image: url('images/Texturas_1C-Tlaloc_rojo.png');
+            background-image: url('images/Texturas/Texturas_1C-Tlaloc_rojo.png');
         }
         .ficha--personalizada,
         .ficha--bg-rojo {
             background-color: #fdf2f2;
-            background-image: url('images/Texturas_1C-Tlaloc_rojo.png');
+            background-image: url('images/Texturas/Texturas_1C-Tlaloc_rojo.png');
         }
         .ficha--bg-beige {
             background-color: #f8f8f8;
-            background-image: url('images/Texturas_1C-Tlaloc_beige.png');
+            background-image: url('images/Texturas/Texturas_1C-Tlaloc_beige.png');
         }
         .ficha--bg-tlaloc_a_beige {
             background-color: #f8f8f8;
-            background-image: url('images/Texturas_1C-Tlaloc_beige.png');
+            background-image: url('images/Texturas/Texturas_1C-Tlaloc_beige.png');
         }
         .ficha--bg-verde {
             background-color: #f0f7f4;
-            background-image: url('images/Texturas_1C-Tlaloc_verde.png');
+            background-image: url('images/Texturas/Texturas_1C-Tlaloc_verde.png');
         }
         .ficha--bg-tlaloc_a_rojo {
             background-color: #fdf2f2;
-            background-image: url('images/Texturas_1C-Tlaloc_rojo.png');
+            background-image: url('images/Texturas/Texturas_1A-Tlaloc_rojo.png');
         }
         .ficha--bg-tlaloc_a_verde {
             background-color: #f0f7f4;
-            background-image: url('images/Texturas_1C-Tlaloc_verde.png');
+            background-image: url('images/Texturas/Texturas_1A-Tlaloc_verde.png');
         }
 
         .ficha__body-wrap {
@@ -301,15 +301,15 @@
         .ficha--bg-tlaloc_a_beige .date-box { border-color: rgba(0, 0, 0, 0.1); }
         .ficha--bg-beige .aforo-line,
         .ficha--bg-tlaloc_a_beige .aforo-line { color: #777; }
-        .ficha--bg-blanco .eyebrow { color: #6b6a6a; }
+        .ficha--bg-blanco .eyebrow { color: #5f1b2d; }
         .ficha--bg-blanco .title { color: #5f1b2d; }
-        .ficha--bg-blanco .label { color: #888; }
+        .ficha--bg-blanco .label { color: #5f1b2d; }
         .ficha--bg-blanco .value,
         .ficha--bg-blanco .description,
         .ficha--bg-blanco .date-text,
-        .ficha--bg-blanco .date-time { color: #444; }
+        .ficha--bg-blanco .date-time { color: #5f1b2d; }
         .ficha--bg-blanco .date-box { border-color: rgba(0, 0, 0, 0.1); }
-        .ficha--bg-blanco .aforo-line { color: #777; }
+        .ficha--bg-blanco .aforo-line { color: #5f1b2d; }
     </style>
 </head>
 <body>
@@ -323,15 +323,25 @@
                 'personalizada' => 'Ficha personalizada',
                 default => 'Agenda',
             };
-            $fichaBg = $kind === 'personalizada' && in_array(($card['ficha_bg'] ?? 'beige'), ['tlaloc_a_beige', 'tlaloc_a_rojo', 'tlaloc_a_verde', 'beige', 'blanco', 'rojo', 'verde'], true) ? $card['ficha_bg'] : '';
-            $logoVersion = ($kind === 'pre_gira') ? '1' : '2';
+            $fichaBg = $kind === 'personalizada' ? (string) ($card['ficha_bg'] ?? '') : '';
+            $fichaBgFile = $fichaBg !== '' && preg_match('/^[A-Za-z0-9_-]+$/', $fichaBg) && file_exists(public_path('images/Texturas/'.$fichaBg.'.png')) ? $fichaBg : '';
+            $fichaBgStyle = $fichaBgFile !== '' ? "background-image: url('images/Texturas/{$fichaBgFile}.png');" : '';
+            $fichaBgToneClass = $fichaBgFile !== '' && preg_match('/blanco/i', $fichaBgFile) ? ' ficha--bg-blanco' : '';
+            $logoVersion = '2';
+            if (preg_match('/blanco|beige/i', $fichaBgFile)) {
+                $logoVersion = '1';
+            } else if (preg_match('/rojo|verde/i', $fichaBgFile)) {
+                $logoVersion = '2';
+            } else if ($kind === 'pre_gira') {
+                $logoVersion = '1';
+            }
             $logoFile = "Gobierno de Puebla_{$logoVersion}-Versión vertical.png";
             $textBulk = mb_strlen(trim((string) ($card['title'] ?? '')))
                 + mb_strlen(trim((string) ($card['lugar'] ?? '')))
                 + mb_strlen(trim((string) ($card['descripcion'] ?? '')));
             $sparseContent = $textBulk < 220;
         @endphp
-        <div class="ficha ficha--{{ $kind }}{{ $fichaBg !== '' ? ' ficha--bg-'.$fichaBg : '' }}{{ $sparseContent ? ' ficha--sparse' : '' }}">
+        <div class="ficha ficha--{{ $kind }}{{ $fichaBgToneClass }}{{ $sparseContent ? ' ficha--sparse' : '' }}" style="{{ $fichaBgStyle }}">
             <div class="ficha__body-wrap">
                 <div class="ficha__body-inner">
                     <div class="ficha__body-cell">

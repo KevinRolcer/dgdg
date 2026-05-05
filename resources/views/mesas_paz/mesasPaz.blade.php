@@ -114,6 +114,7 @@
             <div class="mesas-paz-panel-body panel-body">
                 <div class="border rounded p-3 mb-3">
                     <label for="modalidad_global" class="form-label fw-bold mb-1">Modalidad de la sesión (obligatoria antes de registrar)</label>
+
                     <select id="modalidad_global" class="form-select">
                         <option value="">Seleccionar</option>
                         <option value="Virtual" @if(($modalidadActual ?? '') === 'Virtual') selected @endif>Virtual</option>
@@ -122,6 +123,37 @@
                         <option value="Sin registro de enlace" @if(($modalidadActual ?? '') === 'Sin registro de enlace') selected @endif>Sin registro de enlace</option>
                         <option value="Suspención de mesa de Seguridad" @if(($modalidadActual ?? '') === 'Suspención de mesa de Seguridad') selected @endif>Suspención de mesa de Seguridad</option>
                     </select>
+
+
+                                        <!-- Botón para abrir modal de municipios (solo visible en modo especial) -->
+                                        <button type="button" id="btnAbrirModalMunicipios" class="btn btn-outline-primary mt-3 d-none" data-bs-toggle="modal" data-bs-target="#modalMunicipios">
+                                                Seleccionar municipios (<span id="municipiosSeleccionadosCount">0</span>)
+                                        </button>
+
+                                        <!-- Modal de selección de municipios -->
+                                        <div class="modal fade" id="modalMunicipios" tabindex="-1" aria-labelledby="modalMunicipiosLabel" aria-hidden="true">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title" id="modalMunicipiosLabel">Selecciona los municipios</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <div id="municipios_multiple_btn_group" class="d-flex flex-wrap gap-2 mb-2">
+                                                            @foreach ($municipios as $municipio)
+                                                                <button type="button" class="btn btn-outline-secondary municipio-toggle-btn" data-municipio-id="{{ $municipio->id }}">
+                                                                    {{ $municipio->municipio }}
+                                                                </button>
+                                                            @endforeach
+                                                        </div>
+                                                        <small class="text-muted">Haz clic en los municipios para seleccionarlos. Los seleccionados se marcarán en verde.</small>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
 
                     <div id="delegadoAsistenciaGroup" class="mt-3">
                         <label for="delegado_asistio_global" class="form-label fw-bold mb-1">¿Asistió el delegado?</label>

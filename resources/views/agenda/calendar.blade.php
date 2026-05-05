@@ -86,6 +86,10 @@
                     <input type="text" name="pdf_title" class="agenda-cal-print-text-input" maxlength="120" placeholder="Fichas de agenda">
                 </label>
                 <label class="agenda-cal-print-input-label">
+                    <span>Nombre del archivo</span>
+                    <input type="text" name="pdf_filename" class="agenda-cal-print-text-input" maxlength="160" placeholder="fichas-agenda.pdf">
+                </label>
+                <label class="agenda-cal-print-input-label">
                     <span>Subtítulo</span>
                     <input type="text" name="pdf_subtitle" class="agenda-cal-print-text-input" maxlength="180" placeholder="Periodo, área o nota opcional">
                 </label>

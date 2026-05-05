@@ -113,14 +113,18 @@ class TemporaryModuleController extends Controller
         'delegado' => 'Lista de Delegados (Personal activo)',
     ];
 
-    private function findDuplicateEntryId(TemporaryModule $temporaryModule, int $microrregionId, array $values, ?int $excludeEntryId = null): ?int
+    private function findDuplicateEntryId(TemporaryModule $temporaryModule, ?int $microrregionId, array $values, ?int $excludeEntryId = null): ?int
     {
         $targetSignature = $this->excelImportService->buildDuplicateSignature($values);
         $duplicateId = null;
 
         $temporaryModule->entries()
             ->select(['id', 'data'])
-            ->where('microrregion_id', $microrregionId)
+            ->when(
+                $microrregionId === null,
+                fn ($q) => $q->whereNull('microrregion_id'),
+                fn ($q) => $q->where('microrregion_id', $microrregionId)
+            )
             ->when($excludeEntryId !== null, fn ($q) => $q->where('id', '!=', $excludeEntryId))
             ->orderBy('id')
             ->chunk(500, function ($entries) use ($targetSignature, &$duplicateId) {
@@ -613,6 +617,7 @@ class TemporaryModuleController extends Controller
             'delegate_ids' => ['nullable', 'array'],
             'delegate_ids.*' => ['integer', Rule::exists('users', 'id')],
             'registration_scope' => ['nullable', Rule::in(['microrregion', 'free', 'municipios'])],
+            'show_microregion' => ['nullable', 'boolean'],
             'target_municipios' => ['nullable', 'array'],
             'target_municipios.*' => ['string', 'max:120'],
             'fields' => ['required', 'array', 'min:1'],
@@ -660,7 +665,11 @@ class TemporaryModuleController extends Controller
             ? array_values(array_unique(array_filter(array_map('strval', $validated['target_municipios'] ?? []))))
             : null;
 
-        DB::transaction(function () use ($request, $validated, $preparedFields, $selectedDelegateIds, $regScope, $targetMunicipios): void {
+        $showMicroregion = $regScope === 'microrregion'
+            ? $request->boolean('show_microregion')
+            : false;
+
+        DB::transaction(function () use ($request, $validated, $preparedFields, $selectedDelegateIds, $regScope, $targetMunicipios, $showMicroregion): void {
             $slug = Str::slug($validated['name']);
             $this->slugService->forcePurgeTrashedBySlug($slug);
             $baseSlug = $slug;
@@ -682,6 +691,7 @@ class TemporaryModuleController extends Controller
                 'is_active' => (bool) ($validated['is_active'] ?? true),
                 'applies_to_all' => ($validated['applies_to'] ?? 'all') === 'all',
                 'registration_scope' => $regScope,
+                'show_microregion' => $showMicroregion,
                 'target_municipios' => $targetMunicipios,
                 'created_by' => $request->user()->id,
             ]);
@@ -703,6 +713,7 @@ class TemporaryModuleController extends Controller
         $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
 
         $rules = [
+            'show_microregion' => ['nullable', 'boolean'],
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:1000'],
             'expires_at' => ['nullable', 'date', 'after_or_equal:today'],
@@ -1089,7 +1100,11 @@ class TemporaryModuleController extends Controller
             }
         }
 
-        DB::transaction(function () use ($temporaryModule, $validated, $selectedDelegateIds, $existingDefinitions, $deletedFieldIds, $preparedExtraFields, $invalidMainImageKeys): void {
+        $showMicroregion = ((string) ($temporaryModule->registration_scope ?? 'microrregion') === 'microrregion')
+            ? $request->boolean('show_microregion')
+            : false;
+
+        DB::transaction(function () use ($temporaryModule, $validated, $selectedDelegateIds, $existingDefinitions, $deletedFieldIds, $preparedExtraFields, $invalidMainImageKeys, $showMicroregion): void {
             $slug = Str::slug($validated['name']);
             $this->slugService->forcePurgeTrashedBySlug($slug);
             $baseSlug = $slug;
@@ -1106,6 +1121,7 @@ class TemporaryModuleController extends Controller
                 'expires_at' => $this->resolveExpiresAt($validated),
                 'is_active' => (bool) ($validated['is_active'] ?? true),
                 'applies_to_all' => ($validated['applies_to'] ?? 'all') === 'all',
+                'show_microregion' => $showMicroregion,
             ]);
 
             if ($temporaryModule->applies_to_all) {
@@ -1389,7 +1405,7 @@ class TemporaryModuleController extends Controller
             ->toArray();
 
         $allModulesQuery = TemporaryModule::query()
-            ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all'])
+            ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all', 'registration_scope', 'show_microregion'])
             ->available()
             ->where(function ($query) use ($user) {
                 $query->where('applies_to_all', true)
@@ -1399,11 +1415,18 @@ class TemporaryModuleController extends Controller
                 'fields' => fn ($q) => $q->select('id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required', 'comment')->orderBy('sort_order'),
             ])
             ->withCount([
-                'entries as my_entries_count' => fn ($query) => $query->when(
-                    $microrregionIdsUsuario !== [],
-                    fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
-                    fn ($q) => $q->whereRaw('1 = 0')
-                ),
+                'entries as my_entries_count' => fn ($query) => $query->where(function ($q) use ($microrregionIdsUsuario, $user): void {
+                    if ($microrregionIdsUsuario !== []) {
+                        $q->whereIn('microrregion_id', $microrregionIdsUsuario);
+                    } else {
+                        $q->whereRaw('1 = 0');
+                    }
+
+                    $q->orWhere(function ($ownQuery) use ($user): void {
+                        $ownQuery->where('user_id', $user->id)
+                            ->whereNull('microrregion_id');
+                    });
+                }),
             ])
             ->latest();
 
@@ -1496,7 +1519,7 @@ class TemporaryModuleController extends Controller
         abort_if($user->can('Modulos-Temporales-Admin'), 404);
         $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
         $modules = TemporaryModule::query()
-            ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all'])
+            ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all', 'registration_scope', 'show_microregion'])
             ->available()
             ->where(function ($query) use ($user) {
                 $query->where('applies_to_all', true)
@@ -1506,11 +1529,18 @@ class TemporaryModuleController extends Controller
                 'fields' => fn ($q) => $q->select('id', 'temporary_module_id', 'label', 'key', 'type', 'options', 'is_required', 'comment')->orderBy('sort_order'),
             ])
             ->withCount([
-                'entries as my_entries_count' => fn ($query) => $query->when(
-                    $microrregionIdsUsuario !== [],
-                    fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
-                    fn ($q) => $q->whereRaw('1 = 0')
-                ),
+                'entries as my_entries_count' => fn ($query) => $query->where(function ($q) use ($microrregionIdsUsuario, $user): void {
+                    if ($microrregionIdsUsuario !== []) {
+                        $q->whereIn('microrregion_id', $microrregionIdsUsuario);
+                    } else {
+                        $q->whereRaw('1 = 0');
+                    }
+
+                    $q->orWhere(function ($ownQuery) use ($user): void {
+                        $ownQuery->where('user_id', $user->id)
+                            ->whereNull('microrregion_id');
+                    });
+                }),
             ])
             ->latest()
             ->paginate(6)
@@ -1644,18 +1674,21 @@ class TemporaryModuleController extends Controller
         $regScope = in_array((string) ($temporaryModule->registration_scope ?? ''), ['microrregion', 'free', 'municipios'], true)
             ? (string) $temporaryModule->registration_scope
             : 'microrregion';
+        $usesMicrorregion = $regScope === 'microrregion' && (bool) ($temporaryModule->show_microregion ?? true);
 
         $requestedMicrorregionId = $request->filled('microrregion_id')
             ? (int) $request->input('microrregion_id')
             : null;
 
-        [$microrregionId, $municipios] = $this->accessService->delegadoMunicipios($request->user()->id, $requestedMicrorregionId);
+        [$microrregionId, $municipios] = $usesMicrorregion
+            ? $this->accessService->delegadoMunicipios($request->user()->id, $requestedMicrorregionId)
+            : [null, []];
         $microrregionesAsignadas = $this->accessService->microrregionesConMunicipiosPorUsuario((int) $request->user()->id);
 
         $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
 
         // Filter entries based on scope
-        if ($regScope === 'microrregion') {
+        if ($usesMicrorregion) {
             $entries = $temporaryModule->entries()
                 ->when(
                     $microrregionIdsUsuario !== [],
@@ -1666,7 +1699,7 @@ class TemporaryModuleController extends Controller
                 ->take(200)
                 ->get();
         } else {
-            // free / municipios: show only this user's own entries
+            // free / municipios / no microrregion: show only this user's own entries
             $entries = $temporaryModule->entries()
                 ->where('user_id', $request->user()->id)
                 ->latest('submitted_at')
@@ -1682,7 +1715,7 @@ class TemporaryModuleController extends Controller
                 ->first();
 
             if ($editingEntry) {
-                if ($regScope === 'microrregion') {
+                if ($usesMicrorregion) {
                     if (! $this->accessService->userCanAccessEntryByMicrorregion((int) $request->user()->id, (int) $editingEntry->microrregion_id)) {
                         $editingEntry = null;
                     }
@@ -1719,12 +1752,13 @@ class TemporaryModuleController extends Controller
         $regScope = in_array((string) ($temporaryModule->registration_scope ?? ''), ['microrregion', 'free', 'municipios'], true)
             ? (string) $temporaryModule->registration_scope
             : 'microrregion';
+        $usesMicrorregion = $regScope === 'microrregion' && (bool) ($temporaryModule->show_microregion ?? true);
 
         // ── Resolución de microrregion_id según scope ──────────────────────
         $microrregionId = null;
         $municipios     = [];
 
-        if ($regScope === 'microrregion') {
+        if ($usesMicrorregion) {
             $requestedMicrorregionId = $request->filled('selected_microrregion_id')
                 ? (int) $request->input('selected_microrregion_id')
                 : null;
@@ -1757,7 +1791,7 @@ class TemporaryModuleController extends Controller
                 ]);
             }
         }
-        // regScope === 'free': microrregionId stays null, no validation needed
+        // free / no microrregion: microrregionId stays null, no validation needed
 
         $entryId = (int) ($request->input('entry_id') ?? 0);
         $existingEntry = null;
@@ -1767,7 +1801,7 @@ class TemporaryModuleController extends Controller
                 ->where('temporary_module_id', $temporaryModule->id)
                 ->first();
 
-            if ($regScope === 'microrregion') {
+            if ($usesMicrorregion) {
                 abort_unless(
                     $existingEntry !== null
                     && $this->accessService->userCanAccessEntryByMicrorregion(
@@ -1777,7 +1811,7 @@ class TemporaryModuleController extends Controller
                     403
                 );
             } else {
-                // For free/municipios scopes, only check the entry belongs to this user's module
+                // For free/municipios/no-microrregion scopes, only check the entry belongs to this user's module
                 abort_unless(
                     $existingEntry !== null
                     && (int) $existingEntry->user_id === (int) $request->user()->id,
@@ -1959,7 +1993,7 @@ class TemporaryModuleController extends Controller
 
         $duplicateEntryId = $this->findDuplicateEntryId(
             $temporaryModule,
-            (int) $microrregionId,
+            $microrregionId,
             $values,
             $existingEntry ? (int) $existingEntry->id : null
         );
@@ -2014,13 +2048,21 @@ class TemporaryModuleController extends Controller
             ->where('temporary_module_id', $temporaryModule->id)
             ->firstOrFail();
 
-        abort_unless(
-            $this->accessService->userCanAccessEntryByMicrorregion(
-                (int) $request->user()->id,
-                (int) $entryModel->microrregion_id
-            ),
-            403
-        );
+        $usesMicrorregion = ((string) ($temporaryModule->registration_scope ?? 'microrregion') === 'microrregion')
+            && (bool) ($temporaryModule->show_microregion ?? true)
+            && $entryModel->microrregion_id !== null;
+
+        if ($usesMicrorregion) {
+            abort_unless(
+                $this->accessService->userCanAccessEntryByMicrorregion(
+                    (int) $request->user()->id,
+                    (int) $entryModel->microrregion_id
+                ),
+                403
+            );
+        } else {
+            abort_unless((int) $entryModel->user_id === (int) $request->user()->id, 403);
+        }
 
         $this->entryDataService->deleteEntryAndFiles($entryModel, $temporaryModule);
 
@@ -2043,10 +2085,16 @@ class TemporaryModuleController extends Controller
 
         $entryIds = (array) $request->input('entry_ids');
         $microrregionIdsPermitidos = (array) $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
+        $usesMicrorregion = ((string) ($temporaryModule->registration_scope ?? 'microrregion') === 'microrregion')
+            && (bool) ($temporaryModule->show_microregion ?? true);
 
         $entries = TemporaryModuleEntry::whereIn('id', $entryIds)
             ->where('temporary_module_id', (int) $temporaryModule->id)
-            ->whereIn('microrregion_id', $microrregionIdsPermitidos)
+            ->when(
+                $usesMicrorregion,
+                fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsPermitidos),
+                fn ($q) => $q->where('user_id', (int) $request->user()->id)
+            )
             ->get();
 
         $count = 0;
@@ -3331,10 +3379,18 @@ class TemporaryModuleController extends Controller
 
         if (! Gate::forUser($request->user())->allows('modulos-temporales-admin-ver')) {
             abort_unless($this->accessService->userCanAccessModule($entryModel->module, (int) $request->user()->id), 403);
-            abort_unless(
-                $this->accessService->userCanAccessEntryByMicrorregion((int) $request->user()->id, (int) $entryModel->microrregion_id),
-                403
-            );
+            $usesMicrorregion = ((string) ($entryModel->module->registration_scope ?? 'microrregion') === 'microrregion')
+                && (bool) ($entryModel->module->show_microregion ?? true)
+                && $entryModel->microrregion_id !== null;
+
+            if ($usesMicrorregion) {
+                abort_unless(
+                    $this->accessService->userCanAccessEntryByMicrorregion((int) $request->user()->id, (int) $entryModel->microrregion_id),
+                    403
+                );
+            } else {
+                abort_unless((int) $entryModel->user_id === (int) $request->user()->id, 403);
+            }
         }
 
         $dataValue = $entryModel->data[$fieldKey] ?? null;

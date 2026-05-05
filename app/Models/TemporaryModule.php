@@ -23,6 +23,7 @@ class TemporaryModule extends Model
         'is_active',
         'applies_to_all',
         'registration_scope',
+        'show_microregion',
         'target_municipios',
         'created_by',
         'exported_at',
@@ -32,6 +33,7 @@ class TemporaryModule extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'applies_to_all' => 'boolean',
+        'show_microregion' => 'boolean',
         'expires_at' => 'datetime',
         'exported_at' => 'datetime',
         'seed_discard_log' => 'array',

@@ -201,7 +201,11 @@
     @foreach ($entries as $entry)
         @php
             $microsAsignadas = ($microrregionesAsignadas ?? collect())->values();
-            $mostrarSelectorMicrorregion = $microsAsignadas->count() > 1;
+            $moduleRegScope = in_array((string) ($module->registration_scope ?? ''), ['microrregion', 'free', 'municipios'], true)
+                ? (string) $module->registration_scope
+                : 'microrregion';
+            $moduleUsesMicrorregion = $moduleRegScope === 'microrregion' && (bool) ($module->show_microregion ?? true);
+            $mostrarSelectorMicrorregion = $moduleUsesMicrorregion && $microsAsignadas->count() > 1;
             $entryMicrorregion = $microsAsignadas->firstWhere('id', $entry->microrregion_id);
             $entryMunicipios = $entryMicrorregion && isset($entryMicrorregion->municipios) ? array_values($entryMicrorregion->municipios) : ($municipios ?? []);
 
@@ -238,7 +242,7 @@
                 <div class="tm-modal-body">
                     <form action="{{ route('temporary-modules.submit', $module->id) }}" method="POST" enctype="multipart/form-data" class="tm-form tm-entry-form">
                         @csrf
-                        @if ($microsAsignadas->isNotEmpty() && !$mostrarSelectorMicrorregion)
+                        @if ($moduleUsesMicrorregion && $microsAsignadas->isNotEmpty() && !$mostrarSelectorMicrorregion)
                             <input type="hidden" name="selected_microrregion_id" value="{{ $entry->microrregion_id ?? $microsAsignadas->first()->id }}">
                         @endif
                         <input type="hidden" name="entry_id" value="{{ $entry->id }}">

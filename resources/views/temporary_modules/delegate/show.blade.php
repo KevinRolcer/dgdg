@@ -73,7 +73,7 @@
             @endphp
 
             {{-- ── Selector de microregión (scope = microrregion) ── --}}
-            @if ($regScope === 'microrregion')
+            @if ($regScope === 'microrregion' && ($temporaryModule->show_microregion ?? true))
                 @if ($mostrarSelectorMicrorregion)
                     <label class="tm-col-full">
                         Microrregion de captura *

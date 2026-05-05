@@ -12,6 +12,7 @@ use App\Services\Agenda\AgendaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -125,6 +126,7 @@ class AgendaController extends Controller
             'buscar' => ['nullable', 'string', 'max:500'],
             'template' => ['nullable', 'string', 'in:summary,individual,calendar'],
             'pdf_title' => ['nullable', 'string', 'max:120'],
+            'pdf_filename' => ['nullable', 'string', 'max:160'],
             'pdf_subtitle' => ['nullable', 'string', 'max:180'],
             'personalizada_label' => ['nullable', 'string', 'max:80'],
         ]);
@@ -191,7 +193,7 @@ class AgendaController extends Controller
             }
         }
 
-        $downloadFileName = AgendaFichasPdfBuilderService::buildDownloadFileName(
+        $defaultDownloadFileName = AgendaFichasPdfBuilderService::buildDownloadFileName(
             $scope,
             $year,
             $month,
@@ -203,6 +205,10 @@ class AgendaController extends Controller
             $kindPersonalizada,
             $template,
             $buscar
+        );
+        $downloadFileName = AgendaFichasPdfBuilderService::normalizeCustomDownloadFileName(
+            (string) ($validated['pdf_filename'] ?? ''),
+            $defaultDownloadFileName
         );
 
         $exportRequestId = (string) Str::uuid();
@@ -226,7 +232,7 @@ class AgendaController extends Controller
             'personalizada_label' => trim((string) ($validated['personalizada_label'] ?? '')),
         ];
 
-        $user->notify(new ExcelExportPending($exportRequestId, 'Fichas agenda', 'pdf_fichas'));
+        $user->notify(new ExcelExportPending($exportRequestId, $downloadFileName, 'pdf_fichas'));
 
         GenerateAgendaFichasPdfJob::dispatchAfterResponse(
             $user->id,
@@ -482,7 +488,13 @@ class AgendaController extends Controller
             'tipo' => 'nullable|string|in:asunto,gira,personalizado',
             'subtipo' => 'nullable|string|in:gira,pre-gira',
             'ficha_titulo' => 'nullable|string|max:80|required_if:tipo,personalizado',
-            'ficha_fondo' => 'nullable|string|in:tlaloc_a_beige,tlaloc_a_rojo,tlaloc_a_verde,beige,blanco,rojo,verde|required_if:tipo,personalizado',
+            'ficha_fondo' => [
+                'nullable',
+                'string',
+                'max:80',
+                'required_if:tipo,personalizado',
+                Rule::in($this->nombresTexturasFicha()),
+            ],
             'microrregion' => 'nullable|string|max:255',
             'municipio' => 'nullable|string|max:255',
             'lugar' => 'nullable|string',
@@ -500,5 +512,24 @@ class AgendaController extends Controller
             'usuarios_asignados' => 'nullable|array',
             'usuarios_asignados.*' => 'exists:users,id',
         ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function nombresTexturasFicha(): array
+    {
+        $legacy = ['tlaloc_a_beige', 'tlaloc_a_rojo', 'tlaloc_a_verde', 'beige', 'blanco', 'rojo', 'verde'];
+        $path = public_path('images/Texturas');
+        if (! File::isDirectory($path)) {
+            return $legacy;
+        }
+
+        $texturas = collect(File::files($path))
+            ->filter(fn($f) => strtolower($f->getExtension()) === 'png')
+            ->map(fn($f) => pathinfo($f->getFilename(), PATHINFO_FILENAME))
+            ->all();
+
+        return array_values(array_unique(array_merge($legacy, $texturas)));
     }
 }

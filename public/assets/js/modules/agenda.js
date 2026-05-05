@@ -41,10 +41,34 @@ function updateAgendaFichaBgPreview() {
     var select = document.getElementById('modalFichaFondo');
     var preview = document.getElementById('agendaFichaBgPreview');
     if (!select || !preview) return;
-    preview.classList.remove('is-tlaloc_a_beige', 'is-tlaloc_a_rojo', 'is-tlaloc_a_verde', 'is-beige', 'is-blanco', 'is-rojo', 'is-verde');
-    var allowed = ['tlaloc_a_beige', 'tlaloc_a_rojo', 'tlaloc_a_verde', 'beige', 'blanco', 'rojo', 'verde'];
-    var bg = allowed.indexOf(select.value) !== -1 ? select.value : 'beige';
-    preview.classList.add('is-' + bg);
+    preview.classList.remove('is-blanco');
+    var option = select.options[select.selectedIndex];
+    var url = option ? option.getAttribute('data-preview-url') : '';
+    var tone = option ? option.getAttribute('data-tone') : '';
+
+    if (url) {
+        preview.style.backgroundImage = "linear-gradient(180deg, rgba(20, 20, 20, 0.18), rgba(20, 20, 20, 0.12)), url('" + url.replace(/'/g, "\\'") + "')";
+    } else {
+        preview.style.backgroundImage = '';
+    }
+
+    if (tone === 'blanco' || String(select.value || '').toLowerCase().indexOf('blanco') !== -1) {
+        preview.classList.add('is-blanco');
+    }
+}
+
+function agendaNormalizeFichaFondoValue(value) {
+    var map = {
+        tlaloc_a_beige: 'Texturas_1A-Tlaloc_beige',
+        tlaloc_a_rojo: 'Texturas_1A-Tlaloc_rojo',
+        tlaloc_a_verde: 'Texturas_1A-Tlaloc_verde',
+        beige: 'Texturas_1C-Tlaloc_beige',
+        blanco: 'Texturas_1C-Tlaloc_blanco',
+        rojo: 'Texturas_1C-Tlaloc_rojo',
+        verde: 'Texturas_1C-Tlaloc_verde'
+    };
+
+    return map[value] || value || '';
 }
 
 function openAgendaModal(id = null, tipo = 'asunto') {
@@ -129,7 +153,7 @@ function openAgendaModal(id = null, tipo = 'asunto') {
                 if (aforoEl2) aforoEl2.value = '';
             }
             if (fichaTituloInput) fichaTituloInput.value = btn.dataset.fichaTitulo || '';
-            if (fichaFondoInput) fichaFondoInput.value = btn.dataset.fichaFondo || 'beige';
+            if (fichaFondoInput) fichaFondoInput.value = agendaNormalizeFichaFondoValue(btn.dataset.fichaFondo || 'Texturas_1C-Tlaloc_beige');
             if (lugarPersonalizadoInput) lugarPersonalizadoInput.value = btn.dataset.lugar || '';
             updateAgendaFichaBgPreview();
             if (itemTipo === 'personalizado' && btnOpenDescRef) {
@@ -184,7 +208,7 @@ function openAgendaModal(id = null, tipo = 'asunto') {
         form.action = agendaUrlStore();
         document.getElementById('formMethod').value = 'POST';
         if (fichaTituloInput) fichaTituloInput.value = '';
-        if (fichaFondoInput) fichaFondoInput.value = 'beige';
+        if (fichaFondoInput && fichaFondoInput.options.length > 0) fichaFondoInput.selectedIndex = 0;
         if (lugarPersonalizadoInput) lugarPersonalizadoInput.value = '';
         updateAgendaFichaBgPreview();
     }

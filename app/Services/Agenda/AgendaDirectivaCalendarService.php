@@ -7,10 +7,21 @@ use App\Models\User;
 use App\Services\Home\HomeAgendaCalendarService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 class AgendaDirectivaCalendarService
 {
+    private const LEGACY_FICHA_BG_MAP = [
+        'tlaloc_a_beige' => 'Texturas_1A-Tlaloc_beige',
+        'tlaloc_a_rojo' => 'Texturas_1A-Tlaloc_rojo',
+        'tlaloc_a_verde' => 'Texturas_1A-Tlaloc_verde',
+        'beige' => 'Texturas_1C-Tlaloc_beige',
+        'blanco' => 'Texturas_1C-Tlaloc_blanco',
+        'rojo' => 'Texturas_1C-Tlaloc_rojo',
+        'verde' => 'Texturas_1C-Tlaloc_verde',
+    ];
+
     public function __construct(
         private readonly HomeAgendaCalendarService $homeAgendaCalendar
     ) {}
@@ -446,9 +457,17 @@ class AgendaDirectivaCalendarService
             return '';
         }
 
-        $bg = strtolower(trim((string) ($agenda->ficha_fondo ?? '')));
+        $bg = trim((string) ($agenda->ficha_fondo ?? ''));
+        $legacy = strtolower($bg);
+        if (isset(self::LEGACY_FICHA_BG_MAP[$legacy])) {
+            return self::LEGACY_FICHA_BG_MAP[$legacy];
+        }
 
-        return in_array($bg, ['tlaloc_a_beige', 'tlaloc_a_rojo', 'tlaloc_a_verde', 'beige', 'blanco', 'rojo', 'verde'], true) ? $bg : 'beige';
+        if ($bg !== '' && preg_match('/^[A-Za-z0-9_-]+$/', $bg) && File::exists(public_path('images/Texturas/'.$bg.'.png'))) {
+            return $bg;
+        }
+
+        return self::LEGACY_FICHA_BG_MAP['beige'];
     }
 
     /**

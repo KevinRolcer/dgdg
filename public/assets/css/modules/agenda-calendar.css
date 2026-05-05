@@ -965,62 +965,62 @@ html.theme-dark .agenda-cal-card {
 .agenda-cal-card-head--agenda {
     background-color: #4a1f28;
     background-image: linear-gradient(180deg, rgba(40, 22, 28, 0.5), rgba(40, 22, 28, 0.35)),
-        url('../../../images/Texturas_1A-Tlaloc_rojo.png');
+        url('../../../images/Texturas/Texturas_1A-Tlaloc_rojo.png');
 }
 
 .agenda-cal-card-head--pre_gira {
     background-color: #3d3528;
     background-image: linear-gradient(180deg, rgba(45, 38, 28, 0.5), rgba(45, 38, 28, 0.35)),
-        url('../../../images/Texturas_1A-Tlaloc_beige.png');
+        url('../../../images/Texturas/Texturas_1A-Tlaloc_beige.png');
 }
 
 .agenda-cal-card-head--gira {
     background-color: #1e3d32;
     background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)),
-        url('../../../images/Texturas_1A-Tlaloc_verde.png');
+        url('../../../images/Texturas/Texturas_1A-Tlaloc_verde.png');
 }
 
 .agenda-cal-card-head--personalizada,
 .agenda-cal-card-head--bg-rojo {
     background-color: #4a1f28;
     background-image: linear-gradient(180deg, rgba(40, 22, 28, 0.5), rgba(40, 22, 28, 0.35)),
-        url('../../../images/Texturas_1C-Tlaloc_rojo.png');
+        url('../../../images/Texturas/Texturas_1C-Tlaloc_rojo.png');
 }
 
 .agenda-cal-card-head--bg-tlaloc_a_rojo {
     background-color: #4a1f28;
     background-image: linear-gradient(180deg, rgba(40, 22, 28, 0.5), rgba(40, 22, 28, 0.35)),
-        url('../../../images/Texturas_1A-Tlaloc_rojo.png');
+        url('../../../images/Texturas/Texturas_1A-Tlaloc_rojo.png');
 }
 
 .agenda-cal-card-head--bg-beige {
     background-color: #3d3528;
     background-image: linear-gradient(180deg, rgba(45, 38, 28, 0.5), rgba(45, 38, 28, 0.35)),
-        url('../../../images/Texturas_1C-Tlaloc_beige.png');
+        url('../../../images/Texturas/Texturas_1C-Tlaloc_beige.png');
 }
 
 .agenda-cal-card-head--bg-tlaloc_a_beige {
     background-color: #3d3528;
     background-image: linear-gradient(180deg, rgba(45, 38, 28, 0.5), rgba(45, 38, 28, 0.35)),
-        url('../../../images/Texturas_1A-Tlaloc_beige.png');
+        url('../../../images/Texturas/Texturas_1A-Tlaloc_beige.png');
 }
 
 .agenda-cal-card-head--bg-blanco {
     background-color: #f4f4f4;
     background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.16)),
-        url('../../../images/Texturas_1C-Tlaloc_blanco.png');
+        url('../../../images/Texturas/Texturas_1C-Tlaloc_blanco.png');
 }
 
 .agenda-cal-card-head--bg-verde {
     background-color: #1e3d32;
     background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)),
-        url('../../../images/Texturas_1C-Tlaloc_verde.png');
+        url('../../../images/Texturas/Texturas_1C-Tlaloc_verde.png');
 }
 
 .agenda-cal-card-head--bg-tlaloc_a_verde {
     background-color: #1e3d32;
     background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)),
-        url('../../../images/Texturas_1A-Tlaloc_verde.png');
+        url('../../../images/Texturas/Texturas_1A-Tlaloc_verde.png');
 }
 
 .agenda-cal-card-head--gira .agenda-cal-card-eyebrow,
@@ -1090,7 +1090,7 @@ html.theme-dark .agenda-cal-card {
     padding: 1.65rem 1.25rem 1.15rem;
     border-radius: 22px 22px 20px 20px;
     background-color: #fdfdfd;
-    background-image: url('../../../images/Texturas_2C-Quetzalcoatl_blanco.png');
+    background-image: url('../../../images/Texturas/Texturas_2C-Quetzalcoatl_blanco.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -1099,7 +1099,7 @@ html.theme-dark .agenda-cal-card {
 
 html.theme-dark .agenda-cal-card-body {
     background-color: #fdfdfd;
-    background-image: url('../../../images/Texturas_2C-Quetzalcoatl_blanco.png');
+    background-image: url('../../../images/Texturas/Texturas_2C-Quetzalcoatl_blanco.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;

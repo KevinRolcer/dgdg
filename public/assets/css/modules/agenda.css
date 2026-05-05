@@ -1039,40 +1039,44 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     letter-spacing: 0.08em;
 }
 
+.agenda-ficha-bg-preview.is-blanco {
+    color: #5f1b2d;
+}
+
 .agenda-ficha-bg-preview.is-rojo {
     background-color: #4a1f28;
-    background-image: linear-gradient(180deg, rgba(40, 22, 28, 0.5), rgba(40, 22, 28, 0.35)), url('../../../images/Texturas_1C-Tlaloc_rojo.png');
+    background-image: linear-gradient(180deg, rgba(40, 22, 28, 0.5), rgba(40, 22, 28, 0.35)), url('../../../images/Texturas/Texturas_1C-Tlaloc_rojo.png');
 }
 
 .agenda-ficha-bg-preview.is-tlaloc_a_rojo {
     background-color: #4a1f28;
-    background-image: linear-gradient(180deg, rgba(40, 22, 28, 0.5), rgba(40, 22, 28, 0.35)), url('../../../images/Texturas_1A-Tlaloc_rojo.png');
+    background-image: linear-gradient(180deg, rgba(40, 22, 28, 0.5), rgba(40, 22, 28, 0.35)), url('../../../images/Texturas/Texturas_1A-Tlaloc_rojo.png');
 }
 
 .agenda-ficha-bg-preview.is-beige {
     background-color: #7a6445;
-    background-image: linear-gradient(180deg, rgba(70, 56, 38, 0.35), rgba(70, 56, 38, 0.25)), url('../../../images/Texturas_1C-Tlaloc_beige.png');
+    background-image: linear-gradient(180deg, rgba(70, 56, 38, 0.35), rgba(70, 56, 38, 0.25)), url('../../../images/Texturas/Texturas_1C-Tlaloc_beige.png');
 }
 
 .agenda-ficha-bg-preview.is-tlaloc_a_beige {
     background-color: #7a6445;
-    background-image: linear-gradient(180deg, rgba(70, 56, 38, 0.35), rgba(70, 56, 38, 0.25)), url('../../../images/Texturas_1A-Tlaloc_beige.png');
+    background-image: linear-gradient(180deg, rgba(70, 56, 38, 0.35), rgba(70, 56, 38, 0.25)), url('../../../images/Texturas/Texturas_1A-Tlaloc_beige.png');
 }
 
 .agenda-ficha-bg-preview.is-blanco {
     background-color: #f6f6f6;
-    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.18)), url('../../../images/Texturas_1C-Tlaloc_blanco.png');
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.18)), url('../../../images/Texturas/Texturas_1C-Tlaloc_blanco.png');
     color: #5f1b2d;
 }
 
 .agenda-ficha-bg-preview.is-verde {
     background-color: #1e3d32;
-    background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)), url('../../../images/Texturas_1C-Tlaloc_verde.png');
+    background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)), url('../../../images/Texturas/Texturas_1C-Tlaloc_verde.png');
 }
 
 .agenda-ficha-bg-preview.is-tlaloc_a_verde {
     background-color: #1e3d32;
-    background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)), url('../../../images/Texturas_1A-Tlaloc_verde.png');
+    background-image: linear-gradient(180deg, rgba(18, 32, 28, 0.5), rgba(18, 32, 28, 0.35)), url('../../../images/Texturas/Texturas_1A-Tlaloc_verde.png');
 }
 
 .agenda-fecha-hora-row {

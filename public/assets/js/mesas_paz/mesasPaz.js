@@ -41,6 +41,39 @@ document.addEventListener('DOMContentLoaded', function () {
     let historialLastTrigger = null;
     let mostrarDetalleContestados = false;
 
+
+    // Modal y botón para municipios múltiples
+    const btnAbrirModalMunicipios = document.getElementById('btnAbrirModalMunicipios');
+    const municipiosBtnGroup = document.getElementById('municipios_multiple_btn_group');
+    const municipiosSeleccionadosCount = document.getElementById('municipiosSeleccionadosCount');
+
+    function getMunicipiosSeleccionados() {
+        if (!municipiosBtnGroup) return [];
+        return Array.from(municipiosBtnGroup.querySelectorAll('.municipio-toggle-btn.btn-success'))
+            .map(btn => btn.getAttribute('data-municipio-id'));
+    }
+
+    function actualizarMunicipiosSeleccionadosCount() {
+        if (!municipiosBtnGroup || !municipiosSeleccionadosCount) return;
+        const count = getMunicipiosSeleccionados().length;
+        municipiosSeleccionadosCount.textContent = count;
+    }
+
+    if (municipiosBtnGroup) {
+        municipiosBtnGroup.addEventListener('click', function(e) {
+            const btn = e.target.closest('.municipio-toggle-btn');
+            if (!btn) return;
+            btn.classList.toggle('btn-success');
+            btn.classList.toggle('btn-outline-secondary');
+            actualizarMunicipiosSeleccionadosCount();
+        });
+        // Al cerrar el modal, actualizar el contador (por si se selecciona y cierra con X)
+        const modalMunicipios = document.getElementById('modalMunicipios');
+        if (modalMunicipios) {
+            modalMunicipios.addEventListener('hidden.bs.modal', actualizarMunicipiosSeleccionadosCount);
+        }
+    }
+
     /** Actualiza visualización de municipios contestados */
     function actualizarVistaDetalleContestados() {
         if (!listaContestados) {
@@ -366,6 +399,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (specialModeMunicipiosMsg) {
             specialModeMunicipiosMsg.classList.toggle('d-none', !esEspecial);
+        }
+
+        // Mostrar/ocultar el botón para abrir el modal de municipios
+        if (btnAbrirModalMunicipios) {
+            btnAbrirModalMunicipios.classList.toggle('d-none', !esEspecial);
         }
     }
 
@@ -823,13 +861,68 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (modalidadGlobalSelect) {
         modalidadGlobalSelect.addEventListener('change', function () {
+            // --- NUEVO: Guardar automáticamente municipios seleccionados, parte y acuerdos antes de cambiar modalidad ---
+            const esEspecial = esModoEspecialModalidad();
+            let municipiosSeleccionados = [];
+            if (esEspecial && municipiosBtnGroup) {
+                municipiosSeleccionados = getMunicipiosSeleccionados();
+            }
+            const parteParaGuardar = obtenerParteItems();
+            let acuerdosParaGuardar = obtenerAcuerdoItems();
+            const hayDatosParaGuardar = (municipiosSeleccionados.length > 0) || parteParaGuardar.length > 0 || acuerdosParaGuardar.length > 0;
+            if (esEspecial && hayDatosParaGuardar) {
+                // Guardar automáticamente antes de limpiar
+                const payload = {
+                    parte_observacion_items: parteParaGuardar,
+                    acuerdo_observacion_items: acuerdosParaGuardar,
+                    modalidad: modalidadGlobalSelect ? modalidadGlobalSelect.value : null,
+                    delegado_asistio: delegadoAsistioGlobalSelect ? delegadoAsistioGlobalSelect.value : null,
+                    fecha_asist: app.dataset.fechaHoyIso,
+                    municipios_ids: municipiosSeleccionados
+                };
+                fetch(guardarAcuerdoHoyUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (result) {
+                    // Opcional: mostrar mensaje de éxito o refrescar UI
+                })
+                .catch(function () {
+                    // Opcional: mostrar error
+                });
+            }
+
+            // --- Fin guardar automático ---
+
             aplicarReglaEspecialModalidad();
             actualizarVisibilidadDelegadoAsistio();
             actualizarVisibilidadPartePorModalidad();
             actualizarTextosObservacionPorModalidad();
             actualizarModoEspecialUI();
             actualizarEstadoCaptura();
+
+            // Limpiar selección múltiple y campos al cambiar modalidad
+            if (municipiosBtnGroup) {
+                municipiosBtnGroup.querySelectorAll('.municipio-toggle-btn.btn-success').forEach(function(btn){
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-secondary');
+                });
+                actualizarMunicipiosSeleccionadosCount();
+            }
+            if (parteObservacionHoy) parteObservacionHoy.value = '';
+            if (acuerdoObservacionHoy) acuerdoObservacionHoy.value = '';
         });
+        // Inicializar estado al cargar
+        actualizarModoEspecialUI();
     }
 
     if (delegadoAsistioGlobalSelect) {
@@ -1291,8 +1384,19 @@ document.addEventListener('DOMContentLoaded', function () {
     if (btnGuardarAcuerdoHoy && guardarAcuerdoHoyUrl) {
         btnGuardarAcuerdoHoy.addEventListener('click', function () {
             const esSuspensionActiva = esModalidadSuspension();
+            const esEspecial = esModoEspecialModalidad();
             const parteParaGuardar = obtenerParteItems();
             let acuerdosParaGuardar = obtenerAcuerdoItems();
+
+            // Obtener municipios seleccionados en modo especial
+            let municipiosSeleccionados = [];
+            if (esEspecial && municipiosBtnGroup) {
+                municipiosSeleccionados = getMunicipiosSeleccionados();
+                if (municipiosSeleccionados.length === 0) {
+                    swal('Atención', 'Debes seleccionar al menos un municipio.', 'warning');
+                    return;
+                }
+            }
 
             if (esSuspensionActiva && !acuerdosParaGuardar.length) {
                 acuerdosParaGuardar = ['Motivo no registrado'];
@@ -1306,6 +1410,17 @@ document.addEventListener('DOMContentLoaded', function () {
             btnGuardarAcuerdoHoy.disabled = true;
             btnGuardarAcuerdoHoy.textContent = 'Guardando...';
 
+            const payload = {
+                parte_observacion_items: parteParaGuardar,
+                acuerdo_observacion_items: acuerdosParaGuardar,
+                modalidad: modalidadGlobalSelect ? modalidadGlobalSelect.value : null,
+                delegado_asistio: delegadoAsistioGlobalSelect ? delegadoAsistioGlobalSelect.value : null,
+                fecha_asist: app.dataset.fechaHoyIso
+            };
+            if (esEspecial) {
+                payload.municipios_ids = municipiosSeleccionados;
+            }
+
             fetch(guardarAcuerdoHoyUrl, {
                 method: 'POST',
                 headers: {
@@ -1314,13 +1429,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     'X-CSRF-TOKEN': csrfToken,
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                body: JSON.stringify({
-                    parte_observacion_items: parteParaGuardar,
-                    acuerdo_observacion_items: acuerdosParaGuardar,
-                    modalidad: modalidadGlobalSelect ? modalidadGlobalSelect.value : null,
-                    delegado_asistio: delegadoAsistioGlobalSelect ? delegadoAsistioGlobalSelect.value : null,
-                    fecha_asist: app.dataset.fechaHoyIso
-                })
+                body: JSON.stringify(payload)
             })
             .then(function (response) {
                 return response.json().then(function (data) {
@@ -1331,15 +1440,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (result.status >= 400 || !result.data.success) {
                     throw result.data;
                 }
-
                 if (acuerdoObservacionHoy && Array.isArray(result.data.acuerdo_observacion_items)) {
                     acuerdoObservacionHoy.value = formatearAcuerdoItemsComoTexto(result.data.acuerdo_observacion_items);
                 }
-
                 if (parteObservacionHoy && Array.isArray(result.data.parte_observacion_items)) {
                     parteObservacionHoy.value = formatearAcuerdoItemsComoTexto(result.data.parte_observacion_items);
                 }
-
                 swal('Éxito', result.data.message || 'Parte y acuerdos guardados correctamente.', 'success');
             })
             .catch(function (errorData) {

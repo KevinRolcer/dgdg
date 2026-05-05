@@ -1,3 +1,78 @@
+.agenda-ficha-card--bg-rojo .agenda-ficha-title,
+.agenda-ficha-card--bg-tlaloc_a_rojo .agenda-ficha-title,
+.agenda-ficha-card--agenda .agenda-ficha-title {
+    color: #f0c38e;
+}
+.agenda-ficha-card--bg-rojo .agenda-ficha-value,
+.agenda-ficha-card--bg-tlaloc_a_rojo .agenda-ficha-value,
+.agenda-ficha-card--agenda .agenda-ficha-value {
+    color: #fff;
+}
+.agenda-ficha-card--bg-rojo .agenda-ficha-label,
+.agenda-ficha-card--bg-tlaloc_a_rojo .agenda-ficha-label,
+.agenda-ficha-card--agenda .agenda-ficha-label {
+    color: #eee;
+}
+/* Fondos personalizados para ficha personalizada (deben coincidir con PDF) */
+
+.agenda-ficha-card--bg-rojo {
+    background-color: #6a1f35;
+    background-image: url('../../../images/Texturas/Texturas_1C-Tlaloc_rojo.png');
+    color: #fff;
+}
+.agenda-ficha-card--bg-beige {
+    background-color: #f8f8f8;
+    background-image: url('../../../images/Texturas/Texturas_1C-Tlaloc_beige.png');
+    color: #444;
+}
+.agenda-ficha-card--bg-blanco {
+    background-color: #f6f6f6;
+    background-image: url('../../../images/Texturas/Texturas_1C-Tlaloc_blanco.png');
+    color: #444;
+}
+.agenda-ficha-card--bg-verde {
+    background-color: #0a4a41;
+    background-image: url('../../../images/Texturas/Texturas_1C-Tlaloc_verde.png');
+    color: #fff;
+}
+.agenda-ficha-card--bg-tlaloc_a_rojo {
+    background-color: #6a1f35;
+    background-image: url('../../../images/Texturas/Texturas_1A-Tlaloc_rojo.png');
+    color: #fff;
+}
+.agenda-ficha-card--bg-tlaloc_a_beige {
+    background-color: #f8f8f8;
+    background-image: url('../../../images/Texturas/Texturas_1A-Tlaloc_beige.png');
+    color: #444;
+}
+.agenda-ficha-card--bg-tlaloc_a_verde {
+    background-color: #0a4a41;
+    background-image: url('../../../images/Texturas/Texturas_1A-Tlaloc_verde.png');
+    color: #fff;
+}
+
+.agenda-ficha-card--custom-texture,
+.agenda-ficha-card--custom-texture .agenda-ficha-title,
+.agenda-ficha-card--custom-texture .agenda-ficha-value,
+.agenda-ficha-card--custom-texture .agenda-ficha-label,
+.agenda-ficha-card--custom-texture .agenda-ficha-date-box .agenda-ficha-date-main,
+.agenda-ficha-card--custom-texture .agenda-ficha-time,
+.agenda-ficha-card--custom-texture .agenda-ficha-description,
+.agenda-ficha-card--custom-texture .agenda-ficha-aforo {
+    color: #fff;
+}
+
+.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco,
+.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-title,
+.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-value,
+.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-label,
+.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-eyebrow,
+.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-date-box .agenda-ficha-date-main,
+.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-time,
+.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-description,
+.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-aforo {
+    color: #5f1b2d;
+}
 @font-face {
     font-family: 'Gilroy';
     src: url('../../../fonts/agenda-pdf/Gilroy-Regular.ttf') format('truetype');
@@ -104,19 +179,19 @@
 
 .agenda-ficha-card--pre_gira {
     background-color: #f8f8f8;
-    background-image: url('../../../images/Texturas_1C-Tlaloc_blanco.png');
+    background-image: url('../../../images/Texturas/Texturas_1C-Tlaloc_blanco.png');
     color: #444;
 }
 
 .agenda-ficha-card--gira {
     background-color: #0a4a41;
-    background-image: url('../../../images/Texturas_1C-Tlaloc_verde.png');
+    background-image: url('../../../images/Texturas/Texturas_1C-Tlaloc_verde.png');
     color: #fff;
 }
 
 .agenda-ficha-card--agenda {
     background-color: #6a1f35;
-    background-image: url('../../../images/Texturas_1C-Tlaloc_rojo.png');
+    background-image: url('../../../images/Texturas/Texturas_1C-Tlaloc_rojo.png');
     color: #fff;
 }
 

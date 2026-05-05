@@ -43,14 +43,26 @@
                         </div>
                         <div class="agenda-custom-bg-col">
                             <label class="form-label-agenda">Fondo de ficha</label>
+                            @php
+                                $texturas = collect(File::files(public_path('images/Texturas')))
+                                    ->filter(fn($f) => str_ends_with($f->getFilename(), '.png'))
+                                    ->map(function ($f) {
+                                        $filename = $f->getFilename();
+                                        $name = pathinfo($filename, PATHINFO_FILENAME);
+
+                                        return [
+                                            'name' => $name,
+                                            'url' => asset('images/Texturas/'.$filename),
+                                            'tone' => str_contains(strtolower($name), 'blanco') ? 'blanco' : 'color',
+                                        ];
+                                    })
+                                    ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+                                    ->values();
+                            @endphp
                             <select name="ficha_fondo" id="modalFichaFondo" class="form-control-agenda">
-                                <option value="tlaloc_a_beige">Tlaloc A beige</option>
-                                <option value="tlaloc_a_rojo">Tlaloc A rojo</option>
-                                <option value="tlaloc_a_verde">Tlaloc A verde</option>
-                                <option value="beige">Tlaloc C beige</option>
-                                <option value="blanco">Tlaloc C blanco</option>
-                                <option value="rojo">Tlaloc C rojo</option>
-                                <option value="verde">Tlaloc C verde</option>
+                                @foreach($texturas as $tex)
+                                    <option value="{{ $tex['name'] }}" data-preview-url="{{ $tex['url'] }}" data-tone="{{ $tex['tone'] }}">{{ $tex['name'] }}</option>
+                                @endforeach
                             </select>
                         </div>
                     </div>

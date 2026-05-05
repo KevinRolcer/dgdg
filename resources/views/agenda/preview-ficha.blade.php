@@ -19,10 +19,16 @@
         'pre-gira' => 'Pre-gira',
         'pre_gira' => 'Pre-gira',
         'gira' => 'Gira',
+        'personalizada' => !empty($card['kind_label']) ? $card['kind_label'] : 'Ficha personalizada',
         default => 'Agenda',
     };
     $logoVersion = ($kind === 'pre_gira') ? '1' : '2';
     $logoFile = "Gobierno de Puebla_{$logoVersion}-Versión vertical.png";
+
+    $fichaBg = $kind === 'personalizada' ? (string) ($card['ficha_bg'] ?? '') : '';
+    $fichaBgFile = $fichaBg !== '' && preg_match('/^[A-Za-z0-9_-]+$/', $fichaBg) && File::exists(public_path('images/Texturas/'.$fichaBg.'.png')) ? $fichaBg : '';
+    $fichaBgTone = str_contains(strtolower($fichaBgFile), 'blanco') ? 'blanco' : 'color';
+    $fichaBgStyle = $fichaBgFile !== '' ? "background-image: url('".asset('images/Texturas/'.$fichaBgFile.'.png')."');" : '';
 
     $textBulk = mb_strlen(trim((string) ($card['title'] ?? '')))
                 + mb_strlen(trim((string) ($card['lugar'] ?? '')))
@@ -62,10 +68,14 @@
         </header>
 
         <div class="agenda-ficha-stage">
-            <article class="agenda-ficha-card agenda-ficha-card--{{ $kind }}{{ $sparseContent ? ' agenda-ficha-card--sparse' : '' }}" data-ficha-preview-card>
+            <article class="agenda-ficha-card agenda-ficha-card--{{ $kind }}{{ $fichaBgTone === 'blanco' ? ' agenda-ficha-card--bg-blanco' : '' }}{{ $fichaBgFile !== '' ? ' agenda-ficha-card--custom-texture' : '' }}{{ $sparseContent ? ' agenda-ficha-card--sparse' : '' }}" style="{{ $fichaBgStyle }}" data-ficha-preview-card>
                 <div class="agenda-ficha-card-body">
                     <p class="agenda-ficha-eyebrow">{{ $kindLabel }}</p>
-                    <h2 class="agenda-ficha-title">{{ $card['title'] }}</h2>
+                    @if($kind === 'personalizada' && !empty($card['kind_label']))
+                        <h2 class="agenda-ficha-title">{{ $card['kind_label'] }}</h2>
+                    @else
+                        <h2 class="agenda-ficha-title">{{ $card['title'] }}</h2>
+                    @endif
 
                     @if (!empty($card['lugar']))
                         <div class="agenda-ficha-detail">

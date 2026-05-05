@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Dompdf\Dompdf;
 use Dompdf\FontMetrics;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 /**
  * Genera el PDF de fichas del calendario directiva (Dompdf).
@@ -410,6 +411,26 @@ class AgendaFichasPdfBuilderService
         $name = preg_replace('/-+/', '-', $name);
 
         return $name.'.pdf';
+    }
+
+    public static function normalizeCustomDownloadFileName(string $value, string $fallback): string
+    {
+        $name = trim($value);
+        if ($name === '') {
+            return $fallback;
+        }
+
+        $name = pathinfo($name, PATHINFO_FILENAME);
+        $name = Str::ascii($name);
+        $name = preg_replace('/[^A-Za-z0-9._ -]+/', '', $name) ?: '';
+        $name = preg_replace('/[._ -]+/', '-', trim($name, " ._-\t\n\r\0\x0B")) ?: '';
+        $name = trim($name, '-');
+
+        if ($name === '') {
+            return $fallback;
+        }
+
+        return Str::limit($name, 140, '').'.pdf';
     }
 
     /**
