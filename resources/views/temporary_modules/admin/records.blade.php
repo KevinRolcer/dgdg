@@ -312,11 +312,28 @@
                         </label>
                         <div id="tmExportReportImageWrap" hidden style="margin-top:8px;display:grid;gap:8px;">
                             <input type="file" id="tmExportReportImageFile" accept="image/*" multiple hidden>
-                            <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmExportAddReportImageBtn">
-                                <i class="fa-solid fa-image" aria-hidden="true"></i> Agregar imagen
-                            </button>
+                            <input type="file" id="tmExportReportImageCollageFile" accept="image/*" multiple hidden>
+                            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                                <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmExportAddReportImageBtn">
+                                    <i class="fa-solid fa-image" aria-hidden="true"></i> Agregar imagen
+                                </button>
+                                <label for="tmExportReportCollageColumns" style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:0.88rem;">
+                                    <span>Colección: columnas</span>
+                                    <select id="tmExportReportCollageColumns" class="tm-input" style="width:auto;min-width:3.5rem;padding:4px 8px;">
+                                        <option value="1">1</option>
+                                        <option value="2" selected>2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
+                                        <option value="6">6</option>
+                                    </select>
+                                </label>
+                                <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmExportAddReportImageCollageBtn" title="Varias fotos en malla sin encimar">
+                                    <i class="fa-solid fa-table-cells" aria-hidden="true"></i> Agregar colección
+                                </button>
+                            </div>
                             <div id="tmExportReportImagesList" class="tm-export-sum-list" style="display:grid;gap:8px;"></div>
-                            <p class="tm-analysis-hint" style="margin-top:0;">Usa el botón de tres puntos de cada imagen para definir título, posición, ancho y dato de tabla separada.</p>
+                            <p class="tm-analysis-hint" style="margin-top:0;">Usa el botón de tres puntos de cada elemento para título, posición, ancho y tabla separada. Las colecciones forman una malla (1–6 columnas) con espacio entre celdas.</p>
                         </div>
                     </div>
                     <div class="tm-export-personalize-field">

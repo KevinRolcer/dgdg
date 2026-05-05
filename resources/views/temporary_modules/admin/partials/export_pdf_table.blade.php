@@ -304,6 +304,57 @@
             } elseif ($target !== '' && ($scope === '' || !str_contains($scope, $target))) {
                 continue;
             }
+            $layout = strtolower(trim((string) ($image['layout'] ?? 'single')));
+            if ($layout === 'collage') {
+                $collageItems = is_array($image['items'] ?? null) ? $image['items'] : [];
+                $validCollage = [];
+                foreach ($collageItems as $cit) {
+                    if (!is_array($cit)) {
+                        continue;
+                    }
+                    $cSrc = trim((string) ($cit['src'] ?? ''));
+                    if ($cSrc === '') {
+                        continue;
+                    }
+                    $validCollage[] = $cit;
+                }
+                if ($validCollage === []) {
+                    continue;
+                }
+                $cols = max(1, min(6, (int) ($image['collage_columns'] ?? 2)));
+                $cWidth = max(80, min(700, (int) ($image['width'] ?? 680)));
+                $imgTitle = trim((string) ($image['title'] ?? ''));
+                $pct = round(100 / $cols, 4);
+                $html .= '<div style="max-width:'.$cWidth.'px;margin:8px auto 12px;text-align:center;page-break-inside:avoid;">';
+                if ($imgTitle !== '') {
+                    $html .= '<p style="font-weight:bold;margin:0 0 4px 0;">'.e($imgTitle).'</p>';
+                }
+                $html .= '<table style="width:100%;border-collapse:separate;border-spacing:6px;table-layout:fixed;margin:0 auto;"><tbody>';
+                $nCell = count($validCollage);
+                for ($r = 0; $r < $nCell; $r += $cols) {
+                    $html .= '<tr>';
+                    for ($c = 0; $c < $cols; $c++) {
+                        $idx = $r + $c;
+                        $html .= '<td style="width:'.$pct.'%;vertical-align:top;text-align:center;padding:2px;">';
+                        if ($idx < $nCell) {
+                            $cell = $validCollage[$idx];
+                            $cSrc = e(trim((string) ($cell['src'] ?? '')));
+                            $cap = trim((string) ($cell['caption'] ?? ''));
+                            $html .= '<img src="'.$cSrc.'" style="width:100%;height:auto;max-width:100%;display:block;margin:0 auto;" alt="">';
+                            if ($cap !== '') {
+                                $html .= '<div style="font-size:8px;line-height:1.2;margin-top:3px;">'.e($cap).'</div>';
+                            }
+                        } else {
+                            $html .= '&nbsp;';
+                        }
+                        $html .= '</td>';
+                    }
+                    $html .= '</tr>';
+                }
+                $html .= '</tbody></table></div>';
+
+                continue;
+            }
             $src = trim((string) ($image['src'] ?? ''));
             if ($src === '') {
                 continue;

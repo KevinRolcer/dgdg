@@ -430,19 +430,55 @@ class TemporaryModuleWordPdfService
                 if (!is_array($imageRaw)) {
                     continue;
                 }
-                $src = trim((string) ($imageRaw['src'] ?? ''));
-                if ($src === '' || !str_starts_with(strtolower($src), 'data:image/')) {
-                    continue;
-                }
                 $placement = trim((string) ($imageRaw['placement'] ?? 'after_records'));
                 if (!in_array($placement, ['after_count', 'after_sum', 'after_records', 'before_split_group', 'after_split_group'], true)) {
                     $placement = 'after_records';
                 }
+                $targetGroup = trim((string) ($imageRaw['target_group'] ?? ''));
+                $layout = strtolower(trim((string) ($imageRaw['layout'] ?? 'single')));
+                if ($layout === 'collage') {
+                    $cols = max(1, min(6, (int) ($imageRaw['collage_columns'] ?? ($imageRaw['collageColumns'] ?? 2))));
+                    $items = [];
+                    if (is_array($imageRaw['items'] ?? null)) {
+                        foreach ($imageRaw['items'] as $itemRaw) {
+                            if (!is_array($itemRaw)) {
+                                continue;
+                            }
+                            $itemSrc = trim((string) ($itemRaw['src'] ?? ''));
+                            if ($itemSrc === '' || !str_starts_with(strtolower($itemSrc), 'data:image/')) {
+                                continue;
+                            }
+                            $items[] = [
+                                'src' => $itemSrc,
+                                'caption' => trim((string) ($itemRaw['caption'] ?? '')),
+                            ];
+                        }
+                    }
+                    if ($items === []) {
+                        continue;
+                    }
+                    $reportImages[] = [
+                        'layout' => 'collage',
+                        'title' => trim((string) ($imageRaw['title'] ?? '')),
+                        'placement' => $placement,
+                        'target_group' => $targetGroup,
+                        'width' => max(80, min(700, (int) ($imageRaw['width'] ?? 680))),
+                        'collage_columns' => $cols,
+                        'items' => $items,
+                    ];
+
+                    continue;
+                }
+                $src = trim((string) ($imageRaw['src'] ?? ''));
+                if ($src === '' || !str_starts_with(strtolower($src), 'data:image/')) {
+                    continue;
+                }
                 $reportImages[] = [
+                    'layout' => 'single',
                     'title' => trim((string) ($imageRaw['title'] ?? '')),
                     'src' => $src,
                     'placement' => $placement,
-                    'target_group' => trim((string) ($imageRaw['target_group'] ?? '')),
+                    'target_group' => $targetGroup,
                     'width' => max(80, min(700, (int) ($imageRaw['width'] ?? 320))),
                 ];
             }
@@ -2940,6 +2976,37 @@ class TemporaryModuleWordPdfService
             if (! is_array($image)) {
                 continue;
             }
+            if (($image['layout'] ?? 'single') === 'collage' && is_array($image['items'] ?? null)) {
+                $next = $image;
+                $nextItems = [];
+                foreach ($image['items'] as $item) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+                    $src = trim((string) ($item['src'] ?? ''));
+                    if ($src === '') {
+                        continue;
+                    }
+                    $nit = $item;
+                    if (preg_match('/^data:image\/([a-zA-Z0-9.+-]+);base64,(.+)$/s', $src, $matches)) {
+                        $b64 = preg_replace('/\s+/', '', (string) $matches[2]) ?? '';
+                        $binary = base64_decode($b64, true);
+                        if (is_string($binary) && $binary !== '') {
+                            $payload = $this->buildPdfImagePayloadFromBinary($binary);
+                            if (is_array($payload) && is_string($payload['src'] ?? null) && $payload['src'] !== '') {
+                                $nit['src'] = $payload['src'];
+                            }
+                        }
+                    }
+                    $nextItems[] = $nit;
+                }
+                $next['items'] = $nextItems;
+                if ($nextItems !== []) {
+                    $out[] = $next;
+                }
+
+                continue;
+            }
             $src = trim((string) ($image['src'] ?? ''));
             if ($src === '') {
                 continue;
@@ -3089,6 +3156,19 @@ class TemporaryModuleWordPdfService
             if ($imageTarget !== '' && $targetNeedle !== '' && !str_contains($targetNeedle, $imageTarget)) {
                 continue;
             }
+            if (($image['layout'] ?? 'single') === 'collage') {
+                foreach ($image['items'] ?? [] as $item) {
+                    if (!is_array($item)) {
+                        continue;
+                    }
+                    $src = trim((string) ($item['src'] ?? ''));
+                    if ($src !== '' && str_starts_with(strtolower($src), 'data:image/')) {
+                        return true;
+                    }
+                }
+
+                continue;
+            }
             $src = trim((string) ($image['src'] ?? ''));
             if ($src !== '' && str_starts_with(strtolower($src), 'data:image/')) {
                 return true;
@@ -3165,6 +3245,13 @@ class TemporaryModuleWordPdfService
             if ($imageTarget !== '' && $targetNeedle !== '' && !str_contains($targetNeedle, $imageTarget)) {
                 continue;
             }
+            if (($image['layout'] ?? 'single') === 'collage') {
+                if ($this->addCollageReportImagesToWordBlock($section, $image, $fontName)) {
+                    $insertedAny = true;
+                }
+
+                continue;
+            }
             $path = $this->writeDataUriImageToTemporaryFile((string) ($image['src'] ?? ''));
             if ($path === null) {
                 continue;
@@ -3179,6 +3266,74 @@ class TemporaryModuleWordPdfService
             $section->addTextBreak(1);
             $insertedAny = true;
         }
+    }
+
+    /**
+     * Malla de imágenes (1…N columnas) sin solaparse, ancho total acotado.
+     *
+     * @param  array<string, mixed>  $image
+     */
+    private function addCollageReportImagesToWordBlock(\PhpOffice\PhpWord\Element\Section $section, array $image, string $fontName): bool
+    {
+        $resolved = [];
+        foreach ($image['items'] ?? [] as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $path = $this->writeDataUriImageToTemporaryFile((string) ($item['src'] ?? ''));
+            if ($path === null) {
+                continue;
+            }
+            $resolved[] = [
+                'path' => $path,
+                'caption' => trim((string) ($item['caption'] ?? '')),
+            ];
+        }
+        if ($resolved === []) {
+            return false;
+        }
+
+        $cols = max(1, min(6, (int) ($image['collage_columns'] ?? 2)));
+        $blockWidth = max(80, min(700, (int) ($image['width'] ?? 680)));
+        $cellWidthPx = (int) max(40, floor($blockWidth / $cols) - 14);
+        $title = trim((string) ($image['title'] ?? ''));
+
+        $section->addTextBreak(1);
+        if ($title !== '') {
+            $section->addText($title, ['name' => $fontName, 'bold' => true, 'size' => 11], ['alignment' => Jc::CENTER, 'spaceAfter' => 80]);
+        }
+
+        $table = $section->addTable([
+            'borderSize' => 0,
+            'borderColor' => 'FFFFFF',
+            'cellMarginTop' => 40,
+            'cellMarginBottom' => 40,
+            'cellMarginLeft' => 50,
+            'cellMarginRight' => 50,
+        ]);
+        $totalTwips = $this->pxToTwips($blockWidth);
+        $cellTwips = (int) max(720, round($totalTwips / $cols));
+
+        foreach (array_chunk($resolved, $cols) as $chunk) {
+            $row = $table->addRow();
+            foreach ($chunk as $entry) {
+                $cell = $row->addCell($cellTwips, ['valign' => 'center']);
+                $cell->addImage($entry['path'], [
+                    'width' => $cellWidthPx,
+                    'alignment' => Jc::CENTER,
+                ]);
+                if ($entry['caption'] !== '') {
+                    $cell->addText($entry['caption'], ['name' => $fontName, 'size' => 8], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
+                }
+            }
+            $pad = $cols - count($chunk);
+            for ($i = 0; $i < $pad; $i++) {
+                $row->addCell($cellTwips);
+            }
+        }
+        $section->addTextBreak(1);
+
+        return true;
     }
 
     private function writeDataUriImageToTemporaryFile(string $dataUri): ?string

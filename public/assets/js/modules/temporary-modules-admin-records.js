@@ -1661,7 +1661,6 @@
                 return;
             }
             listEl.innerHTML = images.map(function (img, idx) {
-                var title = String(img.title || img.name || ('Imagen ' + (idx + 1)));
                 var placementMap = {
                     after_count: 'Debajo de conteo',
                     after_sum: 'Debajo de sumatoria',
@@ -1671,6 +1670,29 @@
                 };
                 var placement = placementMap[String(img.placement || 'after_records')] || 'Debajo de registros';
                 var target = String(img.target_group || '').trim();
+                if (String(img.layout || '') === 'collage') {
+                    var items = Array.isArray(img.items) ? img.items : [];
+                    var n = items.length;
+                    var cols = Math.max(1, Math.min(6, parseInt(String(img.collage_columns != null ? img.collage_columns : 2), 10) || 2));
+                    var w = Math.max(80, Math.min(700, parseInt(String(img.width || 680), 10) || 680));
+                    var title = String(img.title || ('Colección (' + n + ')')).trim();
+                    var mosaicCells = '';
+                    var mi;
+                    for (mi = 0; mi < 4; mi++) {
+                        if (items[mi] && items[mi].src) {
+                            mosaicCells += '<div style="min-height:0;overflow:hidden;line-height:0;"><img src="' + escapeHtml(String(items[mi].src)) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;max-height:26px;"></div>';
+                        } else {
+                            mosaicCells += '<div style="background:#e8edf3;min-height:12px;"></div>';
+                        }
+                    }
+                    return '<div class="tm-export-sum-item" data-report-image-id="' + escapeHtml(String(img.id || '')) + '" style="display:grid;grid-template-columns:52px 1fr auto;gap:8px;align-items:center;">'
+                        + '<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;width:52px;height:52px;gap:1px;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;background:#e2e8f0;">' + mosaicCells + '</div>'
+                        + '<div style="min-width:0;"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(title) + '</div>'
+                        + '<div class="tm-analysis-hint" style="margin:0;">' + escapeHtml('Collage · ' + n + ' imágenes · ' + cols + ' col · ' + placement + (target ? (' · ' + target) : '') + ' · ' + w + 'px') + '</div></div>'
+                        + '<button type="button" class="tm-btn tm-btn-sm tm-btn-outline" data-report-image-menu title="Opciones"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>'
+                        + '</div>';
+                }
+                var title = String(img.title || img.name || ('Imagen ' + (idx + 1)));
                 return '<div class="tm-export-sum-item" data-report-image-id="' + escapeHtml(String(img.id || '')) + '" style="display:grid;grid-template-columns:42px 1fr auto;gap:8px;align-items:center;">'
                     + '<img src="' + escapeHtml(String(img.src || '')) + '" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0;">'
                     + '<div style="min-width:0;"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(title) + '</div>'
@@ -1690,15 +1712,24 @@
                 + '<option value="after_sum">Debajo de tabla sumatoria</option>'
                 + '<option value="before_split_group">Al inicio de tabla separada</option>'
                 + '<option value="after_split_group">Al final de tabla separada</option>';
+            var isCollage = String(img.layout || '') === 'collage';
+            var collageColsOptions = [1, 2, 3, 4, 5, 6].map(function (n) {
+                var sel = (Math.max(1, Math.min(6, parseInt(String(img.collage_columns != null ? img.collage_columns : 2), 10) || 2)) === n ? ' selected' : '';
+                return '<option value="' + n + '"' + sel + '>' + n + '</option>';
+            }).join('');
             var html = '<div style="display:grid;gap:10px;text-align:left;">'
-                + '<label style="display:grid;gap:4px;"><span>Título</span><input id="tmRiTitle" class="swal2-input" style="margin:0;" value="' + escapeHtml(String(img.title || '')) + '"></label>'
+                + '<label style="display:grid;gap:4px;"><span>Título' + (isCollage ? ' del bloque' : '') + '</span><input id="tmRiTitle" class="swal2-input" style="margin:0;" value="' + escapeHtml(String(img.title || '')) + '"></label>'
                 + '<label style="display:grid;gap:4px;"><span>Ubicación</span><select id="tmRiPlacement" class="swal2-input" style="margin:0;">' + placementOptions + '</select></label>'
                 + '<label style="display:grid;gap:4px;"><span>Dato de tabla separada (opcional)</span><input id="tmRiTargetGroup" class="swal2-input" style="margin:0;" placeholder="Ej: Registro CTM" value="' + escapeHtml(String(img.target_group || '')) + '"></label>'
-                + '<label style="display:grid;gap:4px;"><span>Ancho PDF/Word (px)</span><input id="tmRiWidth" type="number" min="80" max="700" class="swal2-input" style="margin:0;" value="' + escapeHtml(String(img.width || 320)) + '"></label>'
+                + (isCollage
+                    ? '<label style="display:grid;gap:4px;"><span>Columnas en la malla (1–6)</span><select id="tmRiCollageCols" class="swal2-input" style="margin:0;">' + collageColsOptions + '</select></label>'
+                        + '<label style="display:grid;gap:4px;"><span>Ancho total del bloque (px)</span><input id="tmRiWidth" type="number" min="80" max="700" class="swal2-input" style="margin:0;" value="' + escapeHtml(String(img.width != null ? img.width : 680)) + '"></label>'
+                        + '<p class="tm-analysis-hint" style="margin:0;">Cada celda usa una fracción del ancho; las imágenes escalan dentro de su celda sin encimar.</p>'
+                    : '<label style="display:grid;gap:4px;"><span>Ancho PDF/Word (px)</span><input id="tmRiWidth" type="number" min="80" max="700" class="swal2-input" style="margin:0;" value="' + escapeHtml(String(img.width || 320)) + '"></label>')
                 + '</div>';
             if (typeof Swal !== 'undefined') {
                 Swal.fire({
-                    title: 'Opciones de imagen',
+                    title: isCollage ? 'Opciones de colección (collage)' : 'Opciones de imagen',
                     html: html,
                     showDenyButton: true,
                     showCancelButton: true,
@@ -1710,13 +1741,18 @@
                         if (p) { p.value = String(img.placement || 'after_records'); }
                     },
                     preConfirm: function () {
-                        var w = parseInt(String((document.getElementById('tmRiWidth') || {}).value || '320'), 10);
-                        return {
+                        var w = parseInt(String((document.getElementById('tmRiWidth') || {}).value || (isCollage ? '680' : '320')), 10);
+                        var base = {
                             title: String((document.getElementById('tmRiTitle') || {}).value || '').trim(),
                             placement: String((document.getElementById('tmRiPlacement') || {}).value || 'after_records'),
                             target_group: String((document.getElementById('tmRiTargetGroup') || {}).value || '').trim(),
-                            width: Math.max(80, Math.min(700, Number.isNaN(w) ? 320 : w))
+                            width: Math.max(80, Math.min(700, Number.isNaN(w) ? (isCollage ? 680 : 320) : w))
                         };
+                        if (isCollage) {
+                            var c = parseInt(String((document.getElementById('tmRiCollageCols') || {}).value || '2'), 10);
+                            base.collage_columns = Math.max(1, Math.min(6, Number.isNaN(c) ? 2 : c));
+                        }
+                        return base;
                     }
                 }).then(function (res) {
                     if (res.isDenied) {
@@ -3383,16 +3419,44 @@
             const totalsHeaderFontPx = totalsHeaderFontEl && totalsHeaderFontEl.value ? Math.max(9, Math.min(48, parseInt(totalsHeaderFontEl.value, 10) || 12)) : 12;
             const totalsGroupHeaderFontPx = totalsGroupHeaderFontEl && totalsGroupHeaderFontEl.value ? Math.max(9, Math.min(48, parseInt(totalsGroupHeaderFontEl.value, 10) || 12)) : totalsHeaderFontPx;
             const reportImages = tmExportGetReportImages().map(function (img) {
+                if (String(img.layout || '') === 'collage') {
+                    var cols = Math.max(1, Math.min(6, parseInt(String(img.collage_columns != null ? img.collage_columns : 2), 10) || 2));
+                    var items = (Array.isArray(img.items) ? img.items : []).map(function (it) {
+                        return {
+                            src: String(it && it.src ? it.src : ''),
+                            caption: String(it && it.caption != null ? it.caption : '').trim()
+                        };
+                    }).filter(function (it) {
+                        return it.src !== '' && /^data:image\//i.test(it.src);
+                    });
+                    return {
+                        id: String(img.id || ''),
+                        name: String(img.name || ''),
+                        title: String(img.title || ''),
+                        layout: 'collage',
+                        collage_columns: cols,
+                        items: items,
+                        placement: String(img.placement || 'after_records'),
+                        target_group: String(img.target_group || ''),
+                        width: Math.max(80, Math.min(700, parseInt(String(img.width != null ? img.width : 680), 10) || 680))
+                    };
+                }
                 return {
                     id: String(img.id || ''),
                     name: String(img.name || ''),
                     title: String(img.title || ''),
+                    layout: 'single',
                     src: String(img.src || ''),
                     placement: String(img.placement || 'after_records'),
                     target_group: String(img.target_group || ''),
                     width: Math.max(80, Math.min(700, parseInt(String(img.width || 320), 10) || 320))
                 };
-            }).filter(function (img) { return img.src !== ''; });
+            }).filter(function (img) {
+                if (String(img.layout) === 'collage') {
+                    return Array.isArray(img.items) && img.items.length > 0;
+                }
+                return img.src !== '';
+            });
             const items = Array.from(container.children).filter(function (el) {
                 return el.classList && el.classList.contains('tm-export-personalize-col');
             });
@@ -3717,6 +3781,40 @@
             var html = '';
             selected.forEach(function (img) {
                 var title = String(img.title || img.name || '').trim();
+                if (String(img.layout || '') === 'collage') {
+                    var cItems = Array.isArray(img.items) ? img.items : [];
+                    var cols = Math.max(1, Math.min(6, parseInt(String(img.collage_columns != null ? img.collage_columns : 2), 10) || 2));
+                    var cWidth = Math.max(80, Math.min(700, parseInt(String(img.width != null ? img.width : 680), 10) || 680));
+                    var pct = (100 / cols).toFixed(4);
+                    html += '<div class="tm-export-preview-report-image tm-export-preview-report-collage" style="max-width:' + cWidth + 'px;margin:8px auto 12px;text-align:center;page-break-inside:avoid;">';
+                    if (title) {
+                        html += '<p style="font-weight:700;margin:0 0 4px 0;">' + escapeHtml(title) + '</p>';
+                    }
+                    html += '<table style="width:100%;border-collapse:separate;border-spacing:6px;table-layout:fixed;margin:0 auto;"><tbody>';
+                    var n = cItems.length;
+                    var r;
+                    var c;
+                    for (r = 0; r < n; r += cols) {
+                        html += '<tr>';
+                        for (c = 0; c < cols; c++) {
+                            var idx = r + c;
+                            html += '<td style="width:' + pct + '%;vertical-align:top;text-align:center;padding:2px;">';
+                            if (idx < n && cItems[idx] && cItems[idx].src) {
+                                var cap = String(cItems[idx].caption || '').trim();
+                                html += '<img src="' + escapeHtml(String(cItems[idx].src)) + '" alt="" style="width:100%;height:auto;max-width:100%;display:block;margin:0 auto;">';
+                                if (cap) {
+                                    html += '<div style="font-size:0.65rem;line-height:1.2;margin-top:3px;">' + escapeHtml(cap) + '</div>';
+                                }
+                            } else {
+                                html += '&nbsp;';
+                            }
+                            html += '</td>';
+                        }
+                        html += '</tr>';
+                    }
+                    html += '</tbody></table></div>';
+                    return;
+                }
                 var width = Math.max(80, Math.min(700, parseInt(String(img.width || 320), 10) || 320));
                 html += '<div class="tm-export-preview-report-image" style="margin:8px 0 12px 0;text-align:center;page-break-inside:avoid;">';
                 if (title) {
@@ -5774,6 +5872,12 @@
                                 if (fileInput) { fileInput.click(); }
                                 return;
                             }
+                            var addCollageBtn = e.target.closest('#tmExportAddReportImageCollageBtn');
+                            if (addCollageBtn) {
+                                var collageInput = document.getElementById('tmExportReportImageCollageFile');
+                                if (collageInput) { collageInput.click(); }
+                                return;
+                            }
                             var reportImageMenuBtn = e.target.closest('[data-report-image-menu]');
                             if (reportImageMenuBtn) {
                                 var row = reportImageMenuBtn.closest('[data-report-image-id]');
@@ -5861,6 +5965,7 @@
                                             id: 'img_' + Date.now() + '_' + Math.random().toString(16).slice(2),
                                             name: file.name || 'Imagen',
                                             title: file.name ? file.name.replace(/\.[^.]+$/, '') : 'Imagen',
+                                            layout: 'single',
                                             src: String(reader.result || ''),
                                             placement: 'after_records',
                                             target_group: '',
@@ -5869,6 +5974,47 @@
                                         pending--;
                                         if (pending <= 0) {
                                             e.target.value = '';
+                                            tmExportRenderReportImagesList();
+                                            buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                                        }
+                                    };
+                                    reader.readAsDataURL(file);
+                                });
+                                return;
+                            }
+                            if (e.target && e.target.id === 'tmExportReportImageCollageFile') {
+                                var cfiles = Array.from(e.target.files || []).filter(function (file) {
+                                    return file && /^image\//i.test(String(file.type || ''));
+                                });
+                                if (!cfiles.length) { return; }
+                                var colSel = document.getElementById('tmExportReportCollageColumns');
+                                var colCount = colSel ? parseInt(String(colSel.value || '2'), 10) : 2;
+                                colCount = Math.max(1, Math.min(6, Number.isNaN(colCount) ? 2 : colCount));
+                                var itemsAcc = new Array(cfiles.length);
+                                var done = 0;
+                                var collageId = 'clg_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+                                cfiles.forEach(function (file, idx) {
+                                    var reader = new FileReader();
+                                    reader.onload = function () {
+                                        var cap = file.name ? String(file.name).replace(/\.[^.]+$/, '') : '';
+                                        itemsAcc[idx] = { src: String(reader.result || ''), caption: cap };
+                                        done++;
+                                        if (done >= cfiles.length) {
+                                            e.target.value = '';
+                                            var items = itemsAcc.filter(function (x) { return x && x.src; });
+                                            if (items.length) {
+                                                tmExportGetReportImages().push({
+                                                    id: collageId,
+                                                    name: 'Colección (' + items.length + ')',
+                                                    title: 'Colección de imágenes',
+                                                    layout: 'collage',
+                                                    collage_columns: colCount,
+                                                    items: items,
+                                                    placement: 'after_records',
+                                                    target_group: '',
+                                                    width: 680
+                                                });
+                                            }
                                             tmExportRenderReportImagesList();
                                             buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
                                         }
