@@ -1714,7 +1714,7 @@
                 + '<option value="after_split_group">Al final de tabla separada</option>';
             var isCollage = String(img.layout || '') === 'collage';
             var collageColsOptions = [1, 2, 3, 4, 5, 6].map(function (n) {
-                var sel = (Math.max(1, Math.min(6, parseInt(String(img.collage_columns != null ? img.collage_columns : 2), 10) || 2)) === n ? ' selected' : '';
+                var sel = (Math.max(1, Math.min(6, parseInt(String(img.collage_columns != null ? img.collage_columns : 2), 10) || 2))) === n ? ' selected' : '';
                 return '<option value="' + n + '"' + sel + '>' + n + '</option>';
             }).join('');
             var html = '<div style="display:grid;gap:10px;text-align:left;">'
