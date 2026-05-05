@@ -1536,6 +1536,13 @@
                         '<label class="tm-export-col-field">' +
                         '<span class="tm-export-col-field__lab">Alto (px)</span>' +
                         '<input type="number" min="30" max="300" value="' + String(col.image_height || 80) + '" class="tm-input tm-input--num-compact tm-export-image-height" data-key="' + escapeHtml(col.key) + '">' +
+                        '</label>' +
+                        '<label class="tm-export-col-field tm-export-col-field--stretch" title="En PDF usa el ancho configurado y calcula el alto real de cada imagen">' +
+                        '<span class="tm-export-col-field__lab">Ajuste PDF</span>' +
+                        '<select class="tm-input tm-export-image-fit-mode" data-key="' + escapeHtml(col.key) + '">' +
+                        '<option value="cover"' + (String(col.image_fit_mode || 'cover') !== 'contain' ? ' selected' : '') + '>Recortar a celda</option>' +
+                        '<option value="contain"' + (String(col.image_fit_mode || 'cover') === 'contain' ? ' selected' : '') + '>Ajustar a celda</option>' +
+                        '</select>' +
                         '</label></div>';
                 } else {
                     var approx = col.max_width_chars || 24;
@@ -1934,8 +1941,10 @@
                 if (labelInput && sc.label != null) { labelInput.value = String(sc.label); }
                 var iw = item.querySelector('.tm-export-image-width');
                 var ih = item.querySelector('.tm-export-image-height');
+                var ifm = item.querySelector('.tm-export-image-fit-mode');
                 if (iw && sc.image_width != null) { iw.value = String(sc.image_width); }
                 if (ih && sc.image_height != null) { ih.value = String(sc.image_height); }
+                if (ifm && sc.image_fit_mode != null) { ifm.value = String(sc.image_fit_mode) === 'contain' ? 'contain' : 'cover'; }
                 var winp = item.querySelector('.tm-export-col-width-input');
                 if (winp && sc.max_width_chars != null) {
                     var n = parseInt(sc.max_width_chars, 10);
@@ -3275,6 +3284,7 @@
                 let imageWidth = 120, imageHeight = 80;
                 const w = item.querySelector('.tm-export-image-width');
                 const h = item.querySelector('.tm-export-image-height');
+                const fitModeEl = item.querySelector('.tm-export-image-fit-mode');
                 if (w && h) {
                     imageWidth = parseInt(w.value, 10) || 120;
                     imageHeight = parseInt(h.value, 10) || 80;
@@ -3294,6 +3304,7 @@
                     color: color,
                     imageWidth: imageWidth,
                     imageHeight: imageHeight,
+                    imageFitMode: fitModeEl && fitModeEl.value === 'contain' ? 'contain' : 'cover',
                     group: group,
                     breakdown_answer_fills: fillsObj,
                     breakdown_data_text_color: String(item.dataset.breakdownTextColor || '').trim()
@@ -5453,6 +5464,7 @@
                                     max_width_chars: sc.max_width_chars != null ? sc.max_width_chars : b.max_width_chars,
                                     image_height: sc.image_height != null ? sc.image_height : b.image_height,
                                     image_width: sc.image_width != null ? sc.image_width : b.image_width,
+                                    image_fit_mode: sc.image_fit_mode === 'contain' ? 'contain' : 'cover',
                                     fill_empty_mode: sc.fill_empty_mode || 'none',
                                     fill_empty_value: sc.fill_empty_value != null ? sc.fill_empty_value : '',
                                     content_bold: !!sc.content_bold,
@@ -6334,6 +6346,7 @@
                                     color: colState.color || 'var(--clr-primary)',
                                     image_width: colState.imageWidth || null,
                                     image_height: colState.imageHeight || null,
+                                    image_fit_mode: colState.imageFitMode === 'contain' ? 'contain' : 'cover',
                                     max_width_chars: col.max_width_chars || null,
                                     group: col.group || '',
                                     fill_empty_mode: col.fill_empty_mode || 'none',

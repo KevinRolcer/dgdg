@@ -1418,8 +1418,17 @@
                             if ($extraImagesCount > 0) {
                                 $imageSources = array_slice($imageSources, 0, $maxImagesPerCell);
                             }
-                            $thumbWidth = count($imageSources) > 1 ? 52 : 110;
-                            $thumbHeight = count($imageSources) > 1 ? 52 : 85;
+                            $imageFitMode = ((string) ($col['image_fit_mode'] ?? 'cover')) === 'contain' ? 'contain' : 'cover';
+                            $configuredImageWidth = isset($col['image_width']) && is_numeric($col['image_width']) ? max(40, min(400, (int) $col['image_width'])) : null;
+                            $configuredImageHeight = isset($col['image_height']) && is_numeric($col['image_height']) ? max(30, min(300, (int) $col['image_height'])) : null;
+                            $thumbWidth = $configuredImageWidth ?: (count($imageSources) > 1 ? 52 : 110);
+                            $thumbHeight = $configuredImageHeight ?: (count($imageSources) > 1 ? 52 : 85);
+                            if (count($imageSources) > 1 && $configuredImageWidth === null) {
+                                $thumbWidth = min($thumbWidth, 52);
+                            }
+                            if (count($imageSources) > 1 && $configuredImageHeight === null) {
+                                $thumbHeight = min($thumbHeight, 52);
+                            }
                             $applyBreakdownPdf = ! $isImageType && empty($imageSources) && $imageFallbackLabel === '';
                             $fillsBd = is_array($col['breakdown_answer_fills'] ?? null) ? $col['breakdown_answer_fills'] : [];
                             $bdFillHit = $applyBreakdownPdf ? $breakdownResolveFillMap($fillsBd, (string) $cellText) : null;
@@ -1438,18 +1447,26 @@
                                             $imgSrc = is_array($img) ? (string) ($img['src'] ?? '') : '';
                                             $imgW = is_array($img) && isset($img['w']) && is_numeric($img['w']) ? (int) $img['w'] : 0;
                                             $imgH = is_array($img) && isset($img['h']) && is_numeric($img['h']) ? (int) $img['h'] : 0;
+                                            $containHeight = null;
+                                            if ($imageFitMode === 'contain' && $imgW > 0 && $imgH > 0 && $thumbWidth > 0) {
+                                                $containHeight = max(1, (int) round(($thumbWidth * $imgH) / $imgW));
+                                            }
                                             $containerRatio = ($thumbHeight > 0) ? ($thumbWidth / $thumbHeight) : 1.0;
                                             $imgRatio = ($imgW > 0 && $imgH > 0) ? ($imgW / $imgH) : null;
                                             $fitClass = ($imgRatio !== null && $imgRatio >= $containerRatio) ? 'pdf-thumb-fit-height' : 'pdf-thumb-fit-width';
                                         @endphp
                                         @if($imgSrc !== '')
-                                            <div class="pdf-thumb-box" style="width: {{ $thumbWidth }}px; height: {{ $thumbHeight }}px;">
-                                                <div class="pdf-thumb-inner">
-                                                    <div class="pdf-thumb-inner-cell">
-                                                        <img src="{{ $imgSrc }}" alt="Imagen" class="pdf-thumb-img {{ $fitClass }}">
+                                            @if($imageFitMode === 'contain')
+                                                <img src="{{ $imgSrc }}" alt="Imagen" class="pdf-thumb-img" style="width: {{ $thumbWidth }}px; height: auto; display:inline-block; margin:2px;">
+                                            @else
+                                                <div class="pdf-thumb-box" style="width: {{ $thumbWidth }}px; height: {{ $thumbHeight }}px;">
+                                                    <div class="pdf-thumb-inner">
+                                                        <div class="pdf-thumb-inner-cell">
+                                                            <img src="{{ $imgSrc }}" alt="Imagen" class="pdf-thumb-img {{ $fitClass }}">
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            @endif
                                         @endif
                                     @endforeach
                                 </div>
