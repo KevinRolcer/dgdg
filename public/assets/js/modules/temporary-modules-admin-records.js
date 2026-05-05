@@ -1740,8 +1740,10 @@
                 var sel = (Math.max(1, Math.min(6, parseInt(String(img.collage_columns != null ? img.collage_columns : 2), 10) || 2))) === n ? ' selected' : '';
                 return '<option value="' + n + '"' + sel + '>' + n + '</option>';
             }).join('');
+            var titleFontDefault = Math.max(8, Math.min(24, parseInt(String(img.title_font_size_px != null ? img.title_font_size_px : img.titleFontSizePx != null ? img.titleFontSizePx : 11), 10) || 11));
             var html = '<div style="display:grid;gap:10px;text-align:left;">'
                 + '<label style="display:grid;gap:4px;"><span>Título' + (isCollage ? ' del bloque' : '') + '</span><input id="tmRiTitle" class="swal2-input" style="margin:0;" value="' + escapeHtml(String(img.title || '')) + '"></label>'
+                + '<label style="display:grid;gap:4px;"><span>Tamaño del título (px)</span><input id="tmRiTitleFontPx" type="number" min="8" max="24" step="1" class="swal2-input" style="margin:0;" value="' + escapeHtml(String(titleFontDefault)) + '"></label>'
                 + '<label style="display:grid;gap:4px;"><span>Ubicación</span><select id="tmRiPlacement" class="swal2-input" style="margin:0;">' + placementOptions + '</select></label>'
                 + '<label style="display:grid;gap:4px;"><span>Dato de tabla separada (opcional)</span><input id="tmRiTargetGroup" class="swal2-input" style="margin:0;" placeholder="Ej: Registro CTM" value="' + escapeHtml(String(img.target_group || '')) + '"></label>'
                 + (isCollage
@@ -1765,8 +1767,10 @@
                     },
                     preConfirm: function () {
                         var w = parseInt(String((document.getElementById('tmRiWidth') || {}).value || (isCollage ? '520' : '320')), 10);
+                        var tf = parseInt(String((document.getElementById('tmRiTitleFontPx') || {}).value || '11'), 10);
                         var base = {
                             title: String((document.getElementById('tmRiTitle') || {}).value || '').trim(),
+                            title_font_size_px: Math.max(8, Math.min(24, Number.isNaN(tf) ? 11 : tf)),
                             placement: String((document.getElementById('tmRiPlacement') || {}).value || 'after_records'),
                             target_group: String((document.getElementById('tmRiTargetGroup') || {}).value || '').trim(),
                             width: Math.max(80, Math.min(700, Number.isNaN(w) ? (isCollage ? 520 : 320) : w))
@@ -3461,7 +3465,8 @@
                         items: items,
                         placement: String(img.placement || 'after_records'),
                         target_group: String(img.target_group || ''),
-                        width: Math.max(80, Math.min(700, parseInt(String(img.width != null ? img.width : 520), 10) || 520))
+                        width: Math.max(80, Math.min(700, parseInt(String(img.width != null ? img.width : 520), 10) || 520)),
+                        title_font_size_px: Math.max(8, Math.min(24, parseInt(String(img.title_font_size_px != null ? img.title_font_size_px : img.titleFontSizePx != null ? img.titleFontSizePx : 11), 10) || 11))
                     };
                 }
                 return {
@@ -3472,7 +3477,8 @@
                     src: String(img.src || ''),
                     placement: String(img.placement || 'after_records'),
                     target_group: String(img.target_group || ''),
-                    width: Math.max(80, Math.min(700, parseInt(String(img.width || 320), 10) || 320))
+                    width: Math.max(80, Math.min(700, parseInt(String(img.width || 320), 10) || 320)),
+                    title_font_size_px: Math.max(8, Math.min(24, parseInt(String(img.title_font_size_px != null ? img.title_font_size_px : img.titleFontSizePx != null ? img.titleFontSizePx : 11), 10) || 11))
                 };
             }).filter(function (img) {
                 if (String(img.layout) === 'collage') {
@@ -3804,6 +3810,7 @@
             var html = '';
             selected.forEach(function (img) {
                 var title = String(img.title || img.name || '').trim();
+                var titleFontPx = Math.max(8, Math.min(24, parseInt(String(img.title_font_size_px != null ? img.title_font_size_px : img.titleFontSizePx != null ? img.titleFontSizePx : 11), 10) || 11));
                 if (String(img.layout || '') === 'collage') {
                     var cItems = Array.isArray(img.items) ? img.items : [];
                     var cols = Math.max(1, Math.min(6, parseInt(String(img.collage_columns != null ? img.collage_columns : 2), 10) || 2));
@@ -3812,7 +3819,7 @@
                     html += '<div class="tm-export-preview-report-image tm-export-preview-report-collage" style="max-width:' + cWidth + 'px;margin:4px auto 8px;text-align:center;">';
                     html += '<table style="width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed;margin:0 auto;border:none;">';
                     if (title) {
-                        html += '<thead style="display:table-header-group;"><tr><td colspan="' + cols + '" style="border:none;padding:0 0 4px 0;font-weight:700;text-align:center;font-size:0.85rem;">' + escapeHtml(title) + '</td></tr></thead>';
+                        html += '<thead style="display:table-header-group;"><tr><td colspan="' + cols + '" style="border:none;padding:0 0 4px 0;font-weight:700;text-align:center;font-size:' + titleFontPx + 'px;">' + escapeHtml(title) + '</td></tr></thead>';
                     }
                     html += '<tbody>';
                     var n = cItems.length;
@@ -3838,7 +3845,7 @@
                 var width = Math.max(80, Math.min(700, parseInt(String(img.width || 320), 10) || 320));
                 html += '<div class="tm-export-preview-report-image" style="margin:8px 0 12px 0;text-align:center;page-break-inside:avoid;">';
                 if (title) {
-                    html += '<p style="font-weight:700;margin:0 0 4px 0;">' + escapeHtml(title) + '</p>';
+                    html += '<p style="font-weight:700;margin:0 0 4px 0;font-size:' + titleFontPx + 'px;">' + escapeHtml(title) + '</p>';
                 }
                 html += '<img src="' + escapeHtml(String(img.src || '')) + '" alt="" style="width:' + width + 'px;height:auto;max-width:100%;display:inline-block;">';
                 html += '</div>';
@@ -6007,7 +6014,8 @@
                                             src: String(reader.result || ''),
                                             placement: 'after_records',
                                             target_group: '',
-                                            width: 320
+                                            width: 320,
+                                            title_font_size_px: 11
                                         });
                                         pending--;
                                         if (pending <= 0) {
@@ -6049,7 +6057,8 @@
                                                     items: items,
                                                     placement: 'after_records',
                                                     target_group: '',
-                                                    width: 520
+                                                    width: 520,
+                                                    title_font_size_px: 11
                                                 });
                                             }
                                             tmExportRenderReportImagesList();

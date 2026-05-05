@@ -324,11 +324,12 @@
                 $cols = max(1, min(6, (int) ($image['collage_columns'] ?? 2)));
                 $cWidth = max(80, min(700, (int) ($image['width'] ?? 520)));
                 $imgTitle = trim((string) ($image['title'] ?? ''));
+                $titleFontPx = max(8, min(24, (int) ($image['title_font_size_px'] ?? 11)));
                 $pct = round(100 / $cols, 4);
                 $html .= '<div style="max-width:'.$cWidth.'px;margin:4px auto 8px;text-align:center;">';
                 $html .= '<table class="report-collage-table" style="max-width:'.$cWidth.'px;border-spacing:3px;margin:0 auto;">';
                 if ($imgTitle !== '') {
-                    $html .= '<thead><tr class="report-collage-title-row"><td colspan="'.$cols.'">'.e($imgTitle).'</td></tr></thead>';
+                    $html .= '<thead><tr class="report-collage-title-row"><td colspan="'.$cols.'" style="font-size:'.$titleFontPx.'px;">'.e($imgTitle).'</td></tr></thead>';
                 }
                 $html .= '<tbody>';
                 $nCell = count($validCollage);
@@ -357,10 +358,11 @@
                 continue;
             }
             $imgTitle = trim((string) ($image['title'] ?? ''));
+            $titleFontPx = max(8, min(24, (int) ($image['title_font_size_px'] ?? 11)));
             $width = max(80, min(700, (int) ($image['width'] ?? 320)));
             $html .= '<div style="text-align:center;margin:8px 0 12px 0;page-break-inside:avoid;">';
             if ($imgTitle !== '') {
-                $html .= '<p style="font-weight:bold;margin:0 0 4px 0;">'.e($imgTitle).'</p>';
+                $html .= '<p style="font-weight:bold;margin:0 0 4px 0;font-size:'.$titleFontPx.'px;">'.e($imgTitle).'</p>';
             }
             $html .= '<img src="'.e($src).'" style="width: '.$width.'px; height:auto; display:inline-block;" alt="Imagen">';
             $html .= '</div>';
@@ -462,7 +464,6 @@
         }
         table.report-collage-table .report-collage-title-row td {
             font-weight: bold;
-            font-size: 9px;
             padding: 0 0 3px 0;
             text-align: center;
         }

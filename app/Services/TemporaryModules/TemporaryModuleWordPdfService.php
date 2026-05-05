@@ -460,6 +460,7 @@ class TemporaryModuleWordPdfService
                     $reportImages[] = [
                         'layout' => 'collage',
                         'title' => trim((string) ($imageRaw['title'] ?? '')),
+                        'title_font_size_px' => max(8, min(24, (int) ($imageRaw['title_font_size_px'] ?? ($imageRaw['titleFontSizePx'] ?? 11)))),
                         'placement' => $placement,
                         'target_group' => $targetGroup,
                         'width' => max(80, min(700, (int) ($imageRaw['width'] ?? 520))),
@@ -476,6 +477,7 @@ class TemporaryModuleWordPdfService
                 $reportImages[] = [
                     'layout' => 'single',
                     'title' => trim((string) ($imageRaw['title'] ?? '')),
+                    'title_font_size_px' => max(8, min(24, (int) ($imageRaw['title_font_size_px'] ?? ($imageRaw['titleFontSizePx'] ?? 11)))),
                     'src' => $src,
                     'placement' => $placement,
                     'target_group' => $targetGroup,
@@ -3258,9 +3260,10 @@ class TemporaryModuleWordPdfService
             }
             $title = trim((string) ($image['title'] ?? ''));
             $width = max(80, min(700, (int) ($image['width'] ?? 320)));
+            $titleFontPt = $this->reportImageTitleFontPtForWord($image);
             $section->addTextBreak(1);
             if ($title !== '') {
-                $section->addText($title, ['name' => $fontName, 'bold' => true, 'size' => 11], ['alignment' => Jc::CENTER, 'spaceAfter' => 80]);
+                $section->addText($title, ['name' => $fontName, 'bold' => true, 'size' => $titleFontPt], ['alignment' => Jc::CENTER, 'spaceAfter' => 80]);
             }
             $section->addImage($path, ['width' => $width, 'alignment' => Jc::CENTER]);
             $section->addTextBreak(1);
@@ -3298,10 +3301,11 @@ class TemporaryModuleWordPdfService
         $cellSlotPx = (int) max(48, floor($blockWidth / $cols) - 10);
         $cellWidthPx = (int) max(40, min(120, round($cellSlotPx * 0.92)));
         $title = trim((string) ($image['title'] ?? ''));
+        $titleFontPt = $this->reportImageTitleFontPtForWord($image);
 
         $section->addTextBreak(1);
         if ($title !== '') {
-            $section->addText($title, ['name' => $fontName, 'bold' => true, 'size' => 10], ['alignment' => Jc::CENTER, 'spaceAfter' => 60]);
+            $section->addText($title, ['name' => $fontName, 'bold' => true, 'size' => $titleFontPt], ['alignment' => Jc::CENTER, 'spaceAfter' => 60]);
         }
 
         $table = $section->addTable([
@@ -3332,6 +3336,18 @@ class TemporaryModuleWordPdfService
         $section->addTextBreak(1);
 
         return true;
+    }
+
+    /**
+     * Tamaño del título de imagen/colección del informe para Word (puntos).
+     *
+     * @param  array<string, mixed>  $image
+     */
+    private function reportImageTitleFontPtForWord(array $image): int
+    {
+        $px = max(8, min(24, (int) ($image['title_font_size_px'] ?? ($image['titleFontSizePx'] ?? 11))));
+
+        return max(8, min(18, (int) round($px * 0.75)));
     }
 
     private function writeDataUriImageToTemporaryFile(string $dataUri): ?string
