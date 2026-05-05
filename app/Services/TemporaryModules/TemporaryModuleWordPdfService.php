@@ -422,6 +422,7 @@ class TemporaryModuleWordPdfService
         if (! $splitTableByFieldAllowed) {
             $splitTableByField = '';
         }
+        $splitTableRestartItemNumber = !empty($exportConfig['split_table_restart_item_number'] ?? false);
         $reportImageEnabled = !empty($exportConfig['include_report_image']);
         $reportImages = [];
         if ($reportImageEnabled && is_array($exportConfig['report_images'] ?? null)) {
@@ -1546,6 +1547,7 @@ class TemporaryModuleWordPdfService
             'columnWidthPercents' => $columnWidthPercents,
             'entries' => $entries,
             'splitTableByField' => $splitTableByField,
+            'splitTableRestartItemNumber' => $splitTableRestartItemNumber,
             'reportImageEnabled' => $reportImageEnabled,
             'reportImages' => $reportImagesForPdf,
             'microrregionMeta' => $microrregionMeta,

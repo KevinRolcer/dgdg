@@ -1616,6 +1616,16 @@
             if (cur && Array.from(sel.options).some(function (o) { return o.value === cur; })) {
                 sel.value = cur;
             }
+            tmExportSyncSplitTableItemNumberPanel();
+        }
+
+        function tmExportSyncSplitTableItemNumberPanel() {
+            var sel = document.getElementById('tmExportSplitTableByField');
+            var wrap = document.getElementById('tmExportSplitTableItemNumberWrap');
+            if (!wrap || !sel) {
+                return;
+            }
+            wrap.hidden = !String(sel.value || '').trim();
         }
 
         function tmExportSyncRowHighlightPanel() {
@@ -3306,7 +3316,7 @@
             var modal = document.getElementById('tmExportPersonalizeModal');
             var container = modal ? modal.querySelector('#tmExportPersonalizeColumns') : document.getElementById('tmExportPersonalizeColumns');
             if (!container) {
-                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sectionLabel: 'Desglose', sectionLabelAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumShowItem: true, sumItemLabel: '#', sumShowDelegation: true, sumDelegationLabel: 'Delegación', sumShowCabecera: true, sumCabeceraLabel: 'Cabecera', sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTotalLabel: 'Total de registros', countTableCellWidth: 12, countTableHeaderFontPx: 8, countTableCellFontPx: 10, recordsCellFontPx: 12, recordsHeaderFontPx: 12, recordsGroupHeaderFontPx: 12, sumCellFontPx: 12, sumHeaderFontPx: 12, sumGroupHeaderFontPx: 12, totalsCellFontPx: 12, totalsHeaderFontPx: 12, totalsGroupHeaderFontPx: 12, cellFontPx: 12, headerFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', splitTableByField: '', includeReportImage: false, reportImages: [], includeSumTable: false, sumGroupBy: 'microrregion', includeCalculatedColumns: false, calculatedColumns: [], includeOperationsColumn: false, operationsLabel: 'Operaciones', operationsReferenceField: '', operationsIncludePercent: true, operationsFields: [], sumMetrics: [], sumFormulas: [] };
+                return { title: '', titleAlign: 'center', countTableAlign: 'left', dataTableAlign: 'left', sectionLabel: 'Desglose', sectionLabelAlign: 'left', sumTableAlign: 'left', sumTitle: 'Sumatoria', sumTitleCase: 'normal', sumTitleAlign: 'center', sumTitleFontPx: 14, sumShowItem: true, sumItemLabel: '#', sumShowDelegation: true, sumDelegationLabel: 'Delegación', sumShowCabecera: true, sumCabeceraLabel: 'Cabecera', sumGroupColor: 'var(--clr-primary)', sumIncludeTotalsRow: false, includeTotalsTable: false, totalsTableTitle: 'Totales', totalsTableAlign: 'left', sumTotalsBold: true, sumTotalsTextColor: 'var(--clr-primary)', titleUppercase: false, headersUppercase: false, columns: [], sampleRow: {}, countTableColors: {}, countTotalLabel: 'Total de registros', countTableCellWidth: 12, countTableHeaderFontPx: 8, countTableCellFontPx: 10, recordsCellFontPx: 12, recordsHeaderFontPx: 12, recordsGroupHeaderFontPx: 12, sumCellFontPx: 12, sumHeaderFontPx: 12, sumGroupHeaderFontPx: 12, totalsCellFontPx: 12, totalsHeaderFontPx: 12, totalsGroupHeaderFontPx: 12, cellFontPx: 12, headerFontPx: 12, titleFontPx: 18, docMarginPreset: 'compact', paperSize: 'letter', groups: [], microrregionSort: 'asc', splitTableByField: '', splitTableRestartItemNumber: false, includeReportImage: false, reportImages: [], includeSumTable: false, sumGroupBy: 'microrregion', includeCalculatedColumns: false, calculatedColumns: [], includeOperationsColumn: false, operationsLabel: 'Operaciones', operationsReferenceField: '', operationsIncludePercent: true, operationsFields: [], sumMetrics: [], sumFormulas: [] };
             }
             const titleEl = modal ? modal.querySelector('#tmExportPersonalizeTitle') : document.getElementById('tmExportPersonalizeTitle');
             const titleUppercaseEl = modal ? modal.querySelector('#tmExportTitleUppercase') : document.getElementById('tmExportTitleUppercase');
@@ -3316,6 +3326,7 @@
             const headerFontEl = modal ? modal.querySelector('#tmExportHeaderFontSize') : document.getElementById('tmExportHeaderFontSize');
             const microrregionSortEl = modal ? modal.querySelector('#tmExportMicrorregionSort') : document.getElementById('tmExportMicrorregionSort');
             const splitTableByFieldEl = modal ? modal.querySelector('#tmExportSplitTableByField') : document.getElementById('tmExportSplitTableByField');
+            const splitItemRestartEl = modal ? modal.querySelector('#tmExportSplitItemNumberRestart') : document.getElementById('tmExportSplitItemNumberRestart');
             const includeReportImageEl = modal ? modal.querySelector('#tmExportIncludeReportImage') : document.getElementById('tmExportIncludeReportImage');
             const includeCalculatedColumnsEl = modal ? modal.querySelector('#tmExportIncludeCalculatedColumns') : document.getElementById('tmExportIncludeCalculatedColumns');
             const calculatedColumnsListEl = modal ? modal.querySelector('#tmExportCalculatedColumnsList') : document.getElementById('tmExportCalculatedColumnsList');
@@ -3564,6 +3575,7 @@
                 groups: groups,
                 microrregionSort: (microrregionSortEl && microrregionSortEl.value === 'desc') ? 'desc' : 'asc',
                 splitTableByField: splitTableByFieldEl ? String(splitTableByFieldEl.value || '').trim() : '',
+                splitTableRestartItemNumber: !!(splitItemRestartEl && splitItemRestartEl.checked),
                 includeReportImage: !!(includeReportImageEl && includeReportImageEl.checked),
                 reportImages: reportImages,
                 includeSumTable: !!(includeSumTableEl && includeSumTableEl.checked),
@@ -4425,7 +4437,6 @@
                 var lastSplitGroup = null;
                 entries.forEach(function (entry) {
                     var mrLabel = (meta[entry.microrregion_id] && meta[entry.microrregion_id].label) ? meta[entry.microrregion_id].label : 'Sin microrregión';
-                    var rowItemNum = itemNum;
                     if (splitCol) {
                         var rawSplitVal = entry.data && entry.data[splitKey];
                         rawSplitVal = tmExportApplyEmptyFillForColumn(splitCol, rawSplitVal);
@@ -4441,8 +4452,12 @@
                             html += '<tr class="tm-export-preview-row tm-export-preview-data"><td class="tm-export-preview-cell tm-export-preview-data-cell" colspan="' + String(effectiveColumns.length) + '" style="background:#eef2f7;font-weight:700;text-align:left;font-size:' + recordsHeaderFontPx + 'px;">' + escapeHtml(splitLabel + ': ' + splitVal) + '</td></tr>';
                             html += '<tr><td colspan="' + String(effectiveColumns.length) + '">' + tmExportRenderReportImagePreview(state, 'before_split_group', splitVal) + '</td></tr>';
                             lastSplitGroup = splitGroupKey;
+                            if (state.splitTableRestartItemNumber) {
+                                itemNum = 1;
+                            }
                         }
                     }
+                    var rowItemNum = itemNum++;
                     var rowRh = tmExportPreviewRowHighlightParts(state, entry, rowItemNum, mrLabel, meta, effectiveColumns, headersUppercase);
                     var rowBgImgStyle = rowRh.rowBg ? ('background-color:' + escapeHtml(rowRh.rowBg) + ' !important;') : '';
                     html += '<tr class="tm-export-preview-row tm-export-preview-data">';
@@ -4458,7 +4473,7 @@
                             var val = '';
                             var valueHtml = '';
                             if (col.key === 'item') {
-                                val = String(itemNum++);
+                                val = String(rowItemNum);
                                 valueHtml = escapeHtml(val);
                             } else if (col.key === 'microrregion') {
                                 val = mrLabel;
@@ -5444,6 +5459,18 @@
                         if (mrSortEl) { mrSortEl.value = draftCfg.microrregion_sort === 'desc' ? 'desc' : (data.microrregion_sort || 'asc'); }
                         var splitTableByFieldEl = document.getElementById('tmExportSplitTableByField');
                         if (splitTableByFieldEl) { splitTableByFieldEl.value = draftCfg.split_table_by_field || ''; }
+                        var splitItemContDraft = document.getElementById('tmExportSplitItemNumberContinuous');
+                        var splitItemRestartDraft = document.getElementById('tmExportSplitItemNumberRestart');
+                        if (splitItemContDraft && splitItemRestartDraft) {
+                            if (draftCfg.split_table_restart_item_number || draftCfg.splitTableRestartItemNumber) {
+                                splitItemRestartDraft.checked = true;
+                                splitItemContDraft.checked = false;
+                            } else {
+                                splitItemContDraft.checked = true;
+                                splitItemRestartDraft.checked = false;
+                            }
+                        }
+                        tmExportSyncSplitTableItemNumberPanel();
                         var reportImgEn = document.getElementById('tmExportIncludeReportImage');
                         var reportImgWrap = document.getElementById('tmExportReportImageWrap');
                         if (reportImgEn) {
@@ -5722,6 +5749,13 @@
                         if (mrSortDefaultEl) { mrSortDefaultEl.value = data.microrregion_sort || 'asc'; }
                         var splitTableDefaultEl = document.getElementById('tmExportSplitTableByField');
                         if (splitTableDefaultEl) { splitTableDefaultEl.value = ''; }
+                        var splitItemContDef = document.getElementById('tmExportSplitItemNumberContinuous');
+                        var splitItemRestartDef = document.getElementById('tmExportSplitItemNumberRestart');
+                        if (splitItemContDef && splitItemRestartDef) {
+                            splitItemContDef.checked = true;
+                            splitItemRestartDef.checked = false;
+                        }
+                        tmExportSyncSplitTableItemNumberPanel();
                         var reportImgEnDef = document.getElementById('tmExportIncludeReportImage');
                         var reportImgWrapDef = document.getElementById('tmExportReportImageWrap');
                         if (reportImgEnDef) { reportImgEnDef.checked = false; }
@@ -6369,8 +6403,17 @@
                     }
                     var splitTableByFieldEl = document.getElementById('tmExportSplitTableByField');
                     if (splitTableByFieldEl) {
-                        splitTableByFieldEl.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        splitTableByFieldEl.addEventListener('change', function () {
+                            tmExportSyncSplitTableItemNumberPanel();
+                            buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl);
+                        });
                     }
+                    ['tmExportSplitItemNumberContinuous', 'tmExportSplitItemNumberRestart'].forEach(function (rid) {
+                        var rel = document.getElementById(rid);
+                        if (rel) {
+                            rel.addEventListener('change', function () { buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl); });
+                        }
+                    });
                     ['tmExportIncludeReportImage'].forEach(function (id) {
                         var el = document.getElementById(id);
                         if (el) {
@@ -6559,6 +6602,7 @@
                             row_highlight_text_color: String(state.rowHighlightTextColor || '').trim(),
                             microrregion_sort: state.microrregionSort || 'asc',
                             split_table_by_field: state.splitTableByField || '',
+                            split_table_restart_item_number: !!state.splitTableRestartItemNumber,
                             include_report_image: !!state.includeReportImage,
                             report_images: Array.isArray(state.reportImages) ? state.reportImages : [],
                             groups: state.groups || [],

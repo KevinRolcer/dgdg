@@ -1218,6 +1218,7 @@
             'row_styles' => $rowHighlightStyles,
         ];
     }
+    $splitRestartItemNumber = !empty($splitTableRestartItemNumber ?? false);
     $columnWidthPercents = $columnWidthPercents ?? [];
     if ($nCols > 0 && (count($columnWidthPercents) !== $nCols)) {
         $columnWidthPercents = array_fill(0, $nCols, 100 / $nCols);
@@ -1243,6 +1244,9 @@
     @foreach ($dataTableGroups as $dataGroupIndex => $dataGroup)
         @php
             $tmIsLastSplitDataGroup = ($dataGroupIndex === count($dataTableGroups) - 1);
+            if ($splitRestartItemNumber && (($dataGroup['label'] ?? '') !== '')) {
+                $itemNumber = 1;
+            }
         @endphp
         @if (($dataGroup['label'] ?? '') !== '')
             <p style="font-weight: bold; margin: {{ $dataGroupIndex > 0 ? '0' : '8px' }} 0 4px 0; padding-top: {{ $dataGroupIndex > 0 ? '4px' : '0' }}; page-break-before: {{ $dataGroupIndex > 0 ? 'always' : 'auto' }}; break-before: {{ $dataGroupIndex > 0 ? 'page' : 'auto' }}; text-align: {{ $sectionLabelAlign }};">{{ $dataGroup['label'] }}</p>

@@ -292,6 +292,18 @@
                             <option value="">Sin separar</option>
                         </select>
                         <p class="tm-analysis-hint" style="margin-top:6px;">Crea una tabla por cada valor del campo seleccionado y empieza cada bloque en una nueva hoja al exportar.</p>
+                        <div id="tmExportSplitTableItemNumberWrap" class="tm-export-personalize-field" hidden style="margin-top:10px;">
+                            <span style="display:block;margin-bottom:6px;font-weight:600;">Numeración # en tabla de registros</span>
+                            <label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;cursor:pointer;">
+                                <input type="radio" name="tm_export_split_item_number_mode" id="tmExportSplitItemNumberContinuous" value="continuous" checked>
+                                <span>Continua en todo el listado (1…N total)</span>
+                            </label>
+                            <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;">
+                                <input type="radio" name="tm_export_split_item_number_mode" id="tmExportSplitItemNumberRestart" value="restart">
+                                <span>Reinicia en cada tabla separada (1…n por bloque)</span>
+                            </label>
+                            <p class="tm-analysis-hint" style="margin-top:4px;margin-bottom:0;">Aplica cuando exportas en PDF con tablas separadas. Word y Excel siguen un solo bloque de registros.</p>
+                        </div>
                     </div>
                     <div class="tm-export-personalize-field">
                         <label class="tm-export-count-table-toggle">
