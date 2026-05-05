@@ -538,7 +538,7 @@ class TemporaryModuleWordPdfService
 
         if ($format === 'word') {
             $wordFileName = $this->buildStandardDocumentName($temporaryModule, 'docx');
-            $fullPath = $exportDir.'/'.$wordFileName;
+            [$wordFileName, $fullPath] = $this->resolveAvailableExportPath($exportDir, $wordFileName);
 
             $phpWord = new \PhpOffice\PhpWord\PhpWord();
             $phpWord->setDefaultFontName($exportFontName);
@@ -1415,7 +1415,7 @@ class TemporaryModuleWordPdfService
 
         // PDF
         $pdfFileName = $this->buildStandardDocumentName($temporaryModule, 'pdf');
-        $fullPdfPath = $exportDir.'/'.$pdfFileName;
+        [$pdfFileName, $fullPdfPath] = $this->resolveAvailableExportPath($exportDir, $pdfFileName);
 
         $fechaCorteStr = now()->format('d/m/Y H:i');
 
@@ -1531,9 +1531,14 @@ class TemporaryModuleWordPdfService
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper($paperSize, $orientationConfig === 'landscape' ? 'landscape' : 'portrait');
         $dompdf->render();
-        $bytesWritten = @file_put_contents($fullPdfPath, $dompdf->output());
+        error_clear_last();
+        $bytesWritten = @file_put_contents($fullPdfPath, $dompdf->output(), LOCK_EX);
         if ($bytesWritten === false || ! is_file($fullPdfPath)) {
-            throw new \RuntimeException('No se pudo guardar el PDF exportado en: '.$fullPdfPath);
+            $lastError = error_get_last();
+            $reason = is_array($lastError) && isset($lastError['message'])
+                ? ' Detalle: '.$lastError['message']
+                : '';
+            throw new \RuntimeException('No se pudo guardar el PDF exportado en: '.$fullPdfPath.$reason);
         }
 
         return [
@@ -2772,6 +2777,82 @@ class TemporaryModuleWordPdfService
         return 'data:'.$mime.';base64,'.base64_encode($binary);
     }
 
+    /**
+     * Dompdf en hosting compartido puede fallar al resolver rutas locales dentro de
+     * img src por chroot/open_basedir. Para PDF usamos miniaturas embebidas.
+     *
+     * @return array{src: string, w: int|null, h: int|null}|null
+     */
+    private function buildPdfImagePayloadFromPath(string $path): ?array
+    {
+        if (! is_file($path) || ! is_readable($path)) {
+            return null;
+        }
+
+        $binary = @file_get_contents($path);
+        if (! is_string($binary) || $binary === '') {
+            return null;
+        }
+
+        return $this->buildPdfImagePayloadFromBinary($binary);
+    }
+
+    /**
+     * @return array{src: string, w: int|null, h: int|null}|null
+     */
+    private function buildPdfImagePayloadFromBinary(string $binary): ?array
+    {
+        $dims = @getimagesizefromstring($binary) ?: null;
+        if (! is_array($dims)) {
+            return null;
+        }
+
+        $width = isset($dims[0]) ? (int) $dims[0] : null;
+        $height = isset($dims[1]) ? (int) $dims[1] : null;
+        $mime = strtolower((string) ($dims['mime'] ?? ''));
+        if (! str_starts_with($mime, 'image/')) {
+            return null;
+        }
+
+        $dataUri = null;
+        if (function_exists('imagecreatefromstring') && function_exists('imagecreatetruecolor') && function_exists('imagejpeg')) {
+            $source = @imagecreatefromstring($binary);
+            if ($source !== false) {
+                $srcWidth = imagesx($source);
+                $srcHeight = imagesy($source);
+                $maxEdge = 900;
+                $scale = min(1, $maxEdge / max(1, $srcWidth), $maxEdge / max(1, $srcHeight));
+                $targetWidth = max(1, (int) round($srcWidth * $scale));
+                $targetHeight = max(1, (int) round($srcHeight * $scale));
+                $target = imagecreatetruecolor($targetWidth, $targetHeight);
+                if ($target !== false) {
+                    $white = imagecolorallocate($target, 255, 255, 255);
+                    imagefilledrectangle($target, 0, 0, $targetWidth, $targetHeight, $white);
+                    imagecopyresampled($target, $source, 0, 0, 0, 0, $targetWidth, $targetHeight, $srcWidth, $srcHeight);
+
+                    ob_start();
+                    imagejpeg($target, null, 72);
+                    $thumbBinary = ob_get_clean();
+                    imagedestroy($target);
+
+                    if (is_string($thumbBinary) && $thumbBinary !== '') {
+                        $dataUri = 'data:image/jpeg;base64,'.base64_encode($thumbBinary);
+                        $width = $targetWidth;
+                        $height = $targetHeight;
+                    }
+                }
+
+                imagedestroy($source);
+            }
+        }
+
+        if ($dataUri === null) {
+            $dataUri = 'data:'.$mime.';base64,'.base64_encode($binary);
+        }
+
+        return ['src' => $dataUri, 'w' => $width, 'h' => $height];
+    }
+
     private function normalizeCellFontSizePx(mixed $value): int
     {
         if ($value === null || $value === '') {
@@ -2983,8 +3064,7 @@ class TemporaryModuleWordPdfService
                                     $dims = @getimagesizefromstring($binary) ?: null;
                                     $width = is_array($dims) && isset($dims[0]) ? (int) $dims[0] : null;
                                     $height = is_array($dims) && isset($dims[1]) ? (int) $dims[1] : null;
-                                    // Optimización: Usar ruta física en vez de Base64 para ahorrar RAM
-                                    $payload = ['src' => $normalizedLocalFromUrl, 'w' => $width, 'h' => $height];
+                                    $payload = $this->buildPdfImagePayloadFromPath($normalizedLocalFromUrl);
                                     $payloadByFullPath[$normalizedLocalFromUrl] = $payload;
                                 }
                             }
@@ -3007,7 +3087,7 @@ class TemporaryModuleWordPdfService
                                 $dims = @getimagesize($normalizedDownloaded) ?: null;
                                 $width = is_array($dims) && isset($dims[0]) ? (int) $dims[0] : null;
                                 $height = is_array($dims) && isset($dims[1]) ? (int) $dims[1] : null;
-                                $payload = ['src' => $normalizedDownloaded, 'w' => $width, 'h' => $height];
+                                $payload = $this->buildPdfImagePayloadFromPath($normalizedDownloaded);
                                 $payloadByFullPath[$normalizedDownloaded] = $payload;
                             }
 
@@ -3043,7 +3123,10 @@ class TemporaryModuleWordPdfService
                         $dims = @getimagesize($fullPath) ?: null;
                         $width = is_array($dims) && isset($dims[0]) ? (int) $dims[0] : null;
                         $height = is_array($dims) && isset($dims[1]) ? (int) $dims[1] : null;
-                        $payload = ['src' => $normalizedPath, 'w' => $width, 'h' => $height];
+                        $payload = $this->buildPdfImagePayloadFromPath($normalizedPath);
+                        if ($payload === null) {
+                            continue;
+                        }
                         $payloadByFullPath[$normalizedPath] = $payload;
                     }
 
@@ -3130,6 +3213,40 @@ class TemporaryModuleWordPdfService
         if (! is_writable($exportDir)) {
             throw new \RuntimeException('El directorio de exportación no tiene permisos de escritura: '.$exportDir);
         }
+    }
+
+    /**
+     * Evita colisiones cuando dos exports del mismo módulo se generan el mismo día o
+     * cuando un archivo existente quedó con permisos que impiden sobrescribirlo.
+     *
+     * @return array{0: string, 1: string} [fileName, absolutePath]
+     */
+    private function resolveAvailableExportPath(string $exportDir, string $fileName): array
+    {
+        $baseName = pathinfo($fileName, PATHINFO_FILENAME);
+        $extension = strtolower((string) pathinfo($fileName, PATHINFO_EXTENSION));
+        $extensionSuffix = $extension !== '' ? '.'.$extension : '';
+
+        $candidateName = $fileName;
+        $candidatePath = $exportDir.'/'.$candidateName;
+        if (! file_exists($candidatePath)) {
+            return [$candidateName, $candidatePath];
+        }
+
+        $stamp = now()->format('His');
+        for ($i = 1; $i <= 50; $i++) {
+            $suffix = $i === 1 ? $stamp : $stamp.'-'.$i;
+            $candidateName = $baseName.'-'.$suffix.$extensionSuffix;
+            $candidatePath = $exportDir.'/'.$candidateName;
+
+            if (! file_exists($candidatePath)) {
+                return [$candidateName, $candidatePath];
+            }
+        }
+
+        $candidateName = $baseName.'-'.$stamp.'-'.Str::random(8).$extensionSuffix;
+
+        return [$candidateName, $exportDir.'/'.$candidateName];
     }
 
     /**

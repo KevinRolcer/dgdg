@@ -1511,11 +1511,18 @@ class TemporaryModuleController extends Controller
         $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
 
         $count = $temporaryModule->entries()
-            ->when(
-                $microrregionIdsUsuario !== [],
-                fn ($q) => $q->whereIn('microrregion_id', $microrregionIdsUsuario),
-                fn ($q) => $q->whereRaw('1 = 0')
-            )
+            ->where(function ($q) use ($microrregionIdsUsuario, $user): void {
+                if ($microrregionIdsUsuario !== []) {
+                    $q->whereIn('microrregion_id', $microrregionIdsUsuario);
+                } else {
+                    $q->whereRaw('1 = 0');
+                }
+
+                $q->orWhere(function ($ownQuery) use ($user): void {
+                    $ownQuery->where('user_id', (int) $user->id)
+                        ->whereNull('microrregion_id');
+                });
+            })
             ->count();
 
         return response()->json(['my_entries_count' => $count]);
