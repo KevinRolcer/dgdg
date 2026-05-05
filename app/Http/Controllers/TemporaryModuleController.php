@@ -3100,7 +3100,8 @@ class TemporaryModuleController extends Controller
             return response()->json(['success' => false, 'message' => 'Configuración no válida.'], 422);
         }
 
-        if (strlen($encoded) > 1_200_000) {
+        /* Incluye data URI de imágenes del informe; 1,2 MB era insuficiente. */
+        if (strlen($encoded) > 10_485_760) {
             return response()->json(['success' => false, 'message' => 'La configuración es demasiado grande.'], 422);
         }
 

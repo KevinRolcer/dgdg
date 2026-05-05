@@ -1313,14 +1313,14 @@
                     }
                     if (res.isDenied) {
                         var saveRes = typeof persistFn === 'function' ? persistFn(currentCfg) : null;
-                        var localOk = !!(saveRes && saveRes.ok);
+                        var localOk = !!(saveRes && saveRes.localPersisted);
                         var eu = personalizeModal._exportUrl || '';
                         var sc = personalizeModal._swalChoice || 'single';
-                        if (!localOk) {
+                        if (!saveRes || !saveRes.ok || !eu) {
                             Swal.fire({
                                 icon: 'error',
                                 title: 'No se pudo guardar',
-                                text: 'No fue posible guardar la configuración en este navegador.',
+                                text: 'No fue posible preparar la configuración para guardar.',
                                 toast: true,
                                 position: 'top-end',
                                 timer: 2400,
@@ -1332,12 +1332,15 @@
                         tmSaveUserExportDraft(eu, { v: 1, swal_choice: sc, cfg: currentCfg }).then(function (serverOk) {
                             closePersonalizeModalImmediate();
                             if (typeof Swal !== 'undefined') {
+                                var anyOk = !!(serverOk || localOk);
                                 Swal.fire({
-                                    icon: serverOk ? 'success' : 'warning',
-                                    title: serverOk ? 'Configuración guardada' : 'Guardado parcial',
+                                    icon: anyOk ? (serverOk ? 'success' : 'warning') : 'error',
+                                    title: serverOk ? 'Configuración guardada' : (localOk ? 'Guardado solo en este navegador' : 'No se pudo guardar'),
                                     text: serverOk
                                         ? 'Se guardó en tu cuenta y se cerró el editor.'
-                                        : 'Se guardó en este navegador; no se pudo sincronizar con tu cuenta.',
+                                        : (localOk
+                                            ? 'No se pudo sincronizar con tu cuenta; hay copia en este navegador si cabe.'
+                                            : 'Ni el servidor ni el almacenamiento local guardaron la configuración.'),
                                     toast: true,
                                     position: 'top-end',
                                     timer: 2600,
@@ -5433,11 +5436,14 @@
                         if (splitTableByFieldEl) { splitTableByFieldEl.value = draftCfg.split_table_by_field || ''; }
                         var reportImgEn = document.getElementById('tmExportIncludeReportImage');
                         var reportImgWrap = document.getElementById('tmExportReportImageWrap');
-                        if (reportImgEn) { reportImgEn.checked = !!draftCfg.include_report_image; }
+                        if (reportImgEn) {
+                            reportImgEn.checked = !!(draftCfg.include_report_image || draftCfg.includeReportImage);
+                        }
                         if (reportImgWrap) { reportImgWrap.hidden = !(reportImgEn && reportImgEn.checked); }
                         if (personalizeModal) {
-                            personalizeModal._reportImages = Array.isArray(draftCfg.report_images)
-                                ? draftCfg.report_images.filter(function (img) { return img && img.src; })
+                            var imgsFromDraft = draftCfg.report_images || draftCfg.reportImages;
+                            personalizeModal._reportImages = Array.isArray(imgsFromDraft)
+                                ? imgsFromDraft.filter(function (img) { return img && img.src; })
                                 : [];
                         }
                         var rowHlEnDraft = document.getElementById('tmExportRowHighlightEnabled');
@@ -6595,7 +6601,10 @@
                         }
                     }
 
-                    function showSaveConfigFeedback(hasChanges, savedOk) {
+                    function showSaveConfigFeedback(hasChanges, savedOk, serverSynced) {
+                        if (serverSynced === undefined) {
+                            serverSynced = savedOk;
+                        }
                         if (typeof Swal !== 'undefined') {
                             Swal.fire({
                                 icon: savedOk ? (hasChanges ? 'success' : 'info') : 'error',
@@ -6604,9 +6613,13 @@
                                     : 'No se pudo guardar',
                                 text: savedOk
                                     ? (hasChanges
-                                        ? 'Se guardó en tu cuenta y en este navegador; podrás usarla en cualquier dispositivo al iniciar sesión.'
+                                        ? (serverSynced
+                                            ? 'Se guardó en tu cuenta y en este navegador; podrás usarla en cualquier dispositivo al iniciar sesión.'
+                                            : 'Se guardó solo en este navegador (p. ej. cuota del almacenamiento). No se sincronizó la copia en la cuenta.')
                                         : 'La configuración actual ya estaba guardada en tu cuenta.')
-                                    : 'No fue posible guardar en el servidor. Comprueba la conexión o vuelve a intentar (sigue una copia en este navegador si cabe).',
+                                    : (!serverSynced && hasChanges
+                                        ? 'No fue posible guardar en la cuenta ni en este navegador para esta sesión.'
+                                        : 'No fue posible guardar en el servidor. Comprueba la conexión o vuelve a intentar (sigue una copia en este navegador si cabe).'),
                                 toast: true,
                                 position: 'top-end',
                                 timer: 2200,
@@ -6623,24 +6636,26 @@
                     }
 
                     function persistExportDraft(cfg) {
-                        if (!exportUrl) { return { ok: false, changed: false }; }
+                        if (!exportUrl) { return { ok: false, changed: false, localPersisted: false }; }
                         var payloadCfg = cfg || collectPersonalizeCfgObject();
                         var swalChoice = personalizeModal._swalChoice || 'single';
                         var previous = readSavedExportDraft();
                         var hadChanges = !previous || !isSameExportCfg(previous.cfg, payloadCfg) || previous.swal_choice !== swalChoice;
+                        var localPersisted = false;
                         try {
                             localStorage.setItem(tmExportDraftStorageKey(exportUrl), JSON.stringify({ v: 1, swal_choice: swalChoice, cfg: payloadCfg, savedAt: Date.now() }));
-                            /* Evita que al cerrar (p. ej. tras generar reporte) se compare contra el estado inicial del modal. */
-                            if (personalizeModal) {
-                                try {
-                                    personalizeModal._openCfgSnapshot = JSON.stringify(payloadCfg);
-                                    personalizeModal._openSwalChoice = swalChoice;
-                                } catch (eSnap) { /* ignore */ }
-                            }
-                            return { ok: true, changed: hadChanges };
+                            localPersisted = true;
                         } catch (eSave) {
-                            return { ok: false, changed: hadChanges };
+                            /* Cuota de localStorage o JSON enorme: la cuenta puede guardar igual vía PUT. */
                         }
+                        /* Evita que al cerrar (p. ej. tras generar reporte) se compare contra el estado inicial del modal. */
+                        if (personalizeModal) {
+                            try {
+                                personalizeModal._openCfgSnapshot = JSON.stringify(payloadCfg);
+                                personalizeModal._openSwalChoice = swalChoice;
+                            } catch (eSnap) { /* ignore */ }
+                        }
+                        return { ok: true, changed: hadChanges, localPersisted: localPersisted };
                     }
 
                     function applyExport(format, mode) {
@@ -6675,15 +6690,16 @@
                     [saveCfgTopBtn, saveCfgBtn].forEach(function (btn) {
                         if (!btn || !exportUrl) { return; }
                         btn.onclick = function () {
-                            var result = persistExportDraft();
+                            var payloadCfg = collectPersonalizeCfgObject();
+                            var result = persistExportDraft(payloadCfg);
                             if (!result || !result.ok) {
                                 showSaveConfigFeedback(!!(result && result.changed), false);
                                 return;
                             }
-                            var payloadCfg = collectPersonalizeCfgObject();
                             var swalChoice = personalizeModal._swalChoice || 'single';
                             tmSaveUserExportDraft(exportUrl, { v: 1, swal_choice: swalChoice, cfg: payloadCfg }).then(function (serverOk) {
-                                showSaveConfigFeedback(!!(result && result.changed), serverOk);
+                                var savedOk = !!serverOk || result.localPersisted === true;
+                                showSaveConfigFeedback(!!result.changed, savedOk, !!serverOk);
                             });
                         };
                     });

@@ -1485,6 +1485,10 @@ class TemporaryModuleWordPdfService
             ? $this->buildPdfImageDataByPath($entries, $columns, $fieldTypesByKey)
             : [];
 
+        $reportImagesForPdf = $reportImageEnabled
+            ? $this->normalizeReportImagesPayloadsForDompdf($reportImages)
+            : $reportImages;
+
         $html = view('temporary_modules.admin.partials.export_pdf_table', [
             'title' => $title,
             'titleAlign' => $titleAlign,
@@ -1533,7 +1537,7 @@ class TemporaryModuleWordPdfService
             'entries' => $entries,
             'splitTableByField' => $splitTableByField,
             'reportImageEnabled' => $reportImageEnabled,
-            'reportImages' => $reportImages,
+            'reportImages' => $reportImagesForPdf,
             'microrregionMeta' => $microrregionMeta,
             'stretch' => $stretch,
             'countTable' => $countTable,
@@ -2908,6 +2912,41 @@ class TemporaryModuleWordPdfService
         }
 
         return ['src' => $dataUri, 'w' => $width, 'h' => $height];
+    }
+
+    /**
+     * Las imágenes subidas llegan como data URI completas (alta resolución). Dompdf
+     * suele no pintarlas; reutilizamos la misma ruta JPEG reducida que las columnas imagen.
+     *
+     * @param  list<array<string, mixed>>  $reportImages
+     * @return list<array<string, mixed>>
+     */
+    private function normalizeReportImagesPayloadsForDompdf(array $reportImages): array
+    {
+        $out = [];
+        foreach ($reportImages as $image) {
+            if (! is_array($image)) {
+                continue;
+            }
+            $src = trim((string) ($image['src'] ?? ''));
+            if ($src === '') {
+                continue;
+            }
+            $next = $image;
+            if (preg_match('/^data:image\/([a-zA-Z0-9.+-]+);base64,(.+)$/s', $src, $matches)) {
+                $b64 = preg_replace('/\s+/', '', (string) $matches[2]) ?? '';
+                $binary = base64_decode($b64, true);
+                if (is_string($binary) && $binary !== '') {
+                    $payload = $this->buildPdfImagePayloadFromBinary($binary);
+                    if (is_array($payload) && is_string($payload['src'] ?? null) && $payload['src'] !== '') {
+                        $next['src'] = $payload['src'];
+                    }
+                }
+            }
+            $out[] = $next;
+        }
+
+        return $out;
     }
 
     private function normalizeCellFontSizePx(mixed $value): int
