@@ -1088,6 +1088,63 @@
     $colHeaders = $columns;
     $itemNumber = 1;
     $nCols = count($colHeaders);
+    $splitTableByField = trim((string) ($splitTableByField ?? ''));
+    $splitTableByFieldLabel = '';
+    foreach ($colHeaders as $splitColCandidate) {
+        if ((string) ($splitColCandidate['key'] ?? '') === $splitTableByField) {
+            $splitTableByFieldLabel = trim((string) ($splitColCandidate['label'] ?? $splitTableByField));
+            break;
+        }
+    }
+    $formatSplitValue = function ($value): string {
+        if (is_bool($value)) {
+            return $value ? 'Si' : 'No';
+        }
+        if (is_array($value)) {
+            if (array_key_exists('primary', $value) || array_key_exists('secondary', $value)) {
+                $primary = $value['primary'] ?? '';
+                return is_scalar($primary) ? trim((string) $primary) : '';
+            }
+
+            $parts = [];
+            foreach ($value as $item) {
+                if (is_scalar($item)) {
+                    $parts[] = trim((string) $item);
+                }
+            }
+
+            return trim(implode(', ', array_filter($parts, static fn ($part) => $part !== '')));
+        }
+
+        return is_scalar($value) ? trim((string) $value) : '';
+    };
+    $dataTableGroups = [];
+    if ($splitTableByField !== '' && $splitTableByFieldLabel !== '') {
+        foreach ($tempEntries as $entryIndex => $entryForGroup) {
+            $entryDataForGroup = (array) ($entryForGroup->data ?? []);
+            $groupValue = $formatSplitValue($entryDataForGroup[$splitTableByField] ?? null);
+            if ($groupValue === '') {
+                $groupValue = 'S/R';
+            }
+            $groupKey = mb_strtolower($groupValue);
+            if (!isset($dataTableGroups[$groupKey])) {
+                $dataTableGroups[$groupKey] = [
+                    'label' => $splitTableByFieldLabel.': '.$groupValue,
+                    'entries' => [],
+                    'row_styles' => [],
+                ];
+            }
+            $dataTableGroups[$groupKey]['entries'][] = $entryForGroup;
+            $dataTableGroups[$groupKey]['row_styles'][] = $rowHighlightStyles[$entryIndex] ?? ['bg_css' => '', 'text_css' => ''];
+        }
+        $dataTableGroups = array_values($dataTableGroups);
+    } else {
+        $dataTableGroups[] = [
+            'label' => '',
+            'entries' => $tempEntries,
+            'row_styles' => $rowHighlightStyles,
+        ];
+    }
     $columnWidthPercents = $columnWidthPercents ?? [];
     if ($nCols > 0 && (count($columnWidthPercents) !== $nCols)) {
         $columnWidthPercents = array_fill(0, $nCols, 100 / $nCols);
@@ -1110,6 +1167,10 @@
 @if (count($tempEntries) === 0)
     <p style="margin-top: 8px;">Sin registros.</p>
 @else
+    @foreach ($dataTableGroups as $dataGroupIndex => $dataGroup)
+        @if (($dataGroup['label'] ?? '') !== '')
+            <p style="font-weight: bold; margin: {{ $dataGroupIndex > 0 ? '0' : '8px' }} 0 4px 0; padding-top: {{ $dataGroupIndex > 0 ? '4px' : '0' }}; page-break-before: {{ $dataGroupIndex > 0 ? 'always' : 'auto' }}; break-before: {{ $dataGroupIndex > 0 ? 'page' : 'auto' }}; text-align: {{ $sectionLabelAlign }};">{{ $dataGroup['label'] }}</p>
+        @endif
     <table class="data-table" style="{{ $dataTableStyle }}">
         <thead>
         @if($hasAnyGroup)
@@ -1152,9 +1213,9 @@
         </tr>
         </thead>
         <tbody>
-        @foreach ($tempEntries as $entry)
+        @foreach (($dataGroup['entries'] ?? []) as $entryIndex => $entry)
             @php
-                $rowH = $rowHighlightStyles[$loop->index] ?? ['bg_css' => '', 'text_css' => ''];
+                $rowH = $dataGroup['row_styles'][$entryIndex] ?? ['bg_css' => '', 'text_css' => ''];
                 $rowBgPdf = trim((string) ($rowH['bg_css'] ?? ''));
                 $rowTextPdf = trim((string) ($rowH['text_css'] ?? ''));
                 $rowBgResolvedPdf = $rowBgPdf !== '' ? $resolveCss($rowBgPdf) : '';
@@ -1414,6 +1475,7 @@
         @endforeach
         </tbody>
     </table>
+    @endforeach
 @endif
 </body>
 </html>

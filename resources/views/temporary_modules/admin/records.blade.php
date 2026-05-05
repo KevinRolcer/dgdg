@@ -287,6 +287,13 @@
                         <p class="tm-analysis-hint" style="margin-top:6px;">La vista previa y el archivo exportado seguirán este orden por MR.</p>
                     </div>
                     <div class="tm-export-personalize-field">
+                        <label for="tmExportSplitTableByField">Separar tabla de registros por</label>
+                        <select id="tmExportSplitTableByField" class="tm-input">
+                            <option value="">Sin separar</option>
+                        </select>
+                        <p class="tm-analysis-hint" style="margin-top:6px;">Crea una tabla por cada valor del campo seleccionado y empieza cada bloque en una nueva hoja al exportar.</p>
+                    </div>
+                    <div class="tm-export-personalize-field">
                         <label class="tm-export-count-table-toggle">
                             <input type="checkbox" id="tmExportRowHighlightEnabled" value="1">
                             Sombrear toda la fila según una columna

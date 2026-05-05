@@ -406,6 +406,19 @@ class TemporaryModuleWordPdfService
             default => Jc::START,
         };
         $sectionLabel = $this->normalizeExportHeading($sectionLabelRaw, $headersUppercase);
+        $splitTableByField = trim((string) ($exportConfig['split_table_by_field'] ?? ''));
+        $splitTableByFieldAllowed = false;
+        if ($splitTableByField !== '') {
+            foreach ($columns as $splitColumnCandidate) {
+                if ((string) ($splitColumnCandidate['key'] ?? '') === $splitTableByField) {
+                    $splitTableByFieldAllowed = true;
+                    break;
+                }
+            }
+        }
+        if (! $splitTableByFieldAllowed) {
+            $splitTableByField = '';
+        }
         $cellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['records_cell_font_size_px'] ?? $exportConfig['cell_font_size_px'] ?? $exportConfig['cellFontPx'] ?? null);
         $cellFontSizePt = $this->cellPxToWordPt($cellFontSizePx);
         $countTableCellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['count_table_font_px'] ?? $exportConfig['count_table_font_size_px'] ?? $exportConfig['countTableFontPx'] ?? 9);
@@ -1477,6 +1490,7 @@ class TemporaryModuleWordPdfService
             'groupHeaderColors' => array_map(static fn (string $hex): string => '#'.$hex, $groupHeaderColors),
             'columnWidthPercents' => $columnWidthPercents,
             'entries' => $entries,
+            'splitTableByField' => $splitTableByField,
             'microrregionMeta' => $microrregionMeta,
             'stretch' => $stretch,
             'countTable' => $countTable,
