@@ -423,16 +423,31 @@ class TemporaryModuleWordPdfService
             $splitTableByField = '';
         }
         $reportImageEnabled = !empty($exportConfig['include_report_image']);
-        $reportImageTitle = trim((string) ($exportConfig['report_image_title'] ?? ''));
-        $reportImageField = trim((string) ($exportConfig['report_image_field'] ?? ''));
-        $reportImagePlacement = trim((string) ($exportConfig['report_image_placement'] ?? 'after_records'));
-        if (!in_array($reportImagePlacement, ['after_count', 'after_sum', 'after_records', 'before_split_group', 'after_split_group'], true)) {
-            $reportImagePlacement = 'after_records';
+        $reportImages = [];
+        if ($reportImageEnabled && is_array($exportConfig['report_images'] ?? null)) {
+            foreach ($exportConfig['report_images'] as $imageRaw) {
+                if (!is_array($imageRaw)) {
+                    continue;
+                }
+                $src = trim((string) ($imageRaw['src'] ?? ''));
+                if ($src === '' || !str_starts_with(strtolower($src), 'data:image/')) {
+                    continue;
+                }
+                $placement = trim((string) ($imageRaw['placement'] ?? 'after_records'));
+                if (!in_array($placement, ['after_count', 'after_sum', 'after_records', 'before_split_group', 'after_split_group'], true)) {
+                    $placement = 'after_records';
+                }
+                $reportImages[] = [
+                    'title' => trim((string) ($imageRaw['title'] ?? '')),
+                    'src' => $src,
+                    'placement' => $placement,
+                    'target_group' => trim((string) ($imageRaw['target_group'] ?? '')),
+                    'width' => max(80, min(700, (int) ($imageRaw['width'] ?? 320))),
+                ];
+            }
         }
-        $reportImageWidth = max(80, min(700, (int) ($exportConfig['report_image_width'] ?? 320)));
-        if ($reportImageField === '' || !in_array((string) ($fieldTypesByKey[$reportImageField] ?? ''), ['image', 'file', 'document'], true)) {
+        if ($reportImages === []) {
             $reportImageEnabled = false;
-            $reportImageField = '';
         }
         $cellFontSizePx = $this->normalizeCellFontSizePx($exportConfig['records_cell_font_size_px'] ?? $exportConfig['cell_font_size_px'] ?? $exportConfig['cellFontPx'] ?? null);
         $cellFontSizePt = $this->cellPxToWordPt($cellFontSizePx);
@@ -844,8 +859,8 @@ class TemporaryModuleWordPdfService
                 }
                 $section->addTextBreak(1);
                 $hasSummarySections = true;
-                if ($reportImageEnabled && $reportImagePlacement === 'after_count') {
-                    $this->addReportImageBlockToWord($section, $entries, $reportImageField, $fieldTypesByKey, $reportImageTitle, $reportImageWidth, $exportFontName);
+                if ($reportImageEnabled) {
+                    $this->addUploadedReportImagesToWord($section, $reportImages, 'after_count', '', $exportFontName);
                 }
 
                 if ($sumTable !== null && !empty($sumTable['rows']) && is_array($sumTable['rows'])) {
@@ -1156,8 +1171,8 @@ class TemporaryModuleWordPdfService
 
                 $section->addTextBreak(1);
                 $hasSummarySections = true;
-                if ($reportImageEnabled && $reportImagePlacement === 'after_sum') {
-                    $this->addReportImageBlockToWord($section, $entries, $reportImageField, $fieldTypesByKey, $reportImageTitle, $reportImageWidth, $exportFontName);
+                if ($reportImageEnabled) {
+                    $this->addUploadedReportImagesToWord($section, $reportImages, 'after_sum', '', $exportFontName);
                 }
             }
 
@@ -1438,8 +1453,10 @@ class TemporaryModuleWordPdfService
                 }
                 $rowHighlightEntryIdx++;
             }
-            if ($reportImageEnabled && in_array($reportImagePlacement, ['after_records', 'before_split_group', 'after_split_group'], true)) {
-                $this->addReportImageBlockToWord($section, $entries, $reportImageField, $fieldTypesByKey, $reportImageTitle, $reportImageWidth, $exportFontName);
+            if ($reportImageEnabled) {
+                $this->addUploadedReportImagesToWord($section, $reportImages, 'after_records', '', $exportFontName);
+                $this->addUploadedReportImagesToWord($section, $reportImages, 'before_split_group', '', $exportFontName);
+                $this->addUploadedReportImagesToWord($section, $reportImages, 'after_split_group', '', $exportFontName);
             }
 
             \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007')->save($fullPath);
@@ -1464,24 +1481,9 @@ class TemporaryModuleWordPdfService
         $columnWidthPercents = $this->fractionsToPercents($columnWidthFractions);
         $imageColumnsCount = $this->countPdfImageColumns($columns, $fieldTypesByKey);
         $shouldPreloadPdfImages = $this->shouldPreloadPdfImageData($entries->count(), $imageColumnsCount);
-        $pdfImageColumns = $columns;
-        if ($reportImageEnabled && $reportImageField !== '') {
-            $hasReportImageColumn = false;
-            foreach ($pdfImageColumns as $pdfImageColumn) {
-                if ((string) ($pdfImageColumn['key'] ?? '') === $reportImageField) {
-                    $hasReportImageColumn = true;
-                    break;
-                }
-            }
-            if (! $hasReportImageColumn) {
-                $pdfImageColumns[] = ['key' => $reportImageField];
-            }
-        }
         $pdfImageDataByPath = $shouldPreloadPdfImages
-            ? $this->buildPdfImageDataByPath($entries, $pdfImageColumns, $fieldTypesByKey)
-            : ($reportImageEnabled && $reportImageField !== ''
-                ? $this->buildPdfImageDataByPath($entries, [['key' => $reportImageField]], $fieldTypesByKey)
-                : []);
+            ? $this->buildPdfImageDataByPath($entries, $columns, $fieldTypesByKey)
+            : [];
 
         $html = view('temporary_modules.admin.partials.export_pdf_table', [
             'title' => $title,
@@ -1531,10 +1533,7 @@ class TemporaryModuleWordPdfService
             'entries' => $entries,
             'splitTableByField' => $splitTableByField,
             'reportImageEnabled' => $reportImageEnabled,
-            'reportImageTitle' => $reportImageTitle,
-            'reportImageField' => $reportImageField,
-            'reportImagePlacement' => $reportImagePlacement,
-            'reportImageWidth' => $reportImageWidth,
+            'reportImages' => $reportImages,
             'microrregionMeta' => $microrregionMeta,
             'stretch' => $stretch,
             'countTable' => $countTable,
@@ -3023,6 +3022,66 @@ class TemporaryModuleWordPdfService
             'alignment' => Jc::CENTER,
         ]);
         $section->addTextBreak(1);
+    }
+
+    private function addUploadedReportImagesToWord(
+        \PhpOffice\PhpWord\Element\Section $section,
+        array $images,
+        string $placement,
+        string $targetGroup,
+        string $fontName
+    ): void {
+        $targetNeedle = mb_strtolower(trim($targetGroup), 'UTF-8');
+        foreach ($images as $image) {
+            if (!is_array($image) || (string) ($image['placement'] ?? 'after_records') !== $placement) {
+                continue;
+            }
+            $imageTarget = mb_strtolower(trim((string) ($image['target_group'] ?? '')), 'UTF-8');
+            if ($imageTarget !== '' && $targetNeedle !== '' && !str_contains($targetNeedle, $imageTarget)) {
+                continue;
+            }
+            $path = $this->writeDataUriImageToTemporaryFile((string) ($image['src'] ?? ''));
+            if ($path === null) {
+                continue;
+            }
+            $title = trim((string) ($image['title'] ?? ''));
+            $width = max(80, min(700, (int) ($image['width'] ?? 320)));
+            $section->addTextBreak(1);
+            if ($title !== '') {
+                $section->addText($title, ['name' => $fontName, 'bold' => true, 'size' => 11], ['alignment' => Jc::CENTER, 'spaceAfter' => 80]);
+            }
+            $section->addImage($path, ['width' => $width, 'alignment' => Jc::CENTER]);
+            $section->addTextBreak(1);
+        }
+    }
+
+    private function writeDataUriImageToTemporaryFile(string $dataUri): ?string
+    {
+        if (!preg_match('/^data:image\/([a-zA-Z0-9.+-]+);base64,(.+)$/s', $dataUri, $matches)) {
+            return null;
+        }
+        $ext = strtolower((string) $matches[1]);
+        $ext = match ($ext) {
+            'jpeg', 'jpg' => 'jpg',
+            'png' => 'png',
+            'gif' => 'gif',
+            'webp' => 'webp',
+            default => 'img',
+        };
+        $binary = base64_decode((string) $matches[2], true);
+        if (!is_string($binary) || $binary === '') {
+            return null;
+        }
+        $dir = storage_path('app/temporary-report-images');
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        $path = $dir.DIRECTORY_SEPARATOR.'report-image-'.Str::uuid()->toString().'.'.$ext;
+        if (@file_put_contents($path, $binary) === false) {
+            return null;
+        }
+
+        return $path;
     }
 
     private function isImageTypeOrValue(string $fieldType, string $value): bool

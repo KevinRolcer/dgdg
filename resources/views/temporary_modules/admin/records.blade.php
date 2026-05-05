@@ -299,29 +299,12 @@
                             Agregar imagen con título al reporte
                         </label>
                         <div id="tmExportReportImageWrap" hidden style="margin-top:8px;display:grid;gap:8px;">
-                            <div class="tm-export-personalize-field">
-                                <label for="tmExportReportImageTitle">Título de la imagen</label>
-                                <input type="text" id="tmExportReportImageTitle" class="tm-input" placeholder="Título de la imagen">
-                            </div>
-                            <div class="tm-export-personalize-field">
-                                <label for="tmExportReportImageField">Columna de imagen</label>
-                                <select id="tmExportReportImageField" class="tm-input"></select>
-                            </div>
-                            <div class="tm-export-personalize-field">
-                                <label for="tmExportReportImagePlacement">Ubicación</label>
-                                <select id="tmExportReportImagePlacement" class="tm-input">
-                                    <option value="after_records">Debajo de tabla de registros</option>
-                                    <option value="after_count">Debajo de tabla de conteo</option>
-                                    <option value="after_sum">Debajo de tabla sumatoria</option>
-                                    <option value="before_split_group">Al inicio de cada tabla separada</option>
-                                    <option value="after_split_group">Al final de cada tabla separada</option>
-                                </select>
-                            </div>
-                            <div class="tm-export-personalize-field">
-                                <label for="tmExportReportImageWidth">Ancho PDF/Word (px)</label>
-                                <input type="number" id="tmExportReportImageWidth" class="tm-input tm-input--num-compact" min="80" max="700" value="320">
-                            </div>
-                            <p class="tm-analysis-hint" style="margin-top:0;">Si eliges inicio/final de cada tabla separada, se usa la separación configurada arriba.</p>
+                            <input type="file" id="tmExportReportImageFile" accept="image/*" multiple hidden>
+                            <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmExportAddReportImageBtn">
+                                <i class="fa-solid fa-image" aria-hidden="true"></i> Agregar imagen
+                            </button>
+                            <div id="tmExportReportImagesList" class="tm-export-sum-list" style="display:grid;gap:8px;"></div>
+                            <p class="tm-analysis-hint" style="margin-top:0;">Usa el botón de tres puntos de cada imagen para definir título, posición, ancho y dato de tabla separada.</p>
                         </div>
                     </div>
                     <div class="tm-export-personalize-field">
