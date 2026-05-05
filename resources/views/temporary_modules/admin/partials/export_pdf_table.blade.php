@@ -37,6 +37,11 @@
             $html .= '</div>';
         }
         if ($html !== '') {
+            $breakBefore = ($placement === 'after_records')
+                || ($placement === 'after_split_group' && $isLastSplitDataGroup);
+            if ($breakBefore) {
+                $html = '<div class="tm-report-images-page-break-before">&nbsp;</div>'.$html;
+            }
             $html .= '<div class="tm-report-images-page-break-after">&nbsp;</div>';
         }
 
@@ -486,6 +491,16 @@
         .summary-page-break {
             page-break-before: always;
             margin-top: 0;
+        }
+        .tm-report-images-page-break-before {
+            page-break-before: always;
+            break-before: page;
+            margin: 0;
+            padding: 0;
+            font-size: 0;
+            line-height: 0;
+            height: 0;
+            overflow: hidden;
         }
         .tm-report-images-page-break-after {
             page-break-after: always;

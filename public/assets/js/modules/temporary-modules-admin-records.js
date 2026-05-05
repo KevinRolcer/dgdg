@@ -3713,6 +3713,9 @@
                 html += '<img src="' + escapeHtml(String(img.src || '')) + '" alt="" style="width:' + width + 'px;height:auto;max-width:100%;display:inline-block;">';
                 html += '</div>';
             });
+            if (html !== '' && opts.pageBreakBefore) {
+                html = '<div class="tm-export-preview-report-page-break" style="page-break-before:always;break-before:page;margin:0;padding:0;height:1px;line-height:0;font-size:0;overflow:hidden">&nbsp;</div>' + html;
+            }
             return html;
         }
 
@@ -4490,7 +4493,7 @@
                     html += '</tr>';
                 });
                 if (splitCol) {
-                    html += '<tr><td colspan="' + String(effectiveColumns.length) + '">' + tmExportRenderReportImagePreview(state, 'after_split_group', lastSplitGroup, { onlyAfterLastSplitGroup: true }) + '</td></tr>';
+                    html += '<tr><td colspan="' + String(effectiveColumns.length) + '">' + tmExportRenderReportImagePreview(state, 'after_split_group', lastSplitGroup, { onlyAfterLastSplitGroup: true, pageBreakBefore: true }) + '</td></tr>';
                 }
             } else {
                 html += '<tr class="tm-export-preview-row tm-export-preview-data">';
@@ -4519,7 +4522,7 @@
                 html += '</tr>';
             }
             html += '</table>';
-            html += tmExportRenderReportImagePreview(state, 'after_records', '');
+            html += tmExportRenderReportImagePreview(state, 'after_records', '', { pageBreakBefore: true });
             previewEl.innerHTML = html;
         }
 

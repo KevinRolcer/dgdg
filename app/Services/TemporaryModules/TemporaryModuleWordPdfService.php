@@ -1454,9 +1454,9 @@ class TemporaryModuleWordPdfService
                 $rowHighlightEntryIdx++;
             }
             if ($reportImageEnabled) {
-                $this->addUploadedReportImagesToWord($section, $reportImages, 'after_records', '', $exportFontName);
+                $this->addUploadedReportImagesToWord($section, $reportImages, 'after_records', '', $exportFontName, true);
                 $this->addUploadedReportImagesToWord($section, $reportImages, 'before_split_group', '', $exportFontName);
-                $this->addUploadedReportImagesToWord($section, $reportImages, 'after_split_group', '', $exportFontName);
+                $this->addUploadedReportImagesToWord($section, $reportImages, 'after_split_group', '', $exportFontName, true);
             }
 
             \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007')->save($fullPath);
@@ -3063,14 +3063,41 @@ class TemporaryModuleWordPdfService
         $section->addTextBreak(1);
     }
 
+    /**
+     * ¿Hay al menos una imagen de informe con esta posición/filtro (sin escribir archivo)?
+     */
+    private function hasUploadedReportImagesForPlacement(array $images, string $placement, string $targetGroup): bool
+    {
+        $targetNeedle = mb_strtolower(trim($targetGroup), 'UTF-8');
+        foreach ($images as $image) {
+            if (!is_array($image) || (string) ($image['placement'] ?? 'after_records') !== $placement) {
+                continue;
+            }
+            $imageTarget = mb_strtolower(trim((string) ($image['target_group'] ?? '')), 'UTF-8');
+            if ($imageTarget !== '' && $targetNeedle !== '' && !str_contains($targetNeedle, $imageTarget)) {
+                continue;
+            }
+            $src = trim((string) ($image['src'] ?? ''));
+            if ($src !== '' && str_starts_with(strtolower($src), 'data:image/')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function addUploadedReportImagesToWord(
         \PhpOffice\PhpWord\Element\Section $section,
         array $images,
         string $placement,
         string $targetGroup,
-        string $fontName
+        string $fontName,
+        bool $pageBreakBeforeIfAny = false
     ): void {
         $targetNeedle = mb_strtolower(trim($targetGroup), 'UTF-8');
+        if ($pageBreakBeforeIfAny && $this->hasUploadedReportImagesForPlacement($images, $placement, $targetGroup)) {
+            $section->addPageBreak();
+        }
         $insertedAny = false;
         foreach ($images as $image) {
             if (!is_array($image) || (string) ($image['placement'] ?? 'after_records') !== $placement) {
