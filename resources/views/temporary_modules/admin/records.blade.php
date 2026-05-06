@@ -213,7 +213,7 @@
             <div class="tm-modal-body">
                 <div class="tm-export-personalize-loading" id="tmExportPersonalizeLoading">Cargando estructura...</div>
                 <div class="tm-export-personalize-content" id="tmExportPersonalizeContent" hidden>
-                    <div class="tm-export-personalize-form tm-export-side-panel">
+                    <div class="tm-export-personalize-form">
                         <nav class="tm-export-side-tabs" role="tablist" aria-label="Secciones de personalización">
                             <button type="button" role="tab" class="tm-export-side-tab is-active" data-tm-export-side-tab="tm-export-sec-title" aria-selected="true">Título</button>
                             <button type="button" role="tab" class="tm-export-side-tab" data-tm-export-side-tab="tm-export-sec-layout">Tablas</button>
@@ -685,6 +685,12 @@
                             <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmExportEditCreatedTimeBtn">
                                 <i class="fa-solid fa-clock" aria-hidden="true"></i> Editar hora de creación por registro
                             </button>
+                            <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmExportAddCreatedAtColumnBtn">
+                                + Columna: Hora de creación
+                            </button>
+                            <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmExportAddRegisteredUserColumnBtn">
+                                + Columna: Usuario que registró
+                            </button>
                         </p>
                         <div class="tm-export-personalize-columns" id="tmExportPersonalizeColumns" role="list"></div>
                         <p class="tm-export-restore-wrap" id="tmExportRestoreWrap" hidden>
@@ -781,15 +787,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-            <div class="tm-modal-foot tm-export-modal-foot tm-export-modal-foot--personalize">
-                <button type="button" class="tm-btn tm-btn-outline" data-close-export-personalize>Cancelar</button>
-                <div class="tm-export-save-actions">
-                    <button type="button" class="tm-btn tm-btn-primary" id="tmExportSaveConfig">Guardar configuración</button>
-                    <button type="button" class="tm-btn tm-btn-outline" id="tmExportClearConfig" title="Limpiar configuración guardada" aria-label="Limpiar configuración guardada">
-                        <i class="fa-solid fa-broom" aria-hidden="true"></i>
-                    </button>
                 </div>
             </div>
         </div>

@@ -3472,10 +3472,14 @@ html.theme-dark .tm-template-download-card--all .tm-template-download-icon {
     height: min(92vh, 1100px);
     max-height: 95vh;
     min-height: 520px;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
     overflow: hidden;
     min-width: 0;
+}
+
+#tmExportPersonalizeModal .tm-export-personalize-dialog {
+    row-gap: 0;
 }
 
 .tm-export-personalize-dialog .tm-modal-body {
@@ -3487,15 +3491,26 @@ html.theme-dark .tm-template-download-card--all .tm-template-download-icon {
     flex-direction: column;
 }
 
+/* Aprovecha mejor el area util del modal de exportacion en admin */
+#tmExportPersonalizeModal .tm-modal-body {
+    padding: 8px 10px 2px;
+    max-height: none;
+    height: 100%;
+}
+
 .tm-export-personalize-content {
     display: flex;
     flex-direction: row;
     align-items: stretch;
-    gap: 12px;
+    gap: 8px;
     min-height: 0;
     flex: 1;
     width: 100%;
     min-width: 0;
+}
+
+#tmExportPersonalizeModal .tm-export-personalize-content {
+    height: 100%;
 }
 
 .tm-export-modal-foot {
@@ -3517,6 +3532,11 @@ html.theme-dark .tm-template-download-card--all .tm-template-download-icon {
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
+}
+
+#tmExportPersonalizeModal .tm-modal-foot {
+    margin-top: 0 !important;
+    padding: 0.35rem 0.75rem;
 }
 
 .tm-export-save-actions {
@@ -3815,15 +3835,15 @@ html.theme-dark .tm-swal-export-options strong {
 }
 
 .tm-export-personalize-form {
-    flex: 0 0 40%;
-    max-width: 44%;
+    flex: 0 0 36%;
+    max-width: 40%;
     min-width: 260px;
     min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    padding: 0 10px 8px 0;
-    border-right: 1px solid var(--clr-border);
+    padding: 0 4px 8px 0;
+    border-right: 0;
 }
 
 .tm-export-side-panel {
@@ -3849,7 +3869,7 @@ html.theme-dark .tm-swal-export-options strong {
     position: sticky;
     top: 0;
     z-index: 3;
-    background: linear-gradient(to bottom, color-mix(in srgb, var(--clr-bg) 88%, var(--clr-border)) 85%, transparent);
+    background: linear-gradient(to bottom, var(--clr-card) 88%, transparent);
     border-bottom: 1px solid var(--clr-border);
 }
 
@@ -4741,14 +4761,35 @@ html.theme-dark .tm-export-config-card__menu-btn:hover {
 
 .tm-export-calc-row {
     display: grid;
-    grid-template-columns: minmax(230px, 1.5fr) minmax(200px, 1.2fr) minmax(170px, auto) auto;
-    gap: 8px;
-    align-items: start;
-    min-width: 920px;
+    grid-template-columns: minmax(240px, 1.8fr) minmax(150px, 0.9fr) minmax(170px, 1fr) minmax(180px, auto) auto;
+    gap: 6px;
+    align-items: center;
+    min-width: 760px;
 }
 
 .tm-export-calc-row .tm-input {
     min-width: 0;
+}
+
+.tm-export-calc-op-picker {
+    display: flex;
+    align-items: center;
+}
+
+.tm-export-calc-op-picker [data-calc-op-fields-picker] {
+    min-width: 120px;
+}
+
+.tm-export-calc-options-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tm-export-calc-options-meta {
+    font-size: 0.76rem;
+    color: var(--clr-text-light);
+    white-space: nowrap;
 }
 
 .tm-export-calc-fields {
@@ -4803,6 +4844,66 @@ html.theme-dark .tm-export-config-card__menu-btn:hover {
     overflow-y: auto;
     overflow-x: auto;
     padding-right: 4px;
+}
+
+.tm-calc-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+    text-align: left;
+}
+
+.tm-calc-picker-head {
+    display: grid;
+    gap: 2px;
+    margin: 4px 0 8px;
+    text-align: left;
+}
+
+.tm-calc-picker-head small {
+    color: var(--clr-text-light);
+    font-size: 0.76rem;
+}
+
+.tm-calc-picker-item {
+    border: 1px solid var(--clr-border);
+    background: var(--clr-card);
+    color: var(--clr-text-main);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+.tm-calc-picker-item.is-active {
+    border-color: var(--clr-primary);
+    background: color-mix(in srgb, var(--clr-primary) 12%, var(--clr-card));
+    color: var(--clr-primary-dark);
+    font-weight: 600;
+}
+
+.tm-calc-options-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 10px;
+    margin-bottom: 10px;
+    text-align: left;
+}
+
+.tm-calc-options-form label {
+    display: grid;
+    gap: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--clr-text-main);
+}
+
+.tm-calc-options-form .tm-calc-options-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .tm-export-sum-name-wrap {

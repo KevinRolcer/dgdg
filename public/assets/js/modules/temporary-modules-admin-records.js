@@ -2541,10 +2541,6 @@
             var optionsHtml = '<option value="">Sin referencia</option>' + (countableColumns || []).map(function (c) {
                 return '<option value="' + escapeHtml(String(c.key || '')) + '">' + escapeHtml(String(c.label || c.key || '')) + '</option>';
             }).join('');
-            var opMultiOptionsHtml = (countableColumns || []).map(function (c) {
-                return '<option value="' + escapeHtml(String(c.key || '')) + '">' + escapeHtml(String(c.label || c.key || '')) + '</option>';
-            }).join('');
-
             list.forEach(function (calc, idx) {
                 var row = document.createElement('div');
                 row.className = 'tm-export-sum-row tm-export-calc-row';
@@ -2553,12 +2549,10 @@
                 if (['add', 'subtract', 'multiply', 'percent'].indexOf(operation) === -1) { operation = 'add'; }
                 var baseField = String(calc.baseField || '');
                 var group = String(calc.group || '');
-                var groupOptions = tmExportBuildGroupOptionsHtml(group);
                 var opFields = Array.isArray(calc.operationFields) ? calc.operationFields : [];
                 var cellColor = String(calc.cellColor || 'var(--clr-secondary)');
                 var cellSizeCh = Math.max(8, Math.min(40, parseInt(String(calc.cellSizeCh || 18), 10) || 18));
                 var cellBold = !!calc.cellBold;
-                var calcBoldClass = cellBold ? 'tm-export-col-bold-btn is-active' : 'tm-export-col-bold-btn';
 
                 row.innerHTML = ''
                     + '<div class="tm-export-sum-name-wrap">'
@@ -2566,7 +2560,7 @@
                     + '    <button type="button" class="tm-btn tm-btn-outline tm-export-sum-move-btn" data-move-calc-up title="Subir">&#8593;</button>'
                     + '    <button type="button" class="tm-btn tm-btn-outline tm-export-sum-move-btn" data-move-calc-down title="Bajar">&#8595;</button>'
                     + '  </span>'
-                    + '  <textarea class="tm-input tm-export-col-label-input" rows="2" data-calc-label placeholder="Nombre de columna">' + escapeHtml(String(calc.label || ('Calculada ' + (idx + 1)))) + '</textarea>'
+                    + '  <textarea class="tm-input tm-export-col-label-input" rows="1" data-calc-label placeholder="Nombre de columna">' + escapeHtml(String(calc.label || ('Calculada ' + (idx + 1)))) + '</textarea>'
                     + '</div>'
                     + '<select class="tm-input" data-calc-operation>'
                     + '  <option value="add">Suma (+)</option>'
@@ -2574,44 +2568,40 @@
                     + '  <option value="multiply">Multiplicación (×)</option>'
                     + '  <option value="percent">Porcentaje (%)</option>'
                     + '</select>'
-                    + '<select class="tm-input" data-calc-group>' + groupOptions + '</select>'
                     + '<select class="tm-input" data-calc-base>' + optionsHtml + '</select>'
-                    + '<select class="tm-input" data-calc-op-fields multiple size="4">' + opMultiOptionsHtml + '</select>'
-                    + '<div class="tm-export-col-color tm-export-calc-color-wrap">'
-                    + '  <button type="button" class="tm-export-color-trigger" data-calc-color-trigger data-color="' + escapeHtml(cellColor) + '" aria-haspopup="listbox" aria-expanded="false" title="Color de celda">'
-                    + '    <span class="tm-export-color-swatch" style="background-color:' + escapeHtml(cellColor) + '"></span>'
+                    + '<div class="tm-export-calc-options-cell">'
+                    + '  <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" data-calc-options-btn title="Opciones">'
+                    + '    <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>'
                     + '  </button>'
-                    + '  <div class="tm-export-color-menu" role="listbox" hidden>' + TEMPLATE_COLORS.map(function (c, i) {
-                        return '<button type="button" class="tm-export-color-option' + (i === 0 ? ' is-active' : '') + '" data-color="' + escapeHtml(c.value) + '">' +
-                            '<span class="tm-export-color-swatch" style="background-color:' + escapeHtml(c.value) + '"></span>' +
-                            '<span class="tm-export-color-name">' + escapeHtml(c.name) + '</span></button>';
-                    }).join('') + '</div>'
+                    + '  <span class="tm-export-calc-options-meta" data-calc-options-meta hidden></span>'
+                    + '  <input type="hidden" data-calc-group value="">'
+                    + '  <input type="hidden" data-calc-size value="">'
+                    + '  <input type="hidden" data-calc-bold value="">'
+                    + '  <input type="hidden" data-calc-color value="">'
+                    + '  <input type="hidden" data-calc-op-fields-values value="">'
                     + '</div>'
-                    + '<button type="button" class="tm-btn tm-btn-outline ' + calcBoldClass + '" data-calc-bold title="Negritas en celdas de contenido" aria-label="Negritas en celdas de contenido"><strong>B</strong></button>'
-                    + '<label class="tm-export-col-field tm-export-col-field--wch tm-export-col-field--wch-compact">'
-                    + '  <span class="tm-export-col-field__lab">Tamaño celda (ch)</span>'
-                    + '  <input type="number" class="tm-input tm-input--num-compact" data-calc-size min="8" max="40" value="' + escapeHtml(String(cellSizeCh)) + '">'
-                    + '</label>'
                     + '<button type="button" class="tm-btn tm-btn-danger" data-remove-calc-col>&times;</button>';
 
                 wrap.appendChild(row);
                 var opSel = row.querySelector('[data-calc-operation]');
                 if (opSel) { opSel.value = operation; }
-                var groupSel = row.querySelector('[data-calc-group]');
-                if (groupSel) { groupSel.value = group; }
                 var baseSel = row.querySelector('[data-calc-base]');
                 if (baseSel) { baseSel.value = baseField; }
-                var opFieldsSel = row.querySelector('[data-calc-op-fields]');
-                if (opFieldsSel) {
-                    Array.from(opFieldsSel.options).forEach(function (opt) {
-                        opt.selected = opFields.indexOf(String(opt.value || '')) !== -1;
-                    });
+                var groupHidden = row.querySelector('[data-calc-group]');
+                if (groupHidden) { groupHidden.value = group; }
+                var sizeHidden = row.querySelector('[data-calc-size]');
+                if (sizeHidden) { sizeHidden.value = String(cellSizeCh); }
+                var boldHidden = row.querySelector('[data-calc-bold]');
+                if (boldHidden) { boldHidden.value = cellBold ? '1' : '0'; }
+                var colorHidden = row.querySelector('[data-calc-color]');
+                if (colorHidden) { colorHidden.value = cellColor; }
+                var opFieldsHidden = row.querySelector('[data-calc-op-fields-values]');
+                if (opFieldsHidden) {
+                    opFieldsHidden.value = JSON.stringify(opFields);
                 }
-                var colorTrigger = row.querySelector('[data-calc-color-trigger]');
-                if (colorTrigger) {
-                    row.querySelectorAll('.tm-export-color-option').forEach(function (opt) {
-                        opt.classList.toggle('is-active', (opt.getAttribute('data-color') || '') === cellColor);
-                    });
+                var optionsMeta = row.querySelector('[data-calc-options-meta]');
+                if (optionsMeta) {
+                    optionsMeta.textContent = '';
                 }
             });
         }
@@ -3708,14 +3698,24 @@
                     var groupEl = row.querySelector('[data-calc-group]');
                     var baseEl = row.querySelector('[data-calc-base]');
                     var opFieldsEl = row.querySelector('[data-calc-op-fields]');
-                    var colorTrigger = row.querySelector('[data-calc-color-trigger]');
+                    var colorTrigger = row.querySelector('[data-calc-color]');
                     var sizeEl = row.querySelector('[data-calc-size]');
                     var boldBtn = row.querySelector('[data-calc-bold]');
                     var existingCalc = Array.isArray(personalizeModal._calculatedColumns)
                         ? personalizeModal._calculatedColumns.find(function (x) { return String(x && x.id || '') === id; })
                         : null;
                     var opFields = [];
-                    if (opFieldsEl) {
+                    var opFieldsHiddenEl = row.querySelector('[data-calc-op-fields-values]');
+                    if (opFieldsHiddenEl) {
+                        try {
+                            var parsedOpFields = JSON.parse(String(opFieldsHiddenEl.value || '[]'));
+                            if (Array.isArray(parsedOpFields)) {
+                                opFields = parsedOpFields.map(function (v) { return String(v || ''); }).filter(Boolean);
+                            }
+                        } catch (ePf2) {
+                            opFields = [];
+                        }
+                    } else if (opFieldsEl) {
                         opFields = Array.from(opFieldsEl.selectedOptions || []).map(function (o) { return String(o.value || ''); }).filter(Boolean);
                     }
                     var op = opEl ? String(opEl.value || 'add') : 'add';
@@ -3730,9 +3730,9 @@
                         baseField: baseEl ? String(baseEl.value || '') : '',
                         afterKey: existingCalc ? String(existingCalc.afterKey || '') : '',
                         operationFields: opFields,
-                        cellColor: (colorTrigger && colorTrigger.getAttribute('data-color')) ? String(colorTrigger.getAttribute('data-color')) : 'var(--clr-secondary)',
+                        cellColor: colorTrigger ? String(colorTrigger.value || 'var(--clr-secondary)') : 'var(--clr-secondary)',
                         cellSizeCh: Math.max(8, Math.min(40, size)),
-                        cellBold: !!(boldBtn && boldBtn.classList.contains('is-active'))
+                        cellBold: !!(boldBtn && String(boldBtn.value || '0') === '1')
                     });
                 });
             }
@@ -5098,6 +5098,8 @@
             const addSumMetricBtn = document.getElementById('tmExportAddSumMetricBtn');
             const addSumFormulaBtn = document.getElementById('tmExportAddSumFormulaBtn');
             const editCreatedTimeBtn = document.getElementById('tmExportEditCreatedTimeBtn');
+            const addCreatedAtColumnBtn = document.getElementById('tmExportAddCreatedAtColumnBtn');
+            const addRegisteredUserColumnBtn = document.getElementById('tmExportAddRegisteredUserColumnBtn');
             var exportBtnRef = personalizeModal._exportButtonRef || null;
             personalizeModal._createdAtListUrl = exportBtnRef ? String(exportBtnRef.getAttribute('data-created-at-list-url') || '') : '';
             personalizeModal._createdAtUpdateUrl = exportBtnRef ? String(exportBtnRef.getAttribute('data-created-at-update-url') || '') : '';
@@ -5205,6 +5207,47 @@
                     var data = parts[0];
                     var serverDraft = parts[1];
                     let columns = Array.isArray(data.columns) ? data.columns : [];
+                    var ensureFixedColumn = function (columnKey, columnLabel, maxWidthChars) {
+                        if (!columnsEl || !previewEl) { return; }
+                        var currentCols = reorderColumnsList(columnsEl, columns);
+                        if (currentCols.some(function (c) { return String(c && c.key || '') === columnKey; })) {
+                            if (typeof Swal !== 'undefined') {
+                                Swal.fire({ icon: 'info', title: 'Ya existe', text: 'Esa columna ya está agregada.' });
+                            }
+                            return;
+                        }
+                        var sourceCol = (Array.isArray(personalizeModal._personalizeColumns) ? personalizeModal._personalizeColumns : [])
+                            .find(function (c) { return String(c && c.key || '') === columnKey; });
+                        var newCol = sourceCol ? Object.assign({}, sourceCol) : {
+                            key: columnKey,
+                            label: columnLabel,
+                            type: 'fixed',
+                            is_image: false,
+                            max_width_chars: maxWidthChars
+                        };
+                        if (!newCol.label || !String(newCol.label).trim()) {
+                            newCol.label = columnLabel;
+                        }
+                        if (!Number.isFinite(Number(newCol.max_width_chars))) {
+                            newCol.max_width_chars = maxWidthChars;
+                        }
+                        columns = currentCols.concat([newCol]);
+                        personalizeModal._personalizeColumns = columns.slice();
+                        buildPersonalizeColumnsList(columns, columnsEl);
+                        attachPersonalizeColumnListeners(columnsEl, columns, previewEl, restoreWrap);
+                        renderOmittedColumnsList(columnsEl, columns, omittedListEl, restoreWrap, omittedWrap, omittedToggle);
+                        buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                    };
+                    if (addCreatedAtColumnBtn) {
+                        addCreatedAtColumnBtn.onclick = function () {
+                            ensureFixedColumn('created_at_time', 'Hora de creación', 14);
+                        };
+                    }
+                    if (addRegisteredUserColumnBtn) {
+                        addRegisteredUserColumnBtn.onclick = function () {
+                            ensureFixedColumn('registered_user', 'Usuario que registró', 24);
+                        };
+                    }
                     if (personalizeModal) {
                         personalizeModal._personalizeColumns = columns;
                         personalizeModal._previewEntries = Array.isArray(data.entries) ? data.entries : [];
@@ -5242,6 +5285,30 @@
 
                     var refreshSumPreview = function () {
                         buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                    };
+                    var renderPreviewViaAjax = function () {
+                        if (!previewEl) { return; }
+                        previewEl.innerHTML = '<div class="tm-modal-lazy-loading"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Renderizando vista previa...</div>';
+                        var previewUrl = structureUrl + (structureUrl.indexOf('?') === -1 ? '?' : '&') + 'preview=1&_tm_preview=' + Date.now();
+                        fetch(previewUrl, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                            .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('Preview fetch failed')); })
+                            .then(function (payload) {
+                                if (!payload || typeof payload !== 'object') { return; }
+                                if (personalizeModal) {
+                                    if (Array.isArray(payload.entries)) {
+                                        personalizeModal._previewEntries = payload.entries;
+                                    }
+                                    if (payload.microrregion_meta && typeof payload.microrregion_meta === 'object') {
+                                        personalizeModal._previewMicrorregionMeta = payload.microrregion_meta;
+                                    }
+                                }
+                            })
+                            .catch(function () { /* fallback to current in-memory data */ })
+                            .finally(function () {
+                                window.requestAnimationFrame(function () {
+                                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                                });
+                            });
                     };
 
                     tmExportEnsureCalculatedColumnsState(countableColumns, null);
@@ -5285,14 +5352,24 @@
                                 var groupEl = row.querySelector('[data-calc-group]');
                                 var baseEl = row.querySelector('[data-calc-base]');
                                 var opFieldsEl = row.querySelector('[data-calc-op-fields]');
-                                var colorTrigger = row.querySelector('[data-calc-color-trigger]');
+                                var colorTrigger = row.querySelector('[data-calc-color]');
                                 var sizeEl = row.querySelector('[data-calc-size]');
                                 var boldBtn = row.querySelector('[data-calc-bold]');
                                 var existingCalc = Array.isArray(personalizeModal._calculatedColumns)
                                     ? personalizeModal._calculatedColumns.find(function (x) { return String(x && x.id || '') === id; })
                                     : null;
                                 var opFields = [];
-                                if (opFieldsEl) {
+                                var hiddenFieldsEl = row.querySelector('[data-calc-op-fields-values]');
+                                if (hiddenFieldsEl) {
+                                    try {
+                                        var parsedFields = JSON.parse(String(hiddenFieldsEl.value || '[]'));
+                                        if (Array.isArray(parsedFields)) {
+                                            opFields = parsedFields.map(function (v) { return String(v || ''); }).filter(Boolean);
+                                        }
+                                    } catch (ePf) {
+                                        opFields = [];
+                                    }
+                                } else if (opFieldsEl) {
                                     opFields = Array.from(opFieldsEl.selectedOptions || []).map(function (o) { return String(o.value || ''); }).filter(Boolean);
                                 }
                                 var op = opEl ? String(opEl.value || 'add') : 'add';
@@ -5307,9 +5384,9 @@
                                     baseField: baseEl ? String(baseEl.value || '') : '',
                                     afterKey: existingCalc ? String(existingCalc.afterKey || '') : '',
                                     operationFields: opFields,
-                                    cellColor: (colorTrigger && colorTrigger.getAttribute('data-color')) ? String(colorTrigger.getAttribute('data-color')) : 'var(--clr-secondary)',
+                                    cellColor: colorTrigger ? String(colorTrigger.value || 'var(--clr-secondary)') : 'var(--clr-secondary)',
                                     cellSizeCh: Math.max(8, Math.min(40, size)),
-                                    cellBold: !!(boldBtn && boldBtn.classList.contains('is-active'))
+                                    cellBold: !!(boldBtn && String(boldBtn.value || '0') === '1')
                                 });
                             });
                             personalizeModal._calculatedColumns = next;
@@ -5340,38 +5417,126 @@
                                 }
                                 return;
                             }
-                            var colorTrigger = e.target.closest('[data-calc-color-trigger]');
-                            if (colorTrigger) {
-                                var menu = colorTrigger.nextElementSibling;
-                                if (menu instanceof HTMLElement) {
-                                    var isOpen = !menu.hidden;
-                                    calculatedColumnsListEl.querySelectorAll('.tm-export-color-menu').forEach(function (m) { m.hidden = true; });
-                                    colorTrigger.setAttribute('aria-expanded', String(!isOpen));
-                                    menu.hidden = isOpen;
+                            var optionsBtn = e.target.closest('[data-calc-options-btn]');
+                            if (optionsBtn) {
+                                var calcRow = optionsBtn.closest('[data-calc-col-id]');
+                                if (!calcRow) { return; }
+                                var hiddenValuesEl = calcRow.querySelector('[data-calc-op-fields-values]');
+                                var hiddenGroupEl = calcRow.querySelector('[data-calc-group]');
+                                var hiddenSizeEl = calcRow.querySelector('[data-calc-size]');
+                                var hiddenBoldEl = calcRow.querySelector('[data-calc-bold]');
+                                var hiddenColorEl = calcRow.querySelector('[data-calc-color]');
+                                var selected = [];
+                                if (hiddenValuesEl) {
+                                    try {
+                                        var parsedSel = JSON.parse(String(hiddenValuesEl.value || '[]'));
+                                        if (Array.isArray(parsedSel)) {
+                                            selected = parsedSel.map(function (v) { return String(v || ''); }).filter(Boolean);
+                                        }
+                                    } catch (eSel) {
+                                        selected = [];
+                                    }
                                 }
-                                return;
-                            }
-                            var colorOption = e.target.closest('.tm-export-color-option');
-                            if (colorOption) {
-                                var color = colorOption.getAttribute('data-color') || 'var(--clr-secondary)';
-                                var menu = colorOption.closest('.tm-export-color-menu');
-                                var wrapColor = menu ? menu.closest('.tm-export-col-color') : null;
-                                var tr = wrapColor ? wrapColor.querySelector('[data-calc-color-trigger]') : null;
-                                if (wrapColor && tr) {
-                                    wrapColor.querySelectorAll('.tm-export-color-option').forEach(function (opt) { opt.classList.remove('is-active'); });
-                                    colorOption.classList.add('is-active');
-                                    tr.setAttribute('data-color', color);
-                                    var swatch = tr.querySelector('.tm-export-color-swatch');
-                                    if (swatch instanceof HTMLElement) { swatch.style.backgroundColor = color; }
+                                var options = (Array.isArray(countableColumns) ? countableColumns : []).map(function (c) {
+                                    return {
+                                        key: String(c && c.key || ''),
+                                        label: String(c && (c.label || c.key) || '')
+                                    };
+                                }).filter(function (o) { return o.key !== ''; });
+                                if (!options.length) {
+                                    return;
                                 }
-                                if (menu) { menu.hidden = true; }
-                                syncCalculatedListToState(true);
-                                return;
-                            }
-                            var boldBtn = e.target.closest('[data-calc-bold]');
-                            if (boldBtn) {
-                                boldBtn.classList.toggle('is-active');
-                                syncCalculatedListToState(true);
+                                if (typeof Swal !== 'undefined') {
+                                    var groupValue = hiddenGroupEl ? String(hiddenGroupEl.value || '') : '';
+                                    var sizeValue = hiddenSizeEl ? String(hiddenSizeEl.value || '18') : '18';
+                                    var boldValue = hiddenBoldEl ? String(hiddenBoldEl.value || '0') === '1' : false;
+                                    var colorValue = hiddenColorEl ? String(hiddenColorEl.value || 'var(--clr-secondary)') : 'var(--clr-secondary)';
+                                    var opSelectEl = calcRow.querySelector('[data-calc-operation]');
+                                    var baseSelectEl = calcRow.querySelector('[data-calc-base]');
+                                    var opLabel = opSelectEl && opSelectEl.options && opSelectEl.selectedIndex >= 0
+                                        ? String(opSelectEl.options[opSelectEl.selectedIndex].text || 'Operación')
+                                        : 'Operación';
+                                    var baseLabel = baseSelectEl && baseSelectEl.options && baseSelectEl.selectedIndex >= 0
+                                        ? String(baseSelectEl.options[baseSelectEl.selectedIndex].text || 'Sin referencia')
+                                        : 'Sin referencia';
+                                    var groups = normalizeExportGroups((personalizeModal && personalizeModal._exportGroups) || []);
+                                    var groupOptionsHtml = '<option value="">Sin grupo</option>' + groups.map(function (g) {
+                                        var gn = String((g && g.name) || '').trim();
+                                        var sel = gn === groupValue ? ' selected' : '';
+                                        return '<option value="' + escapeHtml(gn) + '"' + sel + '>' + escapeHtml(gn) + '</option>';
+                                    }).join('');
+                                    var colorOptionsHtml = TEMPLATE_COLORS.map(function (c) {
+                                        var sel = String(c.value || '') === colorValue ? ' selected' : '';
+                                        return '<option value="' + escapeHtml(String(c.value || '')) + '"' + sel + '>' + escapeHtml(String(c.name || '')) + '</option>';
+                                    }).join('');
+                                    var pickerHtml = ''
+                                        + '<div class="tm-calc-options-form">'
+                                        + '  <label>Grupo<select id="tmCalcOptGroup" class="swal2-select">' + groupOptionsHtml + '</select></label>'
+                                        + '  <label>Color<select id="tmCalcOptColor" class="swal2-select">' + colorOptionsHtml + '</select></label>'
+                                        + '  <label>Tamaño de celda (ch)<input id="tmCalcOptSize" class="swal2-input" type="number" min="8" max="40" value="' + escapeHtml(sizeValue) + '"></label>'
+                                        + '  <label class="tm-calc-options-check"><input id="tmCalcOptBold" type="checkbox"' + (boldValue ? ' checked' : '') + '> Negritas</label>'
+                                        + '</div>'
+                                        + '<div class="tm-calc-picker-head">'
+                                        + '  <strong>Seleccionar (' + String(selected.length) + ')</strong>'
+                                        + '  <small>Dato base: ' + escapeHtml(baseLabel) + '</small>'
+                                        + '  <small>Operación: ' + escapeHtml(opLabel) + '</small>'
+                                        + '</div>'
+                                        + '<div class="tm-calc-picker-grid">' + options.map(function (opt) {
+                                        var active = selected.indexOf(opt.key) !== -1 ? ' is-active' : '';
+                                        return '<button type="button" class="tm-calc-picker-item' + active + '" data-calc-picker-key="' + escapeHtml(opt.key) + '">' + escapeHtml(opt.label) + '</button>';
+                                    }).join('') + '</div>';
+                                    Swal.fire({
+                                        title: 'Opciones de operación',
+                                        html: pickerHtml,
+                                        width: 560,
+                                        showCancelButton: true,
+                                        confirmButtonText: 'Aplicar',
+                                        cancelButtonText: 'Cancelar',
+                                        didOpen: function () {
+                                            var htmlContainer = Swal.getHtmlContainer ? Swal.getHtmlContainer() : null;
+                                            if (!htmlContainer) { return; }
+                                            htmlContainer.addEventListener('click', function (evt) {
+                                                var item = evt.target.closest('.tm-calc-picker-item');
+                                                if (!item) { return; }
+                                                item.classList.toggle('is-active');
+                                            });
+                                        },
+                                        preConfirm: function () {
+                                            var htmlContainer = Swal.getHtmlContainer ? Swal.getHtmlContainer() : null;
+                                            if (!htmlContainer) { return []; }
+                                            return Array.from(htmlContainer.querySelectorAll('.tm-calc-picker-item.is-active'))
+                                                .map(function (el) { return String(el.getAttribute('data-calc-picker-key') || ''); })
+                                                .filter(Boolean);
+                                        }
+                                    }).then(function (res) {
+                                        if (!res || !res.isConfirmed) { return; }
+                                        var values = Array.isArray(res.value) ? res.value : [];
+                                        var nextGroup = document.getElementById('tmCalcOptGroup');
+                                        var nextSize = document.getElementById('tmCalcOptSize');
+                                        var nextBold = document.getElementById('tmCalcOptBold');
+                                        var nextColor = document.getElementById('tmCalcOptColor');
+                                        if (hiddenGroupEl && nextGroup) { hiddenGroupEl.value = String(nextGroup.value || ''); }
+                                        if (hiddenSizeEl && nextSize) { hiddenSizeEl.value = String(nextSize.value || '18'); }
+                                        if (hiddenBoldEl && nextBold) { hiddenBoldEl.value = nextBold.checked ? '1' : '0'; }
+                                        if (hiddenColorEl && nextColor) { hiddenColorEl.value = String(nextColor.value || 'var(--clr-secondary)'); }
+                                        if (hiddenValuesEl) {
+                                            hiddenValuesEl.value = JSON.stringify(values);
+                                        }
+                                        var metaEl = calcRow.querySelector('[data-calc-options-meta]');
+                                        if (metaEl) { metaEl.textContent = ''; }
+                                        syncCalculatedListToState(true);
+                                    });
+                                } else {
+                                    var raw = prompt('Selecciona campos separados por coma', selected.join(', '));
+                                    if (raw == null) { return; }
+                                    var values = String(raw || '').split(',').map(function (v) { return v.trim(); }).filter(Boolean);
+                                    if (hiddenValuesEl) {
+                                        hiddenValuesEl.value = JSON.stringify(values);
+                                    }
+                                    var metaElFb = calcRow.querySelector('[data-calc-options-meta]');
+                                    if (metaElFb) { metaElFb.textContent = ''; }
+                                    syncCalculatedListToState(true);
+                                }
                                 return;
                             }
                             var removeBtn = e.target.closest('[data-remove-calc-col]');
@@ -6214,7 +6379,7 @@
                             }
                         });
                     }
-                    buildPersonalizePreview(reorderColumnsList(columnsEl, columns), previewEl, undefined, personalizeModal._previewEntries, personalizeModal._previewMicrorregionMeta);
+                    renderPreviewViaAjax();
                     if (restoreWrap) { restoreWrap.hidden = true; }
                     if (personalizeModal) { personalizeModal._previewZoom = 100; }
                     setupPreviewZoom();
@@ -7320,23 +7485,12 @@
             const exportUrl = exportBtnRef.getAttribute('data-export-url');
             if (!exportUrl || !templateSwal) { return; }
             var choiceAllow = { single: 1, analysis_word: 1 };
-            tmFetchUserExportDraft(exportUrl).then(function (serverDraft) {
-                var savedChoice = null;
-                if (serverDraft && serverDraft.swal_choice && choiceAllow[serverDraft.swal_choice]) {
-                    savedChoice = serverDraft.swal_choice;
-                } else {
-                    try {
-                        var dr = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
-                        if (dr) {
-                            var po = JSON.parse(dr);
-                            if (po && po.swal_choice && choiceAllow[po.swal_choice]) { savedChoice = po.swal_choice; }
-                        }
-                    } catch (e) { /* ignore */ }
-                }
-                if (savedChoice === 'mr') {
-                    savedChoice = 'single';
-                }
-                templateSwal.fire({
+            var applySavedChoiceIfDialogOpen = function (savedChoice) {
+                if (!savedChoice || !Swal || !Swal.isVisible || !Swal.isVisible()) { return; }
+                var inp = document.querySelector('.swal2-container input[name="tm-export-choice"][value="' + savedChoice + '"]');
+                if (inp) { inp.checked = true; }
+            };
+            templateSwal.fire({
                 title: 'Exportación',
                 html: '<div class="tm-swal-export-options tm-swal-export-options--stacked">'
                     + '<label class="tm-swal-export-card">'
@@ -7362,10 +7516,6 @@
                 confirmButtonText: 'Exportar',
                 cancelButtonText: 'Cancelar',
                 didOpen: function () {
-                    if (savedChoice) {
-                        var inp = document.querySelector('input[name="tm-export-choice"][value="' + savedChoice + '"]');
-                        if (inp) { inp.checked = true; }
-                    }
                     var personalizeBtn = document.querySelector('.swal2-html-container .tm-swal-personalize-btn');
                     if (personalizeBtn) {
                         personalizeBtn.addEventListener('click', function () {
@@ -7419,6 +7569,33 @@
                 const separator = exportUrl.indexOf('?') === -1 ? '?' : '&';
                 submitTemporaryModuleExportPost(exportUrl, 'excel', 'single', { microrregion_sort: 'asc' });
             });
+            // Carga no bloqueante de la preferencia guardada (servidor/localStorage).
+            tmFetchUserExportDraft(exportUrl).then(function (serverDraft) {
+                var savedChoice = null;
+                if (serverDraft && serverDraft.swal_choice && choiceAllow[serverDraft.swal_choice]) {
+                    savedChoice = serverDraft.swal_choice;
+                } else {
+                    try {
+                        var dr = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
+                        if (dr) {
+                            var po = JSON.parse(dr);
+                            if (po && po.swal_choice && choiceAllow[po.swal_choice]) { savedChoice = po.swal_choice; }
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+                if (savedChoice === 'mr') {
+                    savedChoice = 'single';
+                }
+                applySavedChoiceIfDialogOpen(savedChoice);
+            }).catch(function () {
+                try {
+                    var raw = localStorage.getItem(tmExportDraftStorageKey(exportUrl));
+                    if (!raw) { return; }
+                    var parsed = JSON.parse(raw);
+                    var lcChoice = (parsed && parsed.swal_choice && choiceAllow[parsed.swal_choice]) ? parsed.swal_choice : null;
+                    if (lcChoice === 'mr') { lcChoice = 'single'; }
+                    applySavedChoiceIfDialogOpen(lcChoice);
+                } catch (eLocal) { /* ignore */ }
             });
         }
 
