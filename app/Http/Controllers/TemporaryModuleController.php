@@ -3148,12 +3148,18 @@ class TemporaryModuleController extends Controller
         $entries = $temporaryModule->entries()
             ->withoutGlobalScopes()
             ->leftJoin('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
+            ->leftJoin('users', 'users.id', '=', 'temporary_module_entries.user_id')
             ->orderByRaw(
                 'CASE WHEN temporary_module_entries.microrregion_id IS NULL THEN 1 ELSE 0 END, '.
                 'CAST(COALESCE(microrregiones.microrregion, 0) AS UNSIGNED) '.strtoupper($sortDirection).', '.
                 'temporary_module_entries.submitted_at DESC'
             )
-            ->select(['data', 'microrregion_id'])
+            ->select([
+                'temporary_module_entries.data',
+                'temporary_module_entries.microrregion_id',
+                'temporary_module_entries.created_at',
+                'users.name as user_name',
+            ])
             ->get();
         foreach ($exportColumns as $col) {
             if (($col['is_image'] ?? false)) {
@@ -3178,6 +3184,8 @@ class TemporaryModuleController extends Controller
         $columns[] = ['key' => 'item', 'label' => '#', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 4];
         $columns[] = ['key' => 'delegacion_numero', 'label' => 'Delegación', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 10];
         $columns[] = ['key' => 'cabecera_microrregion', 'label' => 'Cabecera', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 18];
+        $columns[] = ['key' => 'created_at_time', 'label' => 'Hora de creación', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 14];
+        $columns[] = ['key' => 'registered_user', 'label' => 'Usuario que registró', 'type' => 'fixed', 'is_image' => false, 'max_width_chars' => 24];
         foreach ($exportColumns as $col) {
             $info = $maxWidths[$col['key']] ?? ['chars' => 15];
             $field = $temporaryModule->fields->firstWhere('key', $col['key']);
@@ -3222,10 +3230,105 @@ class TemporaryModuleController extends Controller
         return response()->json([
             'title' => $temporaryModule->name,
             'columns' => $columns,
-            'entries' => $entries->map(fn ($e) => ['data' => $e->data, 'microrregion_id' => $e->microrregion_id])->values()->all(),
+            'entries' => $entries->map(fn ($e) => [
+                'data' => $e->data,
+                'microrregion_id' => $e->microrregion_id,
+                'created_at_time' => optional($e->created_at)?->timezone(config('app.timezone'))->format('H:i') ?? '',
+                'registered_user' => (string) ($e->user_name ?? ''),
+            ])->values()->all(),
             'microrregion_meta' => $microrregionMeta,
             'microrregion_sort' => $sortDirection,
         ]);
+    }
+
+    public function adminCreatedAtTimes(Request $request, int $module): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+
+        $entries = TemporaryModuleEntry::query()
+            ->from('temporary_module_entries')
+            ->leftJoin('users', 'users.id', '=', 'temporary_module_entries.user_id')
+            ->leftJoin('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
+            ->where('temporary_module_entries.temporary_module_id', $temporaryModule->id)
+            ->orderByDesc('temporary_module_entries.submitted_at')
+            ->orderByDesc('temporary_module_entries.id')
+            ->select([
+                'temporary_module_entries.id',
+                'temporary_module_entries.created_at',
+                'users.name as user_name',
+                'microrregiones.microrregion as microrregion_number',
+                'microrregiones.cabecera as microrregion_cabecera',
+            ])
+            ->limit(800)
+            ->get();
+
+        return response()->json([
+            'module_id' => (int) $temporaryModule->id,
+            'module_name' => (string) $temporaryModule->name,
+            'entries' => $entries->map(function ($entry): array {
+                $mrNumber = trim((string) ($entry->microrregion_number ?? ''));
+                $mrCabecera = trim((string) ($entry->microrregion_cabecera ?? ''));
+                $mrLabel = $mrNumber !== ''
+                    ? ('MR '.str_pad($mrNumber, 2, '0', STR_PAD_LEFT).($mrCabecera !== '' ? ' - '.$mrCabecera : ''))
+                    : ($mrCabecera !== '' ? $mrCabecera : 'Sin microrregión');
+
+                return [
+                    'id' => (int) $entry->id,
+                    'created_at_time' => optional($entry->created_at)?->timezone(config('app.timezone'))->format('H:i') ?? '',
+                    'registered_user' => trim((string) ($entry->user_name ?? '')),
+                    'microrregion_label' => $mrLabel,
+                ];
+            })->values()->all(),
+        ]);
+    }
+
+    public function adminUpdateCreatedAtTimes(Request $request, int $module): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+
+        $validated = $request->validate([
+            'entries' => ['required', 'array', 'min:1'],
+            'entries.*.id' => ['required', 'integer'],
+            'entries.*.time' => ['required', 'date_format:H:i'],
+        ]);
+
+        $payload = collect($validated['entries'] ?? [])
+            ->mapWithKeys(fn ($row) => [(int) ($row['id'] ?? 0) => (string) ($row['time'] ?? '')])
+            ->filter(fn (string $time, int $entryId): bool => $entryId > 0 && $time !== '');
+
+        if ($payload->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No se recibieron cambios válidos.'], 422);
+        }
+
+        $entries = TemporaryModuleEntry::query()
+            ->where('temporary_module_id', $temporaryModule->id)
+            ->whereIn('id', $payload->keys()->all())
+            ->get(['id', 'created_at']);
+
+        $updated = 0;
+        foreach ($entries as $entry) {
+            $time = $payload->get((int) $entry->id);
+            if (!is_string($time) || !preg_match('/^\d{2}:\d{2}$/', $time)) {
+                continue;
+            }
+            [$hh, $mm] = array_map('intval', explode(':', $time));
+            if ($hh < 0 || $hh > 23 || $mm < 0 || $mm > 59) {
+                continue;
+            }
+
+            $base = $entry->created_at
+                ? $entry->created_at->copy()->timezone(config('app.timezone'))
+                : Carbon::now(config('app.timezone'));
+            $base->setTime($hh, $mm, 0);
+
+            $entry->timestamps = false;
+            $entry->forceFill(['created_at' => $base])->save();
+            $updated++;
+        }
+
+        return response()->json(['success' => true, 'updated' => $updated]);
     }
 
     /** @return list<array{key: string, label: string, type: string, is_image: bool}> */

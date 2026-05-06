@@ -663,6 +663,125 @@
         }
 
         const personalizeModal = document.getElementById('tmExportPersonalizeModal');
+        const editCreatedTimeModal = document.getElementById('tmEditCreatedTimeModal');
+        const editCreatedTimeTbody = document.getElementById('tmEditCreatedTimeTbody');
+        const editCreatedTimeHelp = document.getElementById('tmEditCreatedTimeHelp');
+        const editCreatedTimeSaveBtn = document.getElementById('tmEditCreatedTimeSaveBtn');
+        function closeEditCreatedTimeModal() {
+            if (!editCreatedTimeModal) { return; }
+            editCreatedTimeModal.classList.remove('is-open');
+            editCreatedTimeModal.setAttribute('aria-hidden', 'true');
+            if (personalizeModal && personalizeModal.classList.contains('is-open')) {
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = '';
+            }
+        }
+        function openEditCreatedTimeModal() {
+            if (!editCreatedTimeModal || !personalizeModal) { return; }
+            var listUrl = String(personalizeModal._createdAtListUrl || '');
+            if (!listUrl) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({ icon: 'warning', title: 'No disponible', text: 'No se encontró la ruta para listar registros.' });
+                }
+                return;
+            }
+            if (editCreatedTimeTbody) {
+                editCreatedTimeTbody.innerHTML = '<tr><td colspan="4" class="tm-muted">Cargando...</td></tr>';
+            }
+            editCreatedTimeModal.classList.add('is-open');
+            editCreatedTimeModal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+            fetch(listUrl, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('No se pudo cargar.')); })
+                .then(function (data) {
+                    var rows = Array.isArray(data && data.entries) ? data.entries : [];
+                    if (editCreatedTimeHelp) {
+                        editCreatedTimeHelp.textContent = 'Módulo: ' + String(data && data.module_name || '');
+                    }
+                    if (!editCreatedTimeTbody) { return; }
+                    if (!rows.length) {
+                        editCreatedTimeTbody.innerHTML = '<tr><td colspan="4" class="tm-muted">No hay registros para editar.</td></tr>';
+                        return;
+                    }
+                    editCreatedTimeTbody.innerHTML = rows.map(function (row) {
+                        var rid = Number(row && row.id || 0);
+                        var mr = escapeHtml(String(row && row.microrregion_label || ''));
+                        var usr = escapeHtml(String(row && row.registered_user || ''));
+                        var hhmm = String(row && row.created_at_time || '');
+                        if (!/^\d{2}:\d{2}$/.test(hhmm)) { hhmm = ''; }
+                        return '<tr data-entry-id="' + String(rid) + '">'
+                            + '<td>#' + String(rid) + '</td>'
+                            + '<td>' + mr + '</td>'
+                            + '<td>' + usr + '</td>'
+                            + '<td><input type="time" class="tm-input" data-created-time-input value="' + escapeHtml(hhmm) + '"></td>'
+                            + '</tr>';
+                    }).join('');
+                })
+                .catch(function (err) {
+                    if (editCreatedTimeTbody) {
+                        editCreatedTimeTbody.innerHTML = '<tr><td colspan="4" class="tm-muted">No fue posible cargar los registros.</td></tr>';
+                    }
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({ icon: 'error', title: 'Error', text: err && err.message ? err.message : 'No se pudo cargar.' });
+                    }
+                });
+        }
+        if (editCreatedTimeModal) {
+            editCreatedTimeModal.querySelectorAll('[data-close-edit-created-time]').forEach(function (el) {
+                el.addEventListener('click', closeEditCreatedTimeModal);
+            });
+        }
+        if (editCreatedTimeSaveBtn) {
+            editCreatedTimeSaveBtn.addEventListener('click', function () {
+                if (!personalizeModal) { return; }
+                var saveUrl = String(personalizeModal._createdAtUpdateUrl || '');
+                if (!saveUrl || !editCreatedTimeTbody) { return; }
+                var rows = Array.from(editCreatedTimeTbody.querySelectorAll('tr[data-entry-id]'));
+                var payload = rows.map(function (tr) {
+                    var id = Number(tr.getAttribute('data-entry-id') || 0);
+                    var input = tr.querySelector('[data-created-time-input]');
+                    var time = input ? String(input.value || '') : '';
+                    return { id: id, time: time };
+                }).filter(function (r) { return r.id > 0 && /^\d{2}:\d{2}$/.test(String(r.time || '')); });
+                if (!payload.length) {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({ icon: 'warning', title: 'Sin cambios válidos', text: 'Captura al menos una hora con formato HH:mm.' });
+                    }
+                    return;
+                }
+                fetch(saveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': (window.TM_ADMIN_RECORDS_BOOT && window.TM_ADMIN_RECORDS_BOOT.csrfToken) || ''
+                    },
+                    body: JSON.stringify({ entries: payload })
+                })
+                    .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('No se pudo guardar.')); })
+                    .then(function (data) {
+                        closeEditCreatedTimeModal();
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Horas actualizadas',
+                                text: 'Se actualizaron ' + String(data && data.updated != null ? data.updated : payload.length) + ' registro(s).',
+                                toast: true,
+                                position: 'top-end',
+                                timer: 2200,
+                                showConfirmButton: false
+                            });
+                        }
+                    })
+                    .catch(function (err) {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({ icon: 'error', title: 'Error', text: err && err.message ? err.message : 'No se pudo guardar.' });
+                        }
+                    });
+            });
+        }
         function tmExportSyncTotalsIndepCardVisibility() {
             var sumOnEl = document.getElementById('tmExportIncludeSumTable');
             var card = document.getElementById('tmExportTotalsIndepCard');
@@ -1605,7 +1724,7 @@
                     return;
                 }
                 var k = String(c.key || '');
-                if (!k || ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'].indexOf(k) !== -1 || k.indexOf('__calc_') === 0) {
+                if (!k || ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion', 'created_at_time', 'registered_user'].indexOf(k) !== -1 || k.indexOf('__calc_') === 0) {
                     return;
                 }
                 var opt = document.createElement('option');
@@ -3770,7 +3889,7 @@
         }
 
         function tmExportApplyEmptyFillForColumn(col, rawValue) {
-            if (!col || col.is_image || ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'].indexOf(String(col.key || '')) !== -1) {
+            if (!col || col.is_image || ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion', 'created_at_time', 'registered_user'].indexOf(String(col.key || '')) !== -1) {
                 return rawValue;
             }
             if (!tmExportIsEmptyCellValue(rawValue)) {
@@ -4609,6 +4728,12 @@
                             } else if (col.key === 'cabecera_microrregion') {
                                 val = (meta[entry.microrregion_id] && meta[entry.microrregion_id].cabecera) ? String(meta[entry.microrregion_id].cabecera) : '';
                                 valueHtml = escapeHtml(val);
+                            } else if (col.key === 'created_at_time') {
+                                val = entry.created_at_time != null ? String(entry.created_at_time) : '';
+                                valueHtml = escapeHtml(val);
+                            } else if (col.key === 'registered_user') {
+                                val = entry.registered_user != null ? String(entry.registered_user) : '';
+                                valueHtml = escapeHtml(val);
                             } else if (String(col.key || '').indexOf('__calc_') === 0) {
                                 val = tmExportBuildCalculatedTextForEntry(entry, col._calc_cfg || null, effectiveColumns, headersUppercase);
                                 valueHtml = escapeHtmlWithBreaks(val);
@@ -4619,7 +4744,7 @@
                                 valueHtml = escapeHtml(val);
                             }
                             var weightStyle = col.content_bold ? 'font-weight:700;' : '';
-                            var skipBd = ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'].indexOf(String(col.key || '')) !== -1
+                            var skipBd = ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion', 'created_at_time', 'registered_user'].indexOf(String(col.key || '')) !== -1
                                 || String(col.key || '').indexOf('__calc_') === 0;
                             var bd = skipBd ? { cellStyle: 'background-color:' + cellColor + ';', hasBreakdownBg: false } : tmExportBreakdownDataCellStyle(col, val);
                             var rowBgPx = (!bd.hasBreakdownBg && rowRh.rowBg) ? ('background-color:' + escapeHtml(rowRh.rowBg) + ' !important;') : '';
@@ -4653,7 +4778,7 @@
                         var dispSample = formatPreviewCellDisplay(col, rawSample);
                         const val = (savedRow && savedRow[col.key] !== undefined) ? escapeHtml(dispSample) : '';
                         var emptyTextBold = col.content_bold ? 'font-weight:700;' : '';
-                        var skipBdE = ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'].indexOf(String(col.key || '')) !== -1
+                        var skipBdE = ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion', 'created_at_time', 'registered_user'].indexOf(String(col.key || '')) !== -1
                             || String(col.key || '').indexOf('__calc_') === 0;
                         var bdE = skipBdE ? { cellStyle: 'background-color:' + cellColor + ';' } : tmExportBreakdownDataCellStyle(col, dispSample);
                         html += '<td class="tm-export-preview-cell tm-export-preview-data-cell" data-key="' + escapeHtml(col.key) + '" contenteditable="true" style="' + widthStyle + bdE.cellStyle + 'font-size:' + recordsCellFontPx + 'px;' + emptyTextBold + '" data-placeholder="Ejemplo">' + val + '</td>';
@@ -4972,6 +5097,13 @@
             const sumTotalsColorMenuEl = document.getElementById('tmExportSumTotalsColorMenu');
             const addSumMetricBtn = document.getElementById('tmExportAddSumMetricBtn');
             const addSumFormulaBtn = document.getElementById('tmExportAddSumFormulaBtn');
+            const editCreatedTimeBtn = document.getElementById('tmExportEditCreatedTimeBtn');
+            var exportBtnRef = personalizeModal._exportButtonRef || null;
+            personalizeModal._createdAtListUrl = exportBtnRef ? String(exportBtnRef.getAttribute('data-created-at-list-url') || '') : '';
+            personalizeModal._createdAtUpdateUrl = exportBtnRef ? String(exportBtnRef.getAttribute('data-created-at-update-url') || '') : '';
+            if (editCreatedTimeBtn) {
+                editCreatedTimeBtn.onclick = function () { openEditCreatedTimeModal(); };
+            }
 
             if (sumGroupColorMenuEl) {
                 sumGroupColorMenuEl.innerHTML = TEMPLATE_COLORS.map(function (c, i) {
@@ -5086,7 +5218,7 @@
                     }
                     var countableColumns = columns.filter(function (c) {
                         var k = (c && c.key) ? c.key : '';
-                        return ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'].indexOf(k) === -1 && !c.is_image;
+                        return ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion', 'created_at_time', 'registered_user'].indexOf(k) === -1 && !c.is_image;
                     });
                     if (personalizeModal) { personalizeModal._countableColumns = countableColumns; }
                     if (personalizeModal) {
@@ -7304,6 +7436,11 @@
 
         document.addEventListener('keydown', function (event) {
             if (event.key !== 'Escape') {
+                return;
+            }
+
+            if (editCreatedTimeModal && editCreatedTimeModal.classList.contains('is-open')) {
+                closeEditCreatedTimeModal();
                 return;
             }
 

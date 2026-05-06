@@ -1418,6 +1418,16 @@
                             $lMrCabecera = (string) ($lMeta['cabecera'] ?? ($lMeta->cabecera ?? ''));
                         @endphp
                         <td style="vertical-align: middle; text-align: center; {{ $baseW }} {{ $cellBoldStyle }} {{ $rowTdBg }}">@if($rowTextResolvedPdf !== '' && $rowBgResolvedPdf !== '')<span style="color: {{ $rowTextResolvedPdf }} !important;">{{ $lMrCabecera }}</span>@else{{ $lMrCabecera }}@endif</td>
+                    @elseif ($key === 'created_at_time')
+                        @php
+                            $lCreatedAtTime = optional($entry->created_at)->timezone(config('app.timezone'))->format('H:i') ?? '';
+                        @endphp
+                        <td style="vertical-align: middle; text-align: center; {{ $baseW }} {{ $cellBoldStyle }} {{ $rowTdBg }}">@if($rowTextResolvedPdf !== '' && $rowBgResolvedPdf !== '')<span style="color: {{ $rowTextResolvedPdf }} !important;">{{ $lCreatedAtTime }}</span>@else{{ $lCreatedAtTime }}@endif</td>
+                    @elseif ($key === 'registered_user')
+                        @php
+                            $lRegisteredUser = trim((string) ($entry->user_name ?? ''));
+                        @endphp
+                        <td style="vertical-align: middle; text-align: center; {{ $baseW }} {{ $cellBoldStyle }} {{ $rowTdBg }}">@if($rowTextResolvedPdf !== '' && $rowBgResolvedPdf !== '')<span style="color: {{ $rowTextResolvedPdf }} !important;">{{ $lRegisteredUser }}</span>@else{{ $lRegisteredUser }}@endif</td>
                     @elseif (
                         is_string($key)
                         && str_starts_with($key, '__calc_')
@@ -1439,7 +1449,7 @@
                             if ($effectiveSelected === []) {
                                 foreach ($colHeaders as $opCol) {
                                     $opKey = (string) ($opCol['key'] ?? '');
-                                    if ($opKey === '' || in_array($opKey, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true) || str_starts_with($opKey, '__calc_')) {
+                                    if ($opKey === '' || in_array($opKey, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion', 'created_at_time', 'registered_user'], true) || str_starts_with($opKey, '__calc_')) {
                                         continue;
                                     }
                                     $effectiveSelected[] = $opKey;
@@ -1488,7 +1498,7 @@
                             $fieldType = (string) ($fieldTypesByKey[$key] ?? '');
                             $fieldTypeLower = strtolower(trim($fieldType));
                             $isImageType = in_array($fieldTypeLower, ['image', 'file', 'foto', 'file_image', 'image_upload', 'imageupload'], true);
-                            if (!$isImageType && !in_array((string) $key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true) && in_array($fillMode, ['auto', 'custom'], true) && $operationsValueIsEmpty($val)) {
+                            if (!$isImageType && !in_array((string) $key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion', 'created_at_time', 'registered_user'], true) && in_array($fillMode, ['auto', 'custom'], true) && $operationsValueIsEmpty($val)) {
                                 if ($fillMode === 'custom') {
                                     $val = $fillValue;
                                 } else {

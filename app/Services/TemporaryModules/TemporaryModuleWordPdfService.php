@@ -104,6 +104,8 @@ class TemporaryModuleWordPdfService
              $cols[] = ['key' => 'item', 'label' => '#', 'color' => ''];
              $cols[] = ['key' => 'delegacion_numero', 'label' => 'Delegación', 'color' => ''];
              $cols[] = ['key' => 'cabecera_microrregion', 'label' => 'Cabecera', 'color' => ''];
+             $cols[] = ['key' => 'created_at_time', 'label' => 'Hora de creación', 'color' => ''];
+             $cols[] = ['key' => 'registered_user', 'label' => 'Usuario que registró', 'color' => ''];
              foreach ($temporaryModule->fields as $field) {
                  $cols[] = [
                      'key' => $field->key,
@@ -315,13 +317,17 @@ class TemporaryModuleWordPdfService
         $entries = $temporaryModule->entries()
             ->withoutGlobalScopes()
             ->leftJoin('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
+            ->leftJoin('users', 'users.id', '=', 'temporary_module_entries.user_id')
             ->orderByRaw(
                 'CASE WHEN temporary_module_entries.microrregion_id IS NULL THEN 1 ELSE 0 END, '.
                 'CAST(COALESCE(microrregiones.microrregion, 0) AS UNSIGNED) '.$sortDirection.', '.
                 'temporary_module_entries.submitted_at DESC'
             )
-            ->select('temporary_module_entries.*')
-            ->get(['microrregion_id', 'data', 'submitted_at']);
+            ->select([
+                'temporary_module_entries.*',
+                'users.name as user_name',
+            ])
+            ->get(['microrregion_id', 'data', 'submitted_at', 'created_at', 'user_name']);
         $entries = $this->sortEntriesByMicrorregion($entries, $microrregionMeta, $sortDirection);
 
         $exportDir = storage_path('app/public/temporary-exports');
@@ -1327,7 +1333,7 @@ class TemporaryModuleWordPdfService
                 $hasImageInRow = false;
                 foreach ($columns as $c) {
                     $k = (string) ($c['key'] ?? '');
-                    if ($k === '' || in_array($k, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true)) {
+                    if ($k === '' || in_array($k, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion', 'created_at_time', 'registered_user'], true)) {
                         continue;
                     }
                     $v = $entry->data[$k] ?? null;
@@ -1416,6 +1422,38 @@ class TemporaryModuleWordPdfService
                     if ($key === 'cabecera_microrregion') {
                         $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
                         $text = (string) ($meta['cabecera'] ?? $meta->cabecera ?? '');
+                        $w = $columnTwips[$idx] ?? null;
+                        $bd0 = $this->breakdownWordDataCellVisual($col, $text);
+                        $vis0 = $this->mergeWordRowBreakdownCellVisual($bd0, (string) ($rh['bg_css'] ?? ''), (string) ($rh['text_css'] ?? ''));
+                        $co0 = ['valign' => 'center'];
+                        if ($vis0['bg'] !== null) {
+                            $co0['bgColor'] = $vis0['bg'];
+                        }
+                        $f0 = ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold];
+                        if ($vis0['text'] !== null) {
+                            $f0['color'] = $vis0['text'];
+                        }
+                        $table->addCell($w, $co0)->addText($text, $f0, ['alignment' => Jc::CENTER]);
+                        continue;
+                    }
+                    if ($key === 'created_at_time') {
+                        $text = optional($entry->created_at)->timezone(config('app.timezone'))->format('H:i') ?? '';
+                        $w = $columnTwips[$idx] ?? null;
+                        $bd0 = $this->breakdownWordDataCellVisual($col, $text);
+                        $vis0 = $this->mergeWordRowBreakdownCellVisual($bd0, (string) ($rh['bg_css'] ?? ''), (string) ($rh['text_css'] ?? ''));
+                        $co0 = ['valign' => 'center'];
+                        if ($vis0['bg'] !== null) {
+                            $co0['bgColor'] = $vis0['bg'];
+                        }
+                        $f0 = ['name' => $exportFontName, 'size' => $cellFontSizePt, 'bold' => $isContentBold];
+                        if ($vis0['text'] !== null) {
+                            $f0['color'] = $vis0['text'];
+                        }
+                        $table->addCell($w, $co0)->addText($text, $f0, ['alignment' => Jc::CENTER]);
+                        continue;
+                    }
+                    if ($key === 'registered_user') {
+                        $text = trim((string) ($entry->user_name ?? ''));
                         $w = $columnTwips[$idx] ?? null;
                         $bd0 = $this->breakdownWordDataCellVisual($col, $text);
                         $vis0 = $this->mergeWordRowBreakdownCellVisual($bd0, (string) ($rh['bg_css'] ?? ''), (string) ($rh['text_css'] ?? ''));
@@ -2291,7 +2329,7 @@ class TemporaryModuleWordPdfService
         if ($selectedKeys === []) {
             foreach ($columns as $column) {
                 $colKey = (string) ($column['key'] ?? '');
-                if ($colKey === '' || in_array($colKey, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true) || str_starts_with($colKey, '__calc_')) {
+                if ($colKey === '' || in_array($colKey, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion', 'created_at_time', 'registered_user'], true) || str_starts_with($colKey, '__calc_')) {
                     continue;
                 }
                 $selectedKeys[] = $colKey;
@@ -2432,7 +2470,7 @@ class TemporaryModuleWordPdfService
     private function applyColumnEmptyFillValue(mixed $value, array $column, string $fieldType): mixed
     {
         $key = (string) ($column['key'] ?? '');
-        if (in_array($key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true)) {
+        if (in_array($key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion', 'created_at_time', 'registered_user'], true)) {
             return $value;
         }
         if (in_array(strtolower(trim($fieldType)), ['image', 'file', 'document', 'foto'], true)) {
@@ -2499,6 +2537,12 @@ class TemporaryModuleWordPdfService
             $meta = $microrregionMeta->get((int) ($entry->microrregion_id ?? 0));
 
             return (string) ($meta['cabecera'] ?? $meta->cabecera ?? '');
+        }
+        if ($key === 'created_at_time') {
+            return optional($entry->created_at)->timezone(config('app.timezone'))->format('H:i') ?? '';
+        }
+        if ($key === 'registered_user') {
+            return trim((string) ($entry->user_name ?? ''));
         }
 
         $col = $colByKey[$key] ?? ['key' => $key];
@@ -3468,7 +3512,7 @@ class TemporaryModuleWordPdfService
         foreach ($entries as $entry) {
             foreach ($columns as $column) {
                 $key = (string) ($column['key'] ?? '');
-                if ($key === '' || in_array($key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true)) {
+                if ($key === '' || in_array($key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion', 'created_at_time', 'registered_user'], true)) {
                     continue;
                 }
 
@@ -3599,7 +3643,7 @@ class TemporaryModuleWordPdfService
                 continue;
             }
             $key = (string) ($column['key'] ?? '');
-            if ($key === '' || in_array($key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion'], true)) {
+            if ($key === '' || in_array($key, ['item', 'microrregion', 'delegacion_numero', 'cabecera_microrregion', 'created_at_time', 'registered_user'], true)) {
                 continue;
             }
 

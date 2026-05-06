@@ -88,6 +88,8 @@
                                     data-export-url="{{ route('temporary-modules.admin.export', $module->id) }}"
                                     data-export-entries="{{ (int) $module->entries_count }}"
                                     data-structure-url="{{ route('temporary-modules.admin.export-preview-structure', $module->id) }}"
+                                    data-created-at-list-url="{{ route('temporary-modules.admin.entries-created-at.index', $module->id) }}"
+                                    data-created-at-update-url="{{ route('temporary-modules.admin.entries-created-at.update', $module->id) }}"
                                     data-analysis-preview-url="{{ route('temporary-modules.admin.analysis-preview', $module->id) }}"
                                     data-analysis-word-url="{{ route('temporary-modules.admin.export-analysis-word', $module->id) }}"
                                     title="Exportar (Excel, PDF, Word o informe)"
@@ -679,6 +681,11 @@
                         </div>
 
                         <p class="tm-export-personalize-hint">Arrastra columnas para reordenar. Usa &times; para omitir. Asigna un grupo a cada columna si aplica.</p>
+                        <p class="tm-export-personalize-hint">
+                            <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" id="tmExportEditCreatedTimeBtn">
+                                <i class="fa-solid fa-clock" aria-hidden="true"></i> Editar hora de creación por registro
+                            </button>
+                        </p>
                         <div class="tm-export-personalize-columns" id="tmExportPersonalizeColumns" role="list"></div>
                         <p class="tm-export-restore-wrap" id="tmExportRestoreWrap" hidden>
                             <button type="button" class="tm-export-restore-btn" id="tmExportRestoreBtn">Restaurar todas las columnas</button>
@@ -784,6 +791,42 @@
                         <i class="fa-solid fa-broom" aria-hidden="true"></i>
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tm-modal" id="tmEditCreatedTimeModal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="tm-modal-backdrop" data-close-edit-created-time></div>
+        <div class="tm-modal-dialog" style="max-width: 960px;">
+            <div class="tm-modal-head">
+                <h3>Editar hora de creación</h3>
+                <button type="button" class="tm-modal-close" data-close-edit-created-time aria-label="Cerrar">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="tm-modal-body">
+                <p class="tm-analysis-hint" id="tmEditCreatedTimeHelp">Ajusta la hora por registro y guarda.</p>
+                <div class="tm-table-wrap tm-table-wrap-scroll">
+                    <table class="tm-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 12%;">Registro</th>
+                                <th style="width: 28%;">Microrregión</th>
+                                <th style="width: 30%;">Usuario</th>
+                                <th style="width: 20%;">Hora de creación</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tmEditCreatedTimeTbody">
+                            <tr>
+                                <td colspan="4" class="tm-muted">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tm-modal-foot">
+                <button type="button" class="tm-btn tm-btn-outline" data-close-edit-created-time>Cancelar</button>
+                <button type="button" class="tm-btn tm-btn-primary" id="tmEditCreatedTimeSaveBtn">Guardar horas</button>
             </div>
         </div>
     </div>

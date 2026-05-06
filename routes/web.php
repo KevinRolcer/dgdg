@@ -181,6 +181,14 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.export-preview-structure');
+            Route::get('/{module}/registros-hora-creacion', [TemporaryModuleController::class, 'adminCreatedAtTimes'])
+                ->whereNumber('module')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.entries-created-at.index');
+            Route::post('/{module}/registros-hora-creacion', [TemporaryModuleController::class, 'adminUpdateCreatedAtTimes'])
+                ->whereNumber('module')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.entries-created-at.update');
             Route::get('/{module}/exportacion-configuracion', [TemporaryModuleController::class, 'exportUserConfigShow'])
                 ->whereNumber('module')
                 ->middleware('can:modulos-temporales-admin-ver')
