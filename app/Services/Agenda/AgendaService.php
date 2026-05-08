@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Permission;
 
 class AgendaService
@@ -187,7 +188,7 @@ class AgendaService
                 }
                 $datos['descripcion'] = $desc;
             }
-            $agenda = Agenda::create($datos);
+            $agenda = Agenda::create($this->onlyExistingAgendaColumns($datos));
             if (! empty($validated['usuarios_asignados'])) {
                 $agenda->usuariosAsignados()->sync($validated['usuarios_asignados']);
             }
@@ -224,10 +225,27 @@ class AgendaService
                 }
                 $datos['descripcion'] = $desc;
             }
-            $agenda->update($datos);
+            $agenda->update($this->onlyExistingAgendaColumns($datos));
             $agenda->usuariosAsignados()->sync($request->input('usuarios_asignados', []));
             $this->sincronizarPermisoSeguimientoAsignados($agenda->fresh());
         });
+    }
+
+    /**
+     * Evita errores 500 si el codigo llega antes que las migraciones nuevas.
+     *
+     * @param  array<string, mixed>  $datos
+     * @return array<string, mixed>
+     */
+    private function onlyExistingAgendaColumns(array $datos): array
+    {
+        static $columns = null;
+
+        if ($columns === null) {
+            $columns = array_flip(Schema::getColumnListing((new Agenda)->getTable()));
+        }
+
+        return array_intersect_key($datos, $columns);
     }
 
     /**
