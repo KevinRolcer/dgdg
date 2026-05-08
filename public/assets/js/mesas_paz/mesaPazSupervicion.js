@@ -411,7 +411,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 tableRows = '<tr><td colspan="4">Sin registros por día en el rango seleccionado</td></tr>';
             }
 
-            const logoMain = pptLogoUrl ? '<img src="' + pptLogoUrl + '" alt="Gobierno de Puebla">' : '';
+            const logoMain = pptLogoUrl ? '<img src="' + pptLogoUrl + '" alt="Gobernación Mesa de trabajo">' : '';
             const logoSegob = pptSegobLogoUrl ? '<img src="' + pptSegobLogoUrl + '" alt="SEGOB Puebla">' : '';
             const coverStyle = pptCoverBgUrl ? ' style="background-image: linear-gradient(rgba(109,21,48,.88), rgba(109,21,48,.92)), url(\'' + pptCoverBgUrl + '\');"' : '';
 

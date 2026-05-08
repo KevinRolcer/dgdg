@@ -19,6 +19,8 @@
             $fichaBgFile = $fichaBg !== '' && preg_match('/^[A-Za-z0-9_-]+$/', $fichaBg) && File::exists(public_path('images/Texturas/'.$fichaBg.'.png')) ? $fichaBg : '';
             $fichaBgTone = str_contains(strtolower($fichaBgFile), 'blanco') ? 'blanco' : 'color';
             $fichaBgStyle = $fichaBgFile !== '' ? "background-image: url('".asset('images/Texturas/'.$fichaBgFile.'.png')."');" : '';
+            $fichaBgPosX = min(100, max(0, (int) ($card['ficha_bg_pos_x'] ?? 50)));
+            $fichaBgStyle .= " background-position: {$fichaBgPosX}% center;";
             $fichaShowUrl = route('agenda.show', ['agenda' => $card['agenda_id'], 'return' => $previewReturn, 'preview' => 'ficha']);
         @endphp
         <article class="agenda-cal-card">

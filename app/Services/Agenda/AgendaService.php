@@ -174,6 +174,8 @@ class AgendaService
                 'subtipo' => $request->input('tipo') === 'gira' ? $request->input('subtipo', 'gira') : null,
                 'ficha_titulo' => $request->input('tipo') === 'personalizado' ? trim((string) $request->input('ficha_titulo', '')) : null,
                 'ficha_fondo' => $request->input('tipo') === 'personalizado' ? $request->input('ficha_fondo', 'beige') : null,
+                'ficha_orientacion' => $request->input('tipo') === 'personalizado' ? $request->input('ficha_orientacion', 'portrait') : null,
+                'ficha_fondo_pos_x' => $request->input('tipo') === 'personalizado' ? min(100, max(0, (int) $request->input('ficha_fondo_pos_x', 50))) : 50,
                 'direcciones_adicionales' => array_values(array_filter(array_map('trim', $request->input('direcciones_adicionales', [])))),
             ]);
             // Si es gira/pre-gira, agregar delegado encargado a la descripción
@@ -208,6 +210,8 @@ class AgendaService
                 'subtipo' => $request->input('tipo') === 'gira' ? $request->input('subtipo', 'gira') : null,
                 'ficha_titulo' => $request->input('tipo') === 'personalizado' ? trim((string) $request->input('ficha_titulo', '')) : null,
                 'ficha_fondo' => $request->input('tipo') === 'personalizado' ? $request->input('ficha_fondo', 'beige') : null,
+                'ficha_orientacion' => $request->input('tipo') === 'personalizado' ? $request->input('ficha_orientacion', 'portrait') : null,
+                'ficha_fondo_pos_x' => $request->input('tipo') === 'personalizado' ? min(100, max(0, (int) $request->input('ficha_fondo_pos_x', 50))) : 50,
                 'dias_repeticion' => $request->input('dias_repeticion', []),
                 'direcciones_adicionales' => array_values(array_filter(array_map('trim', $request->input('direcciones_adicionales', [])))),
             ]);

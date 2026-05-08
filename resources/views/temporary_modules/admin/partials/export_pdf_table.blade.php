@@ -265,7 +265,7 @@
         $h = '<table class="doc-head-table" role="presentation">';
         if (! empty($logoDataUri)) {
             $h .= '<tr><td colspan="2" style="text-align: left; vertical-align: bottom; padding-bottom: 2px;">';
-            $h .= '<img class="doc-head-logo" src="'.e($logoDataUri).'" alt="Gobierno de Puebla" style="max-height: '.(int) $summaryCompactLogoHeightPx.'px;">';
+            $h .= '<img class="doc-head-logo" src="'.e($logoDataUri).'" alt="Gobernación Mesa de trabajo" style="max-height: '.(int) $summaryCompactLogoHeightPx.'px;">';
             $h .= '</td></tr><tr><td colspan="2" style="padding-top: 6px; padding-bottom: 3px;">';
             $h .= '<h1 style="text-align: '.$ta.'; margin-bottom: 0; font-size: '.(int) $summaryCompactTitlePx.'px;">'.e((string) $title).'</h1>';
             $h .= '</td></tr><tr><td colspan="2" style="text-align: right; font-size: '.(int) $summaryCompactDatePx.'px; padding-bottom: 6px;">';
@@ -610,7 +610,7 @@
     @if (!empty($logoDataUri))
     <tr>
         <td colspan="2" style="text-align: left; vertical-align: bottom; padding-bottom: 2px;">
-            <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobierno de Puebla" style="max-height: {{ $summaryCompactLogoHeightPx }}px;">
+            <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobernación Mesa de trabajo" style="max-height: {{ $summaryCompactLogoHeightPx }}px;">
         </td>
     </tr>
     <tr>
@@ -715,7 +715,7 @@
     @if (!empty($logoDataUri))
     <tr>
         <td colspan="2" style="text-align: left; vertical-align: bottom; padding-bottom: 2px;">
-            <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobierno de Puebla" style="max-height: {{ $summaryCompactLogoHeightPx }}px;">
+            <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobernación Mesa de trabajo" style="max-height: {{ $summaryCompactLogoHeightPx }}px;">
         </td>
     </tr>
     <tr>
@@ -884,7 +884,7 @@
     @if (!empty($logoDataUri))
     <tr>
         <td colspan="2" style="text-align: left; vertical-align: bottom; padding-bottom: 2px;">
-            <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobierno de Puebla">
+            <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobernación Mesa de trabajo">
         </td>
     </tr>
     <tr>
@@ -1212,7 +1212,7 @@
     @if (!empty($logoDataUri))
     <tr>
         <td colspan="2" style="text-align: left; vertical-align: bottom; padding-bottom: 2px;">
-            <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobierno de Puebla">
+            <img class="doc-head-logo" src="{{ $logoDataUri }}" alt="Gobernación Mesa de trabajo">
         </td>
     </tr>
     <tr>

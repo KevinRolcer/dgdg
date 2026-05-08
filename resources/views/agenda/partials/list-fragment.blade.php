@@ -78,6 +78,8 @@
                                 data-subtipo="{{ $item->subtipo ?? 'gira' }}"
                                 data-ficha-titulo="{{ e($item->ficha_titulo) }}"
                                 data-ficha-fondo="{{ e($item->ficha_fondo) }}"
+                                data-ficha-orientacion="{{ e($item->ficha_orientacion ?? 'portrait') }}"
+                                data-ficha-fondo-pos-x="{{ (int) ($item->ficha_fondo_pos_x ?? 50) }}"
                                 data-asunto="{{ e($item->asunto) }}"
                                 data-microrregion="{{ e($item->microrregion) }}"
                                 data-municipio="{{ e($item->municipio) }}"

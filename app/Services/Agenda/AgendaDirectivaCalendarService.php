@@ -278,6 +278,8 @@ class AgendaDirectivaCalendarService
                 'kind' => $this->cardKindForFicha($agenda),
                 'kind_label' => $this->cardKindLabelForFicha($agenda),
                 'ficha_bg' => $this->cardBackgroundForFicha($agenda),
+                'ficha_orientation' => $this->cardOrientationForFicha($agenda),
+                'ficha_bg_pos_x' => $this->cardBackgroundPositionXForFicha($agenda),
             ];
         }
 
@@ -629,7 +631,27 @@ class AgendaDirectivaCalendarService
             'kind' => $this->cardKindForFicha($agenda),
             'kind_label' => $this->cardKindLabelForFicha($agenda),
             'ficha_bg' => $this->cardBackgroundForFicha($agenda),
+            'ficha_orientation' => $this->cardOrientationForFicha($agenda),
+            'ficha_bg_pos_x' => $this->cardBackgroundPositionXForFicha($agenda),
             'sort_key' => $anchor->format('Y-m-d'),
         ];
+    }
+
+    private function cardOrientationForFicha(Agenda $agenda): string
+    {
+        if ($agenda->tipo !== 'personalizado') {
+            return 'portrait';
+        }
+
+        return (string) ($agenda->ficha_orientacion ?? '') === 'landscape' ? 'landscape' : 'portrait';
+    }
+
+    private function cardBackgroundPositionXForFicha(Agenda $agenda): int
+    {
+        if ($agenda->tipo !== 'personalizado') {
+            return 50;
+        }
+
+        return min(100, max(0, (int) ($agenda->ficha_fondo_pos_x ?? 50)));
     }
 }

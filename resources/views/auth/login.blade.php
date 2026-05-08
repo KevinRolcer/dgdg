@@ -21,8 +21,8 @@
 
             <header class="auth-header">
                 <div class="auth-logo-box">
-                    <img class="auth-logo-light" src="{{ asset('images/logo-gobierno.png') }}" alt="Logo Gobierno de Puebla">
-                    <img class="auth-logo-dark" src="{{ asset('images/Gobierno de Puebla_2-Versión horizontal.png') }}" alt="Logo Gobierno de Puebla">
+                    <img class="auth-logo-light" src="{{ asset('images/Logos/Gobernación_Mesa de trabajo.png') }}" alt="Gobernación Mesa de trabajo">
+                    <img class="auth-logo-dark" src="{{ asset('images/Logos/Gobernación_Mesa de trabajo 2.png') }}" alt="Gobernación Mesa de trabajo 2">
                 </div>
                 <h1 class="auth-title">Dirección General de Delegaciones</h1>
             </header>

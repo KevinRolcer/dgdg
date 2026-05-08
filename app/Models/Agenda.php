@@ -25,6 +25,8 @@ class Agenda extends Model
         'subtipo',
         'ficha_titulo',
         'ficha_fondo',
+        'ficha_orientacion',
+        'ficha_fondo_pos_x',
         'microrregion',
         'municipio',
         'lugar',
@@ -51,6 +53,7 @@ class Agenda extends Model
         'repite' => 'boolean',
         'dias_repeticion' => 'array',
         'recordatorio_minutos' => 'integer',
+        'ficha_fondo_pos_x' => 'integer',
         'direcciones_adicionales' => 'array',
         'es_actualizacion' => 'boolean',
     ];

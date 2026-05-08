@@ -37,16 +37,16 @@
             <div class="error-brand">
                 <img
                     class="error-brand__logo--light"
-                    src="{{ asset('images/Gobierno de Puebla_1-Versión horizontal.png') }}"
-                    alt="Gobierno de Puebla"
+                    src="{{ asset('images/Logos/Gobernación_Mesa de trabajo.png') }}"
+                    alt="Gobernación Mesa de trabajo"
                     width="320"
                     height="80"
                     decoding="async"
                 >
                 <img
                     class="error-brand__logo--dark"
-                    src="{{ asset('images/Gobierno de Puebla_2-Versión horizontal.png') }}"
-                    alt="Gobierno de Puebla"
+                    src="{{ asset('images/Logos/Gobernación_Mesa de trabajo 2.png') }}"
+                    alt="Gobernación Mesa de trabajo 2"
                     width="320"
                     height="80"
                     decoding="async"

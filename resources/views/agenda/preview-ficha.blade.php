@@ -22,13 +22,44 @@
         'personalizada' => !empty($card['kind_label']) ? $card['kind_label'] : 'Ficha personalizada',
         default => 'Agenda',
     };
-    $logoVersion = ($kind === 'pre_gira') ? '1' : '2';
-    $logoFile = "Gobierno de Puebla_{$logoVersion}-Versión vertical.png";
 
     $fichaBg = $kind === 'personalizada' ? (string) ($card['ficha_bg'] ?? '') : '';
     $fichaBgFile = $fichaBg !== '' && preg_match('/^[A-Za-z0-9_-]+$/', $fichaBg) && File::exists(public_path('images/Texturas/'.$fichaBg.'.png')) ? $fichaBg : '';
+    $textureLower = strtolower($fichaBgFile);
+    if (str_contains($textureLower, 'blanco')) {
+        $logoFile = 'Logos/Gobernación_Mesa de trabajo.png';
+        $titleColor = 'color: #3a3a3a;';
+    } elseif (str_contains($textureLower, 'beige')) {
+        $logoFile = 'Logos/Gobernación_Mesa de trabajo.png';
+        $titleColor = 'color: #861e34;';
+    } elseif (str_contains($textureLower, 'verde') || str_contains($textureLower, 'rojo')) {
+        $logoFile = 'Logos/Gobernación_Mesa de trabajo 2.png';
+        $titleColor = '';
+    } else {
+        $logoFile = ($kind === 'pre_gira')
+            ? 'Logos/Gobernación_Mesa de trabajo.png'
+            : 'Logos/Gobernación_Mesa de trabajo 2.png';
+        $titleColor = '';
+    }
     $fichaBgTone = str_contains(strtolower($fichaBgFile), 'blanco') ? 'blanco' : 'color';
+    $fichaBgClass = '';
+    if ($fichaBgFile !== '') {
+        $textureClass = strtolower($fichaBgFile);
+        $fichaBgClass = match (true) {
+            str_contains($textureClass, 'blanco') => ' agenda-ficha-card--bg-blanco',
+            str_contains($textureClass, 'beige') && str_contains($textureClass, '1a') => ' agenda-ficha-card--bg-tlaloc_a_beige',
+            str_contains($textureClass, 'beige') => ' agenda-ficha-card--bg-beige',
+            str_contains($textureClass, 'rojo') && str_contains($textureClass, '1a') => ' agenda-ficha-card--bg-tlaloc_a_rojo',
+            str_contains($textureClass, 'rojo') => ' agenda-ficha-card--bg-rojo',
+            str_contains($textureClass, 'verde') && str_contains($textureClass, '1a') => ' agenda-ficha-card--bg-tlaloc_a_verde',
+            str_contains($textureClass, 'verde') => ' agenda-ficha-card--bg-verde',
+            default => '',
+        };
+    }
     $fichaBgStyle = $fichaBgFile !== '' ? "background-image: url('".asset('images/Texturas/'.$fichaBgFile.'.png')."');" : '';
+    $fichaOrientation = (($card['ficha_orientation'] ?? 'portrait') === 'landscape') ? 'landscape' : 'portrait';
+    $fichaBgPosX = min(100, max(0, (int) ($card['ficha_bg_pos_x'] ?? 50)));
+    $fichaBgStyle .= " background-position: {$fichaBgPosX}% center;";
 
     $textBulk = mb_strlen(trim((string) ($card['title'] ?? '')))
                 + mb_strlen(trim((string) ($card['lugar'] ?? '')))
@@ -68,13 +99,13 @@
         </header>
 
         <div class="agenda-ficha-stage">
-            <article class="agenda-ficha-card agenda-ficha-card--{{ $kind }}{{ $fichaBgTone === 'blanco' ? ' agenda-ficha-card--bg-blanco' : '' }}{{ $fichaBgFile !== '' ? ' agenda-ficha-card--custom-texture' : '' }}{{ $sparseContent ? ' agenda-ficha-card--sparse' : '' }}" style="{{ $fichaBgStyle }}" data-ficha-preview-card>
+            <article class="agenda-ficha-card agenda-ficha-card--{{ $kind }}{{ $fichaBgClass }}{{ $fichaBgFile !== '' ? ' agenda-ficha-card--custom-texture' : '' }}{{ $fichaOrientation === 'landscape' ? ' agenda-ficha-card--landscape' : '' }}{{ $sparseContent ? ' agenda-ficha-card--sparse' : '' }}" style="{{ $fichaBgStyle }}" data-ficha-preview-card>
                 <div class="agenda-ficha-card-body">
                     <p class="agenda-ficha-eyebrow">{{ $kindLabel }}</p>
                     @if($kind === 'personalizada' && !empty($card['kind_label']))
-                        <h2 class="agenda-ficha-title">{{ $card['kind_label'] }}</h2>
+                        <h2 class="agenda-ficha-title" style="{{ $titleColor ?? '' }}">{{ $card['kind_label'] }}</h2>
                     @else
-                        <h2 class="agenda-ficha-title">{{ $card['title'] }}</h2>
+                        <h2 class="agenda-ficha-title" style="{{ $titleColor ?? '' }}">{{ $card['title'] }}</h2>
                     @endif
 
                     @if (!empty($card['lugar']))
@@ -101,7 +132,7 @@
                 </div>
 
                 <div class="agenda-ficha-logo">
-                    <img src="{{ asset('images/' . $logoFile) }}" alt="Gobierno de Puebla">
+                    <img src="{{ asset('images/' . $logoFile) }}" alt="Gobernación Mesa de trabajo">
                 </div>
             </article>
         </div>

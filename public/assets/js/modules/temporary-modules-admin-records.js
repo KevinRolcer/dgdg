@@ -4549,7 +4549,7 @@
             if (TM_EXPORT_PREVIEW_LOGO_URL) {
                 html += '<tr>';
                 html += '<td style="width:100%;vertical-align:bottom;padding-bottom:2px;">'
-                    + '<img src="' + escapeHtml(TM_EXPORT_PREVIEW_LOGO_URL) + '" alt="Gobierno de Puebla" style="height:52px;width:auto;display:block;">'
+                    + '<img src="' + escapeHtml(TM_EXPORT_PREVIEW_LOGO_URL) + '" alt="Gobernación Mesa de trabajo" style="height:52px;width:auto;display:block;">'
                     + '</td>';
                 html += '</tr>';
                 html += '<tr><td style="padding-top:6px;">';

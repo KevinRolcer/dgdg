@@ -495,6 +495,8 @@ class AgendaController extends Controller
                 'required_if:tipo,personalizado',
                 Rule::in($this->nombresTexturasFicha()),
             ],
+            'ficha_orientacion' => 'nullable|string|in:portrait,landscape',
+            'ficha_fondo_pos_x' => 'nullable|integer|min:0|max:100',
             'microrregion' => 'nullable|string|max:255',
             'municipio' => 'nullable|string|max:255',
             'lugar' => 'nullable|string',

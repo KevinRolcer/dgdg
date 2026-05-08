@@ -13,6 +13,7 @@
             <input type="hidden" name="_method" id="formMethod" value="POST">
             <input type="hidden" name="tipo" id="modalTipo" value="asunto">
             <input type="hidden" name="subtipo" id="modalSubtipo" value="gira">
+            <input type="hidden" name="ficha_fondo_pos_x" id="modalFichaFondoPosX" value="50">
 
             <div class="modal-body-scroll">
                 <div class="agenda-type-switch" id="agendaTipoSelector">
@@ -41,6 +42,13 @@
                             <label class="form-label-agenda">Título de ficha <span class="text-red-500">*</span></label>
                             <input type="text" name="ficha_titulo" id="modalFichaTitulo" class="form-control-agenda" placeholder="Cumpleaños, Asamblea, Reunión...">
                         </div>
+                        <div class="agenda-custom-orientation-col">
+                            <label class="form-label-agenda">Formato</label>
+                            <select name="ficha_orientacion" id="modalFichaOrientacion" class="form-control-agenda">
+                                <option value="portrait">Vertical</option>
+                                <option value="landscape">Horizontal</option>
+                            </select>
+                        </div>
                         <div class="agenda-custom-bg-col">
                             <label class="form-label-agenda">Fondo de ficha</label>
                             @php
@@ -66,9 +74,45 @@
                             </select>
                         </div>
                     </div>
-                    <div class="agenda-ficha-bg-preview" id="agendaFichaBgPreview" aria-hidden="true">
+                    <div class="agenda-ficha-bg-preview" id="agendaFichaBgPreview" aria-hidden="true" style="display:flex;align-items:center;gap:12px;">
                         <span>Vista del fondo</span>
+                        <button type="button" class="agenda-btn agenda-btn-primary" id="btnOpenFichaEjemploPersonalizada" style="margin-left:auto;">Ver completo</button>
                     </div>
+                    <dialog id="modalFichaEjemploPersonalizada" class="agenda-ficha-preview-dialog">
+                        <div class="agenda-ficha-preview-dialog-inner">
+                            <div class="agenda-ficha-preview-dialog-head">
+                                <h2>Vista previa de ficha personalizada</h2>
+                                <label class="agenda-ficha-bg-position-control" for="agendaFichaBgPosX">
+                                    <span>Fondo</span>
+                                    <input type="range" id="agendaFichaBgPosX" min="0" max="100" step="1" value="50">
+                                    <output id="agendaFichaBgPosXValue">50%</output>
+                                </label>
+                                <button type="button" id="btnCloseFichaEjemploPersonalizada" aria-label="Cerrar vista previa">
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <div class="agenda-ficha-preview-dialog-stage">
+                                <article class="agenda-ficha-preview-sheet" id="agendaFichaEjemploSheet">
+                                    <div class="agenda-ficha-preview-sheet-body">
+                                        <p class="agenda-ficha-preview-eyebrow" id="agendaFichaEjemploEyebrow">Ficha personalizada</p>
+                                        <h1 id="agendaFichaEjemploTitulo">Título de ejemplo</h1>
+                                        <div class="agenda-ficha-preview-detail" id="agendaFichaEjemploLugarWrap">
+                                            <p>Ubicación</p>
+                                            <strong id="agendaFichaEjemploLugar">Ubicación de ejemplo</strong>
+                                        </div>
+                                        <div class="agenda-ficha-preview-date">
+                                            <strong id="agendaFichaEjemploFecha">10 DE MAYO 2026</strong>
+                                            <span id="agendaFichaEjemploHora">10:00 hrs</span>
+                                        </div>
+                                        <p class="agenda-ficha-preview-description" id="agendaFichaEjemploDescripcion">Descripción de ejemplo de la ficha personalizada.</p>
+                                    </div>
+                                    <div class="agenda-ficha-preview-logo">
+                                        <img id="agendaFichaEjemploLogo" src="{{ asset('images/Logos/Gobernación_Mesa de trabajo.png') }}" data-logo-dark="{{ asset('images/Logos/Gobernación_Mesa de trabajo.png') }}" data-logo-light="{{ asset('images/Logos/Gobernación_Mesa de trabajo 2.png') }}" alt="Gobernación Mesa de trabajo">
+                                    </div>
+                                </article>
+                            </div>
+                        </div>
+                    </dialog>
                     <div class="form-group-agenda">
                         <label class="form-label-agenda">Ubicación</label>
                         <input type="text" name="lugar" id="modalLugarPersonalizado" class="form-control-agenda" placeholder="Lugar, dirección o enlace de Google Maps" disabled>
@@ -246,7 +290,6 @@
         <div class="modal-agenda-footer">
             <button type="button" class="btn-agenda btn-secondary-agenda" onclick="closeAssignModal()">Cerrar</button>
         </div>
-    </div>
     </div>
 </div>
 

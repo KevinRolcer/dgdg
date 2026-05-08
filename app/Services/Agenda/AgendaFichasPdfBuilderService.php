@@ -145,8 +145,8 @@ class AgendaFichasPdfBuilderService
 
         $view = $template === 'individual' ? 'agenda.pdf.ficha-individual' : 'agenda.pdf.fichas-calendario';
 
-        // Individual cards are always portrait, summary can be either
-        $orientation = $template === 'individual' ? 'portrait' : ($params['orientation'] === 'landscape' ? 'landscape' : 'portrait');
+        // Summary can be either; individual batch keeps one paper orientation for the whole PDF.
+        $orientation = $params['orientation'] === 'landscape' ? 'landscape' : 'portrait';
         $cols = ($template === 'individual') ? 1 : ($orientation === 'landscape' ? 3 : 2);
 
         $rows = [];
@@ -169,6 +169,7 @@ class AgendaFichasPdfBuilderService
                 'cols' => $cols,
                 'filtersNote' => $filtersNote,
                 'pdfFontFamily' => $pdfFontFamily,
+                'paperOrientation' => $orientation,
             ])
             ->setPaper('a4', $orientation)
             ->output();
@@ -181,6 +182,7 @@ class AgendaFichasPdfBuilderService
         $card = $this->agendaDirectivaCalendar->buildSingleFichaCardForAgenda($agenda);
         $rows = [[$card]];
         $documentTitle = 'Ficha de agenda - '.$card['title'];
+        $orientation = ($card['ficha_orientation'] ?? 'portrait') === 'landscape' ? 'landscape' : 'portrait';
 
         /** @var \Barryvdh\DomPDF\PDF $pdf */
         $pdf = app('dompdf.wrapper');
@@ -194,8 +196,9 @@ class AgendaFichasPdfBuilderService
                 'documentTitle' => $documentTitle,
                 'rows' => $rows,
                 'pdfFontFamily' => $pdfFontFamily,
+                'paperOrientation' => $orientation,
             ])
-            ->setPaper('a4', 'portrait')
+            ->setPaper('a4', $orientation)
             ->output();
     }
 

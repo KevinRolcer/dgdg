@@ -41,19 +41,152 @@ function updateAgendaFichaBgPreview() {
     var select = document.getElementById('modalFichaFondo');
     var preview = document.getElementById('agendaFichaBgPreview');
     if (!select || !preview) return;
-    preview.classList.remove('is-blanco');
+    preview.classList.remove('is-blanco', 'is-beige', 'is-rojo', 'is-verde', 'is-tlaloc_a_beige', 'is-tlaloc_a_rojo', 'is-tlaloc_a_verde');
     var option = select.options[select.selectedIndex];
     var url = option ? option.getAttribute('data-preview-url') : '';
     var tone = option ? option.getAttribute('data-tone') : '';
+    var value = String(select.value || '').toLowerCase();
 
     if (url) {
         preview.style.backgroundImage = "linear-gradient(180deg, rgba(20, 20, 20, 0.18), rgba(20, 20, 20, 0.12)), url('" + url.replace(/'/g, "\\'") + "')";
+        preview.style.backgroundPosition = agendaFichaGetBgPosX() + '% center';
     } else {
         preview.style.backgroundImage = '';
+        preview.style.backgroundPosition = '';
     }
 
     if (tone === 'blanco' || String(select.value || '').toLowerCase().indexOf('blanco') !== -1) {
         preview.classList.add('is-blanco');
+    } else if (value.indexOf('beige') !== -1) {
+        preview.classList.add(value.indexOf('1a') !== -1 || value.indexOf('_1a') !== -1 ? 'is-tlaloc_a_beige' : 'is-beige');
+    } else if (value.indexOf('rojo') !== -1) {
+        preview.classList.add(value.indexOf('1a') !== -1 || value.indexOf('_1a') !== -1 ? 'is-tlaloc_a_rojo' : 'is-rojo');
+    } else if (value.indexOf('verde') !== -1) {
+        preview.classList.add(value.indexOf('1a') !== -1 || value.indexOf('_1a') !== -1 ? 'is-tlaloc_a_verde' : 'is-verde');
+    }
+
+    updateAgendaFichaEjemploPreview();
+}
+
+function agendaTextOrExample(value, example) {
+    var text = String(value || '').trim();
+    return text || example;
+}
+
+function agendaFormatFichaDate(value) {
+    if (!value) return '10 DE MAYO 2026';
+    var parts = String(value).split('-');
+    if (parts.length !== 3) return '10 DE MAYO 2026';
+    var date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    if (Number.isNaN(date.getTime())) return '10 DE MAYO 2026';
+    var months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+    return String(date.getDate()).padStart(2, '0') + ' DE ' + months[date.getMonth()] + ' ' + date.getFullYear();
+}
+
+function agendaFormatFichaTime(value, enabled) {
+    if (!enabled || !value) return '10:00 hrs';
+    return String(value).slice(0, 5) + ' hrs';
+}
+
+function agendaFichaTextureKind(value) {
+    var normalized = String(value || '').toLowerCase();
+    if (normalized.indexOf('blanco') !== -1) return 'blanco';
+    if (normalized.indexOf('beige') !== -1) return 'beige';
+    if (normalized.indexOf('verde') !== -1) return 'verde';
+    if (normalized.indexOf('rojo') !== -1) return 'rojo';
+    return 'beige';
+}
+
+function agendaFichaGetBgPosX() {
+    var input = document.getElementById('modalFichaFondoPosX');
+    var value = parseInt(input ? input.value : '50', 10);
+    if (Number.isNaN(value)) value = 50;
+    return Math.max(0, Math.min(100, value));
+}
+
+function agendaFichaSetBgPosX(value) {
+    var n = parseInt(value, 10);
+    if (Number.isNaN(n)) n = 50;
+    n = Math.max(0, Math.min(100, n));
+    var hidden = document.getElementById('modalFichaFondoPosX');
+    var slider = document.getElementById('agendaFichaBgPosX');
+    var output = document.getElementById('agendaFichaBgPosXValue');
+    if (hidden) hidden.value = String(n);
+    if (slider) slider.value = String(n);
+    if (output) output.textContent = n + '%';
+    updateAgendaFichaEjemploPreview();
+}
+
+function updateAgendaFichaEjemploPreview() {
+    var sheet = document.getElementById('agendaFichaEjemploSheet');
+    if (!sheet) return;
+
+    var select = document.getElementById('modalFichaFondo');
+    var orientacion = document.getElementById('modalFichaOrientacion');
+    var option = select ? select.options[select.selectedIndex] : null;
+    var textureUrl = option ? option.getAttribute('data-preview-url') : '';
+    var textureKind = agendaFichaTextureKind(select ? select.value : '');
+    var logo = document.getElementById('agendaFichaEjemploLogo');
+
+    sheet.classList.remove('is-light', 'is-beige', 'is-dark', 'is-landscape');
+    sheet.classList.add(textureKind === 'blanco' ? 'is-light' : (textureKind === 'beige' ? 'is-beige' : 'is-dark'));
+    if (orientacion && orientacion.value === 'landscape') {
+        sheet.classList.add('is-landscape');
+    }
+    sheet.style.backgroundImage = textureUrl ? "url('" + textureUrl.replace(/'/g, "\\'") + "')" : '';
+    sheet.style.backgroundPosition = agendaFichaGetBgPosX() + '% center';
+
+    if (logo) {
+        var darkLogo = logo.getAttribute('data-logo-dark') || logo.src;
+        var lightLogo = logo.getAttribute('data-logo-light') || logo.src;
+        logo.src = (textureKind === 'verde' || textureKind === 'rojo') ? lightLogo : darkLogo;
+    }
+
+    var asunto = document.getElementById('modalAsunto');
+    var titulo = document.getElementById('modalFichaTitulo');
+    var lugar = document.getElementById('modalLugarPersonalizado');
+    var fecha = document.getElementById('modalFecha');
+    var habilitarHora = document.getElementById('modalHabilitarHora');
+    var hora = document.getElementById('modalHora');
+    var descripcion = document.getElementById('modalDescripcion');
+
+    var titleText = agendaTextOrExample(titulo && titulo.value ? titulo.value : (asunto ? asunto.value : ''), 'Título de ejemplo');
+    var lugarText = agendaTextOrExample(lugar ? lugar.value : '', 'Ubicación de ejemplo');
+    var descText = agendaTextOrExample(descripcion ? descripcion.value : '', 'Descripción de ejemplo de la ficha personalizada. Aquí se mostrará el texto que agregues para revisar proporción, color y legibilidad.');
+
+    var titleEl = document.getElementById('agendaFichaEjemploTitulo');
+    var lugarEl = document.getElementById('agendaFichaEjemploLugar');
+    var fechaEl = document.getElementById('agendaFichaEjemploFecha');
+    var horaEl = document.getElementById('agendaFichaEjemploHora');
+    var descEl = document.getElementById('agendaFichaEjemploDescripcion');
+    var eyebrowEl = document.getElementById('agendaFichaEjemploEyebrow');
+
+    if (eyebrowEl) eyebrowEl.textContent = 'Ficha personalizada';
+    if (titleEl) titleEl.textContent = titleText;
+    if (lugarEl) lugarEl.textContent = lugarText;
+    if (fechaEl) fechaEl.textContent = agendaFormatFichaDate(fecha ? fecha.value : '');
+    if (horaEl) horaEl.textContent = agendaFormatFichaTime(hora ? hora.value : '', habilitarHora ? habilitarHora.checked : false);
+    if (descEl) descEl.textContent = descText;
+}
+
+function openAgendaFichaEjemploPersonalizada() {
+    updateAgendaFichaEjemploPreview();
+    var dialog = document.getElementById('modalFichaEjemploPersonalizada');
+    if (!dialog) return;
+    if (typeof dialog.showModal === 'function') {
+        dialog.showModal();
+    } else {
+        dialog.setAttribute('open', 'open');
+    }
+}
+
+function closeAgendaFichaEjemploPersonalizada() {
+    var dialog = document.getElementById('modalFichaEjemploPersonalizada');
+    if (!dialog) return;
+    if (typeof dialog.close === 'function') {
+        dialog.close();
+    } else {
+        dialog.removeAttribute('open');
     }
 }
 
@@ -81,6 +214,8 @@ function openAgendaModal(id = null, tipo = 'asunto') {
     const assignModal = document.getElementById('agendaAssignModal');
     const fichaTituloInput = document.getElementById('modalFichaTitulo');
     const fichaFondoInput = document.getElementById('modalFichaFondo');
+    const fichaOrientacionInput = document.getElementById('modalFichaOrientacion');
+    const fichaFondoPosXInput = document.getElementById('modalFichaFondoPosX');
     const lugarPersonalizadoInput = document.getElementById('modalLugarPersonalizado');
     const lugarGiraInput = document.getElementById('modalLugar');
 
@@ -154,6 +289,8 @@ function openAgendaModal(id = null, tipo = 'asunto') {
             }
             if (fichaTituloInput) fichaTituloInput.value = btn.dataset.fichaTitulo || '';
             if (fichaFondoInput) fichaFondoInput.value = agendaNormalizeFichaFondoValue(btn.dataset.fichaFondo || 'Texturas_1C-Tlaloc_beige');
+            if (fichaOrientacionInput) fichaOrientacionInput.value = btn.dataset.fichaOrientacion === 'landscape' ? 'landscape' : 'portrait';
+            if (fichaFondoPosXInput) agendaFichaSetBgPosX(btn.dataset.fichaFondoPosX || '50');
             if (lugarPersonalizadoInput) lugarPersonalizadoInput.value = btn.dataset.lugar || '';
             updateAgendaFichaBgPreview();
             if (itemTipo === 'personalizado' && btnOpenDescRef) {
@@ -209,6 +346,8 @@ function openAgendaModal(id = null, tipo = 'asunto') {
         document.getElementById('formMethod').value = 'POST';
         if (fichaTituloInput) fichaTituloInput.value = '';
         if (fichaFondoInput && fichaFondoInput.options.length > 0) fichaFondoInput.selectedIndex = 0;
+        if (fichaOrientacionInput) fichaOrientacionInput.value = 'portrait';
+        if (fichaFondoPosXInput) agendaFichaSetBgPosX(50);
         if (lugarPersonalizadoInput) lugarPersonalizadoInput.value = '';
         updateAgendaFichaBgPreview();
     }
@@ -216,6 +355,8 @@ function openAgendaModal(id = null, tipo = 'asunto') {
     // Toggle fields based on type
     const isGira = tipoInput.value === 'gira';
     const isPersonalizado = tipoInput.value === 'personalizado';
+    modal.classList.toggle('is-ficha-personalizada', isPersonalizado);
+    modal.classList.toggle('is-gira', isGira);
     if(fieldsGira) fieldsGira.style.display = isGira ? 'block' : 'none';
     if(fieldsFichaPersonalizada) fieldsFichaPersonalizada.style.display = isPersonalizado ? 'block' : 'none';
     if (fichaTituloInput) {
@@ -223,6 +364,8 @@ function openAgendaModal(id = null, tipo = 'asunto') {
         fichaTituloInput.disabled = !isPersonalizado;
     }
     if (fichaFondoInput) fichaFondoInput.disabled = !isPersonalizado;
+    if (fichaOrientacionInput) fichaOrientacionInput.disabled = !isPersonalizado;
+    if (fichaFondoPosXInput) fichaFondoPosXInput.disabled = !isPersonalizado;
     if (lugarPersonalizadoInput) lugarPersonalizadoInput.disabled = !isPersonalizado;
     if (lugarGiraInput) lugarGiraInput.disabled = !isGira;
     /* Gira y ficha personalizada usan botón + modal para la descripción. */
@@ -267,10 +410,13 @@ function openAgendaModal(id = null, tipo = 'asunto') {
     }
 
     modal.style.display = 'flex';
+    updateAgendaFichaEjemploPreview();
 }
 
 function closeAgendaModal() {
-    document.getElementById('agendaModal').style.display = 'none';
+    const modal = document.getElementById('agendaModal');
+    modal.style.display = 'none';
+    modal.classList.remove('is-ficha-personalizada', 'is-gira');
 }
 
 function setUnfoldState(id, show) {
@@ -423,6 +569,48 @@ document.addEventListener('DOMContentLoaded', function () {
     if (fichaFondo) {
         fichaFondo.addEventListener('change', updateAgendaFichaBgPreview);
         updateAgendaFichaBgPreview();
+    }
+
+    ['modalAsunto', 'modalFichaTitulo', 'modalFichaOrientacion', 'modalLugarPersonalizado', 'modalFecha', 'modalHora', 'modalDescripcion'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', updateAgendaFichaEjemploPreview);
+            el.addEventListener('change', updateAgendaFichaEjemploPreview);
+        }
+    });
+
+    var horaSwitchPreview = document.getElementById('modalHabilitarHora');
+    if (horaSwitchPreview) {
+        horaSwitchPreview.addEventListener('change', updateAgendaFichaEjemploPreview);
+    }
+
+    var btnOpenFichaEjemplo = document.getElementById('btnOpenFichaEjemploPersonalizada');
+    if (btnOpenFichaEjemplo) {
+        btnOpenFichaEjemplo.addEventListener('click', openAgendaFichaEjemploPersonalizada);
+    }
+
+    var btnCloseFichaEjemplo = document.getElementById('btnCloseFichaEjemploPersonalizada');
+    if (btnCloseFichaEjemplo) {
+        btnCloseFichaEjemplo.addEventListener('click', closeAgendaFichaEjemploPersonalizada);
+    }
+
+    var fichaBgPosX = document.getElementById('agendaFichaBgPosX');
+    if (fichaBgPosX) {
+        fichaBgPosX.addEventListener('input', function() {
+            agendaFichaSetBgPosX(this.value);
+        });
+        fichaBgPosX.addEventListener('change', function() {
+            agendaFichaSetBgPosX(this.value);
+        });
+    }
+
+    var fichaEjemploDialog = document.getElementById('modalFichaEjemploPersonalizada');
+    if (fichaEjemploDialog) {
+        fichaEjemploDialog.addEventListener('click', function(e) {
+            if (e.target === fichaEjemploDialog) {
+                closeAgendaFichaEjemploPersonalizada();
+            }
+        });
     }
 
     const microrregionSelect = document.getElementById('modalMicrorregion');

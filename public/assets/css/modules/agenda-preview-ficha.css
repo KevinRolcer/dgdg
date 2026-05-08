@@ -23,7 +23,7 @@
 .agenda-ficha-card--bg-beige {
     background-color: #f8f8f8;
     background-image: url('../../../images/Texturas/Texturas_1C-Tlaloc_beige.png');
-    color: #444;
+    color: #fff;
 }
 .agenda-ficha-card--bg-blanco {
     background-color: #f6f6f6;
@@ -43,7 +43,7 @@
 .agenda-ficha-card--bg-tlaloc_a_beige {
     background-color: #f8f8f8;
     background-image: url('../../../images/Texturas/Texturas_1A-Tlaloc_beige.png');
-    color: #444;
+    color: #fff;
 }
 .agenda-ficha-card--bg-tlaloc_a_verde {
     background-color: #0a4a41;
@@ -62,16 +62,45 @@
     color: #fff;
 }
 
-.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco,
-.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-title,
-.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-value,
-.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-label,
-.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-eyebrow,
-.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-date-box .agenda-ficha-date-main,
-.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-time,
-.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-description,
-.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-aforo {
-    color: #5f1b2d;
+.agenda-ficha-card--personalizada.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-label,
+.agenda-ficha-card--personalizada.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-value,
+.agenda-ficha-card--personalizada.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-date-box .agenda-ficha-date-main,
+.agenda-ficha-card--personalizada.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-time,
+.agenda-ficha-card--personalizada.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-description {
+    color: #444;
+}
+
+.agenda-ficha-card--personalizada.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-eyebrow,
+.agenda-ficha-card--personalizada.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-label {
+    color: #6b6a6a;
+}
+
+.agenda-ficha-card--personalizada.agenda-ficha-card--custom-texture.agenda-ficha-card--bg-blanco .agenda-ficha-title {
+    color: #3a3a3a;
+}
+
+.agenda-ficha-card--personalizada:is(.agenda-ficha-card--bg-beige, .agenda-ficha-card--bg-tlaloc_a_beige) .agenda-ficha-title {
+    color: #861e34;
+}
+
+.agenda-ficha-card--personalizada:is(.agenda-ficha-card--bg-beige, .agenda-ficha-card--bg-tlaloc_a_beige) .agenda-ficha-eyebrow,
+.agenda-ficha-card--personalizada:is(.agenda-ficha-card--bg-beige, .agenda-ficha-card--bg-tlaloc_a_beige) .agenda-ficha-label {
+    color: #fff;
+}
+
+.agenda-ficha-card--personalizada:is(.agenda-ficha-card--bg-beige, .agenda-ficha-card--bg-tlaloc_a_beige) .agenda-ficha-value,
+.agenda-ficha-card--personalizada:is(.agenda-ficha-card--bg-beige, .agenda-ficha-card--bg-tlaloc_a_beige) .agenda-ficha-date-box .agenda-ficha-date-main,
+.agenda-ficha-card--personalizada:is(.agenda-ficha-card--bg-beige, .agenda-ficha-card--bg-tlaloc_a_beige) .agenda-ficha-time,
+.agenda-ficha-card--personalizada:is(.agenda-ficha-card--bg-beige, .agenda-ficha-card--bg-tlaloc_a_beige) .agenda-ficha-description {
+    color: #fff;
+}
+
+.agenda-ficha-card--personalizada:is(.agenda-ficha-card--bg-blanco) .agenda-ficha-date-box {
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+.agenda-ficha-card--personalizada:is(.agenda-ficha-card--bg-beige, .agenda-ficha-card--bg-tlaloc_a_beige) .agenda-ficha-date-box {
+    border-color: rgba(255, 255, 255, 0.38);
 }
 @font-face {
     font-family: 'Gilroy';
@@ -177,6 +206,14 @@
     margin: 0 auto;
 }
 
+.agenda-ficha-card--landscape {
+    width: 297mm;
+    height: 210mm;
+    min-width: 297mm;
+    min-height: 210mm;
+    aspect-ratio: 297 / 210;
+}
+
 .agenda-ficha-card--pre_gira {
     background-color: #f8f8f8;
     background-image: url('../../../images/Texturas/Texturas_1C-Tlaloc_blanco.png');
@@ -209,6 +246,13 @@
     text-align: center;
 }
 
+.agenda-ficha-card--landscape .agenda-ficha-card-body {
+    left: 20mm;
+    right: 20mm;
+    margin-top: -70mm;
+    height: 150mm;
+}
+
 /* Poco texto (agenda/gira/pre-gira): centrar el bloque en toda la hoja, dejando aire para el logo inferior */
 .agenda-ficha-card--sparse .agenda-ficha-card-body {
     top: 50%;
@@ -216,6 +260,10 @@
     height: auto;
     max-height: calc(297mm - 42mm);
     transform: translateY(-50%);
+}
+
+.agenda-ficha-card--landscape.agenda-ficha-card--sparse .agenda-ficha-card-body {
+    max-height: calc(210mm - 36mm);
 }
 
 .agenda-ficha-eyebrow {
@@ -296,6 +344,13 @@
     min-width: 180px;
 }
 
+.agenda-ficha-card--landscape .agenda-ficha-date-box {
+    min-width: 0;
+    width: fit-content;
+    padding-left: 6mm;
+    padding-right: 6mm;
+}
+
 .agenda-ficha-date-box .agenda-ficha-date-main {
     margin: 0;
     font-size: 15pt;
@@ -371,7 +426,7 @@
 
 .agenda-ficha-logo img {
     display: block;
-    max-height: 28mm; /* Se amplia de 20mm a 28mm para mayor impacto visual */
+    max-height: 18mm; /* Más pequeño para agenda directiva */
     width: auto;
     margin: 0 auto;
 }

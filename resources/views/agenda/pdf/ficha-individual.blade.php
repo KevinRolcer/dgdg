@@ -7,7 +7,7 @@
         {{-- @@ evita que Blade interprete @page --}}
         @@page {
             margin: 0;
-            size: a4 portrait;
+            size: a4 {{ ($paperOrientation ?? 'portrait') === 'landscape' ? 'landscape' : 'portrait' }};
         }
         * { box-sizing: border-box; }
 
@@ -30,6 +30,13 @@
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
+        }
+
+        .ficha--landscape {
+            width: 297mm;
+            height: 210mm;
+            min-height: 210mm;
+            max-height: 210mm;
         }
 
         .ficha:last-child {
@@ -88,6 +95,13 @@
             align-items: center;
         }
 
+        .ficha--landscape .ficha__body-wrap {
+            left: 20mm;
+            right: 20mm;
+            margin-top: -70mm;
+            height: 150mm;
+        }
+
         .ficha--sparse .ficha__body-wrap {
             top: 50%;
             left: 14mm;
@@ -97,6 +111,10 @@
             bottom: auto;
             max-height: calc(297mm - 42mm);
             transform: translateY(-50%);
+        }
+
+        .ficha--landscape.ficha--sparse .ficha__body-wrap {
+            max-height: calc(210mm - 36mm);
         }
 
         .ficha__body-inner {
@@ -121,10 +139,20 @@
 
         .ficha__logo img {
             display: block;
-            /* Se amplia de 20mm a 28mm para mayor impacto visual */
-            max-height: 28mm;
+            max-height: 18mm; /* Más pequeño para agenda directiva */
+            max-width: 58mm;
             width: auto;
+            height: auto;
             margin: 0 auto;
+        }
+
+        .ficha--landscape .ficha__logo {
+            bottom: 8mm;
+        }
+
+        .ficha--landscape .ficha__logo img {
+            max-height: 14mm;
+            max-width: 56mm;
         }
 
         .eyebrow {
@@ -196,10 +224,11 @@
             margin: 0 0 1.2mm;
         }
         .ficha--gira .label,
-        .ficha--agenda .label,
-        .ficha--personalizada .label {
+        .ficha--agenda .label {
             color: #ccc;
         }
+        /* Personalizada blanco: gris como pregira */
+        .ficha--personalizada.ficha--bg-blanco .label { color: #888; }
 
         .value {
             font-size: 17pt;
@@ -210,9 +239,11 @@
             word-wrap: break-word;
         }
         .ficha--gira .value,
-        .ficha--agenda .value,
-        .ficha--personalizada .value {
+        .ficha--agenda .value {
             color: #fff;
+        }
+        .ficha--personalizada.ficha--bg-blanco .value {
+            color: #444;
         }
 
         .description {
@@ -226,9 +257,11 @@
             word-wrap: break-word;
         }
         .ficha--gira .description,
-        .ficha--agenda .description,
-        .ficha--personalizada .description {
+        .ficha--agenda .description {
             color: #eee;
+        }
+        .ficha--personalizada.ficha--bg-blanco .description {
+            color: #555;
         }
 
         .date-box {
@@ -238,6 +271,12 @@
             margin: 4mm auto;
             width: fit-content;
             min-width: 180px;
+        }
+
+        .ficha--landscape .date-box {
+            min-width: 0;
+            padding-left: 6mm;
+            padding-right: 6mm;
         }
         .ficha--gira .date-box,
         .ficha--agenda .date-box,
@@ -261,14 +300,18 @@
             margin-top: 1.8mm;
         }
         .ficha--gira .date-text,
-        .ficha--agenda .date-text,
-        .ficha--personalizada .date-text {
+        .ficha--agenda .date-text {
             color: #fff;
         }
+        .ficha--personalizada.ficha--bg-blanco .date-text {
+            color: #333;
+        }
         .ficha--gira .date-time,
-        .ficha--agenda .date-time,
-        .ficha--personalizada .date-time {
+        .ficha--agenda .date-time {
             color: rgba(255, 255, 255, 0.92);
+        }
+        .ficha--personalizada.ficha--bg-blanco .date-time {
+            color: #333;
         }
 
         .aforo-line {
@@ -284,11 +327,11 @@
             color: rgba(255, 255, 255, 0.85);
         }
         .ficha--bg-beige .eyebrow,
-        .ficha--bg-tlaloc_a_beige .eyebrow { color: #6b6a6a; }
+        .ficha--bg-tlaloc_a_beige .eyebrow { color: #fff; }
         .ficha--bg-beige .title,
-        .ficha--bg-tlaloc_a_beige .title { color: #3a3a3a; }
+        .ficha--bg-tlaloc_a_beige .title { color: #861e34; }
         .ficha--bg-beige .label,
-        .ficha--bg-tlaloc_a_beige .label { color: #888; }
+        .ficha--bg-tlaloc_a_beige .label { color: #fff; }
         .ficha--bg-beige .value,
         .ficha--bg-beige .description,
         .ficha--bg-beige .date-text,
@@ -296,20 +339,20 @@
         .ficha--bg-tlaloc_a_beige .value,
         .ficha--bg-tlaloc_a_beige .description,
         .ficha--bg-tlaloc_a_beige .date-text,
-        .ficha--bg-tlaloc_a_beige .date-time { color: #444; }
+        .ficha--bg-tlaloc_a_beige .date-time { color: #fff; }
         .ficha--bg-beige .date-box,
-        .ficha--bg-tlaloc_a_beige .date-box { border-color: rgba(0, 0, 0, 0.1); }
+        .ficha--bg-tlaloc_a_beige .date-box { border-color: rgba(255, 255, 255, 0.38); }
         .ficha--bg-beige .aforo-line,
-        .ficha--bg-tlaloc_a_beige .aforo-line { color: #777; }
-        .ficha--bg-blanco .eyebrow { color: #5f1b2d; }
-        .ficha--bg-blanco .title { color: #5f1b2d; }
-        .ficha--bg-blanco .label { color: #5f1b2d; }
+        .ficha--bg-tlaloc_a_beige .aforo-line { color: #fff; }
+        .ficha--bg-blanco .eyebrow { color: #6b6a6a; }
+        .ficha--bg-blanco .title { color: #3a3a3a; }
+        .ficha--bg-blanco .label { color: #888; }
         .ficha--bg-blanco .value,
         .ficha--bg-blanco .description,
         .ficha--bg-blanco .date-text,
-        .ficha--bg-blanco .date-time { color: #5f1b2d; }
+        .ficha--bg-blanco .date-time { color: #444; }
         .ficha--bg-blanco .date-box { border-color: rgba(0, 0, 0, 0.1); }
-        .ficha--bg-blanco .aforo-line { color: #5f1b2d; }
+        .ficha--bg-blanco .aforo-line { color: #777; }
     </style>
 </head>
 <body>
@@ -326,27 +369,38 @@
             $fichaBg = $kind === 'personalizada' ? (string) ($card['ficha_bg'] ?? '') : '';
             $fichaBgFile = $fichaBg !== '' && preg_match('/^[A-Za-z0-9_-]+$/', $fichaBg) && file_exists(public_path('images/Texturas/'.$fichaBg.'.png')) ? $fichaBg : '';
             $fichaBgStyle = $fichaBgFile !== '' ? "background-image: url('images/Texturas/{$fichaBgFile}.png');" : '';
-            $fichaBgToneClass = $fichaBgFile !== '' && preg_match('/blanco/i', $fichaBgFile) ? ' ficha--bg-blanco' : '';
-            $logoVersion = '2';
-            if (preg_match('/blanco|beige/i', $fichaBgFile)) {
-                $logoVersion = '1';
-            } else if (preg_match('/rojo|verde/i', $fichaBgFile)) {
-                $logoVersion = '2';
-            } else if ($kind === 'pre_gira') {
-                $logoVersion = '1';
+            $fichaBgPosX = min(100, max(0, (int) ($card['ficha_bg_pos_x'] ?? 50)));
+            $fichaBgStyle .= " background-position: {$fichaBgPosX}% center;";
+            $textureLower = strtolower($fichaBgFile);
+            $fichaBgToneClass = match (true) {
+                str_contains($textureLower, 'blanco') => ' ficha--bg-blanco',
+                str_contains($textureLower, 'beige') && str_contains($textureLower, '1a') => ' ficha--bg-tlaloc_a_beige',
+                str_contains($textureLower, 'beige') => ' ficha--bg-beige',
+                str_contains($textureLower, 'rojo') && str_contains($textureLower, '1a') => ' ficha--bg-tlaloc_a_rojo',
+                str_contains($textureLower, 'rojo') => ' ficha--bg-rojo',
+                str_contains($textureLower, 'verde') && str_contains($textureLower, '1a') => ' ficha--bg-tlaloc_a_verde',
+                str_contains($textureLower, 'verde') => ' ficha--bg-verde',
+                default => '',
+            };
+            $fichaOrientation = (($card['ficha_orientation'] ?? 'portrait') === 'landscape') ? 'landscape' : 'portrait';
+            if (preg_match('/blanco|beige/i', $fichaBgFile) || $kind === 'pre_gira') {
+                $logoFile = 'Logos/Gobernación_Mesa de trabajo.png';
+                $titleColor = preg_match('/beige/i', $fichaBgFile) ? 'color: #861e34;' : 'color: #3a3a3a;';
+            } else {
+                $logoFile = 'Logos/Gobernación_Mesa de trabajo 2.png';
+                $titleColor = '';
             }
-            $logoFile = "Gobierno de Puebla_{$logoVersion}-Versión vertical.png";
             $textBulk = mb_strlen(trim((string) ($card['title'] ?? '')))
                 + mb_strlen(trim((string) ($card['lugar'] ?? '')))
                 + mb_strlen(trim((string) ($card['descripcion'] ?? '')));
             $sparseContent = $textBulk < 220;
         @endphp
-        <div class="ficha ficha--{{ $kind }}{{ $fichaBgToneClass }}{{ $sparseContent ? ' ficha--sparse' : '' }}" style="{{ $fichaBgStyle }}">
+        <div class="ficha ficha--{{ $kind }}{{ $fichaBgToneClass }}{{ $fichaOrientation === 'landscape' ? ' ficha--landscape' : '' }}{{ $sparseContent ? ' ficha--sparse' : '' }}" style="{{ $fichaBgStyle }}">
             <div class="ficha__body-wrap">
                 <div class="ficha__body-inner">
                     <div class="ficha__body-cell">
                         <div class="eyebrow">{{ $kindLabel }}</div>
-                        <h1 class="title">{{ $card['title'] }}</h1>
+                        <h1 class="title" style="{{ $titleColor }}">{{ $card['title'] }}</h1>
 
                         @if (! empty($card['lugar']))
                             <div class="detail-group">
@@ -373,7 +427,7 @@
                 </div>
             </div>
             <div class="ficha__logo">
-                <img src="images/{{ $logoFile }}" alt="">
+                <img src="images/{{ $logoFile }}" alt="Gobernación Mesa de trabajo">
             </div>
         </div>
     @endforeach
