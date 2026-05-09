@@ -58,15 +58,21 @@
                 })
                 .then(function (html) {
                     if (mySeq !== agendaAjaxSeq) return;
-                    var doc = new DOMParser().parseFromString(html, 'text/html');
+                    var trimmed = String(html || '').replace(/^\uFEFF/, '').trim();
+                    var doc = new DOMParser().parseFromString(trimmed, 'text/html');
                     var root = doc.getElementById('agendaAjaxRoot');
                     var inner = container.querySelector('#agendaAjaxRoot');
+                    if (!root) {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({ icon: 'error', title: 'Respuesta inválida', text: 'No se pudo leer el listado. Recarga la página.' });
+                        }
+                        return;
+                    }
                     if (root && inner) {
                         inner.outerHTML = root.outerHTML;
                     } else if (root) {
                         container.insertAdjacentHTML('beforeend', root.outerHTML);
                     }
-                    bindPagination();
                     try {
                         var clean = new URL(url);
                         clean.searchParams.delete('fragment');
@@ -100,17 +106,20 @@
             debounceTimer = setTimeout(loadFromForm, 320);
         }
 
-        function bindPagination() {
-            container.querySelectorAll('.agenda-pagination a[href]').forEach(function (a) {
-                a.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    var href = a.getAttribute('href');
-                    if (!href) return;
-                    var u = new URL(href, window.location.origin);
-                    u.searchParams.set('fragment', '1');
-                    agendaAjaxLoad(u.toString());
-                });
-            });
+        /* Delegación: los enlaces de paginación se recrean en cada fragmento; así no depende de re-bind ni de captura en burbuja fallida. */
+        function onPaginationClick(e) {
+            var a = e.target.closest('.agenda-pagination-wrap a[href]');
+            if (!a || !container.contains(a)) {
+                return;
+            }
+            e.preventDefault();
+            var href = a.getAttribute('href');
+            if (!href) {
+                return;
+            }
+            var u = new URL(href, window.location.origin);
+            u.searchParams.set('fragment', '1');
+            agendaAjaxLoad(u.toString());
         }
 
         form.addEventListener('submit', function (e) {
@@ -173,7 +182,7 @@
             });
         }
 
-        bindPagination();
+        container.addEventListener('click', onPaginationClick);
 
         var panel = document.getElementById('agendaFiltersAdvanced');
         var btnMas = document.getElementById('agendaBtnMasFiltros');

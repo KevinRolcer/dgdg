@@ -2,7 +2,7 @@
 
 @push('css')
 <link rel="stylesheet" href="{{ asset('assets/css/modules/temporary-modules.css') }}?v={{ @filemtime(public_path('assets/css/modules/temporary-modules.css')) ?: time() }}">
-<link rel="stylesheet" href="{{ asset('assets/css/modules/agenda.css') }}?v={{ time() }}">
+<link rel="stylesheet" href="{{ asset('assets/css/modules/agenda.css') }}?v={{ @filemtime(public_path('assets/css/modules/agenda.css')) ?: time() }}">
 @endpush
 
 @php

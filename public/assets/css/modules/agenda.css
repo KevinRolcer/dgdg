@@ -237,7 +237,11 @@ html.theme-dark .agenda-shell-tab.is-active {
 
 .agenda-shell .agenda-pagination-wrap {
     flex-shrink: 0;
-    padding-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 0.35rem 0 0;
     margin-top: 0;
     border-top: 1px solid var(--clr-border);
 }
@@ -392,6 +396,8 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     color: var(--clr-text-light);
     margin: 0;
     line-height: 1.3;
+    width: 100%;
+    text-align: left;
 }
 
 .agenda-pagination-wrap {
@@ -400,6 +406,11 @@ html.theme-dark .agenda-shell .agenda-ajax-loading {
     border: 0;
     border-radius: 0;
     background: transparent;
+}
+
+.agenda-shell .agenda-pagination-wrap .tm-paginator {
+    width: 100%;
+    justify-content: flex-start;
 }
 
 /* Compacta la paginacion heredada de tm solo dentro de Agenda Directiva */
@@ -2014,7 +2025,7 @@ input:checked + .slider-mini:before { transform: translateX(16px); }
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 0;
-    padding-bottom: 6px;
+    padding-bottom: 0;
 }
 .ag-chats-grid::-webkit-scrollbar {
     width: 5px;

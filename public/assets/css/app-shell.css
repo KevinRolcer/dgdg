@@ -1204,9 +1204,13 @@ body.notifications-modal-open {
     padding: 0 !important;
 }
 
-.app-content:has(> .agenda-shell){
-    padding: 1.25rem 1.5rem;
+/* Agenda Directiva: listado (index) — sin padding inferior para aprovechar alto útil */
+.app-content:has(> .agenda-page.agenda-shell:not(.agenda-cal-page)) {
+    padding: 1.25rem 1.5rem 0;
+}
 
+.app-content:has(> .agenda-shell.agenda-cal-page) {
+    padding: 1.25rem 1.5rem;
 }
 
 @media (min-width: 1400px) {
@@ -1490,7 +1494,15 @@ body.notifications-modal-open {
         padding: var(--ui-gap) 10px;
     }
 
-    .app-content:has(> :is(.settings-shell, .home-shell, .mesas-paz-shell, .agenda-shell, .tm-shell, .um-page)) {
+    .app-content:has(> :is(.settings-shell, .home-shell, .mesas-paz-shell, .tm-shell, .um-page)) {
+        padding: 0.75rem 1rem;
+    }
+
+    .app-content:has(> .agenda-page.agenda-shell:not(.agenda-cal-page)) {
+        padding: 0.75rem 1rem 0;
+    }
+
+    .app-content:has(> .agenda-page.agenda-shell.agenda-cal-page) {
         padding: 0.75rem 1rem;
     }
 
