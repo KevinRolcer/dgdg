@@ -452,16 +452,16 @@ class TemporaryModuleController extends Controller
             'header_row' => ['nullable', 'integer', 'min:1', 'max:200'],
             'auto_detect' => ['nullable', 'boolean'],
             'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'analyze_options' => ['nullable', 'boolean'],
         ]);
         $file = $request->file('archivo_excel');
         $autoDetect = $request->boolean('auto_detect', true);
+        $analyzeOptions = $request->boolean('analyze_options', false);
         $headerRow = (int) ($request->input('header_row') ?: 1);
         $sheetIndex = (int) ($request->input('sheet_index') ?: 0);
         $detected = null;
 
-        // Subir límites del proceso de forma temprana: la preview puede leer
-        // miles de celdas para sugerir opciones; en archivos pesados (>20MB)
-        // PHP-FPM puede devolver 503 si no boosteamos memoria y tiempo aquí.
+        // Subir límites del proceso de forma temprana (best-effort).
         $sizeMb = $file->getSize() / 1_048_576;
         if ($sizeMb > 80) {
             @ini_set('memory_limit', '2G');
@@ -486,7 +486,10 @@ class TemporaryModuleController extends Controller
         }
 
         try {
-            $preview = $this->adminSeedService->previewHeaders($file, $headerRow, $sheetIndex);
+            // Por defecto NO incluye column_suggestions (operación cara).
+            // El frontend pedirá análisis bajo demanda al endpoint
+            // seedAnalyzeOptions().
+            $preview = $this->adminSeedService->previewHeaders($file, $headerRow, $sheetIndex, $analyzeOptions);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
@@ -496,11 +499,15 @@ class TemporaryModuleController extends Controller
             'headers' => $preview['headers'],
             'preview_rows' => $preview['preview_rows'] ?? [],
             'column_suggestions' => $preview['column_suggestions'] ?? [],
+            'suggestions_pending' => (bool) ($preview['suggestions_pending'] ?? false),
             'header_row' => $headerRow,
             'data_start_row' => $headerRow + 1,
             'sheet_names' => $preview['sheet_names'] ?? [],
             'sheet_index' => $preview['sheet_index'] ?? $sheetIndex,
         ];
+        if (isset($preview['column_suggestions_warning'])) {
+            $payload['column_suggestions_warning'] = $preview['column_suggestions_warning'];
+        }
         if ($autoDetect && isset($detected)) {
             $payload['auto_detected'] = true;
             $payload['header_row'] = $detected['header_row'];
@@ -512,6 +519,64 @@ class TemporaryModuleController extends Controller
         }
 
         return response()->json($payload);
+    }
+
+    /**
+     * Endpoint específico para analizar opciones por columna (paso opcional
+     * después del preview ligero). Esto se ejecuta solo cuando el admin lo
+     * solicita y permite mantener el preview inicial rápido.
+     */
+    public function seedAnalyzeOptions(Request $request): JsonResponse
+    {
+        $request->validate([
+            'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:153600'],
+            'header_row' => ['required', 'integer', 'min:1', 'max:200'],
+            'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'headers' => ['nullable', 'string'],
+        ]);
+        $file = $request->file('archivo_excel');
+        $headerRow = (int) $request->input('header_row');
+        $sheetIndex = (int) ($request->input('sheet_index') ?: 0);
+
+        $headers = [];
+        $rawHeaders = $request->input('headers');
+        if (is_string($rawHeaders) && $rawHeaders !== '') {
+            $decoded = json_decode($rawHeaders, true);
+            if (is_array($decoded)) {
+                $headers = $decoded;
+            }
+        }
+
+        $sizeMb = $file->getSize() / 1_048_576;
+        if ($sizeMb > 80) {
+            @ini_set('memory_limit', '2G');
+            @set_time_limit(600);
+        } elseif ($sizeMb > 20) {
+            @ini_set('memory_limit', '1G');
+            @set_time_limit(300);
+        } else {
+            @ini_set('memory_limit', '512M');
+            @set_time_limit(180);
+        }
+
+        try {
+            $suggestions = $this->adminSeedService->analyzeColumnSuggestions(
+                $file,
+                $headerRow,
+                $sheetIndex,
+                $headers
+            );
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No fue posible analizar opciones: '.$e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'column_suggestions' => $suggestions,
+        ]);
     }
 
     public function seedStore(Request $request): RedirectResponse

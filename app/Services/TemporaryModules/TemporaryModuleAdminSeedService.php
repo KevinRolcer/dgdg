@@ -25,10 +25,94 @@ class TemporaryModuleAdminSeedService
         private readonly TemporaryModuleExcelImportService $excelReader,
     ) {}
 
-    public function previewHeaders(UploadedFile $file, int $headerRow, int $sheetIndex = 0): array
+    /**
+     * Preview liviano: solo headers + filas de muestra. Pensado para que
+     * funcione bajo límites estrictos de PHP-FPM (memory_limit=128M,
+     * max_input_time=60). El análisis de opciones se hace bajo demanda en
+     * un segundo paso vía analyzeColumnSuggestions().
+     */
+    public function previewHeaders(UploadedFile $file, int $headerRow, int $sheetIndex = 0, bool $includeSuggestions = false): array
     {
-        // Boost de límites del proceso para archivos pesados. Si el llamador
-        // (controlador) ya los subió, este ini_set sólo sube; no baja.
+        $this->raiseLimitsForFile($file);
+
+        $preview = $this->excelReader->preview($file, $headerRow, false, $sheetIndex);
+
+        try {
+            $preview['preview_rows'] = $this->buildPreviewRows(
+                $file,
+                (int) ($preview['header_row'] ?? $headerRow),
+                (int) ($preview['sheet_index'] ?? $sheetIndex),
+                12 // Antes 24 — con 12 alcanza para mostrar la tabla
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Seed preview: preview_rows omitido por error: '.$e->getMessage());
+            $preview['preview_rows'] = [];
+        }
+
+        // Sugerencias deshabilitadas por defecto. El frontend pedirá un
+        // segundo endpoint cuando el usuario quiera analizar opciones.
+        $preview['column_suggestions'] = [];
+        $preview['suggestions_pending'] = true;
+
+        if ($includeSuggestions) {
+            try {
+                $preview['column_suggestions'] = $this->analyzeColumnSuggestions(
+                    $file,
+                    (int) ($preview['header_row'] ?? $headerRow),
+                    (int) ($preview['sheet_index'] ?? $sheetIndex),
+                    (array) ($preview['headers'] ?? [])
+                );
+                $preview['suggestions_pending'] = false;
+            } catch (\Throwable $e) {
+                Log::warning('Seed preview: column_suggestions omitido por error: '.$e->getMessage());
+                $preview['column_suggestions_warning'] = 'No fue posible analizar opciones por columna.';
+            }
+        }
+
+        return $preview;
+    }
+
+    /**
+     * Calcula las sugerencias por columna (select/multiselect) con escaneo
+     * adaptativo según el tamaño del archivo. Pensado para invocarse en una
+     * segunda petición cuando el usuario lo solicita.
+     *
+     * @param  list<array{index:int,letter:string,label:string}>  $headers
+     * @return array<int, array{select:list<string>,multiselect:list<string>}>
+     */
+    public function analyzeColumnSuggestions(UploadedFile $file, int $headerRow, int $sheetIndex, array $headers): array
+    {
+        $this->raiseLimitsForFile($file);
+
+        $sizeMb = $file->getSize() / 1_048_576;
+        // Escaneo conservador: para producción nos importa NO matar el worker.
+        if ($sizeMb > 80) {
+            $maxScanRows = 200;
+        } elseif ($sizeMb > 30) {
+            $maxScanRows = 400;
+        } elseif ($sizeMb > 10) {
+            $maxScanRows = 800;
+        } else {
+            $maxScanRows = 1500;
+        }
+
+        return $this->buildColumnSuggestions(
+            $file,
+            $headerRow,
+            $sheetIndex,
+            $headers,
+            $maxScanRows,
+            80
+        );
+    }
+
+    /**
+     * Sube memory_limit/set_time_limit de forma uniforme. ini_set sobre
+     * memory_limit puede ser bloqueado por disable_functions en producción;
+     * intentamos pero seguimos si falla.
+     */
+    private function raiseLimitsForFile(UploadedFile $file): void
+    {
         $sizeMb = $file->getSize() / 1_048_576;
         if ($sizeMb > 80) {
             @ini_set('memory_limit', '2G');
@@ -40,52 +124,6 @@ class TemporaryModuleAdminSeedService
             @ini_set('memory_limit', '512M');
             @set_time_limit(180);
         }
-
-        // Reducir filas escaneadas para sugerencias en archivos grandes
-        // (evita 503 por memoria / timeout en PHP-FPM).
-        if ($sizeMb > 80) {
-            $maxScanRows = 300;
-        } elseif ($sizeMb > 50) {
-            $maxScanRows = 500;
-        } elseif ($sizeMb > 20) {
-            $maxScanRows = 1000;
-        } else {
-            $maxScanRows = 2000;
-        }
-
-        $preview = $this->excelReader->preview($file, $headerRow, false, $sheetIndex);
-
-        // Si la generación de sugerencias falla por memoria/tiempo, no
-        // perdemos los headers ya calculados; devolvemos arreglo vacío
-        // y el usuario podrá editar tipos a mano.
-        try {
-            $preview['column_suggestions'] = $this->buildColumnSuggestions(
-                $file,
-                (int) ($preview['header_row'] ?? $headerRow),
-                (int) ($preview['sheet_index'] ?? $sheetIndex),
-                (array) ($preview['headers'] ?? []),
-                $maxScanRows,
-                80
-            );
-        } catch (\Throwable $e) {
-            Log::warning('Seed preview: column_suggestions omitido por error: '.$e->getMessage());
-            $preview['column_suggestions'] = [];
-            $preview['column_suggestions_warning'] = 'No fue posible analizar opciones por columna (archivo muy grande). Edita tipos a mano si lo necesitas.';
-        }
-
-        try {
-            $preview['preview_rows'] = $this->buildPreviewRows(
-                $file,
-                (int) ($preview['header_row'] ?? $headerRow),
-                (int) ($preview['sheet_index'] ?? $sheetIndex),
-                24
-            );
-        } catch (\Throwable $e) {
-            Log::warning('Seed preview: preview_rows omitido por error: '.$e->getMessage());
-            $preview['preview_rows'] = [];
-        }
-
-        return $preview;
     }
 
     /**
@@ -160,33 +198,35 @@ class TemporaryModuleAdminSeedService
         int $headerRow,
         int $sheetIndex,
         array $headers,
-        int $maxScanRows = 2000,
+        int $maxScanRows = 1500,
         int $maxOptionsPerColumn = 80,
     ): array {
-        // Aseguramos límites por si este método fue invocado fuera del flujo
-        // normal (defensivo).
-        $sizeMb = $file->getSize() / 1_048_576;
-        if ($sizeMb > 80) {
-            @ini_set('memory_limit', '2G');
-            @set_time_limit(600);
-        } elseif ($sizeMb > 20) {
-            @ini_set('memory_limit', '1G');
-            @set_time_limit(300);
-        }
+        $this->raiseLimitsForFile($file);
 
         $headerRow = max(1, $headerRow);
         $endRow = $headerRow + max(50, $maxScanRows);
+
+        // Calcular maxCol antes de cargar para limitar también el lector.
+        $maxColFromHeaders = 0;
+        foreach ($headers as $h) {
+            $maxColFromHeaders = max($maxColFromHeaders, ((int) ($h['index'] ?? 0)) + 1);
+        }
+        $maxColCap = $maxColFromHeaders > 0 ? min($maxColFromHeaders, 40) : 40;
 
         $reader = IOFactory::createReaderForFile($file->getRealPath());
         if (method_exists($reader, 'setReadDataOnly')) {
             $reader->setReadDataOnly(true);
         }
+        // Filtro que limita filas Y columnas — clave para reducir memoria
+        // al cargar archivos grandes.
         if (method_exists($reader, 'setReadFilter')) {
-            $reader->setReadFilter(new class($endRow) implements IReadFilter {
-                public function __construct(private int $maxRow) {}
+            $reader->setReadFilter(new class($endRow, $maxColCap) implements IReadFilter {
+                public function __construct(private int $maxRow, private int $maxColIdx) {}
                 public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool
                 {
-                    return $row <= $this->maxRow;
+                    if ($row > $this->maxRow) return false;
+                    $colIdx = Coordinate::columnIndexFromString($columnAddress);
+                    return $colIdx <= $this->maxColIdx;
                 }
             });
         }
@@ -196,10 +236,6 @@ class TemporaryModuleAdminSeedService
         $sheetIndex = max(0, min($sheetIndex, count($sheetNames) - 1));
         $sheet = $spreadsheet->getSheet($sheetIndex);
 
-        $maxColFromHeaders = 0;
-        foreach ($headers as $h) {
-            $maxColFromHeaders = max($maxColFromHeaders, ((int) ($h['index'] ?? 0)) + 1);
-        }
         $maxCol = $maxColFromHeaders > 0
             ? $maxColFromHeaders
             : Coordinate::columnIndexFromString($sheet->getHighestDataColumn($headerRow));
@@ -215,37 +251,57 @@ class TemporaryModuleAdminSeedService
         $memoryLimit = $this->parseMemoryLimitToBytes((string) ini_get('memory_limit'));
         $memoryBudget = $memoryLimit > 0 ? (int) ($memoryLimit * 0.80) : 0;
         $rowsProcessed = 0;
+        // Chunk de filas a procesar por iteración (rangeToArray es más
+        // eficiente que getCell celda por celda y libera referencias).
+        $chunkSize = 200;
 
-        for ($r = $startRow; $r <= $highest; $r++) {
-            for ($c = 1; $c <= $maxCol; $c++) {
-                $letter = Coordinate::stringFromColumnIndex($c);
-                $idx = $c - 1;
-                $raw = trim((string) ($sheet->getCell($letter.$r)->getFormattedValue() ?? ''));
-                if ($raw === '' || str_starts_with($raw, '=')) {
-                    continue;
-                }
-
-                $this->pushSuggestionValue($selectBuckets[$idx], $raw, $maxOptionsPerColumn);
-
-                $parts = preg_split('/[\r\n,;|]+/u', $raw) ?: [];
-                foreach ($parts as $part) {
-                    $token = trim((string) $part);
-                    if ($token === '') {
-                        continue;
-                    }
-                    $this->pushSuggestionValue($multiBuckets[$idx], $token, $maxOptionsPerColumn);
-                }
+        for ($chunkStart = $startRow; $chunkStart <= $highest; $chunkStart += $chunkSize) {
+            $chunkEnd = min($chunkStart + $chunkSize - 1, $highest);
+            $rangeStart = 'A'.$chunkStart;
+            $rangeEnd = Coordinate::stringFromColumnIndex($maxCol).$chunkEnd;
+            $range = $rangeStart.':'.$rangeEnd;
+            try {
+                // rangeToArray con formato visible (4° arg true) y solo valores.
+                $matrix = $sheet->rangeToArray($range, null, true, true, false);
+            } catch (\Throwable $e) {
+                Log::warning('Seed preview: rangeToArray falló para '.$range.': '.$e->getMessage());
+                break;
             }
-            $rowsProcessed++;
-            // Verificación periódica de memoria (cada 100 filas) para abortar
-            // antes de que PHP nos mate por OOM.
-            if ($memoryBudget > 0 && ($rowsProcessed % 100) === 0) {
-                if (memory_get_usage(true) > $memoryBudget) {
-                    Log::warning('Seed preview: corte preventivo de buildColumnSuggestions por memoria; filas leídas='.$rowsProcessed);
-                    break;
+            foreach ($matrix as $rowArr) {
+                if (! is_array($rowArr)) continue;
+                $i = 0;
+                foreach ($rowArr as $cellVal) {
+                    $idx = $i++;
+                    if ($idx >= $maxCol) break;
+                    $raw = trim((string) ($cellVal ?? ''));
+                    if ($raw === '' || str_starts_with($raw, '=')) continue;
+
+                    $this->pushSuggestionValue($selectBuckets[$idx], $raw, $maxOptionsPerColumn);
+
+                    if (preg_match('/[\r\n,;|]/', $raw)) {
+                        $parts = preg_split('/[\r\n,;|]+/u', $raw) ?: [];
+                        foreach ($parts as $part) {
+                            $token = trim((string) $part);
+                            if ($token === '') continue;
+                            $this->pushSuggestionValue($multiBuckets[$idx], $token, $maxOptionsPerColumn);
+                        }
+                    }
                 }
+                $rowsProcessed++;
+            }
+            unset($matrix);
+
+            // Verificación de memoria cada chunk
+            if ($memoryBudget > 0 && memory_get_usage(true) > $memoryBudget) {
+                Log::warning('Seed preview: corte preventivo de buildColumnSuggestions por memoria; filas leídas='.$rowsProcessed);
+                break;
             }
         }
+
+        // Liberar el spreadsheet completo (a veces los workers reutilizados
+        // mantienen referencias innecesarias).
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet, $sheet);
 
         $result = [];
         foreach (range(0, $maxCol - 1) as $idx) {

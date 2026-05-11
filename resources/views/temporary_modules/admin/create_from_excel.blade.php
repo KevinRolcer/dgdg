@@ -118,6 +118,16 @@
                                 <span>Tipo</span>
                                 <span>Opciones</span>
                             </div>
+                            <div id="tmSeedAnalyzeBar" class="tm-seed-analyze-bar tm-hidden" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:10px 12px; background:#f6f7f9; border:1px solid #e0e3e8; border-radius:8px; margin-bottom:10px;">
+                                <i class="fa-regular fa-circle-question" aria-hidden="true" style="color:#6c757d;"></i>
+                                <span style="flex:1; font-size:0.9em; color:#444;">
+                                    Para tipos de campo "Lista" / "Selección múltiple", puedo analizar las opciones únicas del Excel. Esta operación puede tardar más en archivos grandes; queda desactivada por defecto.
+                                </span>
+                                <button type="button" id="tmSeedAnalyzeBtn" class="tm-btn tm-btn-outline tm-btn-sm">
+                                    <i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i> Analizar opciones
+                                </button>
+                                <small id="tmSeedAnalyzeNote" class="tm-hidden" style="width:100%; color:#6c757d;"></small>
+                            </div>
                             <div id="tmSeedFieldMapRows" class="tm-seed-map-rows"></div>
                             <input type="hidden" name="field_columns" id="tmSeedFieldColumns" value="">
                             <input type="hidden" name="field_types" id="tmSeedFieldTypes" value="{}">
@@ -171,12 +181,14 @@
 @push('scripts')
 @php
     $tmSeedPreviewUrlForJs = route('temporary-modules.admin.seed-preview');
+    $tmSeedAnalyzeUrlForJs = route('temporary-modules.admin.seed-analyze-options');
     $tmCsrfRefreshUrlForJs = route('csrf.refresh');
     $tmLoginUrlForJs = route('login');
 @endphp
 <script>
 window.TM_ADMIN_SEED_EXCEL_BOOT = {
     previewUrl: @json($tmSeedPreviewUrlForJs),
+    analyzeOptionsUrl: @json($tmSeedAnalyzeUrlForJs),
     csrfRefreshUrl: @json($tmCsrfRefreshUrlForJs),
     loginUrl: @json($tmLoginUrlForJs),
 };

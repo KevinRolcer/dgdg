@@ -582,6 +582,8 @@ document.addEventListener('DOMContentLoaded', function () {
         readHeaders(idx);
     });
 
+    let currentHeaders = [];
+
     function readHeaders(sheetIdx) {
         var f = fileInput.files[0];
         if (!f) { errEl.textContent = 'Selecciona un archivo Excel.'; errEl.classList.remove('tm-hidden'); return; }
@@ -598,6 +600,9 @@ document.addEventListener('DOMContentLoaded', function () {
         fd.append('header_row', headerRowInput.value || '1');
         fd.append('auto_detect', autoDetectChk.checked ? '1' : '0');
         fd.append('sheet_index', String(sheetIdx));
+        // Por defecto NO analizamos opciones; eso ocurre bajo demanda con el
+        // botón "Analizar opciones". Mantiene este request liviano.
+        fd.append('analyze_options', '0');
         fd.append('_token', csrf);
         csrfFetch(previewUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, credentials: 'same-origin' })
             .then(function (r) { return safeJsonParse(r); })
@@ -613,10 +618,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     renderSheetTabs(j.sheet_names, typeof j.sheet_index === 'number' ? j.sheet_index : sheetIdx);
                 }
                 currentColumnSuggestions = (j.column_suggestions && typeof j.column_suggestions === 'object') ? j.column_suggestions : {};
+                currentHeaders = Array.isArray(j.headers) ? j.headers : [];
                 colMr.dataset.set = '';
                 colMun.dataset.set = '';
-                fillSelects(j.headers || []);
-                renderPreviewTable(j.headers || [], j.preview_rows || [], j.header_row || 1, j.data_start_row || ((j.header_row || 1) + 1));
+                fillSelects(currentHeaders);
+                renderPreviewTable(currentHeaders, j.preview_rows || [], j.header_row || 1, j.data_start_row || ((j.header_row || 1) + 1));
+                // Mostrar la barra para "Analizar opciones" si el backend la
+                // dejó pendiente. Restablece estado al re-leer.
+                showAnalyzeBar(!!j.suggestions_pending);
             }).catch(function (e) {
                 errEl.textContent = e.message || 'Error al procesar el archivo.';
                 errEl.classList.remove('tm-hidden');
@@ -625,10 +634,70 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
+    function showAnalyzeBar(visible) {
+        var bar = document.getElementById('tmSeedAnalyzeBar');
+        if (!bar) return;
+        bar.classList.toggle('tm-hidden', !visible);
+        var note = document.getElementById('tmSeedAnalyzeNote');
+        if (note) {
+            note.classList.add('tm-hidden');
+            note.textContent = '';
+        }
+        var btn = document.getElementById('tmSeedAnalyzeBtn');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i> Analizar opciones';
+        }
+    }
+
+    function analyzeOptions() {
+        var f = fileInput.files[0];
+        if (!f) return;
+        var btn = document.getElementById('tmSeedAnalyzeBtn');
+        var note = document.getElementById('tmSeedAnalyzeNote');
+        var url = (window.TM_ADMIN_SEED_EXCEL_BOOT && window.TM_ADMIN_SEED_EXCEL_BOOT.analyzeOptionsUrl) || '';
+        if (!url) return;
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Analizando opciones…'; }
+        if (note) {
+            note.classList.remove('tm-hidden');
+            note.textContent = 'Esto puede tardar unos segundos en archivos grandes.';
+        }
+        var fd = new FormData();
+        fd.append('archivo_excel', f);
+        fd.append('header_row', headerRowInput.value || '1');
+        fd.append('sheet_index', sheetIndexInput.value || '0');
+        fd.append('headers', JSON.stringify(currentHeaders || []));
+        fd.append('_token', csrf);
+        csrfFetch(url, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, credentials: 'same-origin' })
+            .then(function (r) { return safeJsonParse(r); })
+            .then(function (j) {
+                if (!j.success) {
+                    if (note) note.textContent = j.message || 'No fue posible analizar.';
+                    return;
+                }
+                currentColumnSuggestions = (j.column_suggestions && typeof j.column_suggestions === 'object') ? j.column_suggestions : {};
+                if (note) { note.textContent = 'Listo. Las opciones por columna se aplicarán a campos tipo "Lista" / "Selección múltiple".'; }
+                if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Opciones analizadas'; }
+                // Re-aplicar sugerencias a filas tipo Lista/Selección múltiple
+                // que no tengan opciones manuales.
+                if (fieldMapRows) {
+                    fieldMapRows.querySelectorAll('.tm-seed-map-row').forEach(function (row) {
+                        try { fillAutoOptionsIfNeeded(row, true); } catch (_) {}
+                    });
+                }
+            }).catch(function (e) {
+                if (note) note.textContent = e.message || 'Error al analizar opciones.';
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i> Reintentar análisis'; }
+            });
+    }
+
     document.getElementById('tmSeedReadHeaders').addEventListener('click', function () {
         currentSheetIndex = parseInt(sheetIndexInput.value || '0', 10);
         readHeaders(currentSheetIndex);
     });
+
+    var analyzeBtnEl = document.getElementById('tmSeedAnalyzeBtn');
+    if (analyzeBtnEl) analyzeBtnEl.addEventListener('click', analyzeOptions);
 
     indef.addEventListener('change', function () {
         expires.disabled = indef.checked;

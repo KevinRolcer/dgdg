@@ -168,6 +168,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/crear', [TemporaryModuleController::class, 'create'])->middleware('can:Modulos-Temporales-Admin')->name('temporary-modules.admin.create');
             Route::get('/crear-desde-excel', [TemporaryModuleController::class, 'createFromExcel'])->middleware('can:Modulos-Temporales-Admin')->name('temporary-modules.admin.create-from-excel');
             Route::post('/semilla-preview', [TemporaryModuleController::class, 'seedPreview'])->middleware('can:Modulos-Temporales-Admin')->name('temporary-modules.admin.seed-preview');
+            Route::post('/semilla-analizar-opciones', [TemporaryModuleController::class, 'seedAnalyzeOptions'])->middleware('can:Modulos-Temporales-Admin')->name('temporary-modules.admin.seed-analyze-options');
             Route::post('/semilla-guardar', [TemporaryModuleController::class, 'seedStore'])->middleware('can:Modulos-Temporales-Admin')->name('temporary-modules.admin.seed-store');
             Route::get('/export-status/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
                 ->where('exportRequest', '[a-f0-9\-]+')
