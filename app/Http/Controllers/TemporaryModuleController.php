@@ -459,6 +459,21 @@ class TemporaryModuleController extends Controller
         $sheetIndex = (int) ($request->input('sheet_index') ?: 0);
         $detected = null;
 
+        // Subir límites del proceso de forma temprana: la preview puede leer
+        // miles de celdas para sugerir opciones; en archivos pesados (>20MB)
+        // PHP-FPM puede devolver 503 si no boosteamos memoria y tiempo aquí.
+        $sizeMb = $file->getSize() / 1_048_576;
+        if ($sizeMb > 80) {
+            @ini_set('memory_limit', '2G');
+            @set_time_limit(600);
+        } elseif ($sizeMb > 20) {
+            @ini_set('memory_limit', '1G');
+            @set_time_limit(300);
+        } else {
+            @ini_set('memory_limit', '512M');
+            @set_time_limit(180);
+        }
+
         if ($autoDetect) {
             try {
                 $detected = $this->adminSeedService->detectTableLayout($file, 80, $sheetIndex);

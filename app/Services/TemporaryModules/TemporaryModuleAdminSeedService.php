@@ -7,6 +7,7 @@ use App\Models\TemporaryModuleEntry;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -26,21 +27,63 @@ class TemporaryModuleAdminSeedService
 
     public function previewHeaders(UploadedFile $file, int $headerRow, int $sheetIndex = 0): array
     {
+        // Boost de límites del proceso para archivos pesados. Si el llamador
+        // (controlador) ya los subió, este ini_set sólo sube; no baja.
+        $sizeMb = $file->getSize() / 1_048_576;
+        if ($sizeMb > 80) {
+            @ini_set('memory_limit', '2G');
+            @set_time_limit(600);
+        } elseif ($sizeMb > 20) {
+            @ini_set('memory_limit', '1G');
+            @set_time_limit(300);
+        } else {
+            @ini_set('memory_limit', '512M');
+            @set_time_limit(180);
+        }
+
+        // Reducir filas escaneadas para sugerencias en archivos grandes
+        // (evita 503 por memoria / timeout en PHP-FPM).
+        if ($sizeMb > 80) {
+            $maxScanRows = 300;
+        } elseif ($sizeMb > 50) {
+            $maxScanRows = 500;
+        } elseif ($sizeMb > 20) {
+            $maxScanRows = 1000;
+        } else {
+            $maxScanRows = 2000;
+        }
+
         $preview = $this->excelReader->preview($file, $headerRow, false, $sheetIndex);
-        $preview['column_suggestions'] = $this->buildColumnSuggestions(
-            $file,
-            (int) ($preview['header_row'] ?? $headerRow),
-            (int) ($preview['sheet_index'] ?? $sheetIndex),
-            (array) ($preview['headers'] ?? []),
-            2000,
-            80
-        );
-        $preview['preview_rows'] = $this->buildPreviewRows(
-            $file,
-            (int) ($preview['header_row'] ?? $headerRow),
-            (int) ($preview['sheet_index'] ?? $sheetIndex),
-            24
-        );
+
+        // Si la generación de sugerencias falla por memoria/tiempo, no
+        // perdemos los headers ya calculados; devolvemos arreglo vacío
+        // y el usuario podrá editar tipos a mano.
+        try {
+            $preview['column_suggestions'] = $this->buildColumnSuggestions(
+                $file,
+                (int) ($preview['header_row'] ?? $headerRow),
+                (int) ($preview['sheet_index'] ?? $sheetIndex),
+                (array) ($preview['headers'] ?? []),
+                $maxScanRows,
+                80
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Seed preview: column_suggestions omitido por error: '.$e->getMessage());
+            $preview['column_suggestions'] = [];
+            $preview['column_suggestions_warning'] = 'No fue posible analizar opciones por columna (archivo muy grande). Edita tipos a mano si lo necesitas.';
+        }
+
+        try {
+            $preview['preview_rows'] = $this->buildPreviewRows(
+                $file,
+                (int) ($preview['header_row'] ?? $headerRow),
+                (int) ($preview['sheet_index'] ?? $sheetIndex),
+                24
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Seed preview: preview_rows omitido por error: '.$e->getMessage());
+            $preview['preview_rows'] = [];
+        }
 
         return $preview;
     }
@@ -50,6 +93,15 @@ class TemporaryModuleAdminSeedService
      */
     private function buildPreviewRows(UploadedFile $file, int $headerRow, int $sheetIndex, int $maxRows = 24): array
     {
+        $sizeMb = $file->getSize() / 1_048_576;
+        if ($sizeMb > 80) {
+            @ini_set('memory_limit', '2G');
+            @set_time_limit(600);
+        } elseif ($sizeMb > 20) {
+            @ini_set('memory_limit', '1G');
+            @set_time_limit(300);
+        }
+
         $headerRow = max(1, $headerRow);
         $endRow = $headerRow + max(8, $maxRows);
 
@@ -111,6 +163,17 @@ class TemporaryModuleAdminSeedService
         int $maxScanRows = 2000,
         int $maxOptionsPerColumn = 80,
     ): array {
+        // Aseguramos límites por si este método fue invocado fuera del flujo
+        // normal (defensivo).
+        $sizeMb = $file->getSize() / 1_048_576;
+        if ($sizeMb > 80) {
+            @ini_set('memory_limit', '2G');
+            @set_time_limit(600);
+        } elseif ($sizeMb > 20) {
+            @ini_set('memory_limit', '1G');
+            @set_time_limit(300);
+        }
+
         $headerRow = max(1, $headerRow);
         $endRow = $headerRow + max(50, $maxScanRows);
 
@@ -147,6 +210,12 @@ class TemporaryModuleAdminSeedService
         $selectBuckets = [];
         $multiBuckets = [];
 
+        // Umbral de memoria: si rebasamos el 80% del límite, abortamos el
+        // escaneo para no morir con fatal error. Devolvemos lo que tengamos.
+        $memoryLimit = $this->parseMemoryLimitToBytes((string) ini_get('memory_limit'));
+        $memoryBudget = $memoryLimit > 0 ? (int) ($memoryLimit * 0.80) : 0;
+        $rowsProcessed = 0;
+
         for ($r = $startRow; $r <= $highest; $r++) {
             for ($c = 1; $c <= $maxCol; $c++) {
                 $letter = Coordinate::stringFromColumnIndex($c);
@@ -165,6 +234,15 @@ class TemporaryModuleAdminSeedService
                         continue;
                     }
                     $this->pushSuggestionValue($multiBuckets[$idx], $token, $maxOptionsPerColumn);
+                }
+            }
+            $rowsProcessed++;
+            // Verificación periódica de memoria (cada 100 filas) para abortar
+            // antes de que PHP nos mate por OOM.
+            if ($memoryBudget > 0 && ($rowsProcessed % 100) === 0) {
+                if (memory_get_usage(true) > $memoryBudget) {
+                    Log::warning('Seed preview: corte preventivo de buildColumnSuggestions por memoria; filas leídas='.$rowsProcessed);
+                    break;
                 }
             }
         }
@@ -204,6 +282,26 @@ class TemporaryModuleAdminSeedService
         }
 
         $bucket[$key] = $this->formatSuggestionDisplay($rawValue);
+    }
+
+    /**
+     * Convierte el valor de ini_get('memory_limit') a bytes.
+     * Devuelve 0 si es ilimitado (-1) o no parseable.
+     */
+    private function parseMemoryLimitToBytes(string $value): int
+    {
+        $value = trim($value);
+        if ($value === '' || $value === '-1') {
+            return 0;
+        }
+        $unit = strtoupper(substr($value, -1));
+        $num = (float) $value;
+        switch ($unit) {
+            case 'G': return (int) ($num * 1024 * 1024 * 1024);
+            case 'M': return (int) ($num * 1024 * 1024);
+            case 'K': return (int) ($num * 1024);
+            default:  return is_numeric($value) ? (int) $value : 0;
+        }
     }
 
     private function normalizeSuggestionCompareKey(string $value): string
