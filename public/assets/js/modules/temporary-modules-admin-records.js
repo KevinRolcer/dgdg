@@ -26,12 +26,341 @@
         const textToggleButtons = Array.from(document.querySelectorAll('[data-text-toggle]'));
         const cellExpandButtons = Array.from(document.querySelectorAll('[data-cell-expand]'));
         const exportButtons = Array.from(document.querySelectorAll('[data-open-export-options]'));
+        const editPermissionsModal = document.getElementById('tmEditPermissionsModal');
+        const editPermissionsTbody = document.getElementById('tmEditPermissionsTbody');
+        let editPermissionFilter = 'all';
+        let editPermissionItems = [];
         const seedLogModal = document.getElementById('tmSeedDiscardLogModal');
         const seedLogTbody = document.getElementById('tmSeedDiscardLogTbody');
         const seedLogModuleEl = document.getElementById('tmSeedDiscardLogModule');
         const seedLogEmpty = document.getElementById('tmSeedDiscardLogEmpty');
         const seedLogTableWrap = document.getElementById('tmSeedDiscardLogTableWrap');
         var TM_EXPORT_PREVIEW_LOGO_URL = (typeof window !== 'undefined' && window.TM_ADMIN_RECORDS_BOOT && window.TM_ADMIN_RECORDS_BOOT.exportPreviewLogoUrl) ? window.TM_ADMIN_RECORDS_BOOT.exportPreviewLogoUrl : '';
+
+        function tmAdminEsc(value) {
+            var d = document.createElement('div');
+            d.textContent = value == null ? '' : String(value);
+            return d.innerHTML;
+        }
+
+        function openEditPermissionsModal() {
+            if (!editPermissionsModal) return;
+            editPermissionsModal.classList.add('is-open');
+            editPermissionsModal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+            loadEditPermissions();
+        }
+
+        function closeEditPermissionsModal() {
+            if (!editPermissionsModal) return;
+            editPermissionsModal.classList.remove('is-open');
+            editPermissionsModal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+        }
+
+        function loadEditPermissions() {
+            if (!editPermissionsModal || !editPermissionsTbody) return;
+            var url = editPermissionsModal.getAttribute('data-list-url') || '';
+            if (!url) return;
+            editPermissionsTbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
+            fetch(url, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    editPermissionItems = Array.isArray(data.items) ? data.items : [];
+                    renderEditPermissions();
+                })
+                .catch(function () {
+                    editPermissionsTbody.innerHTML = '<tr><td colspan="6">No se pudieron cargar los permisos.</td></tr>';
+                });
+        }
+
+        var TM_PERMISSION_ACTION_OPTIONS = [
+            { value: 'view',   label: 'Ver registros' },
+            { value: 'create', label: 'Registrar' },
+            { value: 'edit',   label: 'Editar en hoja' },
+            { value: 'delete', label: 'Eliminar' }
+        ];
+
+        function renderEditPermissions() {
+            if (!editPermissionsTbody) return;
+            var items = editPermissionItems.filter(function (item) {
+                if (editPermissionFilter === 'all') return true;
+                if (editPermissionFilter === 'approved') return item.status === 'approved';
+                if (editPermissionFilter === 'revoked') return item.status === 'revoked';
+                return item.status === editPermissionFilter;
+            });
+            if (items.length === 0) {
+                        editPermissionsTbody.innerHTML = '<tr><td colspan="6">No hay solicitudes ni permisos recientes.</td></tr>';
+                        return;
+                    }
+                    editPermissionsTbody.innerHTML = items.map(function (item) {
+                        var status = item.status_label || (item.status === 'pending' ? 'Pendiente' : (item.is_active ? 'Activo' : (item.status === 'revoked' ? 'Denegado' : 'Vencido')));
+                        var kind = item.kind === 'action' ? 'action' : 'entry';
+                        var approve = item.status === 'pending'
+                            ? '<button type="button" class="tm-btn tm-btn-sm tm-btn-primary" data-edit-permission-kind="' + kind + '" data-edit-permission-action-id="' + tmAdminEsc(item.action || '') + '" data-edit-permission-approve="' + item.id + '">Aceptar</button>'
+                            : '';
+                        var editBtn = (item.status === 'approved' && item.is_active)
+                            ? '<button type="button" class="tm-btn tm-btn-sm tm-btn-outline" data-edit-permission-kind="' + kind + '" data-edit-permission-edit="' + item.id + '" title="Modificar duración o acciones permitidas"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Editar</button>'
+                            : '';
+                        var revoke = item.status === 'pending'
+                            ? '<button type="button" class="tm-btn tm-btn-sm tm-btn-danger" data-edit-permission-kind="' + kind + '" data-edit-permission-revoke="' + item.id + '">Denegar</button>'
+                            : (item.is_active
+                                ? '<button type="button" class="tm-btn tm-btn-sm tm-btn-danger" data-edit-permission-kind="' + kind + '" data-edit-permission-revoke="' + item.id + '">Revocar</button>'
+                                : '')
+                            ;
+                        var destroy = '<button type="button" class="tm-btn tm-btn-sm tm-btn-outline" data-edit-permission-kind="' + kind + '" data-edit-permission-destroy="' + item.id + '" title="Eliminar este registro del historial de permisos"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>';
+                        return '<tr>'
+                            + '<td><strong>' + tmAdminEsc(item.module) + '</strong><br><small>' + tmAdminEsc(item.requested_at) + '</small></td>'
+                            + '<td>' + (item.entry_id ? ('#' + tmAdminEsc(item.entry_id)) : tmAdminEsc(item.action_label || 'Accion')) + '<br><small>' + tmAdminEsc(item.microrregion) + '</small></td>'
+                            + '<td>' + tmAdminEsc(item.requester) + '</td>'
+                            + '<td>' + tmAdminEsc(status) + '</td>'
+                            + '<td>' + tmAdminEsc(item.expires_at || '-') + '</td>'
+                            + '<td style="display:flex;gap:6px;flex-wrap:wrap;">' + approve + editBtn + revoke + destroy + '</td>'
+                            + '</tr>';
+                    }).join('');
+        }
+
+        function findEditPermissionItem(id, kind) {
+            var numericId = parseInt(String(id), 10);
+            if (!isFinite(numericId)) return null;
+            for (var i = 0; i < editPermissionItems.length; i++) {
+                var it = editPermissionItems[i];
+                if (!it) continue;
+                var itKind = it.kind === 'action' ? 'action' : 'entry';
+                if (parseInt(String(it.id), 10) === numericId && itKind === kind) {
+                    return it;
+                }
+            }
+            return null;
+        }
+
+        function askApprovalDetails(options) {
+            options = options || {};
+            var requestedAction = options.requestedAction || '';
+            var currentActions = Array.isArray(options.currentActions) ? options.currentActions : [];
+            var mode = options.mode === 'edit' ? 'edit' : 'approve';
+            var itemContext = options.itemContext || null;
+            var title = mode === 'edit' ? 'Editar permisos' : 'Autorizar permiso';
+            var confirmText = mode === 'edit' ? 'Guardar cambios' : 'Autorizar';
+            var introText = mode === 'edit'
+                ? 'Modifica la duracion y las acciones permitidas. Las acciones marcadas se renuevan; las no marcadas seran revocadas.'
+                : 'Marca las acciones que el usuario podra realizar mientras dure el permiso. Para que pueda ver los registros del modulo cifrado debes marcar <em>Ver registros</em>.';
+
+            if (typeof Swal === 'undefined') {
+                return Promise.resolve({ duration: 1, actions: currentActions.slice() });
+            }
+
+            var contextHtml = '';
+            if (mode === 'edit' && itemContext) {
+                var contextParts = [];
+                if (itemContext.module) contextParts.push('<strong>Modulo:</strong> ' + tmAdminEsc(itemContext.module));
+                if (itemContext.requester) contextParts.push('<strong>Usuario:</strong> ' + tmAdminEsc(itemContext.requester));
+                if (itemContext.expires_at) contextParts.push('<strong>Vigente hasta:</strong> ' + tmAdminEsc(itemContext.expires_at));
+                if (currentActions.length === 0) {
+                    contextParts.push('<em style="color:#888;">Sin acciones de modulo activas. Marca abajo para otorgar.</em>');
+                }
+                if (contextParts.length) {
+                    contextHtml = '<div style="background:#f6f7f9;border:1px solid #e0e3e8;border-radius:6px;padding:10px;font-size:0.85em;line-height:1.45;">'
+                        + contextParts.join('<br>')
+                        + '</div>';
+                }
+            }
+
+            var actionCheckboxesHtml = TM_PERMISSION_ACTION_OPTIONS.map(function (opt) {
+                var preChecked = mode === 'edit'
+                    ? (currentActions.indexOf(opt.value) !== -1)
+                    : (opt.value === requestedAction);
+                var checked = preChecked ? 'checked' : '';
+                var note = '';
+                if (mode === 'approve' && opt.value === requestedAction) {
+                    note = ' <small style="color:#888;">(solicitado)</small>';
+                } else if (mode === 'edit' && preChecked) {
+                    note = ' <small style="color:#2e7d32;">(vigente)</small>';
+                }
+                return '<label style="display:flex;align-items:center;gap:8px;font-size:0.95em;padding:4px 0;">'
+                    + '<input type="checkbox" class="tm-approve-action" value="' + opt.value + '" ' + checked + '>'
+                    + '<span>' + opt.label + '</span>' + note
+                    + '</label>';
+            }).join('');
+
+            var html = ''
+                + '<div style="text-align:left;display:flex;flex-direction:column;gap:14px;">'
+                + (contextHtml ? '  ' + contextHtml : '')
+                + '  <div>'
+                + '    <label for="tmApproveDuration" style="display:block;font-weight:600;margin-bottom:6px;">Duracion del permiso (desde ahora)</label>'
+                + '    <select id="tmApproveDuration" class="swal2-select" style="width:100%;margin:0;">'
+                + '      <option value="1" selected>1 hora</option>'
+                + '      <option value="2">2 horas</option>'
+                + '      <option value="3">3 horas</option>'
+                + '      <option value="24">1 dia</option>'
+                + '    </select>'
+                + '  </div>'
+                + '  <div>'
+                + '    <label style="display:block;font-weight:600;margin-bottom:6px;">Permisos a otorgar</label>'
+                + '    <small style="display:block;color:#888;margin-bottom:6px;">' + introText + '</small>'
+                + '    <div style="display:flex;flex-direction:column;gap:4px;">' + actionCheckboxesHtml + '</div>'
+                + '  </div>'
+                + '</div>';
+
+            return Swal.fire({
+                title: title,
+                html: html,
+                showCancelButton: true,
+                confirmButtonText: confirmText,
+                cancelButtonText: 'Cancelar',
+                focusConfirm: false,
+                preConfirm: function () {
+                    var popup = Swal.getPopup();
+                    if (!popup) return false;
+                    var durEl = popup.querySelector('#tmApproveDuration');
+                    var duration = parseInt(durEl ? durEl.value : '1', 10);
+                    if ([1, 2, 3, 24].indexOf(duration) === -1) {
+                        Swal.showValidationMessage('Selecciona una duración válida.');
+                        return false;
+                    }
+                    var checked = Array.prototype.slice.call(popup.querySelectorAll('.tm-approve-action:checked')).map(function (el) { return el.value; });
+                    if (mode === 'approve' && requestedAction && checked.indexOf(requestedAction) === -1) {
+                        checked.push(requestedAction);
+                    }
+                    return { duration: duration, actions: checked };
+                }
+            }).then(function (result) {
+                if (!result.isConfirmed) return null;
+                return result.value || { duration: 1, actions: mode === 'edit' ? currentActions.slice() : (requestedAction ? [requestedAction] : []) };
+            });
+        }
+
+        function permissionEndpointBase(kind) {
+            if (!editPermissionsModal) return '';
+            var base = editPermissionsModal.getAttribute('data-approve-base') || (window.TM_ADMIN_RECORDS_BOOT && window.TM_ADMIN_RECORDS_BOOT.editPermissionsBase) || '';
+            if (kind === 'action') {
+                base = String(base).replace(/permisos-edicion\/?$/, 'permisos-accion');
+            }
+            return String(base).replace(/\/$/, '');
+        }
+
+        function postEditPermission(id, action, kind, payload) {
+            if (!editPermissionsModal || !id) return;
+            var csrf = editPermissionsModal.getAttribute('data-csrf-token') || (window.TM_ADMIN_RECORDS_BOOT && window.TM_ADMIN_RECORDS_BOOT.csrfToken) || '';
+            var url = permissionEndpointBase(kind) + '/' + encodeURIComponent(String(id)) + '/' + action;
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrf,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(payload || {})
+            })
+                .then(function (r) { return r.json(); })
+                .then(function () { loadEditPermissions(); })
+                .catch(function () { loadEditPermissions(); });
+        }
+
+        function deletePermissionRow(id, kind) {
+            if (!editPermissionsModal || !id) return;
+            var csrf = editPermissionsModal.getAttribute('data-csrf-token') || (window.TM_ADMIN_RECORDS_BOOT && window.TM_ADMIN_RECORDS_BOOT.csrfToken) || '';
+            var url = permissionEndpointBase(kind) + '/' + encodeURIComponent(String(id));
+            fetch(url, {
+                method: 'DELETE',
+                headers: {
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': csrf,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            })
+                .then(function (r) { return r.json().catch(function () { return {}; }); })
+                .then(function () { loadEditPermissions(); })
+                .catch(function () { loadEditPermissions(); });
+        }
+
+        document.querySelectorAll('[data-open-edit-permissions]').forEach(function (btn) {
+            btn.addEventListener('click', openEditPermissionsModal);
+        });
+        document.querySelectorAll('[data-close-edit-permissions]').forEach(function (el) {
+            el.addEventListener('click', closeEditPermissionsModal);
+        });
+        document.querySelectorAll('[data-edit-permission-filter]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                editPermissionFilter = btn.getAttribute('data-edit-permission-filter') || 'all';
+                document.querySelectorAll('[data-edit-permission-filter]').forEach(function (b) {
+                    b.classList.toggle('tm-btn-primary', b === btn);
+                    b.classList.toggle('tm-btn-outline', b !== btn);
+                });
+                renderEditPermissions();
+            });
+        });
+        if (editPermissionsTbody) {
+            editPermissionsTbody.addEventListener('click', function (event) {
+                var approve = event.target.closest('[data-edit-permission-approve]');
+                if (approve) {
+                    var requestedAction = approve.getAttribute('data-edit-permission-action-id') || '';
+                    askApprovalDetails({ mode: 'approve', requestedAction: requestedAction }).then(function (details) {
+                        if (!details) return;
+                        postEditPermission(
+                            approve.getAttribute('data-edit-permission-approve'),
+                            'autorizar',
+                            approve.getAttribute('data-edit-permission-kind'),
+                            { duration: details.duration || 1, actions: details.actions || [] }
+                        );
+                    });
+                    return;
+                }
+                var editPerm = event.target.closest('[data-edit-permission-edit]');
+                if (editPerm) {
+                    var editKind = editPerm.getAttribute('data-edit-permission-kind') || 'entry';
+                    var editId = editPerm.getAttribute('data-edit-permission-edit');
+                    var item = findEditPermissionItem(editId, editKind);
+                    var currentActions = [];
+                    if (item && Array.isArray(item.active_actions)) {
+                        currentActions = item.active_actions.slice();
+                    }
+                    // Para autorizaciones de acción de módulo, asegúrate de pre-seleccionar
+                    // al menos la acción propia del registro si no aparece en active_actions.
+                    if (item && editKind === 'action' && item.action && currentActions.indexOf(item.action) === -1) {
+                        currentActions.push(item.action);
+                    }
+                    askApprovalDetails({ mode: 'edit', currentActions: currentActions, itemContext: item || null }).then(function (details) {
+                        if (!details) return;
+                        postEditPermission(
+                            editId,
+                            'editar',
+                            editKind,
+                            { duration: details.duration || 1, actions: details.actions || [] }
+                        );
+                    });
+                    return;
+                }
+                var revoke = event.target.closest('[data-edit-permission-revoke]');
+                if (revoke) {
+                    postEditPermission(revoke.getAttribute('data-edit-permission-revoke'), 'revocar', revoke.getAttribute('data-edit-permission-kind'), {});
+                    return;
+                }
+                var destroy = event.target.closest('[data-edit-permission-destroy]');
+                if (destroy) {
+                    var doDelete = function () {
+                        deletePermissionRow(destroy.getAttribute('data-edit-permission-destroy'), destroy.getAttribute('data-edit-permission-kind'));
+                    };
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            title: 'Eliminar solicitud',
+                            text: 'Se eliminara este registro del historial de permisos. Esta accion no se puede deshacer.',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonText: 'Eliminar',
+                            cancelButtonText: 'Cancelar'
+                        }).then(function (result) {
+                            if (result.isConfirmed) doDelete();
+                        });
+                    } else if (window.confirm('Eliminar este registro del historial de permisos?')) {
+                        doDelete();
+                    }
+                }
+            });
+        }
 
         function openSeedDiscardLog(moduleName, jsonId, registerUrl, searchUrl) {
             if (!seedLogModal || !seedLogTbody) return;

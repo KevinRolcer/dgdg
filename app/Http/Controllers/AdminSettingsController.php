@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\TemporaryModuleSecuritySetting;
 use App\Services\Admin\ImageStorageMigrationService;
 use App\Services\Settings\DistribuirMunicipiosExcelService;
 use Illuminate\Http\RedirectResponse;
@@ -10,6 +11,35 @@ use Illuminate\Support\Facades\Validator;
 
 class AdminSettingsController extends Controller
 {
+    public function updateTemporaryModulePdfPassword(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'pdf_password' => ['nullable', 'string', 'min:4', 'max:120', 'confirmed'],
+            'clear_pdf_password' => ['nullable', 'boolean'],
+        ]);
+
+        if ($request->boolean('clear_pdf_password')) {
+            TemporaryModuleSecuritySetting::clearPdfPassword();
+
+            return redirect()
+                ->route('settings.importacion-exportacion')
+                ->with('status', 'Contraseña de PDF eliminada. Los nuevos PDF de módulos temporales saldrán sin contraseña.');
+        }
+
+        $password = trim((string) ($validated['pdf_password'] ?? ''));
+        if ($password === '') {
+            return redirect()
+                ->route('settings.importacion-exportacion')
+                ->with('error', 'Escribe una contraseña nueva o marca la opción para eliminarla.');
+        }
+
+        TemporaryModuleSecuritySetting::setPdfPassword($password);
+
+        return redirect()
+            ->route('settings.importacion-exportacion')
+            ->with('status', 'Contraseña de PDF actualizada. Se aplicará a los nuevos PDF de módulos temporales.');
+    }
+
     public function migrateImages(Request $request, ImageStorageMigrationService $service): RedirectResponse
     {
         $deleteOriginals = (bool) $request->boolean('delete_originals');

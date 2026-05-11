@@ -46,6 +46,23 @@
             </label>
 
             {{-- ── Modo de captura ── --}}
+            <section class="tm-target-box">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                    <label style="display:flex;align-items:center;gap:8px;margin:0;">
+                        <input type="hidden" name="is_encrypted_event" value="0">
+                        <input type="checkbox" id="tmEncryptedEventToggle" name="is_encrypted_event" value="1" @checked(old('is_encrypted_event'))>
+                        Evento cifrado
+                    </label>
+                    <button type="button" class="tm-btn tm-btn-secondary" id="tmEncryptedEventConfigBtn" style="{{ old('is_encrypted_event') ? '' : 'display:none;' }}">
+                        <i class="fa-solid fa-lock" aria-hidden="true"></i> Configurar
+                    </button>
+                </div>
+                <p class="tm-help-text" style="margin:8px 0 0;">Cuando esta activo, los registros existentes solo se editan con autorizacion del administrador y los PDF pueden salir con contrasena.</p>
+                <input type="hidden" id="tmEncryptedEditDuration" name="edit_permission_duration_hours" value="{{ old('edit_permission_duration_hours', 1) }}">
+                <input type="hidden" id="tmEncryptedPdfPassword" name="encrypted_pdf_password" value="">
+                <input type="hidden" id="tmEncryptedPdfPasswordConfirm" name="encrypted_pdf_password_confirmation" value="">
+            </section>
+
             <section class="tm-target-box" id="tmRegistrationScopeBox">
                 <h3>Modo de captura</h3>
                 <p class="tm-help-text" style="margin:0 0 10px;">Define si los registros se asocian a una microregión, a municipios específicos o se capturan sin asociación geográfica.</p>
@@ -314,6 +331,7 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 window.TM_ADMIN_CREATE_BOOT = { copyFieldsUrl: @json(route('temporary-modules.admin.fields-json', ['module' => '__ID__'])) };
 </script>
@@ -387,6 +405,56 @@ window.TM_ADMIN_CREATE_BOOT = { copyFieldsUrl: @json(route('temporary-modules.ad
     });
 
     updateCount();
+
+    var encryptedToggle = document.getElementById('tmEncryptedEventToggle');
+    var encryptedConfigBtn = document.getElementById('tmEncryptedEventConfigBtn');
+    var durationInput = document.getElementById('tmEncryptedEditDuration');
+    var pdfPassInput = document.getElementById('tmEncryptedPdfPassword');
+    var pdfPassConfirmInput = document.getElementById('tmEncryptedPdfPasswordConfirm');
+
+    function toggleEncryptedConfig() {
+        if (encryptedConfigBtn) encryptedConfigBtn.style.display = encryptedToggle && encryptedToggle.checked ? '' : 'none';
+    }
+
+    if (encryptedToggle) encryptedToggle.addEventListener('change', toggleEncryptedConfig);
+    if (encryptedConfigBtn) {
+        encryptedConfigBtn.addEventListener('click', function () {
+            if (typeof Swal === 'undefined') return;
+            Swal.fire({
+                title: 'Configurar evento cifrado',
+                html:
+                    '<label style="display:grid;gap:6px;text-align:left;margin-bottom:10px;"><span>Tiempo de edición autorizado</span><select id="tmSwalDuration" class="swal2-select" style="width:100%;margin:0;"><option value="1">1 hora</option><option value="2">2 horas</option><option value="3">3 horas</option><option value="24">1 día</option></select></label>' +
+                    '<label style="display:grid;gap:6px;text-align:left;margin-bottom:10px;"><span>Contraseña para PDF</span><input id="tmSwalPdfPass" type="password" class="swal2-input" style="width:100%;margin:0;" autocomplete="new-password"></label>' +
+                    '<label style="display:grid;gap:6px;text-align:left;"><span>Confirmar contraseña</span><input id="tmSwalPdfPassConfirm" type="password" class="swal2-input" style="width:100%;margin:0;" autocomplete="new-password"></label>',
+                didOpen: function () {
+                    document.getElementById('tmSwalDuration').value = durationInput ? String(durationInput.value || '1') : '1';
+                },
+                preConfirm: function () {
+                    var duration = document.getElementById('tmSwalDuration').value || '1';
+                    var pass = document.getElementById('tmSwalPdfPass').value || '';
+                    var confirm = document.getElementById('tmSwalPdfPassConfirm').value || '';
+                    if (pass !== '' && pass.length < 4) {
+                        Swal.showValidationMessage('La contraseña debe tener al menos 4 caracteres.');
+                        return false;
+                    }
+                    if (pass !== confirm) {
+                        Swal.showValidationMessage('La confirmación no coincide.');
+                        return false;
+                    }
+                    return { duration: duration, pass: pass };
+                },
+                confirmButtonText: 'Guardar',
+                showCancelButton: true,
+                cancelButtonText: 'Cancelar'
+            }).then(function (result) {
+                if (!result.isConfirmed || !result.value) return;
+                if (durationInput) durationInput.value = result.value.duration;
+                if (pdfPassInput) pdfPassInput.value = result.value.pass || '';
+                if (pdfPassConfirmInput) pdfPassConfirmInput.value = result.value.pass || '';
+            });
+        });
+    }
+    toggleEncryptedConfig();
 })();
 </script>
 @endpush

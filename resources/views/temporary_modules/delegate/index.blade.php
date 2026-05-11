@@ -160,7 +160,13 @@
                         $mediaDividerPrinted = false;
                     @endphp
 
-                    <form action="{{ route('temporary-modules.submit', $module->id) }}" method="POST" enctype="multipart/form-data" class="tm-form tm-entry-form">
+                    <form
+                        action="{{ route('temporary-modules.submit', $module->id) }}"
+                        method="POST"
+                        enctype="multipart/form-data"
+                        class="tm-form tm-entry-form"
+                        data-access-request-url="{{ route('temporary-modules.action-permission.request', ['module' => $module->id, 'action' => 'create']) }}"
+                    >
                         @csrf
                         @if ($moduleUsesMicrorregion && $microsAsignadas->isNotEmpty() && !$moduleMostrarSelectorMicrorregion)
                             <input type="hidden" name="selected_microrregion_id" value="{{ $microsAsignadas->first()->id }}">
@@ -1011,11 +1017,81 @@
                                     </select>
                                 </label>
                                 <label class="tm-records-filter-field">
+                                    @php
+                                        $tmRecEncrypted = (bool) ($module->is_encrypted_event ?? false);
+                                        $tmRecHasEditPerm = true;
+                                        $tmRecHasEditPending = false;
+                                        $tmRecHasDeletePerm = true;
+                                        $tmRecHasDeletePending = false;
+                                        if ($tmRecEncrypted) {
+                                            $tmRecUserId = (int) auth()->id();
+                                            $tmRecNow = \Illuminate\Support\Carbon::now();
+                                            $tmRecActiveActions = \App\Models\TemporaryModuleActionAuthorization::query()
+                                                ->where('temporary_module_id', (int) $module->id)
+                                                ->where('requested_by', $tmRecUserId)
+                                                ->where('status', \App\Models\TemporaryModuleActionAuthorization::STATUS_APPROVED)
+                                                ->where('expires_at', '>', $tmRecNow)
+                                                ->pluck('action')
+                                                ->map(fn ($a) => (string) $a)
+                                                ->all();
+                                            $tmRecPendingActions = \App\Models\TemporaryModuleActionAuthorization::query()
+                                                ->where('temporary_module_id', (int) $module->id)
+                                                ->where('requested_by', $tmRecUserId)
+                                                ->where('status', \App\Models\TemporaryModuleActionAuthorization::STATUS_PENDING)
+                                                ->pluck('action')
+                                                ->map(fn ($a) => (string) $a)
+                                                ->all();
+                                            $tmRecHasEditPerm = in_array(\App\Models\TemporaryModuleActionAuthorization::ACTION_EDIT, $tmRecActiveActions, true);
+                                            $tmRecHasEditPending = ! $tmRecHasEditPerm && in_array(\App\Models\TemporaryModuleActionAuthorization::ACTION_EDIT, $tmRecPendingActions, true);
+                                            $tmRecHasDeletePerm = in_array(\App\Models\TemporaryModuleActionAuthorization::ACTION_DELETE, $tmRecActiveActions, true);
+                                            $tmRecHasDeletePending = ! $tmRecHasDeletePerm && in_array(\App\Models\TemporaryModuleActionAuthorization::ACTION_DELETE, $tmRecPendingActions, true);
+                                        }
+                                    @endphp
                                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                                        <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-tm-bulk-toggle title="Selección masiva">Eliminar varios</button>
-                                        <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" data-tm-bulk-edit-open data-module-id="{{ $module->id }}" title="Editar varios registros">
-                                            <i class="fa-solid fa-table-cells" aria-hidden="true"></i> Editar en hoja de cálculo
-                                        </button>
+                                        <span class="tm-permission-slot"
+                                              data-tm-permission-slot="toolbar-delete"
+                                              data-tm-permission-module="{{ $module->id }}"
+                                              data-tm-permission-encrypted="{{ $tmRecEncrypted ? '1' : '0' }}"
+                                              data-tm-permission-request-url="{{ route('temporary-modules.action-permission.request', ['module' => $module->id, 'action' => 'delete']) }}"
+                                              style="display:inline-flex; gap:8px; align-items:center;">
+                                            @if (! $tmRecEncrypted || $tmRecHasDeletePerm)
+                                                <button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-tm-bulk-toggle title="Selección masiva">Eliminar varios</button>
+                                            @elseif ($tmRecHasDeletePending)
+                                                <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" disabled title="Solicitud enviada al administrador">
+                                                    <i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Permiso (Eliminar) pendiente
+                                                </button>
+                                            @else
+                                                <form action="{{ route('temporary-modules.action-permission.request', ['module' => $module->id, 'action' => 'delete']) }}" method="POST" class="tm-inline-form">
+                                                    @csrf
+                                                    <button type="submit" class="tm-btn tm-btn-outline tm-btn-sm" title="Pedir permiso para eliminar registros en módulo cifrado">
+                                                        <i class="fa-solid fa-key" aria-hidden="true"></i> Permiso para eliminar
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </span>
+                                        <span class="tm-permission-slot"
+                                              data-tm-permission-slot="toolbar-edit"
+                                              data-tm-permission-module="{{ $module->id }}"
+                                              data-tm-permission-encrypted="{{ $tmRecEncrypted ? '1' : '0' }}"
+                                              data-tm-permission-request-url="{{ route('temporary-modules.action-permission.request', ['module' => $module->id, 'action' => 'edit']) }}"
+                                              style="display:inline-flex; gap:8px; align-items:center;">
+                                            @if (! $tmRecEncrypted || $tmRecHasEditPerm)
+                                                <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" data-tm-bulk-edit-open data-module-id="{{ $module->id }}" title="Editar varios registros">
+                                                    <i class="fa-solid fa-table-cells" aria-hidden="true"></i> Editar en hoja de cálculo
+                                                </button>
+                                            @elseif ($tmRecHasEditPending)
+                                                <button type="button" class="tm-btn tm-btn-outline tm-btn-sm" disabled title="Solicitud enviada al administrador">
+                                                    <i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Permiso (Editar) pendiente
+                                                </button>
+                                            @else
+                                                <form action="{{ route('temporary-modules.action-permission.request', ['module' => $module->id, 'action' => 'edit']) }}" method="POST" class="tm-inline-form">
+                                                    @csrf
+                                                    <button type="submit" class="tm-btn tm-btn-outline tm-btn-sm" title="Pedir permiso para editar en hoja de cálculo">
+                                                        <i class="fa-solid fa-key" aria-hidden="true"></i> Permiso para editar en Hoja de cálculo
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </span>
                                         <button type="button" class="tm-btn tm-btn-sm tm-btn-danger tm-hidden" data-tm-bulk-delete-trigger>
                                             <i class="fa-solid fa-trash-can"></i> <span data-tm-bulk-count>0</span>
                                         </button>

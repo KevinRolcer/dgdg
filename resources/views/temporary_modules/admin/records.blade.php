@@ -35,6 +35,14 @@
                 >
                     <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Actividad
                 </button>
+                <button
+                    type="button"
+                    class="tm-btn tm-btn-secondary"
+                    data-open-edit-permissions
+                    title="Revisar solicitudes y permisos activos"
+                >
+                    <i class="fa-solid fa-user-shield" aria-hidden="true"></i> Permisos
+                </button>
                 <a href="{{ route('temporary-modules.admin.create') }}" class="tm-btn tm-btn-primary">Nuevo módulo</a>
             </div>
         </div>
@@ -1102,6 +1110,53 @@
     {{-- Log de filas descartadas al crear módulo desde Excel (solo si ya exportó) --}}
     <div
         class="tm-modal"
+        id="tmEditPermissionsModal"
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+        data-list-url="{{ route('temporary-modules.admin.edit-authorizations.index') }}"
+        data-approve-base="{{ rtrim(route('temporary-modules.admin.index'), '/\\') }}/permisos-edicion"
+        data-csrf-token="{{ csrf_token() }}"
+    >
+        <div class="tm-modal-backdrop" data-close-edit-permissions></div>
+        <div class="tm-modal-dialog tm-modal-dialog-admin-preview">
+            <div class="tm-modal-head">
+                <h3>Permisos</h3>
+                <button type="button" class="tm-modal-close" data-close-edit-permissions aria-label="Cerrar">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="tm-modal-body">
+                <p class="tm-muted">Cada usuario puede solicitar una autorización por acción cada hora. Desde aquí puedes aceptar o denegar solicitudes pendientes.</p>
+                <div class="tm-edit-permissions-filters" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 16px;">
+                    <button type="button" class="tm-btn tm-btn-sm tm-btn-primary" data-edit-permission-filter="all">Todos</button>
+                    <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" data-edit-permission-filter="pending">Pendientes</button>
+                    <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" data-edit-permission-filter="approved">Aceptados</button>
+                    <button type="button" class="tm-btn tm-btn-sm tm-btn-outline" data-edit-permission-filter="revoked">Denegados</button>
+                </div>
+                <div class="tm-table-wrap tm-table-wrap-scroll">
+                    <table class="tm-table tm-table-sm">
+                        <thead>
+                            <tr>
+                                <th>Módulo</th>
+                                <th>Solicitud</th>
+                                <th>Usuario</th>
+                                <th>Estado</th>
+                                <th>Vigencia</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tmEditPermissionsTbody">
+                            <tr><td colspan="6">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div
+        class="tm-modal"
         id="tmSeedDiscardLogModal"
         aria-hidden="true"
         role="dialog"
@@ -1146,6 +1201,7 @@
 window.TM_ADMIN_RECORDS_BOOT = {
             exportPreviewLogoUrl: @json(asset('images/LogoSegobHorizontal.png')),
             exportUserConfigBase: @json(rtrim(route('temporary-modules.admin.index'), '/\\')),
+            editPermissionsBase: @json(rtrim(route('temporary-modules.admin.index'), '/\\').'/permisos-edicion'),
             csrfToken: @json(csrf_token()),
         };
 </script>

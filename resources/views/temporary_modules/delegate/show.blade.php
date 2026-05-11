@@ -48,7 +48,13 @@
             </div>
         </div>
 
-        <form action="{{ route('temporary-modules.submit', $temporaryModule->id) }}" method="POST" enctype="multipart/form-data" class="tm-form tm-entry-form">
+        <form
+            action="{{ route('temporary-modules.submit', $temporaryModule->id) }}"
+            method="POST"
+            enctype="multipart/form-data"
+            class="tm-form tm-entry-form"
+            data-access-request-url="{{ route('temporary-modules.action-permission.request', ['module' => $temporaryModule->id, 'action' => 'create']) }}"
+        >
             @csrf
             @if (!empty($editingEntry))
                 <input type="hidden" name="entry_id" value="{{ $editingEntry->id }}">
@@ -448,8 +454,19 @@ iv>
     </div>
     @endif
 
+    @php
+        $tmShowEncrypted = (bool) ($temporaryModule->is_encrypted_event ?? false);
+        $tmShowCanView = $canViewModuleRecords ?? true;
+    @endphp
     <article class="content-card tm-card" id="tmRecentRecords">
         <h2>Mis registros recientes</h2>
+        @if ($tmShowEncrypted && ! $tmShowCanView)
+            <div class="inline-alert inline-alert-error" role="alert" style="margin-top: 10px;">
+                <strong>Modulo cifrado.</strong>
+                No tienes permiso vigente para ver registros. Solicita autorizacion desde la pantalla de
+                <a href="{{ route('temporary-modules.records') }}">Mis registros</a> y espera la aprobacion del administrador.
+            </div>
+        @else
         <div class="tm-table-wrap">
             <table class="tm-table">
                 <thead>
@@ -512,6 +529,7 @@ iv>
                 </tbody>
             </table>
         </div>
+        @endif
     </article>
 
     <div class="tm-modal" id="tmImagePreviewModal" aria-hidden="true" role="dialog" aria-modal="true">

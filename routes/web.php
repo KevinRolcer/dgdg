@@ -79,6 +79,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/ajustes/imagenes/migrar', [AdminSettingsController::class, 'migrateImages'])
         ->middleware('can:Modulos-Temporales-Admin')
         ->name('settings.images.migrate');
+    Route::post('/ajustes/modulos-temporales/pdf-password', [AdminSettingsController::class, 'updateTemporaryModulePdfPassword'])
+        ->middleware('can:Modulos-Temporales-Admin')
+        ->name('settings.temporary-modules.pdf-password');
     Route::post('/ajustes/microrregiones/distribuir-excel', [AdminSettingsController::class, 'distribuirMunicipiosExcel'])
         ->middleware('can:Modulos-Temporales-Admin')
         ->name('settings.microrregiones.distribuir-excel');
@@ -169,6 +172,41 @@ Route::middleware('auth')->group(function () {
             Route::get('/export-status/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
                 ->where('exportRequest', '[a-f0-9\-]+')
                 ->name('temporary-modules.admin.export-status');
+            Route::get('/permisos-edicion', [TemporaryModuleController::class, 'adminEditAuthorizations'])
+                ->middleware('can:modulos-temporales-admin-ver')
+                ->name('temporary-modules.admin.edit-authorizations.index');
+            Route::post('/permisos-edicion/{authorization}/autorizar', [TemporaryModuleController::class, 'adminApproveEditAuthorization'])
+                ->whereNumber('authorization')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.edit-authorizations.approve');
+            Route::post('/permisos-edicion/{authorization}/revocar', [TemporaryModuleController::class, 'adminRevokeEditAuthorization'])
+                ->whereNumber('authorization')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.edit-authorizations.revoke');
+            Route::post('/permisos-edicion/{authorization}/editar', [TemporaryModuleController::class, 'adminUpdateEditAuthorization'])
+                ->whereNumber('authorization')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.edit-authorizations.update');
+            Route::delete('/permisos-edicion/{authorization}', [TemporaryModuleController::class, 'adminDestroyEditAuthorization'])
+                ->whereNumber('authorization')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.edit-authorizations.destroy');
+            Route::post('/permisos-accion/{authorization}/autorizar', [TemporaryModuleController::class, 'adminApproveActionAuthorization'])
+                ->whereNumber('authorization')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.action-authorizations.approve');
+            Route::post('/permisos-accion/{authorization}/revocar', [TemporaryModuleController::class, 'adminRevokeActionAuthorization'])
+                ->whereNumber('authorization')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.action-authorizations.revoke');
+            Route::post('/permisos-accion/{authorization}/editar', [TemporaryModuleController::class, 'adminUpdateActionAuthorization'])
+                ->whereNumber('authorization')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.action-authorizations.update');
+            Route::delete('/permisos-accion/{authorization}', [TemporaryModuleController::class, 'adminDestroyActionAuthorization'])
+                ->whereNumber('authorization')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.action-authorizations.destroy');
             Route::get('/exportaciones/{file}', [TemporaryModuleController::class, 'downloadExport'])
                 ->where('file', '[A-Za-z0-9_\-.]+\.(xlsx|docx|pdf)')
                 ->middleware('can:Modulos-Temporales-Admin')
@@ -273,7 +311,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/{module}/actualizar-desde-excel', [TemporaryModuleController::class, 'updateExistingFromExcel'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.update-from-excel');
         Route::post('/{module}/importar-fila', [TemporaryModuleController::class, 'importSingleRow'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.import-single-row');
         Route::get('/{module}', [TemporaryModuleController::class, 'show'])->middleware('can:modulos-temporales-ver')->whereNumber('module')->name('temporary-modules.show');
+        Route::post('/{module}/solicitar-permiso/{action}', [TemporaryModuleController::class, 'requestModuleActionAuthorization'])->middleware('can:Modulos-Temporales')->whereNumber('module')->where('action', 'view|create|edit|delete')->name('temporary-modules.action-permission.request');
         Route::post('/{module}/registros', [TemporaryModuleController::class, 'submit'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.submit');
+        Route::post('/{module}/registros/{entry}/solicitar-edicion', [TemporaryModuleController::class, 'requestEntryEditAuthorization'])->middleware('can:Modulos-Temporales')->whereNumber('module')->whereNumber('entry')->name('temporary-modules.entry.edit-request');
         Route::delete('/{module}/registros/{entry}', [TemporaryModuleController::class, 'destroyEntry'])->middleware('can:Modulos-Temporales')->whereNumber('module')->whereNumber('entry')->name('temporary-modules.entry.destroy');
         Route::delete('/{module}/registros-masivo', [TemporaryModuleController::class, 'bulkDestroyEntries'])->middleware('can:Modulos-Temporales')->whereNumber('module')->name('temporary-modules.entries.bulk-destroy');
         Route::get('/{module}/plantilla', [TemporaryModuleController::class, 'downloadTemplate'])->middleware('can:modulos-temporales-ver')->whereNumber('module')->name('temporary-modules.download-template');

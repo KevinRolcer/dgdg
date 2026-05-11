@@ -27,6 +27,10 @@
         <div class="inline-alert inline-alert-success settings-alert" role="alert">{{ session('status') }}</div>
     @endif
 
+    @if (session('error'))
+        <div class="inline-alert inline-alert-error settings-alert" role="alert">{{ session('error') }}</div>
+    @endif
+
     @if (session('distribuir_errors') && !session('distribuir_result'))
         <div class="inline-alert inline-alert-error settings-alert" role="alert">
             @foreach ((array) session('distribuir_errors') as $err)
@@ -34,6 +38,42 @@
             @endforeach
         </div>
     @endif
+
+    @php
+        $hasTmPdfPassword = \App\Models\TemporaryModuleSecuritySetting::pdfPassword() !== null;
+    @endphp
+    <section class="settings-panel-block settings-migrate-block">
+        <div class="settings-micro-heading-row">
+            <h2 class="settings-panel-heading">PDF de módulos temporales</h2>
+            <button type="button" class="settings-help-btn" aria-label="Ayuda" title="Los PDF nuevos pedirán esta contraseña al abrirse">
+                <i class="fa-solid fa-lock" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <form method="POST" action="{{ route('settings.temporary-modules.pdf-password') }}" class="settings-migrate-form">
+            @csrf
+            <div class="settings-migrate-row" style="align-items:flex-end;">
+                <label style="display:grid;gap:6px;min-width:min(100%,220px);">
+                    <span>Nueva contraseña</span>
+                    <input type="password" name="pdf_password" class="tm-input" autocomplete="new-password" placeholder="{{ $hasTmPdfPassword ? 'Configurada actualmente' : 'Sin contraseña' }}">
+                </label>
+                <label style="display:grid;gap:6px;min-width:min(100%,220px);">
+                    <span>Confirmar</span>
+                    <input type="password" name="pdf_password_confirmation" class="tm-input" autocomplete="new-password">
+                </label>
+                <label class="settings-migrate-check">
+                    <input type="checkbox" name="clear_pdf_password" value="1">
+                    <span>Eliminar contraseña</span>
+                </label>
+                <button type="submit" class="tm-btn tm-btn-primary settings-migrate-btn">
+                    <i class="fa-solid fa-key" aria-hidden="true"></i> Guardar
+                </button>
+            </div>
+            @error('pdf_password')
+                <div class="inline-alert inline-alert-error settings-alert" role="alert">{{ $message }}</div>
+            @enderror
+        </form>
+    </section>
 
     {{-- Microregiones: distribuir municipios desde Excel --}}
     <section class="settings-panel-block settings-micro-block">

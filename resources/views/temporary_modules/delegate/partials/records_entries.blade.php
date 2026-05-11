@@ -1,11 +1,81 @@
 @php
     $module = $module;
     $entries = $entries;
+    $moduleEncryptedEvent = (bool) ($module->is_encrypted_event ?? false);
     $municipioField = $municipioField ?? null;
     $entryDataService = app(\App\Services\TemporaryModules\TemporaryModuleEntryDataService::class);
+    $canViewRecords = $canViewRecords ?? true;
+    $pendingViewRequest = $pendingViewRequest ?? null;
+    $entryCollectionForAuth = method_exists($entries, 'items') ? collect($entries->items()) : collect($entries);
+    $entryIdsForAuth = $entryCollectionForAuth->pluck('id')->map(fn ($id) => (int) $id)->all();
+    $editAuthRows = $entryIdsForAuth
+        ? \App\Models\TemporaryModuleEditAuthorization::query()
+            ->whereIn('temporary_module_entry_id', $entryIdsForAuth)
+            ->where('requested_by', (int) auth()->id())
+            ->whereIn('status', [
+                \App\Models\TemporaryModuleEditAuthorization::STATUS_PENDING,
+                \App\Models\TemporaryModuleEditAuthorization::STATUS_APPROVED,
+            ])
+            ->latest('requested_at')
+            ->get()
+        : collect();
+    $activeEditAuthByEntry = $editAuthRows
+        ->filter(fn ($auth) => $auth->status === \App\Models\TemporaryModuleEditAuthorization::STATUS_APPROVED && $auth->expires_at && $auth->expires_at->isFuture())
+        ->keyBy('temporary_module_entry_id');
+    $pendingEditAuthByEntry = $editAuthRows
+        ->filter(fn ($auth) => $auth->status === \App\Models\TemporaryModuleEditAuthorization::STATUS_PENDING)
+        ->keyBy('temporary_module_entry_id');
+    // Permisos de módulo (cifrado) vigentes para el usuario actual
+    $now = \Illuminate\Support\Carbon::now();
+    $activeModuleActionsByUser = $moduleEncryptedEvent
+        ? \App\Models\TemporaryModuleActionAuthorization::query()
+            ->where('temporary_module_id', (int) $module->id)
+            ->where('requested_by', (int) auth()->id())
+            ->where('status', \App\Models\TemporaryModuleActionAuthorization::STATUS_APPROVED)
+            ->where('expires_at', '>', $now)
+            ->pluck('action')
+            ->map(fn ($a) => (string) $a)
+            ->all()
+        : [];
+    $pendingModuleActionsByUser = $moduleEncryptedEvent
+        ? \App\Models\TemporaryModuleActionAuthorization::query()
+            ->where('temporary_module_id', (int) $module->id)
+            ->where('requested_by', (int) auth()->id())
+            ->where('status', \App\Models\TemporaryModuleActionAuthorization::STATUS_PENDING)
+            ->pluck('action')
+            ->map(fn ($a) => (string) $a)
+            ->all()
+        : [];
+    $hasModuleEditPermission = in_array(\App\Models\TemporaryModuleActionAuthorization::ACTION_EDIT, $activeModuleActionsByUser, true);
+    $hasModuleDeletePermission = in_array(\App\Models\TemporaryModuleActionAuthorization::ACTION_DELETE, $activeModuleActionsByUser, true);
+    $hasPendingModuleDelete = in_array(\App\Models\TemporaryModuleActionAuthorization::ACTION_DELETE, $pendingModuleActionsByUser, true);
 @endphp
 <div class="tm-records-fragment-inner" data-module-id="{{ $module->id }}">
     <p class="tm-module-subtitle">{{ $module->name }}</p>
+
+    @if ($moduleEncryptedEvent && ! $canViewRecords)
+        <div class="inline-alert inline-alert-error" role="alert" style="margin: 12px 0;">
+            <strong>Modulo cifrado.</strong>
+            Aun no tienes permiso vigente para <strong>ver registros</strong> de este modulo.
+            @if ($pendingViewRequest)
+                Tu solicitud esta en revision (enviada {{ $pendingViewRequest->requested_at?->timezone(config('app.timezone'))->format('d/m/Y H:i') }}).
+            @else
+                Solicita el permiso al administrador para poder consultar los registros.
+            @endif
+        </div>
+        <div class="tm-record-card-actions" style="margin-bottom: 14px;">
+            @if ($pendingViewRequest)
+                <button type="button" class="tm-btn tm-btn-outline" disabled>Solicitud enviada</button>
+            @else
+                <form action="{{ route('temporary-modules.action-permission.request', ['module' => $module->id, 'action' => 'view']) }}" method="POST" class="tm-inline-form">
+                    @csrf
+                    <button type="submit" class="tm-btn tm-btn-primary">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i> Solicitar permiso para ver
+                    </button>
+                </form>
+            @endif
+        </div>
+    @endif
     <div class="tm-records-mobile tm-scroll-panel">
         @forelse ($entries as $entry)
             @php
@@ -78,12 +148,38 @@
                         </div>
                     @endforeach
                     <div class="tm-record-card-actions">
-                        <button type="button" class="tm-btn" data-open-module-preview="delegate-edit-{{ $entry->id }}">Editar</button>
-                        <form action="{{ route('temporary-modules.entry.destroy', ['module' => $module->id, 'entry' => $entry->id]) }}" method="POST" class="tm-inline-form" data-confirm-delete data-record-title="{{ $cardTitle }}">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="tm-btn tm-btn-danger"><i class="fa-solid fa-trash" aria-hidden="true"></i> Eliminar</button>
-                        </form>
+                        @php
+                            $activeEditAuth = $activeEditAuthByEntry->get((int) $entry->id);
+                            $pendingEditAuth = $pendingEditAuthByEntry->get((int) $entry->id);
+                            $canEditThisEntry = ! $moduleEncryptedEvent || $hasModuleEditPermission || (bool) $activeEditAuth;
+                        @endphp
+                        @if ($canEditThisEntry)
+                            <button type="button" class="tm-btn" data-open-module-preview="delegate-edit-{{ $entry->id }}"@if ($moduleEncryptedEvent && $activeEditAuth) title="Permiso hasta {{ $activeEditAuth->expires_at->timezone(config('app.timezone'))->format('d/m/Y H:i') }}"@endif>Editar</button>
+                            @if ($moduleEncryptedEvent && $activeEditAuth && ! $hasModuleEditPermission)
+                                <small class="tm-muted">Permiso hasta {{ $activeEditAuth->expires_at->timezone(config('app.timezone'))->format('H:i') }}</small>
+                            @endif
+                        @elseif ($pendingEditAuth)
+                            <button type="button" class="tm-btn tm-btn-outline" disabled>Solicitud enviada</button>
+                        @else
+                            <form action="{{ route('temporary-modules.entry.edit-request', ['module' => $module->id, 'entry' => $entry->id]) }}" method="POST" class="tm-inline-form">
+                                @csrf
+                                <button type="submit" class="tm-btn tm-btn-outline">Solicitar edición</button>
+                            </form>
+                        @endif
+                        @if (! $moduleEncryptedEvent || $hasModuleDeletePermission)
+                            <form action="{{ route('temporary-modules.entry.destroy', ['module' => $module->id, 'entry' => $entry->id]) }}" method="POST" class="tm-inline-form" data-confirm-delete data-record-title="{{ $cardTitle }}">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="tm-btn tm-btn-danger"><i class="fa-solid fa-trash" aria-hidden="true"></i> Eliminar</button>
+                            </form>
+                        @elseif ($hasPendingModuleDelete)
+                            <button type="button" class="tm-btn tm-btn-outline" disabled title="Solicitud de permiso para eliminar pendiente">Permiso eliminar (pendiente)</button>
+                        @else
+                            <form action="{{ route('temporary-modules.action-permission.request', ['module' => $module->id, 'action' => 'delete']) }}" method="POST" class="tm-inline-form">
+                                @csrf
+                                <button type="submit" class="tm-btn tm-btn-outline">Permiso eliminar</button>
+                            </form>
+                        @endif
                     </div>
                 </div>
             </details>
@@ -173,13 +269,34 @@
                             @php
                                 $rowMrValue = $municipioField ? ($entry->data[$municipioField->key] ?? null) : null;
                                 $rowTitle = (is_string($rowMrValue) && trim($rowMrValue) !== '') ? $rowMrValue : 'Registro '.($loop->iteration + ($entries->firstItem() ?? 1) - 1);
+                                $activeEditAuth = $activeEditAuthByEntry->get((int) $entry->id);
+                                $pendingEditAuth = $pendingEditAuthByEntry->get((int) $entry->id);
+                                $canEditThisEntryDesktop = ! $moduleEncryptedEvent || $hasModuleEditPermission || (bool) $activeEditAuth;
                             @endphp
-                            <button type="button" class="tm-btn" data-open-module-preview="delegate-edit-{{ $entry->id }}">Editar</button>
-                            <form action="{{ route('temporary-modules.entry.destroy', ['module' => $module->id, 'entry' => $entry->id]) }}" method="POST" class="tm-inline-form" data-confirm-delete data-record-title="{{ $rowTitle }}">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="tm-btn tm-btn-danger" title="Eliminar"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
-                            </form>
+                            @if ($canEditThisEntryDesktop)
+                                <button type="button" class="tm-btn" data-open-module-preview="delegate-edit-{{ $entry->id }}"@if ($moduleEncryptedEvent && $activeEditAuth) title="Permiso vigente hasta {{ $activeEditAuth->expires_at->timezone(config('app.timezone'))->format('d/m/Y H:i') }}"@endif>Editar</button>
+                            @elseif ($pendingEditAuth)
+                                <button type="button" class="tm-btn tm-btn-outline" disabled title="Solicitud pendiente">Pendiente</button>
+                            @else
+                                <form action="{{ route('temporary-modules.entry.edit-request', ['module' => $module->id, 'entry' => $entry->id]) }}" method="POST" class="tm-inline-form">
+                                    @csrf
+                                    <button type="submit" class="tm-btn tm-btn-outline" title="Solicitar permiso de edición">Solicitar</button>
+                                </form>
+                            @endif
+                            @if (! $moduleEncryptedEvent || $hasModuleDeletePermission)
+                                <form action="{{ route('temporary-modules.entry.destroy', ['module' => $module->id, 'entry' => $entry->id]) }}" method="POST" class="tm-inline-form" data-confirm-delete data-record-title="{{ $rowTitle }}">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="tm-btn tm-btn-danger" title="Eliminar"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+                                </form>
+                            @elseif ($hasPendingModuleDelete)
+                                <button type="button" class="tm-btn tm-btn-outline" disabled title="Solicitud de permiso para eliminar pendiente"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i></button>
+                            @else
+                                <form action="{{ route('temporary-modules.action-permission.request', ['module' => $module->id, 'action' => 'delete']) }}" method="POST" class="tm-inline-form">
+                                    @csrf
+                                    <button type="submit" class="tm-btn tm-btn-outline" title="Pedir permiso para eliminar"><i class="fa-solid fa-key" aria-hidden="true"></i></button>
+                                </form>
+                            @endif
                         </td>
                     </tr>
                 @empty

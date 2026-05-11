@@ -2,6 +2,7 @@
 
 namespace App\Services\TemporaryModules;
 
+use App\Models\TemporaryModuleSecuritySetting;
 use App\Models\TemporaryModule;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -1680,6 +1681,12 @@ class TemporaryModuleWordPdfService
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper($paperSize, $orientationConfig === 'landscape' ? 'landscape' : 'portrait');
         $dompdf->render();
+        $pdfPassword = (bool) ($temporaryModule->is_encrypted_event ?? false)
+            ? ($temporaryModule->pdfPassword() ?? TemporaryModuleSecuritySetting::pdfPassword())
+            : TemporaryModuleSecuritySetting::pdfPassword();
+        if ($pdfPassword !== null) {
+            $dompdf->getCanvas()->get_cpdf()->setEncryption($pdfPassword, '', ['print']);
+        }
         error_clear_last();
         $bytesWritten = @file_put_contents($fullPdfPath, $dompdf->output(), LOCK_EX);
         if ($bytesWritten === false || ! is_file($fullPdfPath)) {

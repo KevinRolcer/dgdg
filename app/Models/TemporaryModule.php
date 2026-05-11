@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
 
 class TemporaryModule extends Model
 {
@@ -24,6 +25,9 @@ class TemporaryModule extends Model
         'applies_to_all',
         'registration_scope',
         'show_microregion',
+        'is_encrypted_event',
+        'edit_permission_duration_hours',
+        'pdf_password_encrypted',
         'target_municipios',
         'created_by',
         'exported_at',
@@ -34,6 +38,8 @@ class TemporaryModule extends Model
         'is_active' => 'boolean',
         'applies_to_all' => 'boolean',
         'show_microregion' => 'boolean',
+        'is_encrypted_event' => 'boolean',
+        'edit_permission_duration_hours' => 'integer',
         'expires_at' => 'datetime',
         'exported_at' => 'datetime',
         'seed_discard_log' => 'array',
@@ -72,6 +78,23 @@ class TemporaryModule extends Model
         }
 
         return $this->expires_at->greaterThanOrEqualTo(Carbon::now());
+    }
+
+    public function pdfPassword(): ?string
+    {
+        if (! is_string($this->pdf_password_encrypted) || trim($this->pdf_password_encrypted) === '') {
+            return null;
+        }
+
+        try {
+            $password = Crypt::decryptString($this->pdf_password_encrypted);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $password = trim($password);
+
+        return $password !== '' ? $password : null;
     }
 
     public function scopeAvailable(Builder $query): Builder

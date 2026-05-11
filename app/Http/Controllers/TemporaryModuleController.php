@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Jobs\GenerateTemporaryModuleAnalysisWordJob;
 use App\Models\TemporaryModule;
+use App\Models\TemporaryModuleActionAuthorization;
+use App\Models\TemporaryModuleEditAuthorization;
 use App\Models\TemporaryModuleEntry;
 use App\Models\TemporaryModuleField;
 use App\Models\TemporaryModuleUserExportSetting;
+use App\Notifications\TemporaryModulePermissionStatusNotification;
 use App\Services\TemporaryModules\TemporaryModuleAccessService;
 use App\Services\TemporaryModules\TemporaryModuleAdminSeedService;
 use App\Services\TemporaryModules\TemporaryModuleAnalysisWordService;
@@ -25,6 +28,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -49,6 +53,85 @@ class TemporaryModuleController extends Controller
     private function analysisWordService(): TemporaryModuleAnalysisWordService
     {
         return app(TemporaryModuleAnalysisWordService::class);
+    }
+
+    private function hasActiveEditAuthorization(TemporaryModuleEntry $entry, int $userId): bool
+    {
+        if (! (bool) ($entry->module?->is_encrypted_event ?? false)) {
+            return true;
+        }
+
+        return TemporaryModuleEditAuthorization::query()
+            ->where('temporary_module_entry_id', (int) $entry->id)
+            ->where('requested_by', $userId)
+            ->where('status', TemporaryModuleEditAuthorization::STATUS_APPROVED)
+            ->where('expires_at', '>', Carbon::now())
+            ->exists();
+    }
+
+    private function hasActiveModuleActionAuthorization(TemporaryModule $module, int $userId, string $action): bool
+    {
+        if (! (bool) ($module->is_encrypted_event ?? false)) {
+            return true;
+        }
+
+        return TemporaryModuleActionAuthorization::query()
+            ->where('temporary_module_id', (int) $module->id)
+            ->where('requested_by', $userId)
+            ->where('action', $action)
+            ->where('status', TemporaryModuleActionAuthorization::STATUS_APPROVED)
+            ->where('expires_at', '>', Carbon::now())
+            ->exists();
+    }
+
+    private function ensureEncryptedActionAllowed(TemporaryModule $module, int $userId, string $action): void
+    {
+        if (! $this->hasActiveModuleActionAuthorization($module, $userId, $action)) {
+            $labels = [
+                TemporaryModuleActionAuthorization::ACTION_VIEW => 'ver registros',
+                TemporaryModuleActionAuthorization::ACTION_CREATE => 'registrar',
+                TemporaryModuleActionAuthorization::ACTION_EDIT => 'editar',
+                TemporaryModuleActionAuthorization::ACTION_DELETE => 'eliminar',
+            ];
+
+            throw ValidationException::withMessages([
+                'permission' => 'Para '.($labels[$action] ?? 'realizar esta accion').' en este modulo cifrado necesitas una autorizacion vigente del administrador.',
+            ]);
+        }
+    }
+
+    /**
+     * Indica si el usuario puede ver registros del módulo. En módulos no cifrados siempre.
+     * En módulos cifrados requiere autorización vigente con acción "view".
+     */
+    private function canViewEncryptedModuleRecords(TemporaryModule $module, int $userId): bool
+    {
+        return $this->hasActiveModuleActionAuthorization(
+            $module,
+            $userId,
+            TemporaryModuleActionAuthorization::ACTION_VIEW
+        );
+    }
+
+    private function notifyPermissionRequester(object $auth, string $status, string $permissionLabel, ?Carbon $expiresAt = null): void
+    {
+        $requester = method_exists($auth, 'requester') ? $auth->requester : null;
+        if (! $requester) {
+            return;
+        }
+
+        $moduleName = (string) ($auth->module?->name ?? 'Modulo temporal');
+        $expiresLabel = $expiresAt
+            ? $expiresAt->timezone(config('app.timezone'))->format('d/m/Y H:i')
+            : null;
+
+        $requester->notify(new TemporaryModulePermissionStatusNotification(
+            $status,
+            $moduleName,
+            $permissionLabel,
+            $expiresLabel,
+            route('temporary-modules.records')
+        ));
     }
 
     /**
@@ -574,6 +657,16 @@ class TemporaryModuleController extends Controller
     public function edit(int $module): View
     {
         $select = ['id', 'name', 'description', 'expires_at', 'applies_to_all', 'is_active'];
+        foreach (['registration_scope', 'show_microregion', 'target_municipios'] as $column) {
+            if (Schema::hasColumn('temporary_modules', $column)) {
+                $select[] = $column;
+            }
+        }
+        foreach (['is_encrypted_event', 'edit_permission_duration_hours', 'pdf_password_encrypted'] as $column) {
+            if (Schema::hasColumn('temporary_modules', $column)) {
+                $select[] = $column;
+            }
+        }
         if (Schema::hasColumn('temporary_modules', 'seed_discard_log')) {
             $select[] = 'seed_discard_log';
         }
@@ -620,6 +713,9 @@ class TemporaryModuleController extends Controller
             'show_microregion' => ['nullable', 'boolean'],
             'target_municipios' => ['nullable', 'array'],
             'target_municipios.*' => ['string', 'max:120'],
+            'is_encrypted_event' => ['nullable', 'boolean'],
+            'edit_permission_duration_hours' => ['nullable', 'integer', Rule::in([1, 2, 3, 24])],
+            'encrypted_pdf_password' => ['nullable', 'string', 'min:4', 'max:120', 'confirmed'],
             'fields' => ['required', 'array', 'min:1'],
             'fields.*.label' => ['required', 'string', 'max:120'],
             'fields.*.key' => ['nullable', 'string', 'max:120'],
@@ -692,6 +788,11 @@ class TemporaryModuleController extends Controller
                 'applies_to_all' => ($validated['applies_to'] ?? 'all') === 'all',
                 'registration_scope' => $regScope,
                 'show_microregion' => $showMicroregion,
+                'is_encrypted_event' => (bool) ($validated['is_encrypted_event'] ?? false),
+                'edit_permission_duration_hours' => (int) ($validated['edit_permission_duration_hours'] ?? 1),
+                'pdf_password_encrypted' => ! empty($validated['encrypted_pdf_password'])
+                    ? Crypt::encryptString((string) $validated['encrypted_pdf_password'])
+                    : null,
                 'target_municipios' => $targetMunicipios,
                 'created_by' => $request->user()->id,
             ]);
@@ -722,6 +823,13 @@ class TemporaryModuleController extends Controller
             'applies_to' => ['required', Rule::in(['all', 'selected'])],
             'delegate_ids' => ['nullable', 'array'],
             'delegate_ids.*' => ['integer', Rule::exists('users', 'id')],
+            'registration_scope' => ['nullable', Rule::in(['microrregion', 'free', 'municipios'])],
+            'target_municipios' => ['nullable', 'array'],
+            'target_municipios.*' => ['string', 'max:120'],
+            'is_encrypted_event' => ['nullable', 'boolean'],
+            'edit_permission_duration_hours' => ['nullable', 'integer', Rule::in([1, 2, 3, 24])],
+            'encrypted_pdf_password' => ['nullable', 'string', 'min:4', 'max:120', 'confirmed'],
+            'clear_encrypted_pdf_password' => ['nullable', 'boolean'],
             'conflict_action' => ['nullable', Rule::in(['none', 'clear_module', 'clear_field_data', 'normalize_municipio', 'migrate_to_multiselect', 'normalize_boolean_select', 'normalize_text_select'])],
             'existing_fields' => ['nullable', 'array'],
             'existing_fields.*.id' => ['required_with:existing_fields', 'integer'],
@@ -763,6 +871,23 @@ class TemporaryModuleController extends Controller
                 'delegate_ids' => 'Selecciona al menos un delegado o cambia el alcance a todos.',
             ]);
         }
+
+        $currentRegScope = in_array((string) ($temporaryModule->registration_scope ?? ''), ['microrregion', 'free', 'municipios'], true)
+            ? (string) $temporaryModule->registration_scope
+            : 'microrregion';
+        $regScope = in_array($validated['registration_scope'] ?? '', ['microrregion', 'free', 'municipios'], true)
+            ? (string) $validated['registration_scope']
+            : $currentRegScope;
+        $targetMunicipios = null;
+        if ($regScope === 'municipios') {
+            $municipiosInput = array_key_exists('target_municipios', $validated)
+                ? $validated['target_municipios']
+                : ($temporaryModule->target_municipios ?? []);
+            $targetMunicipios = array_values(array_unique(array_filter(array_map('strval', (array) $municipiosInput))));
+        }
+        $showMicroregion = $regScope === 'microrregion'
+            ? $request->boolean('show_microregion')
+            : false;
 
         $currentFieldsById = $temporaryModule->fields->keyBy('id');
         $submittedExisting = collect($validated['existing_fields'] ?? [])
@@ -1100,11 +1225,7 @@ class TemporaryModuleController extends Controller
             }
         }
 
-        $showMicroregion = ((string) ($temporaryModule->registration_scope ?? 'microrregion') === 'microrregion')
-            ? $request->boolean('show_microregion')
-            : false;
-
-        DB::transaction(function () use ($temporaryModule, $validated, $selectedDelegateIds, $existingDefinitions, $deletedFieldIds, $preparedExtraFields, $invalidMainImageKeys, $showMicroregion): void {
+        DB::transaction(function () use ($temporaryModule, $validated, $selectedDelegateIds, $existingDefinitions, $deletedFieldIds, $preparedExtraFields, $invalidMainImageKeys, $regScope, $targetMunicipios, $showMicroregion, $request): void {
             $slug = Str::slug($validated['name']);
             $this->slugService->forcePurgeTrashedBySlug($slug);
             $baseSlug = $slug;
@@ -1114,15 +1235,27 @@ class TemporaryModuleController extends Controller
                 $suffix++;
             }
 
-            $temporaryModule->update([
+            $moduleUpdates = [
                 'name' => $validated['name'],
                 'slug' => $slug,
                 'description' => $validated['description'] ?? null,
                 'expires_at' => $this->resolveExpiresAt($validated),
                 'is_active' => (bool) ($validated['is_active'] ?? true),
                 'applies_to_all' => ($validated['applies_to'] ?? 'all') === 'all',
+                'registration_scope' => $regScope,
+                'target_municipios' => $targetMunicipios,
                 'show_microregion' => $showMicroregion,
-            ]);
+                'is_encrypted_event' => (bool) ($validated['is_encrypted_event'] ?? false),
+                'edit_permission_duration_hours' => (int) ($validated['edit_permission_duration_hours'] ?? 1),
+            ];
+
+            if ($request->boolean('clear_encrypted_pdf_password')) {
+                $moduleUpdates['pdf_password_encrypted'] = null;
+            } elseif (! empty($validated['encrypted_pdf_password'])) {
+                $moduleUpdates['pdf_password_encrypted'] = Crypt::encryptString((string) $validated['encrypted_pdf_password']);
+            }
+
+            $temporaryModule->update($moduleUpdates);
 
             if ($temporaryModule->applies_to_all) {
                 $temporaryModule->targetUsers()->sync([]);
@@ -1414,7 +1547,7 @@ class TemporaryModuleController extends Controller
             ->toArray();
 
         $allModulesQuery = TemporaryModule::query()
-            ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all', 'registration_scope', 'show_microregion'])
+            ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all', 'registration_scope', 'show_microregion', 'is_encrypted_event'])
             ->available()
             ->where(function ($query) use ($user) {
                 $query->where('applies_to_all', true)
@@ -1502,7 +1635,7 @@ class TemporaryModuleController extends Controller
         abort_if($user->can('Modulos-Temporales-Admin'), 404);
 
         $temporaryModule = TemporaryModule::query()
-            ->select(['id', 'is_active', 'applies_to_all', 'expires_at'])
+            ->select(['id', 'is_active', 'applies_to_all', 'expires_at', 'is_encrypted_event'])
             ->findOrFail($module);
 
         abort_unless($temporaryModule->isAvailable(), 404);
@@ -1525,7 +1658,40 @@ class TemporaryModuleController extends Controller
             })
             ->count();
 
-        return response()->json(['my_entries_count' => $count]);
+        $isEncrypted = (bool) ($temporaryModule->is_encrypted_event ?? false);
+        $permissions = [];
+        if ($isEncrypted) {
+            $now = Carbon::now();
+            $rows = TemporaryModuleActionAuthorization::query()
+                ->where('temporary_module_id', (int) $temporaryModule->id)
+                ->where('requested_by', (int) $user->id)
+                ->whereIn('action', TemporaryModuleActionAuthorization::ACTIONS)
+                ->whereIn('status', [
+                    TemporaryModuleActionAuthorization::STATUS_APPROVED,
+                    TemporaryModuleActionAuthorization::STATUS_PENDING,
+                ])
+                ->get(['action', 'status', 'expires_at']);
+            foreach (TemporaryModuleActionAuthorization::ACTIONS as $action) {
+                $activeRow = $rows->first(fn ($r) => $r->action === $action
+                    && $r->status === TemporaryModuleActionAuthorization::STATUS_APPROVED
+                    && $r->expires_at instanceof Carbon
+                    && $r->expires_at->isFuture());
+                $pendingRow = ! $activeRow
+                    ? $rows->first(fn ($r) => $r->action === $action && $r->status === TemporaryModuleActionAuthorization::STATUS_PENDING)
+                    : null;
+                $permissions[$action] = [
+                    'active' => (bool) $activeRow,
+                    'pending' => (bool) $pendingRow,
+                    'expires_at' => $activeRow ? $activeRow->expires_at->timezone(config('app.timezone'))->format('d/m/Y H:i') : null,
+                ];
+            }
+        }
+
+        return response()->json([
+            'my_entries_count' => $count,
+            'is_encrypted_event' => $isEncrypted,
+            'permissions' => $permissions,
+        ]);
     }
 
     /** HTML parcial: grid de módulos + paginación (AJAX). */
@@ -1535,7 +1701,7 @@ class TemporaryModuleController extends Controller
         abort_if($user->can('Modulos-Temporales-Admin'), 404);
         $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
         $modules = TemporaryModule::query()
-            ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all', 'registration_scope', 'show_microregion'])
+            ->select(['id', 'name', 'description', 'expires_at', 'is_active', 'applies_to_all', 'registration_scope', 'show_microregion', 'is_encrypted_event'])
             ->available()
             ->where(function ($query) use ($user) {
                 $query->where('applies_to_all', true)
@@ -1578,8 +1744,22 @@ class TemporaryModuleController extends Controller
         $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($moduleId);
         abort_unless($temporaryModule->isAvailable(), 404);
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $user->id), 403);
+
+        $isEncrypted = (bool) ($temporaryModule->is_encrypted_event ?? false);
+        $canViewRecords = ! $isEncrypted || $this->canViewEncryptedModuleRecords($temporaryModule, (int) $user->id);
+        $pendingViewRequest = null;
+        if ($isEncrypted && ! $canViewRecords) {
+            $pendingViewRequest = TemporaryModuleActionAuthorization::query()
+                ->where('temporary_module_id', (int) $temporaryModule->id)
+                ->where('requested_by', (int) $user->id)
+                ->where('action', TemporaryModuleActionAuthorization::ACTION_VIEW)
+                ->where('status', TemporaryModuleActionAuthorization::STATUS_PENDING)
+                ->latest('requested_at')
+                ->first();
+        }
+
         $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $user->id);
-        $myEntries = $temporaryModule->entries()
+        $entriesQuery = $temporaryModule->entries()
             ->where(function ($q) use ($microrregionIdsUsuario, $user): void {
                 if ($microrregionIdsUsuario !== []) {
                     $q->whereIn('microrregion_id', $microrregionIdsUsuario);
@@ -1595,7 +1775,14 @@ class TemporaryModuleController extends Controller
             ->tap(fn ($q) => $this->applyDelegateMyRecordsFilters($q, $request, $microrregionIdsUsuario))
             ->with('microrregion:id,microrregion,cabecera')
             ->select(['id', 'temporary_module_id', 'user_id', 'microrregion_id', 'data', 'submitted_at'])
-            ->latest('submitted_at')
+            ->latest('submitted_at');
+
+        if (! $canViewRecords) {
+            // Restringe el resultado para que el delegado nunca vea registros sin permiso de visualización.
+            $entriesQuery->whereRaw('1 = 0');
+        }
+
+        $myEntries = $entriesQuery
             ->paginate(10, ['*'], 'entries_page')
             ->appends($this->delegateRecordsAppends($request, $moduleId))
             ->withQueryString();
@@ -1611,6 +1798,8 @@ class TemporaryModuleController extends Controller
             'fragmentRecordsUrl' => route('temporary-modules.fragment.records'),
             'microrregionesAsignadas' => $microrregionesAsignadas,
             'tmImportable' => $tmImportable,
+            'canViewRecords' => $canViewRecords,
+            'pendingViewRequest' => $pendingViewRequest,
         ]);
     }
 
@@ -1717,8 +1906,14 @@ class TemporaryModuleController extends Controller
 
         $microrregionIdsUsuario = $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
 
+        $isEncryptedModule = (bool) ($temporaryModule->is_encrypted_event ?? false);
+        $canViewModuleRecords = ! $isEncryptedModule
+            || $this->canViewEncryptedModuleRecords($temporaryModule, (int) $request->user()->id);
+
         // Filter entries based on scope
-        if ($usesMicrorregion) {
+        if (! $canViewModuleRecords) {
+            $entries = collect();
+        } elseif ($usesMicrorregion) {
             $entries = $temporaryModule->entries()
                 ->when(
                     $microrregionIdsUsuario !== [],
@@ -1770,6 +1965,7 @@ class TemporaryModuleController extends Controller
             'fieldTypes' => self::FIELD_TYPES,
             'editingEntry' => $editingEntry,
             'delegados' => $this->accessService->onlyDelegates(),
+            'canViewModuleRecords' => $canViewModuleRecords,
         ]);
     }
 
@@ -1848,6 +2044,15 @@ class TemporaryModuleController extends Controller
                     403
                 );
             }
+
+            if (! $this->hasActiveModuleActionAuthorization($temporaryModule, (int) $request->user()->id, TemporaryModuleActionAuthorization::ACTION_EDIT)
+                && ! $this->hasActiveEditAuthorization($existingEntry, (int) $request->user()->id)) {
+                throw ValidationException::withMessages([
+                    'entry_id' => 'Para editar este registro necesitas una autorizacion vigente del administrador.',
+                ]);
+            }
+        } else {
+            $this->ensureEncryptedActionAllowed($temporaryModule, (int) $request->user()->id, TemporaryModuleActionAuthorization::ACTION_CREATE);
         }
 
         $rules = [];
@@ -2093,12 +2298,142 @@ class TemporaryModuleController extends Controller
         } else {
             abort_unless((int) $entryModel->user_id === (int) $request->user()->id, 403);
         }
+        $this->ensureEncryptedActionAllowed($temporaryModule, (int) $request->user()->id, TemporaryModuleActionAuthorization::ACTION_DELETE);
 
         $this->entryDataService->deleteEntryAndFiles($entryModel, $temporaryModule);
 
         return redirect()
             ->route('temporary-modules.records', ['module' => $temporaryModule->id])
             ->with('status', 'Registro eliminado correctamente.');
+    }
+
+    public function requestEntryEditAuthorization(Request $request, int $module, int $entry): RedirectResponse|JsonResponse
+    {
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+        abort_unless($temporaryModule->isAvailable(), 404);
+        abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
+
+        $entryModel = TemporaryModuleEntry::query()
+            ->where('id', $entry)
+            ->where('temporary_module_id', $temporaryModule->id)
+            ->firstOrFail();
+
+        $usesMicrorregion = ((string) ($temporaryModule->registration_scope ?? 'microrregion') === 'microrregion')
+            && (bool) ($temporaryModule->show_microregion ?? true)
+            && $entryModel->microrregion_id !== null;
+
+        if ($usesMicrorregion) {
+            abort_unless(
+                $this->accessService->userCanAccessEntryByMicrorregion((int) $request->user()->id, (int) $entryModel->microrregion_id),
+                403
+            );
+        } else {
+            abort_unless((int) $entryModel->user_id === (int) $request->user()->id, 403);
+        }
+
+        $active = TemporaryModuleEditAuthorization::query()
+            ->where('temporary_module_entry_id', $entryModel->id)
+            ->where('requested_by', (int) $request->user()->id)
+            ->where('status', TemporaryModuleEditAuthorization::STATUS_APPROVED)
+            ->where('expires_at', '>', Carbon::now())
+            ->first();
+
+        if ($active) {
+            $message = 'Ya tienes permiso vigente para editar este registro hasta '.$active->expires_at->timezone(config('app.timezone'))->format('d/m/Y H:i').'.';
+        } else {
+            $recentRequest = TemporaryModuleEditAuthorization::query()
+                ->where('temporary_module_entry_id', $entryModel->id)
+                ->where('requested_by', (int) $request->user()->id)
+                ->where('requested_at', '>=', Carbon::now()->subHour())
+                ->whereIn('status', [
+                    TemporaryModuleEditAuthorization::STATUS_PENDING,
+                    TemporaryModuleEditAuthorization::STATUS_APPROVED,
+                ])
+                ->first();
+
+            if ($recentRequest) {
+                $message = 'Ya existe una solicitud de edición para este registro en la última hora.';
+            } else {
+                TemporaryModuleEditAuthorization::query()->create([
+                    'temporary_module_id' => (int) $temporaryModule->id,
+                    'temporary_module_entry_id' => (int) $entryModel->id,
+                    'requested_by' => (int) $request->user()->id,
+                    'status' => TemporaryModuleEditAuthorization::STATUS_PENDING,
+                    'reason' => trim((string) $request->input('reason', '')),
+                    'requested_at' => Carbon::now(),
+                ]);
+                $message = 'Solicitud enviada. Un administrador debe autorizar la edición.';
+            }
+        }
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'message' => $message]);
+        }
+
+        return redirect()
+            ->back()
+            ->with('status', $message);
+    }
+
+    public function requestModuleActionAuthorization(Request $request, int $module, string $action): RedirectResponse|JsonResponse
+    {
+        abort_unless(in_array($action, [
+            TemporaryModuleActionAuthorization::ACTION_CREATE,
+            TemporaryModuleActionAuthorization::ACTION_EDIT,
+            TemporaryModuleActionAuthorization::ACTION_DELETE,
+        ], true), 404);
+
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+        abort_unless($temporaryModule->isAvailable(), 404);
+        abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
+
+        if (! (bool) ($temporaryModule->is_encrypted_event ?? false)) {
+            $message = 'Este modulo no requiere permiso especial para esa accion.';
+        } else {
+            $active = TemporaryModuleActionAuthorization::query()
+                ->where('temporary_module_id', (int) $temporaryModule->id)
+                ->where('requested_by', (int) $request->user()->id)
+                ->where('action', $action)
+                ->where('status', TemporaryModuleActionAuthorization::STATUS_APPROVED)
+                ->where('expires_at', '>', Carbon::now())
+                ->first();
+
+            if ($active) {
+                $message = 'Ya tienes permiso vigente hasta '.$active->expires_at->timezone(config('app.timezone'))->format('d/m/Y H:i').'.';
+            } else {
+                $recentRequest = TemporaryModuleActionAuthorization::query()
+                    ->where('temporary_module_id', (int) $temporaryModule->id)
+                    ->where('requested_by', (int) $request->user()->id)
+                    ->where('action', $action)
+                    ->where('requested_at', '>=', Carbon::now()->subHour())
+                    ->whereIn('status', [
+                        TemporaryModuleActionAuthorization::STATUS_PENDING,
+                        TemporaryModuleActionAuthorization::STATUS_APPROVED,
+                    ])
+                    ->first();
+
+                if ($recentRequest) {
+                    $message = 'Ya existe una solicitud para esta accion en la ultima hora.';
+                } else {
+                    TemporaryModuleActionAuthorization::query()->create([
+                        'temporary_module_id' => (int) $temporaryModule->id,
+                        'requested_by' => (int) $request->user()->id,
+                        'action' => $action,
+                        'status' => TemporaryModuleActionAuthorization::STATUS_PENDING,
+                        'requested_at' => Carbon::now(),
+                    ]);
+                    $message = 'Solicitud enviada. Un administrador debe autorizar esta accion.';
+                }
+            }
+        }
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'message' => $message]);
+        }
+
+        return redirect()
+            ->back()
+            ->with('status', $message);
     }
 
     /** El delegado elimina varios de sus registros de forma masiva. */
@@ -2112,6 +2447,7 @@ class TemporaryModuleController extends Controller
             'entry_ids' => ['required', 'array'],
             'entry_ids.*' => ['integer'],
         ]);
+        $this->ensureEncryptedActionAllowed($temporaryModule, (int) $request->user()->id, TemporaryModuleActionAuthorization::ACTION_DELETE);
 
         $entryIds = (array) $request->input('entry_ids');
         $microrregionIdsPermitidos = (array) $this->accessService->microrregionIdsPorUsuario((int) $request->user()->id);
@@ -2247,6 +2583,7 @@ class TemporaryModuleController extends Controller
         $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
         abort_unless($temporaryModule->isAvailable(), 404);
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
+        $this->ensureEncryptedActionAllowed($temporaryModule, (int) $request->user()->id, TemporaryModuleActionAuthorization::ACTION_CREATE);
 
         $request->validate([
             'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls,pdf', 'max:153600'],
@@ -2376,6 +2713,7 @@ class TemporaryModuleController extends Controller
         $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
         abort_unless($temporaryModule->isAvailable(), 404);
         abort_unless($this->accessService->userCanAccessModule($temporaryModule, (int) $request->user()->id), 403);
+        $this->ensureEncryptedActionAllowed($temporaryModule, (int) $request->user()->id, TemporaryModuleActionAuthorization::ACTION_EDIT);
 
         $request->validate([
             'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:153600'],
@@ -2557,6 +2895,7 @@ class TemporaryModuleController extends Controller
                 'message' => 'No tienes acceso a este módulo temporal.',
             ], 403);
         }
+        $this->ensureEncryptedActionAllowed($temporaryModule, (int) $request->user()->id, TemporaryModuleActionAuthorization::ACTION_CREATE);
 
         $validated = $request->validate([
             'data' => ['required', 'array'],
@@ -3329,6 +3668,502 @@ class TemporaryModuleController extends Controller
         }
 
         return response()->json(['success' => true, 'updated' => $updated]);
+    }
+
+    public function adminEditAuthorizations(Request $request): JsonResponse
+    {
+        abort_unless($request->user() && Gate::forUser($request->user())->allows('modulos-temporales-admin-ver'), 403);
+
+        $items = TemporaryModuleEditAuthorization::query()
+            ->with([
+                'module:id,name',
+                'entry:id,temporary_module_id,microrregion_id,created_at',
+                'entry.microrregion:id,microrregion,cabecera',
+                'requester:id,name',
+                'approver:id,name',
+            ])
+            ->where(function ($query): void {
+                $query->where('status', TemporaryModuleEditAuthorization::STATUS_PENDING)
+                    ->orWhere(function ($q): void {
+                        $q->where('status', TemporaryModuleEditAuthorization::STATUS_APPROVED)
+                            ->where('expires_at', '>', Carbon::now()->subDay());
+                    })
+                    ->orWhere(function ($q): void {
+                        $q->where('status', TemporaryModuleEditAuthorization::STATUS_REVOKED)
+                            ->where('updated_at', '>', Carbon::now()->subDay());
+                    });
+            })
+            ->latest('requested_at')
+            ->limit(200)
+            ->get();
+
+        // Calcula acciones vigentes (a nivel módulo) por par (usuario, módulo) para precargar el modal de edición.
+        $pairKeys = collect();
+        foreach ($items as $editAuth) {
+            $pairKeys->push(((int) $editAuth->requested_by).'-'.((int) $editAuth->temporary_module_id));
+        }
+        $activeActionsMap = [];
+
+        $editItems = $items->map(function (TemporaryModuleEditAuthorization $auth): array {
+                $entry = $auth->entry;
+                $mr = $entry?->microrregion;
+                $mrLabel = $mr
+                    ? 'MR '.str_pad((string) $mr->microrregion, 2, '0', STR_PAD_LEFT).($mr->cabecera ? ' - '.$mr->cabecera : '')
+                    : 'Sin microrregion';
+                $requestedAt = $auth->requested_at instanceof Carbon ? $auth->requested_at : $auth->created_at;
+                $expiresAt = $auth->expires_at instanceof Carbon ? $auth->expires_at : null;
+
+                return [
+                    'id' => (int) $auth->id,
+                    'kind' => 'entry',
+                    'action' => 'edit',
+                    'action_label' => 'Editar registro',
+                    'status' => (string) $auth->status,
+                    'status_label' => $auth->status === TemporaryModuleEditAuthorization::STATUS_PENDING
+                        ? 'Pendiente'
+                        : ($auth->status === TemporaryModuleEditAuthorization::STATUS_REVOKED
+                            ? ($auth->expires_at ? 'Revocado' : 'Denegado')
+                            : ($auth->isActive() ? 'Activo' : 'Vencido')),
+                    'module' => (string) ($auth->module?->name ?? 'Modulo'),
+                    'entry_id' => (int) ($auth->temporary_module_entry_id ?? 0),
+                    'microrregion' => $mrLabel,
+                    'requester' => (string) ($auth->requester?->name ?? 'Usuario'),
+                    'approver' => (string) ($auth->approver?->name ?? ''),
+                    'requested_at' => $requestedAt instanceof Carbon ? $requestedAt->timezone(config('app.timezone'))->format('d/m/Y H:i') : '',
+                    'expires_at' => $expiresAt ? $expiresAt->timezone(config('app.timezone'))->format('d/m/Y H:i') : '',
+                    'is_active' => $auth->isActive(),
+                ];
+            })->values();
+
+        $actionRows = TemporaryModuleActionAuthorization::query()
+            ->with(['module:id,name', 'requester:id,name', 'approver:id,name'])
+            ->where(function ($query): void {
+                $query->where('status', TemporaryModuleActionAuthorization::STATUS_PENDING)
+                    ->orWhere(function ($q): void {
+                        $q->where('status', TemporaryModuleActionAuthorization::STATUS_APPROVED)
+                            ->where('expires_at', '>', Carbon::now()->subDay());
+                    })
+                    ->orWhere(function ($q): void {
+                        $q->where('status', TemporaryModuleActionAuthorization::STATUS_REVOKED)
+                            ->where('updated_at', '>', Carbon::now()->subDay());
+                    });
+            })
+            ->latest('requested_at')
+            ->limit(200)
+            ->get();
+
+        $actionLabels = TemporaryModuleActionAuthorization::ACTION_LABELS;
+
+        foreach ($actionRows as $actionAuth) {
+            $pairKeys->push(((int) $actionAuth->requested_by).'-'.((int) $actionAuth->temporary_module_id));
+        }
+
+        $uniquePairs = $pairKeys->unique()->values()->all();
+        if (! empty($uniquePairs)) {
+            $userIds = [];
+            $moduleIds = [];
+            foreach ($uniquePairs as $pair) {
+                [$u, $m] = explode('-', (string) $pair, 2);
+                $userIds[] = (int) $u;
+                $moduleIds[] = (int) $m;
+            }
+            $userIds = array_values(array_unique($userIds));
+            $moduleIds = array_values(array_unique($moduleIds));
+
+            $activeRows = TemporaryModuleActionAuthorization::query()
+                ->select(['requested_by', 'temporary_module_id', 'action'])
+                ->whereIn('requested_by', $userIds)
+                ->whereIn('temporary_module_id', $moduleIds)
+                ->where('status', TemporaryModuleActionAuthorization::STATUS_APPROVED)
+                ->where('expires_at', '>', Carbon::now())
+                ->get();
+
+            foreach ($activeRows as $row) {
+                $key = ((int) $row->requested_by).'-'.((int) $row->temporary_module_id);
+                $activeActionsMap[$key] = $activeActionsMap[$key] ?? [];
+                $action = (string) $row->action;
+                if (! in_array($action, $activeActionsMap[$key], true)) {
+                    $activeActionsMap[$key][] = $action;
+                }
+            }
+        }
+
+        $attachActiveActions = function (array $item) use ($activeActionsMap, $items, $actionRows) {
+            $authId = (int) $item['id'];
+            $kind = (string) ($item['kind'] ?? '');
+            $userId = 0;
+            $moduleId = 0;
+            if ($kind === 'entry') {
+                $row = $items->firstWhere('id', $authId);
+                if ($row) {
+                    $userId = (int) $row->requested_by;
+                    $moduleId = (int) $row->temporary_module_id;
+                }
+            } else {
+                $row = $actionRows->firstWhere('id', $authId);
+                if ($row) {
+                    $userId = (int) $row->requested_by;
+                    $moduleId = (int) $row->temporary_module_id;
+                }
+            }
+            $key = $userId.'-'.$moduleId;
+            $item['active_actions'] = $activeActionsMap[$key] ?? [];
+
+            return $item;
+        };
+
+        $editItems = $editItems->map($attachActiveActions);
+
+        $actionItems = $actionRows->map(function (TemporaryModuleActionAuthorization $auth) use ($actionLabels): array {
+            $requestedAt = $auth->requested_at instanceof Carbon ? $auth->requested_at : $auth->created_at;
+            $expiresAt = $auth->expires_at instanceof Carbon ? $auth->expires_at : null;
+
+            return [
+                'id' => (int) $auth->id,
+                'kind' => 'action',
+                'action' => (string) $auth->action,
+                'action_label' => $actionLabels[$auth->action] ?? (string) $auth->action,
+                'status' => (string) $auth->status,
+                'status_label' => $auth->status === TemporaryModuleActionAuthorization::STATUS_PENDING
+                    ? 'Pendiente'
+                    : ($auth->status === TemporaryModuleActionAuthorization::STATUS_REVOKED
+                        ? ($auth->expires_at ? 'Revocado' : 'Denegado')
+                        : ($auth->isActive() ? 'Activo' : 'Vencido')),
+                'module' => (string) ($auth->module?->name ?? 'Modulo'),
+                'entry_id' => 0,
+                'microrregion' => 'Accion de modulo',
+                'requester' => (string) ($auth->requester?->name ?? 'Usuario'),
+                'approver' => (string) ($auth->approver?->name ?? ''),
+                'requested_at' => $requestedAt instanceof Carbon ? $requestedAt->timezone(config('app.timezone'))->format('d/m/Y H:i') : '',
+                'expires_at' => $expiresAt ? $expiresAt->timezone(config('app.timezone'))->format('d/m/Y H:i') : '',
+                'is_active' => $auth->isActive(),
+            ];
+        })->values()->map($attachActiveActions);
+
+        return response()->json([
+            'success' => true,
+            'items' => $editItems->concat($actionItems)->sortByDesc('requested_at')->values()->all(),
+        ]);
+    }
+
+    public function adminApproveEditAuthorization(Request $request, int $authorization): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+
+        $validated = $request->validate([
+            'duration' => ['required', 'integer', Rule::in([1, 2, 3, 24])],
+            'actions' => ['nullable', 'array'],
+            'actions.*' => ['string', Rule::in(TemporaryModuleActionAuthorization::ACTIONS)],
+        ]);
+
+        $auth = TemporaryModuleEditAuthorization::query()
+            ->with(['module:id,name', 'requester:id,name'])
+            ->findOrFail($authorization);
+        $now = Carbon::now();
+        $hours = (int) $validated['duration'];
+        $expiresAt = $now->copy()->addHours($hours);
+        $extraActions = array_values(array_unique(array_filter((array) ($validated['actions'] ?? []), fn ($a) => in_array($a, TemporaryModuleActionAuthorization::ACTIONS, true))));
+
+        DB::transaction(function () use ($auth, $request, $now, $expiresAt, $extraActions): void {
+            TemporaryModuleEditAuthorization::query()
+                ->where('temporary_module_entry_id', (int) $auth->temporary_module_entry_id)
+                ->where('requested_by', (int) $auth->requested_by)
+                ->where('status', TemporaryModuleEditAuthorization::STATUS_APPROVED)
+                ->where('id', '!=', (int) $auth->id)
+                ->update(['status' => TemporaryModuleEditAuthorization::STATUS_REVOKED]);
+
+            $auth->update([
+                'status' => TemporaryModuleEditAuthorization::STATUS_APPROVED,
+                'approved_by' => (int) $request->user()->id,
+                'approved_at' => $now,
+                'expires_at' => $expiresAt,
+            ]);
+
+            foreach ($extraActions as $action) {
+                $this->grantModuleActionAuthorization(
+                    (int) $auth->temporary_module_id,
+                    (int) $auth->requested_by,
+                    (string) $action,
+                    (int) $request->user()->id,
+                    $now,
+                    $expiresAt
+                );
+            }
+        });
+
+        $this->notifyPermissionRequester($auth, 'approved', 'editar registro', $expiresAt);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Permiso autorizado por '.$hours.($hours === 1 ? ' hora.' : ' horas.'),
+        ]);
+    }
+
+    /**
+     * Crea o renueva una autorización aprobada a nivel de módulo para una acción específica.
+     * Revoca aprobaciones previas vigentes de la misma combinación user+module+action.
+     */
+    private function grantModuleActionAuthorization(int $moduleId, int $userId, string $action, int $approverId, Carbon $now, Carbon $expiresAt): void
+    {
+        if (! in_array($action, TemporaryModuleActionAuthorization::ACTIONS, true)) {
+            return;
+        }
+
+        TemporaryModuleActionAuthorization::query()
+            ->where('temporary_module_id', $moduleId)
+            ->where('requested_by', $userId)
+            ->where('action', $action)
+            ->where('status', TemporaryModuleActionAuthorization::STATUS_APPROVED)
+            ->update(['status' => TemporaryModuleActionAuthorization::STATUS_REVOKED]);
+
+        $pending = TemporaryModuleActionAuthorization::query()
+            ->where('temporary_module_id', $moduleId)
+            ->where('requested_by', $userId)
+            ->where('action', $action)
+            ->where('status', TemporaryModuleActionAuthorization::STATUS_PENDING)
+            ->latest('requested_at')
+            ->first();
+
+        if ($pending) {
+            $pending->update([
+                'status' => TemporaryModuleActionAuthorization::STATUS_APPROVED,
+                'approved_by' => $approverId,
+                'approved_at' => $now,
+                'expires_at' => $expiresAt,
+            ]);
+
+            return;
+        }
+
+        TemporaryModuleActionAuthorization::query()->create([
+            'temporary_module_id' => $moduleId,
+            'requested_by' => $userId,
+            'approved_by' => $approverId,
+            'action' => $action,
+            'status' => TemporaryModuleActionAuthorization::STATUS_APPROVED,
+            'requested_at' => $now,
+            'approved_at' => $now,
+            'expires_at' => $expiresAt,
+        ]);
+    }
+
+    public function adminRevokeEditAuthorization(Request $request, int $authorization): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+
+        $auth = TemporaryModuleEditAuthorization::query()
+            ->with(['module:id,name', 'requester:id,name'])
+            ->findOrFail($authorization);
+        $wasPending = $auth->status === TemporaryModuleEditAuthorization::STATUS_PENDING;
+
+        $auth->update(['status' => TemporaryModuleEditAuthorization::STATUS_REVOKED]);
+        $this->notifyPermissionRequester($auth, 'denied', 'editar registro');
+
+        return response()->json(['success' => true, 'message' => $wasPending ? 'Permiso denegado.' : 'Permiso revocado.']);
+    }
+
+    public function adminApproveActionAuthorization(Request $request, int $authorization): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+
+        $validated = $request->validate([
+            'duration' => ['required', 'integer', Rule::in([1, 2, 3, 24])],
+            'actions' => ['nullable', 'array'],
+            'actions.*' => ['string', Rule::in(TemporaryModuleActionAuthorization::ACTIONS)],
+        ]);
+
+        $auth = TemporaryModuleActionAuthorization::query()
+            ->with(['module:id,name', 'requester:id,name'])
+            ->findOrFail($authorization);
+        $now = Carbon::now();
+        $hours = (int) $validated['duration'];
+        $expiresAt = $now->copy()->addHours($hours);
+        $requestedAction = (string) $auth->action;
+        $extraActions = array_values(array_unique(array_filter(
+            (array) ($validated['actions'] ?? []),
+            fn ($a) => in_array($a, TemporaryModuleActionAuthorization::ACTIONS, true) && $a !== $requestedAction
+        )));
+
+        DB::transaction(function () use ($auth, $request, $now, $expiresAt, $extraActions, $requestedAction): void {
+            TemporaryModuleActionAuthorization::query()
+                ->where('temporary_module_id', (int) $auth->temporary_module_id)
+                ->where('requested_by', (int) $auth->requested_by)
+                ->where('action', $requestedAction)
+                ->where('status', TemporaryModuleActionAuthorization::STATUS_APPROVED)
+                ->where('id', '!=', (int) $auth->id)
+                ->update(['status' => TemporaryModuleActionAuthorization::STATUS_REVOKED]);
+
+            $auth->update([
+                'status' => TemporaryModuleActionAuthorization::STATUS_APPROVED,
+                'approved_by' => (int) $request->user()->id,
+                'approved_at' => $now,
+                'expires_at' => $expiresAt,
+            ]);
+
+            foreach ($extraActions as $action) {
+                $this->grantModuleActionAuthorization(
+                    (int) $auth->temporary_module_id,
+                    (int) $auth->requested_by,
+                    (string) $action,
+                    (int) $request->user()->id,
+                    $now,
+                    $expiresAt
+                );
+            }
+        });
+
+        $primaryLabel = TemporaryModuleActionAuthorization::ACTION_LABELS[$requestedAction] ?? $requestedAction;
+        $this->notifyPermissionRequester($auth, 'approved', mb_strtolower($primaryLabel), $expiresAt);
+
+        return response()->json(['success' => true, 'message' => 'Permiso autorizado.']);
+    }
+
+    public function adminRevokeActionAuthorization(Request $request, int $authorization): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+
+        $auth = TemporaryModuleActionAuthorization::query()
+            ->with(['module:id,name', 'requester:id,name'])
+            ->findOrFail($authorization);
+        $wasPending = $auth->status === TemporaryModuleActionAuthorization::STATUS_PENDING;
+
+        $auth->update(['status' => TemporaryModuleActionAuthorization::STATUS_REVOKED]);
+
+        $label = TemporaryModuleActionAuthorization::ACTION_LABELS[$auth->action] ?? (string) $auth->action;
+        $this->notifyPermissionRequester($auth, 'denied', mb_strtolower($label));
+
+        return response()->json(['success' => true, 'message' => $wasPending ? 'Permiso denegado.' : 'Permiso revocado.']);
+    }
+
+    /**
+     * Reconcilia los permisos vigentes de módulo para el par (usuario, módulo) de una autorización.
+     * Las acciones marcadas se mantienen/renuevan; las no marcadas y actualmente vigentes se revocan.
+     */
+    private function reconcileModuleActionAuthorizations(int $moduleId, int $userId, array $desiredActions, int $approverId, Carbon $now, Carbon $expiresAt): void
+    {
+        $desired = array_values(array_unique(array_filter(
+            $desiredActions,
+            fn ($a) => is_string($a) && in_array($a, TemporaryModuleActionAuthorization::ACTIONS, true)
+        )));
+
+        TemporaryModuleActionAuthorization::query()
+            ->where('temporary_module_id', $moduleId)
+            ->where('requested_by', $userId)
+            ->where('status', TemporaryModuleActionAuthorization::STATUS_APPROVED)
+            ->where('expires_at', '>', $now)
+            ->when(! empty($desired), fn ($q) => $q->whereNotIn('action', $desired))
+            ->update(['status' => TemporaryModuleActionAuthorization::STATUS_REVOKED]);
+
+        foreach ($desired as $action) {
+            $this->grantModuleActionAuthorization($moduleId, $userId, $action, $approverId, $now, $expiresAt);
+        }
+    }
+
+    public function adminUpdateActionAuthorization(Request $request, int $authorization): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+
+        $validated = $request->validate([
+            'duration' => ['required', 'integer', Rule::in([1, 2, 3, 24])],
+            'actions' => ['nullable', 'array'],
+            'actions.*' => ['string', Rule::in(TemporaryModuleActionAuthorization::ACTIONS)],
+        ]);
+
+        $auth = TemporaryModuleActionAuthorization::query()
+            ->with(['module:id,name', 'requester:id,name'])
+            ->findOrFail($authorization);
+
+        $now = Carbon::now();
+        $hours = (int) $validated['duration'];
+        $expiresAt = $now->copy()->addHours($hours);
+        $desired = (array) ($validated['actions'] ?? []);
+
+        DB::transaction(function () use ($auth, $request, $now, $expiresAt, $desired): void {
+            $this->reconcileModuleActionAuthorizations(
+                (int) $auth->temporary_module_id,
+                (int) $auth->requested_by,
+                $desired,
+                (int) $request->user()->id,
+                $now,
+                $expiresAt
+            );
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Permisos actualizados. Vigencia hasta '.$expiresAt->timezone(config('app.timezone'))->format('d/m/Y H:i').'.',
+        ]);
+    }
+
+    public function adminUpdateEditAuthorization(Request $request, int $authorization): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+
+        $validated = $request->validate([
+            'duration' => ['required', 'integer', Rule::in([1, 2, 3, 24])],
+            'actions' => ['nullable', 'array'],
+            'actions.*' => ['string', Rule::in(TemporaryModuleActionAuthorization::ACTIONS)],
+        ]);
+
+        $auth = TemporaryModuleEditAuthorization::query()
+            ->with(['module:id,name', 'requester:id,name'])
+            ->findOrFail($authorization);
+
+        $now = Carbon::now();
+        $hours = (int) $validated['duration'];
+        $expiresAt = $now->copy()->addHours($hours);
+        $desired = (array) ($validated['actions'] ?? []);
+
+        DB::transaction(function () use ($auth, $request, $now, $expiresAt, $desired): void {
+            // Renueva la autorización del registro y revoca otras del mismo registro/usuario.
+            TemporaryModuleEditAuthorization::query()
+                ->where('temporary_module_entry_id', (int) $auth->temporary_module_entry_id)
+                ->where('requested_by', (int) $auth->requested_by)
+                ->where('status', TemporaryModuleEditAuthorization::STATUS_APPROVED)
+                ->where('id', '!=', (int) $auth->id)
+                ->update(['status' => TemporaryModuleEditAuthorization::STATUS_REVOKED]);
+
+            $auth->update([
+                'status' => TemporaryModuleEditAuthorization::STATUS_APPROVED,
+                'approved_by' => (int) $request->user()->id,
+                'approved_at' => $now,
+                'expires_at' => $expiresAt,
+            ]);
+
+            $this->reconcileModuleActionAuthorizations(
+                (int) $auth->temporary_module_id,
+                (int) $auth->requested_by,
+                $desired,
+                (int) $request->user()->id,
+                $now,
+                $expiresAt
+            );
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Permisos actualizados. Vigencia hasta '.$expiresAt->timezone(config('app.timezone'))->format('d/m/Y H:i').'.',
+        ]);
+    }
+
+    public function adminDestroyActionAuthorization(Request $request, int $authorization): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+
+        $auth = TemporaryModuleActionAuthorization::query()->findOrFail($authorization);
+        $auth->delete();
+
+        return response()->json(['success' => true, 'message' => 'Solicitud eliminada.']);
+    }
+
+    public function adminDestroyEditAuthorization(Request $request, int $authorization): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+
+        $auth = TemporaryModuleEditAuthorization::query()->findOrFail($authorization);
+        $auth->delete();
+
+        return response()->json(['success' => true, 'message' => 'Solicitud eliminada.']);
     }
 
     /** @return list<array{key: string, label: string, type: string, is_image: bool}> */

@@ -807,6 +807,81 @@
             }
         };
 
+        const isEncryptedPermissionMessage = function (message) {
+            return /modulo cifrado/i.test(String(message || ''))
+                && /autorizacion vigente/i.test(String(message || ''));
+        };
+
+        const requestEncryptedModuleAccess = function (url) {
+            if (!url) {
+                return Promise.reject(new Error('No se encontro la ruta para solicitar acceso.'));
+            }
+
+            const fd = new FormData();
+            fd.append('_token', csrfToken);
+
+            return csrfFetch(url, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: fd
+            }).then(function (response) {
+                return response.json().catch(function () {
+                    return {};
+                }).then(function (data) {
+                    if (!response.ok || data.success === false) {
+                        throw new Error(data.message || 'No se pudo solicitar el acceso.');
+                    }
+                    return data;
+                });
+            });
+        };
+
+        const showEncryptedAccessError = function (message, accessUrl) {
+            if (typeof Swal === 'undefined') {
+                notify('Error', message, 'error');
+                return;
+            }
+
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: message,
+                showCancelButton: true,
+                confirmButtonText: 'Solicitar acceso',
+                cancelButtonText: 'Cerrar',
+                reverseButtons: true,
+                didOpen: function () {
+                    const confirm = Swal.getConfirmButton();
+                    if (confirm) {
+                        confirm.classList.add('tm-btn', 'tm-btn-success');
+                        confirm.style.background = 'var(--clr-secondary)';
+                        confirm.style.borderColor = 'var(--clr-secondary)';
+                        confirm.style.color = '#fff';
+                    }
+                },
+                preConfirm: function () {
+                    return requestEncryptedModuleAccess(accessUrl)
+                        .then(function (data) {
+                            return data;
+                        })
+                        .catch(function (error) {
+                            Swal.showValidationMessage(error.message || 'No se pudo solicitar el acceso.');
+                            return false;
+                        });
+                }
+            }).then(function (result) {
+                if (!result.isConfirmed) {
+                    return;
+                }
+                const data = result.value || {};
+                notify('Solicitud enviada', data.message || 'Solicitud enviada. Un administrador debe autorizar el acceso.', 'success');
+            });
+        };
+
         const activateModulePanel = function (targetId) {
             if (!targetId) {
                 return;
@@ -1773,6 +1848,10 @@
                 .catch(function (errorData) {
                     const backendErrors = errorData && errorData.errors ? Object.values(errorData.errors).flat() : [];
                     const message = backendErrors[0] || errorData.message || 'No fue posible guardar el registro.';
+                    if (isEncryptedPermissionMessage(message)) {
+                        showEncryptedAccessError(message, form.getAttribute('data-access-request-url') || '');
+                        return;
+                    }
                     notify('Error', message, 'error');
                 })
                 .finally(function () {
@@ -8708,3 +8787,222 @@
             }
         });
     };
+
+    // ============================================================
+    // Permisos: peticiones AJAX, toast de aviso y re-render de slots.
+    // Soporta:
+    //   - Botones "Pedir Acceso (Registrar)" / "Permiso para editar" /
+    //     "Permiso para eliminar" / "Solicitar permiso para ver" en
+    //     contenedores [data-tm-permission-slot].
+    //   - "Solicitar edición" por fila (entry-edit) y "Permiso eliminar"
+    //     por fila dentro del fragmento de registros.
+    //   - Botón actualizar (data-refresh-module): re-renderiza los slots
+    //     del módulo y recarga el fragmento de registros.
+    // ============================================================
+    (function () {
+        function tmPermShowToast(message, icon) {
+            if (typeof Swal === 'undefined') {
+                if (icon === 'error') alert(message);
+                return;
+            }
+            Swal.fire({
+                icon: icon || 'success',
+                title: message,
+                toast: true,
+                position: 'top-end',
+                timer: 3500,
+                timerProgressBar: true,
+                showConfirmButton: false,
+            });
+        }
+
+        function tmPermSlotTypeToAction(slotType) {
+            if (slotType === 'upload-create') return 'create';
+            if (slotType === 'toolbar-edit') return 'edit';
+            if (slotType === 'toolbar-delete') return 'delete';
+            return null;
+        }
+
+        function tmPermCsrfInput() {
+            return '<input type="hidden" name="_token" value="' + (csrfToken || '') + '">';
+        }
+
+        function tmPermRenderSlot(slot, slotType, moduleId, encrypted, permState) {
+            const requestUrl = slot.getAttribute('data-tm-permission-request-url') || '';
+            const previewTarget = slot.getAttribute('data-tm-preview-target') || ('delegate-preview-' + moduleId);
+            const bulkInsertTarget = slot.getAttribute('data-tm-bulk-insert-target') || ('tmBulkInsertModal-' + moduleId);
+            let active = !encrypted;
+            let pending = false;
+            if (permState && typeof permState === 'object') {
+                if (permState.active) active = true;
+                if (!active && permState.pending) pending = true;
+            }
+            slot.setAttribute('data-tm-permission-state', active ? 'active' : (pending ? 'pending' : 'none'));
+
+            let html = '';
+            if (slotType === 'upload-create') {
+                if (active) {
+                    html = (encrypted ? '<span class="tm-btn tm-btn-success tm-btn-sm" title="Permiso vigente para registrar" style="cursor:default;"><i class="fa-solid fa-check" aria-hidden="true"></i> Permiso activo</span> ' : '')
+                        + '<button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-open-module-preview="' + previewTarget + '">Registrar</button>'
+                        + ' <button type="button" class="tm-btn tm-btn-outline tm-btn-sm tm-btn-excel-inline" data-open-bulk-insert="' + bulkInsertTarget + '" title="Registrar en hoja de calculo" aria-label="Registrar en hoja de calculo"><i class="fa-regular fa-file-excel" aria-hidden="true"></i></button>';
+                } else if (pending) {
+                    html = '<button type="button" class="tm-btn tm-btn-outline tm-btn-sm" disabled title="Solicitud enviada al administrador"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Permiso (Registrar) pendiente</button>';
+                } else {
+                    html = '<form action="' + requestUrl + '" method="POST" class="tm-inline-form">' + tmPermCsrfInput()
+                         + '<button type="submit" class="tm-btn tm-btn-outline tm-btn-sm" title="Pedir permiso para registrar en este modulo cifrado"><i class="fa-solid fa-key" aria-hidden="true"></i> Pedir Acceso (Registrar)</button></form>';
+                }
+            } else if (slotType === 'toolbar-delete') {
+                if (active) {
+                    html = '<button type="button" class="tm-btn tm-btn-primary tm-btn-sm" data-tm-bulk-toggle title="Selección masiva">Eliminar varios</button>';
+                } else if (pending) {
+                    html = '<button type="button" class="tm-btn tm-btn-outline tm-btn-sm" disabled title="Solicitud enviada al administrador"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Permiso (Eliminar) pendiente</button>';
+                } else {
+                    html = '<form action="' + requestUrl + '" method="POST" class="tm-inline-form">' + tmPermCsrfInput()
+                         + '<button type="submit" class="tm-btn tm-btn-outline tm-btn-sm" title="Pedir permiso para eliminar registros en módulo cifrado"><i class="fa-solid fa-key" aria-hidden="true"></i> Permiso para eliminar</button></form>';
+                }
+            } else if (slotType === 'toolbar-edit') {
+                if (active) {
+                    html = '<button type="button" class="tm-btn tm-btn-outline tm-btn-sm" data-tm-bulk-edit-open data-module-id="' + moduleId + '" title="Editar varios registros"><i class="fa-solid fa-table-cells" aria-hidden="true"></i> Editar en hoja de cálculo</button>';
+                } else if (pending) {
+                    html = '<button type="button" class="tm-btn tm-btn-outline tm-btn-sm" disabled title="Solicitud enviada al administrador"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Permiso (Editar) pendiente</button>';
+                } else {
+                    html = '<form action="' + requestUrl + '" method="POST" class="tm-inline-form">' + tmPermCsrfInput()
+                         + '<button type="submit" class="tm-btn tm-btn-outline tm-btn-sm" title="Pedir permiso para editar en hoja de cálculo"><i class="fa-solid fa-key" aria-hidden="true"></i> Permiso para editar en Hoja de cálculo</button></form>';
+                }
+            }
+            slot.innerHTML = html;
+        }
+
+        function tmPermApplyStatus(moduleId, data) {
+            const slots = document.querySelectorAll('[data-tm-permission-slot][data-tm-permission-module="' + moduleId + '"]');
+            slots.forEach(function (slot) {
+                const slotType = slot.getAttribute('data-tm-permission-slot');
+                const slotAction = tmPermSlotTypeToAction(slotType);
+                const encryptedAttr = slot.getAttribute('data-tm-permission-encrypted') === '1';
+                const apiEncrypted = !!(data && data.is_encrypted_event);
+                // Si cualquiera de los dos dice "cifrado", tratamos al módulo como
+                // cifrado para no degradar el control de acceso por un response
+                // inconsistente.
+                const encrypted = encryptedAttr || apiEncrypted;
+                const permState = (data && data.permissions && slotAction) ? data.permissions[slotAction] : null;
+                tmPermRenderSlot(slot, slotType, moduleId, encrypted, permState);
+            });
+        }
+        window.__tmPermApplyStatus = tmPermApplyStatus;
+
+        async function tmPermFetchAndApply(moduleId) {
+            if (!moduleId) return null;
+            const probe = document.querySelector('[data-refresh-module="' + moduleId + '"]');
+            const url = probe ? probe.getAttribute('data-refresh-url') : null;
+            if (!url) return null;
+            try {
+                const res = await fetch(url, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    credentials: 'same-origin'
+                });
+                if (!res.ok) return null;
+                const data = await res.json();
+                tmPermApplyStatus(moduleId, data);
+                return data;
+            } catch (_) {
+                return null;
+            }
+        }
+        window.__tmPermFetchAndApply = tmPermFetchAndApply;
+
+        function tmPermReloadRecordsPanel(moduleId) {
+            const panel = document.getElementById('module-records-' + moduleId);
+            if (panel && typeof window.__tmReloadRecordsPanel === 'function') {
+                window.__tmReloadRecordsPanel(panel, { requireActive: false });
+            }
+        }
+
+        async function tmPermHandleFormSubmit(form, ev) {
+            ev.preventDefault();
+            const url = form.getAttribute('action') || '';
+            const submitBtn = form.querySelector('button[type="submit"]') || form.querySelector('button:not([type])');
+            const originalHtml = submitBtn ? submitBtn.innerHTML : '';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Enviando...';
+            }
+            try {
+                const fd = new FormData(form);
+                if (csrfToken) fd.set('_token', csrfToken);
+                const res = await csrfFetch(url, {
+                    method: 'POST',
+                    body: fd,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    credentials: 'same-origin'
+                });
+                let data = {};
+                try { data = await res.json(); } catch (_) { data = {}; }
+                if (!res.ok) {
+                    throw new Error((data && (data.message || data.error)) || 'No se pudo enviar la solicitud.');
+                }
+                const message = (data && data.message) || 'Solicitud enviada.';
+                tmPermShowToast(message, 'success');
+
+                const slot = form.closest('[data-tm-permission-slot]');
+                if (slot) {
+                    const moduleId = String(slot.getAttribute('data-tm-permission-module') || '').replace(/[^\d]/g, '');
+                    await tmPermFetchAndApply(moduleId);
+                    return;
+                }
+
+                // Forma fuera de un slot: probablemente está dentro del fragmento
+                // de registros o como botón individual. Reemplazo optimista.
+                const placeholder = document.createElement('button');
+                placeholder.type = 'button';
+                placeholder.className = 'tm-btn tm-btn-outline tm-btn-sm';
+                placeholder.disabled = true;
+                placeholder.title = 'Solicitud enviada al administrador';
+                placeholder.innerHTML = '<i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Solicitud enviada';
+                form.replaceWith(placeholder);
+
+                // Si la forma estaba en el fragmento de registros, refrescar el
+                // fragmento para que el resto del UI se mantenga consistente.
+                const fragmentHost = placeholder.closest('.tm-records-fragment-host');
+                if (fragmentHost) {
+                    const moduleId = String(fragmentHost.getAttribute('data-module-id') || '').replace(/[^\d]/g, '');
+                    if (moduleId) {
+                        tmPermReloadRecordsPanel(moduleId);
+                        tmPermFetchAndApply(moduleId);
+                    }
+                }
+            } catch (err) {
+                tmPermShowToast(err && err.message ? err.message : 'No se pudo enviar la solicitud.', 'error');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalHtml;
+                }
+            }
+        }
+
+        document.addEventListener('submit', function (event) {
+            const form = event.target;
+            if (!form || !form.matches || !form.matches('form.tm-inline-form')) return;
+            const url = form.getAttribute('action') || '';
+            const isActionPerm = /\/solicitar-permiso\/(view|create|edit|delete)(\?|$|\/)/.test(url);
+            const isEntryEdit = /\/registros\/\d+\/solicitar-edicion/.test(url);
+            if (!isActionPerm && !isEntryEdit) return;
+            tmPermHandleFormSubmit(form, event);
+        });
+
+        // Engancharse al click del botón Actualizar de la tarjeta para que,
+        // además del conteo, refresque los slots de permisos y el fragmento
+        // de registros del módulo.
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-refresh-module]');
+            if (!btn) return;
+            const moduleId = String(btn.getAttribute('data-refresh-module') || '').replace(/[^\d]/g, '');
+            if (!moduleId) return;
+            // Pequeño defer para que el handler existente envíe primero la
+            // petición de conteo; luego nosotros aplicamos permisos sobre el
+            // mismo módulo (segunda petición barata) y recargamos el fragmento.
+            setTimeout(function () {
+                tmPermFetchAndApply(moduleId);
+                tmPermReloadRecordsPanel(moduleId);
+            }, 50);
+        });
+    })();

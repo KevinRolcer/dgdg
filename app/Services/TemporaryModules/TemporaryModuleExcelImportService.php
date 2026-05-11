@@ -3,6 +3,7 @@
 namespace App\Services\TemporaryModules;
 
 use App\Models\TemporaryModule;
+use App\Models\TemporaryModuleEditAuthorization;
 use App\Models\TemporaryModuleField;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
@@ -1821,6 +1822,31 @@ class TemporaryModuleExcelImportService
                 continue;
             }
 
+            $hasEditAuthorization = ! (bool) ($module->is_encrypted_event ?? false)
+                || TemporaryModuleEditAuthorization::query()
+                    ->where('temporary_module_entry_id', (int) $matchedEntry->id)
+                    ->where('requested_by', (int) $userId)
+                    ->where('status', TemporaryModuleEditAuthorization::STATUS_APPROVED)
+                    ->where('expires_at', '>', Carbon::now())
+                    ->exists();
+
+            if (! $hasEditAuthorization) {
+                $rowErrors[] = [
+                    'row' => $row,
+                    'message' => "Fila {$row}: el registro #{$matchedEntry->id} requiere autorizacion vigente del administrador para editarse.",
+                    'data' => $values,
+                    'failed_fields' => [[
+                        'key' => '__edit_authorization__',
+                        'label' => 'Permiso de edicion',
+                        'reason' => 'No hay permiso de edicion vigente para este registro.',
+                        'received' => '',
+                    ]],
+                    'suggestions' => [],
+                ];
+                $skipped++;
+                continue;
+            }
+
             $newData = array_merge($entryData, $fieldsToUpdate);
             $matchedEntry->data = $newData;
             $matchedEntry->save();
@@ -1925,5 +1951,3 @@ class TemporaryModuleExcelImportService
     }
 
 }
-
-

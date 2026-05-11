@@ -112,11 +112,24 @@
                         <button type="button" class="tm-btn" id="tmIndefiniteBtn" aria-pressed="{{ old('is_indefinite', is_null($temporaryModule->expires_at) ? '1' : '0') ? 'true' : 'false' }}">Indefinido</button>
                     </div>
                 </label>
-                <label style="display:flex;align-items:center;gap:8px;">
+                @php
+                    $editRegScope = in_array((string) old('registration_scope', $temporaryModule->registration_scope ?? 'microrregion'), ['microrregion', 'free', 'municipios'], true)
+                        ? (string) old('registration_scope', $temporaryModule->registration_scope ?? 'microrregion')
+                        : 'microrregion';
+                @endphp
+                <input type="hidden" name="registration_scope" value="{{ $editRegScope }}">
+                @if ($editRegScope === 'microrregion')
+                    <label style="display:flex;align-items:center;gap:8px;">
+                        <input type="hidden" name="show_microregion" value="0">
+                        <input type="checkbox" name="show_microregion" value="1" {{ old('show_microregion', $temporaryModule->show_microregion ?? true) ? 'checked' : '' }}>
+                        Mostrar campo microregión
+                    </label>
+                @else
                     <input type="hidden" name="show_microregion" value="0">
-                    <input type="checkbox" name="show_microregion" value="1" {{ old('show_microregion', $temporaryModule->show_microregion ?? true) ? 'checked' : '' }}>
-                    Mostrar campo microregión
-                </label>
+                    <div class="tm-upload-meta-pill" style="align-self:center;">
+                        <strong>Modo:</strong> {{ $editRegScope === 'free' ? 'Sin microregion' : 'Por municipio' }}
+                    </div>
+                @endif
             </div>
             <input type="hidden" name="is_active" value="{{ old('is_active', $temporaryModule->is_active ? '1' : '0') ? '1' : '0' }}">
 
@@ -126,6 +139,22 @@
             </label>
 
             <section class="tm-target-box">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                    <label style="display:flex;align-items:center;gap:8px;margin:0;">
+                        <input type="hidden" name="is_encrypted_event" value="0">
+                        <input type="checkbox" id="tmEncryptedEventToggle" name="is_encrypted_event" value="1" @checked(old('is_encrypted_event', $temporaryModule->is_encrypted_event ?? false))>
+                        Evento cifrado
+                    </label>
+                    <button type="button" class="tm-btn tm-btn-secondary" id="tmEncryptedEventConfigBtn" style="{{ old('is_encrypted_event', $temporaryModule->is_encrypted_event ?? false) ? '' : 'display:none;' }}">
+                        <i class="fa-solid fa-lock" aria-hidden="true"></i> Configurar
+                    </button>
+                </div>
+                <p class="tm-help-text" style="margin:8px 0 16px;">Controla autorizaciones de edicion y contrasena para nuevos PDF de este modulo.</p>
+                <input type="hidden" id="tmEncryptedEditDuration" name="edit_permission_duration_hours" value="{{ old('edit_permission_duration_hours', $temporaryModule->edit_permission_duration_hours ?? 1) }}">
+                <input type="hidden" id="tmEncryptedPdfPassword" name="encrypted_pdf_password" value="">
+                <input type="hidden" id="tmEncryptedPdfPasswordConfirm" name="encrypted_pdf_password_confirmation" value="">
+                <input type="hidden" id="tmEncryptedPdfPasswordClear" name="clear_encrypted_pdf_password" value="0">
+
                 <h3>Alcance del módulo</h3>
                 @php
                     $oldDelegates = old('delegate_ids', $temporaryModule->applies_to_all ? collect($delegates)->pluck('id')->all() : $selectedDelegates);
@@ -431,4 +460,62 @@ window.TM_ADMIN_EDIT_BOOT = {
 };
 </script>
 <script src="{{ asset('assets/js/modules/temporary-modules-admin-edit.js') }}?v={{ @filemtime(public_path('assets/js/modules/temporary-modules-admin-edit.js')) ?: time() }}"></script>
+<script>
+(function () {
+    'use strict';
+    var encryptedToggle = document.getElementById('tmEncryptedEventToggle');
+    var encryptedConfigBtn = document.getElementById('tmEncryptedEventConfigBtn');
+    var durationInput = document.getElementById('tmEncryptedEditDuration');
+    var pdfPassInput = document.getElementById('tmEncryptedPdfPassword');
+    var pdfPassConfirmInput = document.getElementById('tmEncryptedPdfPasswordConfirm');
+    var pdfPassClearInput = document.getElementById('tmEncryptedPdfPasswordClear');
+
+    function toggleEncryptedConfig() {
+        if (encryptedConfigBtn) encryptedConfigBtn.style.display = encryptedToggle && encryptedToggle.checked ? '' : 'none';
+    }
+
+    if (encryptedToggle) encryptedToggle.addEventListener('change', toggleEncryptedConfig);
+    if (encryptedConfigBtn) {
+        encryptedConfigBtn.addEventListener('click', function () {
+            if (typeof Swal === 'undefined') return;
+            Swal.fire({
+                title: 'Configurar evento cifrado',
+                html:
+                    '<label style="display:grid;gap:6px;text-align:left;margin-bottom:10px;"><span>Tiempo de edición autorizado</span><select id="tmSwalDuration" class="swal2-select" style="width:100%;margin:0;"><option value="1">1 hora</option><option value="2">2 horas</option><option value="3">3 horas</option><option value="24">1 día</option></select></label>' +
+                    '<label style="display:grid;gap:6px;text-align:left;margin-bottom:10px;"><span>Nueva contraseña para PDF</span><input id="tmSwalPdfPass" type="password" class="swal2-input" style="width:100%;margin:0;" autocomplete="new-password"></label>' +
+                    '<label style="display:grid;gap:6px;text-align:left;margin-bottom:10px;"><span>Confirmar contraseña</span><input id="tmSwalPdfPassConfirm" type="password" class="swal2-input" style="width:100%;margin:0;" autocomplete="new-password"></label>' +
+                    '<label style="display:flex;gap:8px;align-items:center;text-align:left;"><input id="tmSwalClearPdfPass" type="checkbox"> <span>Eliminar contraseña PDF del módulo</span></label>',
+                didOpen: function () {
+                    document.getElementById('tmSwalDuration').value = durationInput ? String(durationInput.value || '1') : '1';
+                },
+                preConfirm: function () {
+                    var duration = document.getElementById('tmSwalDuration').value || '1';
+                    var pass = document.getElementById('tmSwalPdfPass').value || '';
+                    var confirm = document.getElementById('tmSwalPdfPassConfirm').value || '';
+                    var clear = document.getElementById('tmSwalClearPdfPass').checked;
+                    if (pass !== '' && pass.length < 4) {
+                        Swal.showValidationMessage('La contraseña debe tener al menos 4 caracteres.');
+                        return false;
+                    }
+                    if (pass !== confirm) {
+                        Swal.showValidationMessage('La confirmación no coincide.');
+                        return false;
+                    }
+                    return { duration: duration, pass: pass, clear: clear };
+                },
+                confirmButtonText: 'Guardar',
+                showCancelButton: true,
+                cancelButtonText: 'Cancelar'
+            }).then(function (result) {
+                if (!result.isConfirmed || !result.value) return;
+                if (durationInput) durationInput.value = result.value.duration;
+                if (pdfPassInput) pdfPassInput.value = result.value.pass || '';
+                if (pdfPassConfirmInput) pdfPassConfirmInput.value = result.value.pass || '';
+                if (pdfPassClearInput) pdfPassClearInput.value = result.value.clear ? '1' : '0';
+            });
+        });
+    }
+    toggleEncryptedConfig();
+})();
+</script>
 @endpush
