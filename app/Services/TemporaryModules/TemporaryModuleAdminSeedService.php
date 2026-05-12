@@ -7,9 +7,16 @@ use App\Models\TemporaryModuleEntry;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Reader\XLSX\Options as XlsxOptions;
+use OpenSpout\Reader\XLSX\Reader as XlsxReader;
+use OpenSpout\Writer\CSV\Options as CsvWriterOptions;
+use OpenSpout\Writer\CSV\Writer as CsvWriter;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
@@ -23,6 +30,8 @@ class TemporaryModuleAdminSeedService
 {
     public function __construct(
         private readonly TemporaryModuleExcelImportService $excelReader,
+        private readonly TemporaryModuleSpoutReader $spoutReader,
+        private readonly TemporaryModulePythonExcelService $pythonExcel,
     ) {}
 
     /**
@@ -30,23 +39,30 @@ class TemporaryModuleAdminSeedService
      * funcione bajo límites estrictos de PHP-FPM (memory_limit=128M,
      * max_input_time=60). El análisis de opciones se hace bajo demanda en
      * un segundo paso vía analyzeColumnSuggestions().
+     *
+     * Si el archivo es .xlsx usa OpenSpout (streaming, baja memoria).
+     * Para .xls cae a PhpSpreadsheet.
      */
     public function previewHeaders(UploadedFile $file, int $headerRow, int $sheetIndex = 0, bool $includeSuggestions = false): array
     {
         $this->raiseLimitsForFile($file);
 
-        $preview = $this->excelReader->preview($file, $headerRow, false, $sheetIndex);
-
-        try {
-            $preview['preview_rows'] = $this->buildPreviewRows(
-                $file,
-                (int) ($preview['header_row'] ?? $headerRow),
-                (int) ($preview['sheet_index'] ?? $sheetIndex),
-                12 // Antes 24 — con 12 alcanza para mostrar la tabla
-            );
-        } catch (\Throwable $e) {
-            Log::warning('Seed preview: preview_rows omitido por error: '.$e->getMessage());
-            $preview['preview_rows'] = [];
+        if ($this->spoutReader->supports($file)) {
+            $preview = $this->pythonExcel->previewHeaders($file, $headerRow, $sheetIndex)
+                ?? $this->previewHeadersViaSpout($file, $headerRow, $sheetIndex);
+        } else {
+            $preview = $this->excelReader->preview($file, $headerRow, false, $sheetIndex);
+            try {
+                $preview['preview_rows'] = $this->buildPreviewRows(
+                    $file,
+                    (int) ($preview['header_row'] ?? $headerRow),
+                    (int) ($preview['sheet_index'] ?? $sheetIndex),
+                    12
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Seed preview: preview_rows omitido por error: '.$e->getMessage());
+                $preview['preview_rows'] = [];
+            }
         }
 
         // Sugerencias deshabilitadas por defecto. El frontend pedirá un
@@ -77,6 +93,9 @@ class TemporaryModuleAdminSeedService
      * adaptativo según el tamaño del archivo. Pensado para invocarse en una
      * segunda petición cuando el usuario lo solicita.
      *
+     * Para XLSX usa OpenSpout (streaming) que escala con archivos grandes.
+     * Para XLS cae a PhpSpreadsheet con chunks + límite de memoria.
+     *
      * @param  list<array{index:int,letter:string,label:string}>  $headers
      * @return array<int, array{select:list<string>,multiselect:list<string>}>
      */
@@ -85,7 +104,31 @@ class TemporaryModuleAdminSeedService
         $this->raiseLimitsForFile($file);
 
         $sizeMb = $file->getSize() / 1_048_576;
-        // Escaneo conservador: para producción nos importa NO matar el worker.
+
+        if ($this->spoutReader->supports($file)) {
+            // Spout es eficiente en memoria → podemos escanear más filas sin riesgo.
+            if ($sizeMb > 80) {
+                $maxScanRows = 2000;
+            } elseif ($sizeMb > 30) {
+                $maxScanRows = 3000;
+            } else {
+                $maxScanRows = 5000;
+            }
+            $memoryBudget = $this->parseMemoryLimitToBytes((string) ini_get('memory_limit'));
+            $memoryBudget = $memoryBudget > 0 ? (int) ($memoryBudget * 0.80) : 0;
+
+            return $this->spoutReader->scanColumnSuggestions(
+                $file->getRealPath(),
+                $headerRow,
+                $sheetIndex,
+                $headers,
+                $maxScanRows,
+                80,
+                $memoryBudget,
+            );
+        }
+
+        // Fallback PhpSpreadsheet (.xls)
         if ($sizeMb > 80) {
             $maxScanRows = 200;
         } elseif ($sizeMb > 30) {
@@ -104,6 +147,50 @@ class TemporaryModuleAdminSeedService
             $maxScanRows,
             80
         );
+    }
+
+    /**
+     * Genera el preview (headers + sample rows) usando OpenSpout en streaming.
+     *
+     * @return array{success:bool, headers:list<array{index:int,letter:string,label:string}>, suggested_map:array, header_row:int, sheet_names:list<string>, sheet_index:int, preview_rows:list<array{row:int,cells:list<string>}>}
+     */
+    private function previewHeadersViaSpout(UploadedFile $file, int $headerRow, int $sheetIndex): array
+    {
+        $path = $file->getRealPath();
+
+        try {
+            $head = $this->spoutReader->previewHeaders($path, $headerRow, $sheetIndex);
+            $resolvedHeaderRow = (int) ($head['header_row'] ?? $headerRow);
+            $resolvedSheetIndex = (int) ($head['sheet_index'] ?? $sheetIndex);
+        } catch (\Throwable $e) {
+            Log::warning('Seed preview: Spout falló al leer headers, cayendo a PhpSpreadsheet: '.$e->getMessage());
+
+            return $this->excelReader->preview($file, $headerRow, false, $sheetIndex);
+        }
+
+        $previewRows = [];
+        $headerCount = count($head['headers'] ?? []);
+        try {
+            $previewRows = $this->spoutReader->previewRows(
+                $path,
+                $resolvedHeaderRow,
+                $resolvedSheetIndex,
+                12,
+                $headerCount,
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Seed preview: Spout falló al leer preview_rows: '.$e->getMessage());
+        }
+
+        return [
+            'success' => true,
+            'headers' => $head['headers'] ?? [],
+            'suggested_map' => [],
+            'header_row' => $resolvedHeaderRow,
+            'sheet_names' => $head['sheet_names'] ?? [],
+            'sheet_index' => $resolvedSheetIndex,
+            'preview_rows' => $previewRows,
+        ];
     }
 
     /**
@@ -422,11 +509,23 @@ class TemporaryModuleAdminSeedService
      * Detecta la fila de encabezados de la tabla de ítems (p. ej. N°, MICROREGION, MUNICIPIO, ACCION)
      * ignorando bloques superiores como KPIs o títulos largos en una sola celda.
      *
+     * Para XLSX usa OpenSpout. Para XLS cae a PhpSpreadsheet.
+     *
      * @return array{header_row:int,data_start_row:int,score:int,note:string}|null
      */
     public function detectTableLayout(UploadedFile $file, int $maxScanRow = 80, int $sheetIndex = 0): ?array
     {
         $path = $file->getRealPath();
+
+        if ($this->spoutReader->supports($file)) {
+            try {
+                return $this->spoutReader->detectTableLayout($path, $maxScanRow, $sheetIndex);
+            } catch (\Throwable $e) {
+                Log::warning('detectTableLayout Spout falló, fallback PhpSpreadsheet: '.$e->getMessage());
+                // continúa con PhpSpreadsheet abajo
+            }
+        }
+
         $reader = IOFactory::createReaderForFile($path);
 
         // Subir memoria para archivos grandes
@@ -491,6 +590,9 @@ class TemporaryModuleAdminSeedService
             }
             if (preg_match('/\b(MICRORREGION|MICROREGION|MICRORREG)\b/u', $joined)) {
                 $score += 4;
+            }
+            if (preg_match('/\b(DELEGACION|DELEG)\b/u', $joined)) {
+                $score += 3;
             }
             if (preg_match('/\bACCION\b/u', $joined) && ! preg_match('/SOLICITUDES DE ACCIONES/u', $joined)) {
                 $score += 2;
@@ -587,6 +689,7 @@ class TemporaryModuleAdminSeedService
         array $fieldUnificationsByColumn,
         array &$stats,
         int $sheetIndex = 0,
+        array $encryptionConfig = [],
     ): TemporaryModule {
         $hasMunCol = $colMunicipio >= 0;
         $hasMrCol = $colMicrorregion >= 0;
@@ -749,7 +852,7 @@ class TemporaryModuleAdminSeedService
         $slug = Str::slug($name);
         /** @var TemporaryModuleSlugService $slugSvc */
         $slugSvc = app(TemporaryModuleSlugService::class);
-        $slugSvc->forcePurgeTrashedBySlug($slug);
+        $slugSvc->reclaimSlugForCreate($slug);
         $baseSlug = $slug;
         $suf = 2;
         while (TemporaryModule::query()->where('slug', $slug)->exists()) {
@@ -787,8 +890,9 @@ class TemporaryModuleAdminSeedService
             $microLabels,
             $cabeceraPorMicro,
             &$stats,
+            $encryptionConfig,
         ): TemporaryModule {
-            $module = TemporaryModule::query()->create([
+            $moduleAttrs = [
                 'name' => $name,
                 'slug' => $slug,
                 'description' => $description,
@@ -796,7 +900,9 @@ class TemporaryModuleAdminSeedService
                 'is_active' => true,
                 'applies_to_all' => false,
                 'created_by' => $adminUserId,
-            ]);
+            ];
+            $this->applyEncryptionConfigToAttrs($moduleAttrs, $encryptionConfig);
+            $module = TemporaryModule::query()->create($moduleAttrs);
 
             $module->fields()->createMany($preparedFields);
 
@@ -878,12 +984,11 @@ class TemporaryModuleAdminSeedService
 
                         continue;
                     }
-                    // Prioridad: municipio → MR por BD (sin filtrar primero por celda MR)
-                    $municipioDB = $this->resolveMunicipioGlobal($municipioSearch, null, $municipiosGlobalNorm, $municipiosByMicro);
-                    if (! $municipioDB && $microId !== null) {
-                        $municipioDB = $this->resolveMunicipioInMicrorregion($municipioSearch, $microId, $municipiosByMicro)
-                            ?: $this->resolveMunicipioGlobal($municipioSearch, $microId, $municipiosGlobalNorm, $municipiosByMicro);
-                    }
+                    // Si el Excel trae delegación/microrregión, úsala como referencia.
+                    // Un municipio que no pertenezca a esa MR se descarta para corrección manual.
+                    $municipioDB = $microId !== null
+                        ? $this->resolveMunicipioInMicrorregion($municipioSearch, $microId, $municipiosByMicro)
+                        : $this->resolveMunicipioGlobal($municipioSearch, null, $municipiosGlobalNorm, $municipiosByMicro);
                     if (! $municipioDB) {
                         $stats['skipped']++;
                         if (count($stats['unmatched']) < 150) {
@@ -1036,9 +1141,6 @@ class TemporaryModuleAdminSeedService
         ?array $entryPayload = null,
         ?array $suggestions = null,
     ): void {
-        if (count($stats['discarded'] ?? []) >= 250) {
-            return;
-        }
         $accion = '';
         foreach ($fieldColumnIndices as $ci) {
             $t = $this->cellStrMerged($sheet, (int) $ci, $row);
@@ -1311,6 +1413,137 @@ class TemporaryModuleAdminSeedService
             return [
                 'entry' => $entry,
                 'seed_discard_log' => $newLog,
+            ];
+        });
+    }
+
+    /**
+     * Crea registros a partir de varias filas del log usando el mismo municipio.
+     *
+     * @param  list<string>  $discardUids
+     * @return array{created:int, seed_discard_log: array<int, mixed>}
+     */
+    public function registerDiscardedSeedRows(
+        TemporaryModule $module,
+        array $discardUids,
+        int $municipioId,
+        int $actingUserId,
+    ): array {
+        $discardUids = array_values(array_unique(array_filter(array_map(
+            static fn ($uid) => trim((string) $uid),
+            $discardUids
+        ), static fn (string $uid): bool => $uid !== '')));
+
+        if ($discardUids === []) {
+            throw ValidationException::withMessages(['discard_uids' => 'Selecciona al menos una fila del log.']);
+        }
+        if (count($discardUids) > 2000) {
+            throw ValidationException::withMessages(['discard_uids' => 'Corrige hasta 2000 filas por grupo para evitar saturar el servidor.']);
+        }
+
+        $module->loadMissing('fields');
+        $log = $module->seed_discard_log;
+        if (! is_array($log)) {
+            $log = [];
+        }
+
+        $munRow = DB::table('municipios as mu')
+            ->join('microrregiones as mr', 'mr.id', '=', 'mu.microrregion_id')
+            ->where('mu.id', $municipioId)
+            ->select(['mu.id', 'mu.municipio', 'mu.microrregion_id'])
+            ->first();
+        if (! $munRow) {
+            throw ValidationException::withMessages(['municipio_id' => 'El municipio no existe o no tiene microrregión asignada en el catálogo.']);
+        }
+
+        $wanted = array_fill_keys($discardUids, true);
+        $selected = [];
+        $remainingLog = [];
+        foreach ($log as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $uid = (string) ($item['discard_uid'] ?? '');
+            if ($uid !== '' && isset($wanted[$uid])) {
+                $reason = (string) ($item['reason'] ?? '');
+                $payload = $item['entry_payload'] ?? null;
+                if ($reason !== '' && str_starts_with($reason, 'Municipio no resuelto') && is_array($payload) && $payload !== []) {
+                    $selected[] = $item;
+                    continue;
+                }
+            }
+            $remainingLog[] = $item;
+        }
+
+        if ($selected === []) {
+            throw ValidationException::withMessages(['discard_uids' => 'Las filas seleccionadas ya no están disponibles o no admiten corrección por municipio.']);
+        }
+
+        $microrregionId = (int) $munRow->microrregion_id;
+        $allowedKeys = $module->fields->pluck('key')->all();
+        $microLabels = [];
+        foreach (DB::table('microrregiones')->select(['id', 'microrregion', 'cabecera'])->get() as $mr) {
+            $n = str_pad(trim((string) $mr->microrregion), 2, '0', STR_PAD_LEFT);
+            $id = (int) $mr->id;
+            $microLabels[$id] = 'MR '.$n.' '.trim((string) ($mr->cabecera ?? ''));
+        }
+
+        $userId = $this->resolveUserIdForMicrorregion($microrregionId) ?? $actingUserId;
+        $now = Carbon::now();
+        $rows = [];
+        foreach ($selected as $item) {
+            $payload = (array) ($item['entry_payload'] ?? []);
+            $data = [];
+            foreach ($payload as $k => $v) {
+                if ($k === '_fila_excel') {
+                    $data[$k] = is_scalar($v) ? (string) $v : '';
+                    continue;
+                }
+                if (in_array($k, $allowedKeys, true)) {
+                    $data[$k] = is_scalar($v) ? (string) $v : '';
+                }
+            }
+            $data['_microrregion_reporte'] = $microLabels[$microrregionId] ?? ('MR '.$microrregionId);
+            $data['_municipio_reporte'] = (string) $munRow->municipio;
+
+            $rows[] = [
+                'temporary_module_id' => $module->id,
+                'user_id' => $userId,
+                'microrregion_id' => $microrregionId,
+                'data' => json_encode($data, JSON_UNESCAPED_UNICODE),
+                'main_image_field_key' => null,
+                'submitted_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        return DB::transaction(function () use ($module, $rows, $remainingLog, $actingUserId) {
+            foreach (array_chunk($rows, 500) as $chunk) {
+                DB::table('temporary_module_entries')->insert($chunk);
+            }
+
+            $module->seed_discard_log = array_values($remainingLog);
+            $module->save();
+
+            $accessService = app(TemporaryModuleAccessService::class);
+            $microrregionIdsUsed = TemporaryModuleEntry::query()
+                ->where('temporary_module_id', $module->id)
+                ->pluck('microrregion_id')
+                ->unique()
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+            $allTargetUserIds = $accessService->userIdsForMicrorregionIds($microrregionIdsUsed);
+            if ($allTargetUserIds === []) {
+                $allTargetUserIds = [$actingUserId];
+            }
+            $module->targetUsers()->sync($allTargetUserIds);
+
+            return [
+                'created' => count($rows),
+                'seed_discard_log' => array_values($remainingLog),
             ];
         });
     }
@@ -1986,5 +2219,1142 @@ class TemporaryModuleAdminSeedService
         $unmatched = array_values(array_unique($unmatched));
 
         return ['updated' => $updated, 'skipped' => $skipped, 'unmatched' => $unmatched];
+    }
+
+    // =====================================================================
+    //  Pipeline DIFERIDA (carga por lotes) — para archivos grandes
+    // =====================================================================
+    //  Flujo:
+    //    1. prepareDeferredSeed(): valida + persiste archivo + crea módulo
+    //       vacío con sus campos + exporta la hoja (desde data_start_row)
+    //       a CSV lineal + guarda estado pendiente. total_rows = líneas CSV.
+    //    2. processSeedBatch(): el frontend llama N veces; cada llamada
+    //       avanza en el CSV con fgetcsv (sin re-leer el XLSX desde la fila 1).
+    //    3. finalizeSeed(): cuando ya no hay filas pendientes, sincroniza
+    //       delegados, mueve logs de descartes al campo definitivo y
+    //       borra el archivo temporal (.xlsx y .csv).
+    // =====================================================================
+
+    private const SEED_STATE_LOG_TYPE = 'seed_pending_state';
+    private const SEED_STORAGE_DIR = 'temporary-module-seeds';
+
+    /**
+     * Persiste el archivo y crea el shell del módulo. NO procesa registros.
+     *
+     * @param  array<int>  $fieldColumnIndices
+     * @param  array<int, string>  $fieldTypesByColumn
+     * @param  array<int, string>  $fieldOptionsByColumn
+     * @param  array<int, string>  $fieldUnificationsByColumn
+     * @return array{module: TemporaryModule, total_rows: int, batch_size: int, next_row: int}
+     */
+    public function prepareDeferredSeed(
+        int $adminUserId,
+        string $name,
+        ?string $description,
+        ?Carbon $expiresAt,
+        bool $isIndefinite,
+        UploadedFile $file,
+        int $headerRow,
+        int $dataStartRow,
+        int $colMicrorregion,
+        int $colMunicipio,
+        array $fieldColumnIndices,
+        array $fieldTypesByColumn,
+        array $fieldOptionsByColumn,
+        array $fieldUnificationsByColumn,
+        int $sheetIndex = 0,
+        array $encryptionConfig = [],
+    ): array {
+        if ($colMunicipio < 0 && $colMicrorregion < 0) {
+            throw new \InvalidArgumentException('Debe indicarse columna Municipio o Microrregión.');
+        }
+        if (! $this->spoutReader->supports($file)) {
+            throw new \InvalidArgumentException('La carga por lotes solo está disponible para archivos .xlsx. Para .xls usa la carga normal.');
+        }
+
+        $this->raiseLimitsForFile($file);
+
+        $headerRow = max(1, $headerRow);
+        $dataStartRow = max($headerRow + 1, $dataStartRow);
+
+        // 1. Persistir archivo en storage local con extensión .xlsx
+        $disk = Storage::disk('local');
+        $fileName = (string) Str::uuid().'.xlsx';
+        $storagePath = self::SEED_STORAGE_DIR.'/'.$fileName;
+        $disk->putFileAs(self::SEED_STORAGE_DIR, $file, $fileName);
+        $absolutePath = $disk->path($storagePath);
+
+        // 2. Leer headers (Spout) y preparar campos
+        $headerInfo = $this->spoutReader->previewHeaders($absolutePath, $headerRow, $sheetIndex);
+        $headers = $headerInfo['headers'] ?? [];
+        $headerLabels = array_map(fn ($h) => (string) ($h['label'] ?? ''), $headers);
+
+        [$preparedFields, $indexToKey] = $this->buildPreparedFieldsAndIndex(
+            $headerLabels,
+            $fieldColumnIndices,
+            $fieldTypesByColumn,
+            $fieldOptionsByColumn,
+            $fieldUnificationsByColumn,
+        );
+
+        if ($preparedFields === []) {
+            $disk->delete($storagePath);
+
+            throw new \InvalidArgumentException('Selecciona al menos una columna como campo del módulo.');
+        }
+
+        // 2b. Materializar la hoja desde data_start_row como CSV lineal.
+        // Cada lote HTTP salta líneas con fgetcsv (O(batch)) en lugar de re-leer
+        // desde la fila 1 del XLSX en cada petición (O(n²), timeouts con ~100k+ filas).
+        $this->raiseLimitsForDeferredCsvExport();
+        $csvFileName = (string) Str::uuid().'.csv';
+        $csvStoragePath = self::SEED_STORAGE_DIR.'/'.$csvFileName;
+        $csvAbsolutePath = $disk->path($csvStoragePath);
+        try {
+            $totalRows = $this->pythonExcel->exportSheetToCsv($absolutePath, $sheetIndex, $dataStartRow, $csvAbsolutePath)
+                ?? $this->exportDeferredSeedSheetToCsv($absolutePath, $sheetIndex, $dataStartRow, $csvAbsolutePath);
+        } catch (\Throwable $e) {
+            $disk->delete($storagePath);
+            if (is_file($csvAbsolutePath)) {
+                @unlink($csvAbsolutePath);
+            }
+            throw $e;
+        }
+
+        // 3. Crear módulo + campos
+        $slug = $this->buildUniqueSeedSlug($name);
+        $expires = $isIndefinite ? null : $expiresAt;
+
+        $moduleAttrs = [
+            'name' => $name,
+            'slug' => $slug,
+            'description' => $description,
+            'expires_at' => $expires,
+            'is_active' => false, // se activa al finalizar el lote
+            'applies_to_all' => false,
+            'created_by' => $adminUserId,
+        ];
+        $this->applyEncryptionConfigToAttrs($moduleAttrs, $encryptionConfig);
+
+        $module = DB::transaction(function () use ($moduleAttrs, $preparedFields) {
+            $module = TemporaryModule::query()->create($moduleAttrs);
+            $module->fields()->createMany($preparedFields);
+
+            return $module;
+        });
+
+        // 4. Guardar estado pendiente en seed_discard_log con sentinel.
+        $state = [
+            'log_type' => self::SEED_STATE_LOG_TYPE,
+            'file_path' => $storagePath,
+            'csv_path' => $csvStoragePath,
+            'sheet_index' => $sheetIndex,
+            'header_row' => $headerRow,
+            'data_start_row' => $dataStartRow,
+            'col_microrregion' => $colMicrorregion,
+            'col_municipio' => $colMunicipio,
+            'field_column_indices' => array_values(array_map('intval', $fieldColumnIndices)),
+            'index_to_key' => $indexToKey,
+            'admin_user_id' => $adminUserId,
+            'total_estimated_rows' => $totalRows,
+            'next_row' => $dataStartRow,
+            'csv_offset' => 0,
+            'processed_count' => 0,
+            'state' => [
+                'lastMicroId' => null,
+                'lastMunicipioCell' => '',
+                'lastFieldCarry' => [],
+                'microrregionIdsUsed' => [],
+                'assignedUserIds' => [],
+                'stats' => ['created' => 0, 'skipped' => 0, 'unmatched' => [], 'discarded' => []],
+            ],
+        ];
+        $module->seed_discard_log = [$state];
+        $module->save();
+
+        return [
+            'module' => $module,
+            'total_rows' => $totalRows,
+            'batch_size' => 1000,
+            'next_row' => $dataStartRow,
+        ];
+    }
+
+    /**
+     * Procesa el siguiente lote del archivo persistido.
+     * Devuelve progreso para que el frontend itere hasta agotar el archivo.
+     *
+     * @return array{processed_in_batch:int, processed_total:int, next_row:int, has_more:bool, total_rows:int, stats:array}
+     */
+    public function processSeedBatch(TemporaryModule $module, int $batchSize = 200): array
+    {
+        $module->refresh();
+        $state = $this->loadSeedPendingState($module);
+        if ($state === null) {
+            throw new \RuntimeException('Este módulo no tiene una carga pendiente.');
+        }
+
+        @set_time_limit(120);
+        @ini_set('memory_limit', '1G');
+
+        $disk = Storage::disk('local');
+        $storagePath = (string) ($state['file_path'] ?? '');
+        $csvStoragePath = (string) ($state['csv_path'] ?? '');
+        $hasCsv = $csvStoragePath !== '' && $disk->exists($csvStoragePath);
+
+        if (! $hasCsv) {
+            if ($storagePath === '' || ! $disk->exists($storagePath)) {
+                throw new \RuntimeException('El archivo de carga ya no existe. Reintenta la carga desde cero.');
+            }
+        }
+
+        $absolutePath = ($storagePath !== '' && $disk->exists($storagePath)) ? $disk->path($storagePath) : '';
+        $csvAbsolutePath = $hasCsv ? $disk->path($csvStoragePath) : '';
+
+        $config = [
+            'sheet_index' => (int) ($state['sheet_index'] ?? 0),
+            'header_row' => (int) ($state['header_row'] ?? 1),
+            'data_start_row' => (int) ($state['data_start_row'] ?? 2),
+            'col_microrregion' => (int) ($state['col_microrregion'] ?? -1),
+            'col_municipio' => (int) ($state['col_municipio'] ?? -1),
+            'field_column_indices' => array_map('intval', (array) ($state['field_column_indices'] ?? [])),
+            'index_to_key' => (array) ($state['index_to_key'] ?? []),
+        ];
+        $adminUserId = (int) ($state['admin_user_id'] ?? 0);
+        $totalRows = (int) ($state['total_estimated_rows'] ?? 0);
+        $startRow = (int) ($state['next_row'] ?? $config['data_start_row']);
+        $processedBefore = (int) ($state['processed_count'] ?? 0);
+
+        $runtimeState = (array) ($state['state'] ?? []);
+        $runtimeState['lastMicroId'] = isset($runtimeState['lastMicroId']) ? (int) $runtimeState['lastMicroId'] ?: null : null;
+        $runtimeState['lastMunicipioCell'] = (string) ($runtimeState['lastMunicipioCell'] ?? '');
+        $runtimeState['lastFieldCarry'] = (array) ($runtimeState['lastFieldCarry'] ?? []);
+        $runtimeState['microrregionIdsUsed'] = (array) ($runtimeState['microrregionIdsUsed'] ?? []);
+        $runtimeState['assignedUserIds'] = (array) ($runtimeState['assignedUserIds'] ?? []);
+        $runtimeState['stats'] = (array) ($runtimeState['stats'] ?? ['created' => 0, 'skipped' => 0, 'unmatched' => [], 'discarded' => []]);
+
+        $catalogs = $this->buildSeedCatalogs();
+
+        $processedInBatch = 0;
+        $lastSeenRow = $startRow - 1;
+        $reachedEnd = false;
+        $pendingEntryRows = [];
+        $nextCsvOffset = isset($state['csv_offset']) ? (int) $state['csv_offset'] : null;
+
+        if ($csvAbsolutePath !== '') {
+            $fh = fopen($csvAbsolutePath, 'rb');
+            if ($fh === false) {
+                throw new \RuntimeException('No se pudo abrir el CSV de trabajo. Reintenta la carga desde cero.');
+            }
+            try {
+                if ($nextCsvOffset !== null && $nextCsvOffset > 0) {
+                    fseek($fh, $nextCsvOffset);
+                } else {
+                    $dataStart = (int) $config['data_start_row'];
+                    $linesToSkip = max(0, $startRow - $dataStart);
+                    for ($s = 0; $s < $linesToSkip; $s++) {
+                        if ($this->readDeferredSeedCsvRow($fh) === null) {
+                            $reachedEnd = true;
+                            break;
+                        }
+                    }
+                }
+                if (! $reachedEnd) {
+                    $rowNumber = $startRow;
+                    for ($n = 0; $n < $batchSize; $n++) {
+                        $cells = $this->readDeferredSeedCsvRow($fh);
+                        if ($cells === null) {
+                            $reachedEnd = true;
+                            break;
+                        }
+                        $this->processSeedRowFromCells(
+                            $cells,
+                            $rowNumber,
+                            $runtimeState,
+                            $catalogs,
+                            $config,
+                            $module,
+                            $adminUserId,
+                            $pendingEntryRows,
+                        );
+                        $processedInBatch++;
+                        $lastSeenRow = $rowNumber;
+                        $rowNumber++;
+                    }
+                }
+                $pos = ftell($fh);
+                $nextCsvOffset = is_int($pos) ? $pos : null;
+            } finally {
+                fclose($fh);
+            }
+        } else {
+            $endRow = $startRow + $batchSize - 1;
+            $reader = $this->makeStreamingXlsxReader();
+            $reader->open($absolutePath);
+            try {
+                $idx = 0;
+                foreach ($reader->getSheetIterator() as $sheet) {
+                    if ($idx !== $config['sheet_index']) {
+                        $idx++;
+                        continue;
+                    }
+                    $rowNumber = 0;
+                    foreach ($sheet->getRowIterator() as $row) {
+                        $rowNumber++;
+                        if ($rowNumber < $startRow) {
+                            continue;
+                        }
+                        if ($rowNumber > $endRow) {
+                            break;
+                        }
+                        $cells = $this->rowToStringCells($row);
+
+                        $this->processSeedRowFromCells(
+                            $cells,
+                            $rowNumber,
+                            $runtimeState,
+                            $catalogs,
+                            $config,
+                            $module,
+                            $adminUserId,
+                            $pendingEntryRows,
+                        );
+                        $processedInBatch++;
+                        $lastSeenRow = $rowNumber;
+                    }
+
+                    // Si terminamos el iterator sin alcanzar endRow, se acabó el archivo.
+                    if ($rowNumber < $endRow) {
+                        $reachedEnd = true;
+                    }
+                    break;
+                }
+            } finally {
+                $reader->close();
+            }
+        }
+
+        $this->insertSeedEntryRows($pendingEntryRows);
+
+        $nextRow = $reachedEnd ? -1 : ($lastSeenRow + 1);
+        $processedTotal = $processedBefore + $processedInBatch;
+
+        // Guardar nuevo estado
+        $state['next_row'] = $nextRow;
+        if ($nextCsvOffset !== null) {
+            $state['csv_offset'] = $nextRow > 0 ? $nextCsvOffset : null;
+        }
+        $state['processed_count'] = $processedTotal;
+        $state['state'] = $runtimeState;
+        $module->seed_discard_log = $this->replaceSeedPendingState($module, $state);
+        $module->save();
+
+        return [
+            'processed_in_batch' => $processedInBatch,
+            'processed_total' => $processedTotal,
+            'next_row' => $nextRow,
+            'has_more' => $nextRow > 0,
+            'total_rows' => $totalRows,
+            'stats' => [
+                'created' => (int) ($runtimeState['stats']['created'] ?? 0),
+                'skipped' => (int) ($runtimeState['stats']['skipped'] ?? 0),
+                'discarded' => count($runtimeState['stats']['discarded'] ?? []),
+                'unmatched' => count($runtimeState['stats']['unmatched'] ?? []),
+            ],
+        ];
+    }
+
+    /**
+     * Cierra la carga por lotes: vincula delegados, mueve descartes,
+     * activa el módulo y borra el archivo temporal.
+     *
+     * @return array{module: TemporaryModule, stats: array}
+     */
+    public function finalizeSeed(TemporaryModule $module, int $actingUserId): array
+    {
+        $module->refresh();
+        $state = $this->loadSeedPendingState($module);
+        if ($state === null) {
+            return ['module' => $module, 'stats' => ['created' => 0, 'skipped' => 0]];
+        }
+
+        $runtime = (array) ($state['state'] ?? []);
+        $stats = (array) ($runtime['stats'] ?? ['created' => 0, 'skipped' => 0, 'unmatched' => [], 'discarded' => []]);
+        $microrregionIdsUsed = array_keys((array) ($runtime['microrregionIdsUsed'] ?? []));
+        $assignedUserIds = array_keys((array) ($runtime['assignedUserIds'] ?? []));
+
+        // Sincronizar usuarios destino
+        $accessService = app(TemporaryModuleAccessService::class);
+        $allTargetUserIds = $accessService->userIdsForMicrorregionIds(array_map('intval', $microrregionIdsUsed));
+        if ($allTargetUserIds === []) {
+            $allTargetUserIds = array_map('intval', $assignedUserIds);
+        }
+        if ($allTargetUserIds === []) {
+            $allTargetUserIds = [$actingUserId];
+        }
+        $module->targetUsers()->sync($allTargetUserIds);
+
+        // Borrar archivo temporal
+        $disk = Storage::disk('local');
+        $storagePath = (string) ($state['file_path'] ?? '');
+        if ($storagePath !== '' && $disk->exists($storagePath)) {
+            try {
+                $disk->delete($storagePath);
+            } catch (\Throwable $e) {
+                Log::warning('finalizeSeed: no se pudo borrar archivo temporal '.$storagePath.': '.$e->getMessage());
+            }
+        }
+        $csvPath = (string) ($state['csv_path'] ?? '');
+        if ($csvPath !== '' && $disk->exists($csvPath)) {
+            try {
+                $disk->delete($csvPath);
+            } catch (\Throwable $e) {
+                Log::warning('finalizeSeed: no se pudo borrar CSV temporal '.$csvPath.': '.$e->getMessage());
+            }
+        }
+
+        // Activar módulo y guardar log final (sin sentinel de estado)
+        $module->is_active = true;
+        $module->seed_discard_log = array_values((array) ($stats['discarded'] ?? []));
+        $module->save();
+
+        return [
+            'module' => $module,
+            'stats' => [
+                'created' => (int) ($stats['created'] ?? 0),
+                'skipped' => (int) ($stats['skipped'] ?? 0),
+                'discarded' => count((array) ($stats['discarded'] ?? [])),
+                'unmatched' => count((array) ($stats['unmatched'] ?? [])),
+                'unmatched_list' => array_values((array) ($stats['unmatched'] ?? [])),
+            ],
+        ];
+    }
+
+    /**
+     * Cancela una carga pendiente: borra archivo + módulo (force delete).
+     */
+    public function cancelDeferredSeed(TemporaryModule $module): void
+    {
+        $state = $this->loadSeedPendingState($module);
+        if ($state !== null) {
+            $disk = Storage::disk('local');
+            $storagePath = (string) ($state['file_path'] ?? '');
+            if ($storagePath !== '' && $disk->exists($storagePath)) {
+                try {
+                    $disk->delete($storagePath);
+                } catch (\Throwable) {
+                }
+            }
+            $csvPath = (string) ($state['csv_path'] ?? '');
+            if ($csvPath !== '' && $disk->exists($csvPath)) {
+                try {
+                    $disk->delete($csvPath);
+                } catch (\Throwable) {
+                }
+            }
+        }
+        $module->forceDelete();
+    }
+
+    private function loadSeedPendingState(TemporaryModule $module): ?array
+    {
+        $log = $module->seed_discard_log;
+        if (! is_array($log)) {
+            return null;
+        }
+        foreach ($log as $item) {
+            if (is_array($item) && (($item['log_type'] ?? '') === self::SEED_STATE_LOG_TYPE)) {
+                return $item;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Reemplaza el sentinel de estado pendiente conservando los demás items
+     * (discards, normalizations) que estuvieran en el log.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function replaceSeedPendingState(TemporaryModule $module, array $newState): array
+    {
+        $log = $module->seed_discard_log;
+        if (! is_array($log)) {
+            $log = [];
+        }
+        $out = [];
+        $replaced = false;
+        foreach ($log as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            if (($item['log_type'] ?? '') === self::SEED_STATE_LOG_TYPE) {
+                if (! $replaced) {
+                    $out[] = $newState;
+                    $replaced = true;
+                }
+                continue;
+            }
+            $out[] = $item;
+        }
+        if (! $replaced) {
+            $out[] = $newState;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Convierte una fila de Spout en lista de celdas string (indexadas 0..N).
+     *
+     * @return list<string>
+     */
+    private function rowToStringCells($row): array
+    {
+        $values = method_exists($row, 'toArray') ? $row->toArray() : [];
+        $out = [];
+        foreach ($values as $v) {
+            $out[] = $this->stringifyAnyCellValue($v);
+        }
+
+        return $out;
+    }
+
+    private function stringifyAnyCellValue(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        if (is_string($value)) {
+            return trim($value);
+        }
+        if (is_bool($value)) {
+            return $value ? 'VERDADERO' : 'FALSO';
+        }
+        if (is_int($value)) {
+            return (string) $value;
+        }
+        if (is_float($value)) {
+            if (floor($value) === $value && abs($value) < 1e15) {
+                return (string) (int) $value;
+            }
+
+            return rtrim(rtrim(sprintf('%.6F', $value), '0'), '.');
+        }
+        if ($value instanceof \DateTimeInterface) {
+            $time = $value->format('H:i:s');
+            if ($time === '00:00:00') {
+                return $value->format('Y-m-d');
+            }
+
+            return $value->format('Y-m-d H:i:s');
+        }
+        if ($value instanceof \DateInterval) {
+            return $value->format('%H:%I:%S');
+        }
+
+        return trim((string) $value);
+    }
+
+    /**
+     * Procesa una sola fila (en formato array de celdas) replicando la
+     * lógica del loop principal de createModuleFromExcel.
+     */
+    private function processSeedRowFromCells(
+        array $cells,
+        int $rowNumber,
+        array &$runtimeState,
+        array $catalogs,
+        array $config,
+        TemporaryModule $module,
+        int $adminUserId,
+        array &$pendingEntryRows,
+    ): void {
+        $colMicrorregion = (int) $config['col_microrregion'];
+        $colMunicipio = (int) $config['col_municipio'];
+        $fieldColumnIndices = (array) $config['field_column_indices'];
+        $indexToKey = (array) $config['index_to_key'];
+
+        $hasMrCol = $colMicrorregion >= 0;
+        $hasMunCol = $colMunicipio >= 0;
+
+        $microPorNumero = $catalogs['microPorNumero'];
+        $microByNormToken = $catalogs['microByNormToken'];
+        $municipiosGlobalNorm = $catalogs['municipiosGlobalNorm'];
+        $municipiosByMicro = $catalogs['municipiosByMicro'];
+        $microLabels = $catalogs['microLabels'];
+        $cabeceraPorMicro = $catalogs['cabeceraPorMicro'];
+        $userByMicro = (array) ($catalogs['userByMicro'] ?? []);
+
+        $cellAt = function (int $colIdx) use ($cells): string {
+            if ($colIdx < 0) {
+                return '';
+            }
+
+            return trim((string) ($cells[$colIdx] ?? ''));
+        };
+
+        $cellMr = $hasMrCol ? $cellAt($colMicrorregion) : '';
+        $cellMun = $hasMunCol ? $cellAt($colMunicipio) : '';
+
+        if ($hasMrCol && $cellMr !== '') {
+            $parsedMr = $this->resolveMicrorregionId($cellMr, $microPorNumero)
+                ?? $this->resolveMicrorregionByName($cellMr, $microByNormToken);
+            if ($parsedMr !== null) {
+                $runtimeState['lastMicroId'] = $parsedMr;
+            }
+        }
+        if ($hasMunCol && $cellMun !== '') {
+            $runtimeState['lastMunicipioCell'] = $cellMun;
+        }
+        $microId = $runtimeState['lastMicroId'] ?? null;
+
+        // ¿Fila tiene contenido en alguna columna relevante?
+        $rowHasAny = false;
+        foreach ($cells as $c) {
+            if (trim((string) $c) !== '') {
+                $rowHasAny = true;
+                break;
+            }
+        }
+
+        // ¿Difiere del carry actual?
+        $differsFromCarry = false;
+        foreach ($fieldColumnIndices as $ci) {
+            $ci = (int) $ci;
+            $now = $cellAt($ci);
+            $prev = $runtimeState['lastFieldCarry'][$ci] ?? '';
+            if ($now !== '' && $now !== $prev) {
+                $differsFromCarry = true;
+                break;
+            }
+        }
+
+        $itemColHint = $cellAt(0);
+        $itemColHint2 = $cellAt(1);
+        $looksLikeItemRow = (preg_match('/^\s*\d+\s*$/', $itemColHint) || preg_match('/^\s*\d+\s*$/', $itemColHint2)) === 1;
+
+        $hasGeo = $hasMunCol
+            ? ($runtimeState['lastMunicipioCell'] !== '' || $cellMun !== '')
+            : ($runtimeState['lastMicroId'] !== null);
+
+        if (! $rowHasAny && $hasGeo && ($looksLikeItemRow || $differsFromCarry)) {
+            $rowHasAny = true;
+        }
+        if (! $rowHasAny) {
+            return;
+        }
+
+        $stats = &$runtimeState['stats'];
+
+        if ($hasMunCol) {
+            $municipioSearch = $cellMun !== '' ? $cellMun : $runtimeState['lastMunicipioCell'];
+            if ($municipioSearch === '') {
+                $stats['skipped'] = (int) ($stats['skipped'] ?? 0) + 1;
+                $this->pushDiscardedFromCells($stats, $cells, $rowNumber, 'Sin municipio en fila', $colMicrorregion, $colMunicipio, $fieldColumnIndices, $cellMr, '', $hasMrCol, $hasMunCol, null, null);
+
+                return;
+            }
+            // Si el Excel trae delegación/microrregión, úsala como referencia.
+            // Un municipio que no pertenezca a esa MR se descarta para corrección manual.
+            $municipioDB = $microId !== null
+                ? $this->resolveMunicipioInMicrorregion($municipioSearch, $microId, $municipiosByMicro)
+                : $this->resolveMunicipioGlobal($municipioSearch, null, $municipiosGlobalNorm, $municipiosByMicro);
+            if (! $municipioDB) {
+                $stats['skipped'] = (int) ($stats['skipped'] ?? 0) + 1;
+                if (count((array) ($stats['unmatched'] ?? [])) < 150) {
+                    $stats['unmatched'][] = ['row' => $rowNumber, 'reason' => 'Municipio: '.$municipioSearch];
+                }
+                $entryPayload = $this->buildSeedRowFieldPayloadFromCells(
+                    $cells,
+                    $rowNumber,
+                    $fieldColumnIndices,
+                    $indexToKey,
+                    $runtimeState['lastFieldCarry'],
+                    $municipiosGlobalNorm,
+                    $municipiosByMicro,
+                );
+                $suggestions = $this->suggestMunicipiosForDiscard($municipioSearch, $microId, $municipiosGlobalNorm, $microLabels);
+                $this->pushDiscardedFromCells(
+                    $stats,
+                    $cells,
+                    $rowNumber,
+                    'Municipio no resuelto: '.$municipioSearch,
+                    $colMicrorregion,
+                    $colMunicipio,
+                    $fieldColumnIndices,
+                    $cellMr,
+                    $municipioSearch,
+                    $hasMrCol,
+                    $hasMunCol,
+                    $entryPayload,
+                    $suggestions,
+                );
+
+                return;
+            }
+            $microrregionId = (int) $municipioDB->microrregion_id;
+            $userId = (int) ($userByMicro[$microrregionId] ?? $adminUserId);
+            $data = [
+                '_microrregion_reporte' => $microLabels[$microrregionId] ?? ('MR '.$microrregionId),
+                '_municipio_reporte' => (string) $municipioDB->municipio,
+            ];
+        } else {
+            if ($microId === null) {
+                $stats['skipped'] = (int) ($stats['skipped'] ?? 0) + 1;
+                $this->pushDiscardedFromCells($stats, $cells, $rowNumber, 'Sin microrregión en fila', $colMicrorregion, $colMunicipio, $fieldColumnIndices, $cellMr, '', $hasMrCol, $hasMunCol, null, null);
+
+                return;
+            }
+            $microrregionId = $microId;
+            $userId = (int) ($userByMicro[$microrregionId] ?? $adminUserId);
+            $cab = $cabeceraPorMicro[$microrregionId] ?? '';
+            $data = [
+                '_microrregion_reporte' => $microLabels[$microrregionId] ?? ('MR '.$microrregionId),
+                '_municipio_reporte' => $cab !== '' ? $cab.' (MR)' : 'MR '.$microrregionId,
+            ];
+        }
+
+        // Llenado de campos con carry-over
+        foreach ($fieldColumnIndices as $colIdx) {
+            $colIdx = (int) $colIdx;
+            $descriptor = $indexToKey[$colIdx] ?? null;
+            if (! is_array($descriptor) || ! isset($descriptor['key'])) {
+                continue;
+            }
+            $key = (string) $descriptor['key'];
+            $raw = $cellAt($colIdx);
+            if ($raw !== '') {
+                $runtimeState['lastFieldCarry'][$colIdx] = $raw;
+            }
+            $resolved = $raw !== '' ? $raw : ($runtimeState['lastFieldCarry'][$colIdx] ?? '');
+            $data[$key] = $this->normalizeSeedFieldValue(
+                $resolved,
+                (string) ($descriptor['type'] ?? 'text'),
+                $descriptor['options'] ?? null,
+                $municipiosGlobalNorm,
+                $municipiosByMicro,
+                is_array($descriptor['unifications'] ?? null) ? $descriptor['unifications'] : [],
+            );
+        }
+
+        // Filas de totales/resumen
+        $hasAggregateFormula = false;
+        $hasNonFormulaValue = false;
+        foreach ($fieldColumnIndices as $colIdx) {
+            $txt = $cellAt((int) $colIdx);
+            if ($txt === '') {
+                continue;
+            }
+            if ($this->isAggregateFormulaValue($txt)) {
+                $hasAggregateFormula = true;
+                continue;
+            }
+            $hasNonFormulaValue = true;
+        }
+        if (! $looksLikeItemRow && $hasAggregateFormula && ! $hasNonFormulaValue) {
+            return;
+        }
+
+        $data['_fila_excel'] = (string) $rowNumber;
+
+        $now = Carbon::now();
+        $pendingEntryRows[] = [
+            'temporary_module_id' => $module->id,
+            'user_id' => $userId,
+            'microrregion_id' => $microrregionId,
+            'data' => json_encode($data, JSON_UNESCAPED_UNICODE),
+            'main_image_field_key' => null,
+            'submitted_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+        $runtimeState['microrregionIdsUsed'][$microrregionId] = true;
+        $runtimeState['assignedUserIds'][$userId] = true;
+        $stats['created'] = (int) ($stats['created'] ?? 0) + 1;
+    }
+
+    /**
+     * Inserta registros precargados en bloque. Evita un INSERT por fila,
+     * que era el cuello principal cuando un archivo trae miles de registros.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function insertSeedEntryRows(array $rows): void
+    {
+        if ($rows === []) {
+            return;
+        }
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            DB::table('temporary_module_entries')->insert($chunk);
+        }
+    }
+
+    /**
+     * Equivalente a pushDiscarded() pero operando sobre array de celdas
+     * (no necesita Worksheet).
+     */
+    private function pushDiscardedFromCells(
+        array &$stats,
+        array $cells,
+        int $row,
+        string $reason,
+        int $colMicrorregion,
+        int $colMunicipio,
+        array $fieldColumnIndices,
+        string $cellMr,
+        string $municipioCell,
+        bool $hasMrCol,
+        bool $hasMunCol,
+        ?array $entryPayload,
+        ?array $suggestions,
+    ): void {
+        $accion = '';
+        foreach ($fieldColumnIndices as $ci) {
+            $t = trim((string) ($cells[(int) $ci] ?? ''));
+            if (mb_strlen($t) > mb_strlen($accion)) {
+                $accion = $t;
+            }
+        }
+        if ($accion === '') {
+            foreach ($fieldColumnIndices as $ci) {
+                $t = trim((string) ($cells[(int) $ci] ?? ''));
+                if ($t !== '') {
+                    $accion = $t;
+                    break;
+                }
+            }
+        }
+        if (mb_strlen($accion) > 220) {
+            $accion = mb_substr($accion, 0, 217).'…';
+        }
+        $entry = [
+            'discard_uid' => (string) Str::uuid(),
+            'row' => $row,
+            'reason' => $reason,
+            'microrregion' => ($hasMrCol && $cellMr !== '') ? $cellMr : null,
+            'municipio' => ($hasMunCol && $municipioCell !== '') ? $municipioCell : null,
+            'accion' => $accion !== '' ? $accion : null,
+            'log_type' => 'seed_discard',
+        ];
+        if (is_array($entryPayload) && $entryPayload !== []) {
+            $entry['entry_payload'] = $entryPayload;
+        }
+        if (is_array($suggestions) && $suggestions !== []) {
+            $entry['municipio_suggestions'] = $suggestions;
+        }
+        $stats['discarded'][] = $entry;
+    }
+
+    /**
+     * Equivalente a buildSeedRowFieldPayload() para array de celdas.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildSeedRowFieldPayloadFromCells(
+        array $cells,
+        int $row,
+        array $fieldColumnIndices,
+        array $indexToKey,
+        array $lastFieldCarrySnapshot,
+        array $municipiosGlobalNorm,
+        array $municipiosByMicro,
+    ): array {
+        $carry = $lastFieldCarrySnapshot;
+        $data = [];
+        foreach ($fieldColumnIndices as $colIdx) {
+            $colIdx = (int) $colIdx;
+            $descriptor = $indexToKey[$colIdx] ?? null;
+            if (! is_array($descriptor) || ! isset($descriptor['key'])) {
+                continue;
+            }
+            $key = (string) $descriptor['key'];
+            $raw = trim((string) ($cells[$colIdx] ?? ''));
+            if ($raw !== '') {
+                $carry[$colIdx] = $raw;
+            }
+            $resolved = $raw !== '' ? $raw : ($carry[$colIdx] ?? '');
+            $data[$key] = $this->normalizeSeedFieldValue(
+                $resolved,
+                (string) ($descriptor['type'] ?? 'text'),
+                $descriptor['options'] ?? null,
+                $municipiosGlobalNorm,
+                $municipiosByMicro,
+                is_array($descriptor['unifications'] ?? null) ? $descriptor['unifications'] : [],
+            );
+        }
+        $data['_fila_excel'] = (string) $row;
+
+        return $data;
+    }
+
+    /**
+     * Construye y devuelve los catálogos compartidos por todos los lotes.
+     *
+     * @return array{municipiosByMicro: array, microPorNumero: array, microByNormToken: array, municipiosGlobalNorm: array, microLabels: array, cabeceraPorMicro: array, userByMicro: array}
+     */
+    private function buildSeedCatalogs(): array
+    {
+        $municipiosRows = DB::table('municipios as mu')
+            ->join('microrregiones as mr', 'mr.id', '=', 'mu.microrregion_id')
+            ->select(['mu.id', 'mu.municipio', 'mu.microrregion_id', 'mr.microrregion as mr_num'])
+            ->get();
+
+        $municipiosByMicro = [];
+        foreach ($municipiosRows as $m) {
+            $mid = (int) $m->microrregion_id;
+            $municipiosByMicro[$mid][] = $m;
+        }
+
+        $microPorNumero = [];
+        $microByNormToken = [];
+        $microLabels = [];
+        $cabeceraPorMicro = [];
+        foreach (DB::table('microrregiones')->select(['id', 'microrregion', 'cabecera'])->get() as $mr) {
+            $id = (int) $mr->id;
+            $n = trim((string) $mr->microrregion);
+            $microPorNumero[$n] = $id;
+            $num = (int) preg_replace('/\D/', '', $n) ?: (int) $n;
+            if ($num > 0) {
+                $microPorNumero[(string) $num] = $id;
+                $microPorNumero[str_pad((string) $num, 2, '0', STR_PAD_LEFT)] = $id;
+            }
+            $cab = $this->normalizeMunicipioName((string) ($mr->cabecera ?? ''));
+            if (mb_strlen($cab) >= 4) {
+                $microByNormToken[$cab] = $id;
+            }
+            foreach (preg_split('/\s+/', $cab) ?: [] as $tok) {
+                if (mb_strlen((string) $tok) >= 5) {
+                    $microByNormToken[(string) $tok] = $id;
+                }
+            }
+            $padded = str_pad(trim((string) $mr->microrregion), 2, '0', STR_PAD_LEFT);
+            $microLabels[$id] = 'MR '.$padded.' '.trim((string) ($mr->cabecera ?? ''));
+            $cabeceraPorMicro[$id] = trim((string) ($mr->cabecera ?? ''));
+        }
+
+        $municipiosGlobalNorm = [];
+        foreach ($municipiosRows as $m) {
+            $k = $this->normalizeMunicipioName($m->municipio);
+            $municipiosGlobalNorm[$k][] = $m;
+        }
+
+        $userByMicro = [];
+        foreach (DB::table('user_microrregion as um')->select(['um.microrregion_id', 'um.user_id'])->orderBy('um.user_id')->get() as $row) {
+            $mid = (int) $row->microrregion_id;
+            if (! isset($userByMicro[$mid])) {
+                $userByMicro[$mid] = (int) $row->user_id;
+            }
+        }
+        foreach (DB::table('delegados')->select(['microrregion_id', 'user_id'])->get() as $row) {
+            $mid = (int) $row->microrregion_id;
+            if ($mid > 0 && (int) $row->user_id > 0) {
+                $userByMicro[$mid] = (int) $row->user_id;
+            }
+        }
+
+        return compact(
+            'municipiosByMicro',
+            'microPorNumero',
+            'microByNormToken',
+            'municipiosGlobalNorm',
+            'microLabels',
+            'cabeceraPorMicro',
+            'userByMicro',
+        );
+    }
+
+    /**
+     * Genera $preparedFields (para `fields()->createMany`) y $indexToKey
+     * a partir de los headers y opciones del formulario.
+     *
+     * @return array{0: list<array<string,mixed>>, 1: array<int, array<string,mixed>>}
+     */
+    private function buildPreparedFieldsAndIndex(
+        array $headerLabels,
+        array $fieldColumnIndices,
+        array $fieldTypesByColumn,
+        array $fieldOptionsByColumn,
+        array $fieldUnificationsByColumn,
+    ): array {
+        $usedKeys = [];
+        $preparedFields = [];
+        $sort = 1;
+        foreach ($fieldColumnIndices as $idx) {
+            $idx = (int) $idx;
+            if ($idx < 0) {
+                continue;
+            }
+            $label = (string) ($headerLabels[$idx] ?? '');
+            if ($label === '') {
+                $label = 'Columna_'.($idx + 1);
+            }
+            $key = Str::slug($label, '_');
+            if ($key === '') {
+                $key = 'campo_'.$sort;
+            }
+            $base = $key;
+            $n = 2;
+            while (in_array($key, $usedKeys, true)) {
+                $key = $base.'_'.$n;
+                $n++;
+            }
+            $usedKeys[] = $key;
+            $fieldType = strtolower(trim((string) ($fieldTypesByColumn[$idx] ?? 'text')));
+            if (! in_array($fieldType, ['text', 'textarea', 'number', 'date', 'datetime', 'select', 'multiselect', 'municipio', 'boolean', 'semaforo'], true)) {
+                $fieldType = 'text';
+            }
+            $rawOptions = trim((string) ($fieldOptionsByColumn[$idx] ?? ''));
+            $rawUnifications = trim((string) ($fieldUnificationsByColumn[$idx] ?? ''));
+            $unificationMap = $this->parseSeedUnificationRules($fieldType, $rawUnifications);
+            $preparedFields[] = [
+                'label' => $label,
+                'comment' => null,
+                'key' => $key,
+                'type' => $fieldType,
+                'is_required' => false,
+                'options' => $this->normalizeSeedFieldOptions($fieldType, $rawOptions, $unificationMap),
+                'unifications' => $unificationMap,
+                'sort_order' => $sort,
+                'subsection_index' => null,
+            ];
+            $sort++;
+        }
+
+        $indexToKey = [];
+        $fieldCols = array_values($fieldColumnIndices);
+        foreach ($fieldCols as $i => $colIdx) {
+            if (isset($preparedFields[$i])) {
+                $indexToKey[(int) $colIdx] = [
+                    'key' => $preparedFields[$i]['key'],
+                    'type' => (string) ($preparedFields[$i]['type'] ?? 'text'),
+                    'options' => $preparedFields[$i]['options'] ?? null,
+                    'unifications' => $preparedFields[$i]['unifications'] ?? [],
+                ];
+            }
+        }
+
+        return [$preparedFields, $indexToKey];
+    }
+
+    private function buildUniqueSeedSlug(string $name): string
+    {
+        $slug = Str::slug($name);
+        /** @var TemporaryModuleSlugService $slugSvc */
+        $slugSvc = app(TemporaryModuleSlugService::class);
+        $slugSvc->reclaimSlugForCreate($slug);
+        $baseSlug = $slug;
+        $suf = 2;
+        while (TemporaryModule::query()->where('slug', $slug)->exists()) {
+            $slug = $baseSlug.'-'.$suf;
+            $suf++;
+            if ($suf > 999) {
+                $slug = $baseSlug.'-'.substr(sha1(uniqid((string) mt_rand(), true)), 0, 8);
+                break;
+            }
+        }
+
+        return $slug;
+    }
+
+    private function raiseLimitsForDeferredCsvExport(): void
+    {
+        @ini_set('memory_limit', '2G');
+        @set_time_limit(0);
+    }
+
+    /**
+     * Exporta en streaming la hoja indicada desde data_start_row a CSV
+     * (una línea = una fila Excel). Usado para lotes sin re-escanear el XLSX.
+     *
+     * @return int Número de filas escritas
+     */
+    private function exportDeferredSeedSheetToCsv(string $xlsxAbsolutePath, int $sheetIndex, int $dataStartRow, string $csvAbsolutePath): int
+    {
+        $writerOpts = new CsvWriterOptions();
+        $writerOpts->SHOULD_ADD_BOM = false;
+
+        $writer = new CsvWriter($writerOpts);
+        $writer->openToFile($csvAbsolutePath);
+        $written = 0;
+        try {
+            $reader = $this->makeStreamingXlsxReader();
+            $reader->open($xlsxAbsolutePath);
+            try {
+                $idx = 0;
+                foreach ($reader->getSheetIterator() as $sheet) {
+                    if ($idx !== $sheetIndex) {
+                        $idx++;
+                        continue;
+                    }
+                    $rowNumber = 0;
+                    foreach ($sheet->getRowIterator() as $row) {
+                        $rowNumber++;
+                        if ($rowNumber < $dataStartRow) {
+                            continue;
+                        }
+                        $cells = $this->rowToStringCells($row);
+                        $writer->addRow(Row::fromValues($cells));
+                        $written++;
+                    }
+                    break;
+                }
+            } finally {
+                $reader->close();
+            }
+        } finally {
+            $writer->close();
+        }
+
+        return $written;
+    }
+
+    /**
+     * @param  resource  $fh
+     * @return list<string>|null null = EOF
+     */
+    private function readDeferredSeedCsvRow($fh): ?array
+    {
+        $row = fgetcsv($fh, 0, ',', '"', '');
+        if ($row === false) {
+            return null;
+        }
+        $out = [];
+        foreach ($row as $cell) {
+            $out[] = $cell === null ? '' : trim((string) $cell);
+        }
+
+        return $out;
+    }
+
+    private function makeStreamingXlsxReader(): XlsxReader
+    {
+        $options = new XlsxOptions();
+        $options->SHOULD_FORMAT_DATES = true;
+        $options->SHOULD_PRESERVE_EMPTY_ROWS = true;
+
+        return new XlsxReader($options);
+    }
+
+    /**
+     * Aplica los atributos de evento cifrado al array de creación del módulo.
+     *
+     * @param  array<string, mixed>  $attrs  modificado in-place
+     * @param  array{is_encrypted_event?:bool,edit_permission_duration_hours?:int,encrypted_pdf_password?:?string}  $config
+     */
+    private function applyEncryptionConfigToAttrs(array &$attrs, array $config): void
+    {
+        $isEncrypted = (bool) ($config['is_encrypted_event'] ?? false);
+        $attrs['is_encrypted_event'] = $isEncrypted;
+        $attrs['edit_permission_duration_hours'] = (int) ($config['edit_permission_duration_hours'] ?? 1);
+
+        $rawPassword = $config['encrypted_pdf_password'] ?? null;
+        if ($isEncrypted && is_string($rawPassword) && trim($rawPassword) !== '') {
+            $attrs['pdf_password_encrypted'] = Crypt::encryptString($rawPassword);
+        } else {
+            $attrs['pdf_password_encrypted'] = null;
+        }
     }
 }

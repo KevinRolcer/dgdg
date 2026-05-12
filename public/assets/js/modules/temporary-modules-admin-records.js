@@ -424,13 +424,81 @@
             seedLogModal.setAttribute('aria-hidden', 'true');
             document.body.style.overflow = '';
         }
+
+        function openSeedDiscardLogPaged(moduleName, jsonId, registerUrl, searchUrl, logUrl) {
+            if (!logUrl) {
+                openSeedDiscardLog(moduleName, jsonId, registerUrl, searchUrl);
+                return;
+            }
+            if (!seedLogModal || !seedLogTbody) return;
+            var el = document.getElementById(jsonId);
+            seedLogModuleEl.textContent = moduleName || 'Módulo';
+            var csrf = seedLogModal.getAttribute('data-csrf-token') || '';
+
+            function loadLogPage(page) {
+                seedLogEmpty.hidden = true;
+                seedLogTableWrap.hidden = false;
+                seedLogTbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
+                var glue = logUrl.indexOf('?') === -1 ? '?' : '&';
+                fetch(logUrl + glue + 'page=' + encodeURIComponent(String(page || 1)) + '&per_page=20', {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                })
+                    .then(function (r) {
+                        if (!r.ok) {
+                            return Promise.reject(new Error('HTTP ' + r.status));
+                        }
+                        return r.json();
+                    })
+                    .then(function (payload) {
+                        var list = Array.isArray(payload && payload.items) ? payload.items : [];
+                        var groups = Array.isArray(payload && payload.groups) ? payload.groups : [];
+                        var pagination = payload && payload.pagination ? payload.pagination : null;
+                        if (list.length === 0 && (!pagination || Number(pagination.total || 0) === 0)) {
+                            seedLogEmpty.hidden = false;
+                            seedLogTableWrap.hidden = true;
+                            seedLogTbody.innerHTML = '';
+                            return;
+                        }
+                        if (window.tmSeedDiscardLog && registerUrl) {
+                            window.tmSeedDiscardLog.renderRows(seedLogTbody, list, {
+                                registerUrl: registerUrl,
+                                searchUrl: searchUrl || '',
+                                csrfToken: csrf,
+                                jsonScriptEl: el,
+                                groups: groups,
+                                pagination: pagination,
+                                compactResponse: true,
+                                onPageChange: loadLogPage,
+                                onAfterMutation: function () {
+                                    loadLogPage(pagination && pagination.page ? pagination.page : 1);
+                                },
+                                onEmpty: function () {
+                                    seedLogEmpty.hidden = false;
+                                    seedLogTableWrap.hidden = true;
+                                },
+                            });
+                        }
+                    })
+                    .catch(function () {
+                        seedLogTbody.innerHTML = '<tr><td colspan="6">No se pudo cargar el log.</td></tr>';
+                    });
+            }
+
+            seedLogModal.classList.add('is-open');
+            seedLogModal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+            loadLogPage(1);
+        }
+
         document.querySelectorAll('[data-tm-seed-log-open]').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                openSeedDiscardLog(
+                openSeedDiscardLogPaged(
                     btn.getAttribute('data-module-name'),
                     btn.getAttribute('data-json-id'),
                     btn.getAttribute('data-register-url') || '',
-                    btn.getAttribute('data-search-url') || ''
+                    btn.getAttribute('data-search-url') || '',
+                    btn.getAttribute('data-log-url') || ''
                 );
             });
         });

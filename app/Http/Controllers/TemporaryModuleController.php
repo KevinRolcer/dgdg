@@ -338,13 +338,10 @@ class TemporaryModuleController extends Controller
 
     public function adminRecords(Request $request): View
     {
-        // Evita 500 si en producción no corrió la migración de exported_at / seed_discard_log
+        // Evita cargar seed_discard_log en el listado: puede contener miles de filas.
         $select = ['id', 'name', 'description', 'expires_at'];
         if (Schema::hasColumn('temporary_modules', 'exported_at')) {
             $select[] = 'exported_at';
-        }
-        if (Schema::hasColumn('temporary_modules', 'seed_discard_log')) {
-            $select[] = 'seed_discard_log';
         }
 
         $searchQuery = trim((string) $request->input('q', ''));
@@ -366,6 +363,12 @@ class TemporaryModuleController extends Controller
         }
 
         $modules = $modulesQuery->latest()->paginate(15)->withQueryString();
+
+        if (Schema::hasColumn('temporary_modules', 'seed_discard_log')) {
+            $modules->getCollection()->each(function (TemporaryModule $module): void {
+                $module->has_seed_discard_log = true;
+            });
+        }
 
         $activityFeedQuery = TemporaryModule::query()
             ->select(['id', 'name'])
@@ -579,7 +582,7 @@ class TemporaryModuleController extends Controller
         ]);
     }
 
-    public function seedStore(Request $request): RedirectResponse
+    public function seedStore(Request $request): RedirectResponse|JsonResponse
     {
         $request->validate([
             'name' => ['required', 'string', 'max:150'],
@@ -596,6 +599,10 @@ class TemporaryModuleController extends Controller
             'field_options' => ['nullable', 'string'],
             'field_unifications' => ['nullable', 'string'],
             'sheet_index' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'defer_processing' => ['nullable', 'boolean'],
+            'is_encrypted_event' => ['nullable', 'boolean'],
+            'edit_permission_duration_hours' => ['nullable', 'integer', Rule::in([1, 2, 3, 24])],
+            'encrypted_pdf_password' => ['nullable', 'string', 'min:4', 'max:120', 'confirmed'],
         ]);
 
         $colMr = (int) $request->input('col_microrregion', -1);
@@ -653,6 +660,71 @@ class TemporaryModuleController extends Controller
             $expiresAt = Carbon::parse($request->input('expires_at'));
         }
 
+        $deferProcessing = $request->boolean('defer_processing', false);
+        $uploadedFile = $request->file('archivo_excel');
+        $isXlsx = strtolower((string) $uploadedFile->getClientOriginalExtension()) === 'xlsx';
+
+        // Configuración de evento cifrado (opcional). Se aplica al módulo
+        // sin importar si el flujo es síncrono o diferido.
+        $encryptionConfig = [
+            'is_encrypted_event' => $request->boolean('is_encrypted_event', false),
+            'edit_permission_duration_hours' => (int) ($request->input('edit_permission_duration_hours') ?: 1),
+            'encrypted_pdf_password' => (string) ($request->input('encrypted_pdf_password') ?? ''),
+        ];
+
+        // Para archivos grandes (>15 MB) y formato XLSX, fuerza el modo
+        // diferido para evitar 503/timeout. Para XLS o pequeños mantenemos
+        // el flujo síncrono original (compatibilidad).
+        if (! $deferProcessing && $isXlsx && $uploadedFile->getSize() > 15 * 1024 * 1024) {
+            $deferProcessing = true;
+        }
+
+        if ($deferProcessing && $isXlsx) {
+            try {
+                $prep = $this->adminSeedService->prepareDeferredSeed(
+                    (int) $request->user()->id,
+                    $request->input('name'),
+                    $request->input('description'),
+                    $expiresAt,
+                    $isIndefinite,
+                    $uploadedFile,
+                    (int) ($request->input('header_row') ?: 1),
+                    (int) ($request->input('data_start_row') ?: ((int) ($request->input('header_row') ?: 1) + 1)),
+                    $colMr,
+                    $colMun,
+                    $fieldColumns,
+                    $fieldTypes,
+                    $fieldOptions,
+                    $fieldUnifications,
+                    (int) ($request->input('sheet_index') ?: 0),
+                    $encryptionConfig,
+                );
+            } catch (\InvalidArgumentException $e) {
+                if ($request->wantsJson() || $request->ajax()) {
+                    return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+                }
+                throw ValidationException::withMessages(['archivo_excel' => $e->getMessage()]);
+            } catch (\Throwable $e) {
+                if ($request->wantsJson() || $request->ajax()) {
+                    return response()->json(['success' => false, 'message' => 'Error: '.$e->getMessage()], 422);
+                }
+                throw ValidationException::withMessages(['archivo_excel' => 'Error: '.$e->getMessage()]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'deferred' => true,
+                'module_id' => $prep['module']->id,
+                'total_rows' => $prep['total_rows'],
+                'batch_size' => $prep['batch_size'],
+                'next_row' => $prep['next_row'],
+                'batch_url' => route('temporary-modules.admin.seed-batch', $prep['module']->id),
+                'finalize_url' => route('temporary-modules.admin.seed-finalize', $prep['module']->id),
+                'cancel_url' => route('temporary-modules.admin.seed-cancel', $prep['module']->id),
+                'redirect_url' => route('temporary-modules.admin.edit', $prep['module']->id),
+            ]);
+        }
+
         $stats = [];
         try {
             $module = $this->adminSeedService->createModuleFromExcel(
@@ -672,6 +744,7 @@ class TemporaryModuleController extends Controller
                 $fieldUnifications,
                 $stats,
                 (int) ($request->input('sheet_index') ?: 0),
+                $encryptionConfig,
             );
         } catch (\InvalidArgumentException $e) {
             throw ValidationException::withMessages(['archivo_excel' => $e->getMessage()]);
@@ -696,6 +769,89 @@ class TemporaryModuleController extends Controller
             ->route('temporary-modules.admin.edit', $module->id)
             ->with('status', $msg)
             ->with('show_seed_log', true);
+    }
+
+    /**
+     * Procesa el siguiente lote de registros del archivo persistido en
+     * prepareDeferredSeed(). El frontend itera este endpoint hasta agotar
+     * el archivo (cuando `has_more=false`).
+     */
+    public function seedProcessBatch(Request $request, int $module): JsonResponse
+    {
+        $request->validate([
+            'batch_size' => ['nullable', 'integer', 'min:10', 'max:1000'],
+        ]);
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+        $batchSize = (int) ($request->input('batch_size') ?: 1000);
+
+        try {
+            $result = $this->adminSeedService->processSeedBatch($temporaryModule, $batchSize);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'processed_in_batch' => $result['processed_in_batch'],
+            'processed_total' => $result['processed_total'],
+            'next_row' => $result['next_row'],
+            'has_more' => $result['has_more'],
+            'total_rows' => $result['total_rows'],
+            'stats' => $result['stats'],
+        ]);
+    }
+
+    /**
+     * Cierra la carga por lotes: sincroniza usuarios destino, mueve logs de
+     * descartes al campo final del módulo, activa el módulo y borra el
+     * archivo temporal.
+     */
+    public function seedFinalize(Request $request, int $module): JsonResponse
+    {
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+        try {
+            $result = $this->adminSeedService->finalizeSeed($temporaryModule, (int) $request->user()->id);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        if (($result['stats']['created'] ?? 0) < 1) {
+            $this->adminSeedService->cancelDeferredSeed($temporaryModule);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'No se creó ningún registro. Revisa MR/municipio y que exista delegado o enlace por microrregión. Filas no coincidentes: '.($result['stats']['unmatched'] ?? 0).'.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'module_id' => $temporaryModule->id,
+            'stats' => $result['stats'],
+            'redirect_url' => route('temporary-modules.admin.edit', $temporaryModule->id),
+            'message' => 'Módulo creado con '.($result['stats']['created'] ?? 0).' registro(s).',
+        ]);
+    }
+
+    /**
+     * Cancela una carga diferida en curso (borra archivo y módulo).
+     */
+    public function seedCancel(int $module): JsonResponse
+    {
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+        try {
+            $this->adminSeedService->cancelDeferredSeed($temporaryModule);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['success' => true]);
     }
 
     public function fieldsJson(int $module): JsonResponse
@@ -847,7 +1003,7 @@ class TemporaryModuleController extends Controller
 
         DB::transaction(function () use ($request, $validated, $preparedFields, $selectedDelegateIds, $regScope, $targetMunicipios, $showMicroregion): void {
             $slug = Str::slug($validated['name']);
-            $this->slugService->forcePurgeTrashedBySlug($slug);
+            $this->slugService->reclaimSlugForCreate($slug);
             $baseSlug = $slug;
             $suffix = 2;
             while (TemporaryModule::query()->where('slug', $slug)->exists()) {
@@ -1307,7 +1463,7 @@ class TemporaryModuleController extends Controller
 
         DB::transaction(function () use ($temporaryModule, $validated, $selectedDelegateIds, $existingDefinitions, $deletedFieldIds, $preparedExtraFields, $invalidMainImageKeys, $regScope, $targetMunicipios, $showMicroregion, $request): void {
             $slug = Str::slug($validated['name']);
-            $this->slugService->forcePurgeTrashedBySlug($slug);
+            $this->slugService->reclaimSlugForCreate($slug);
             $baseSlug = $slug;
             $suffix = 2;
             while (TemporaryModule::query()->where('slug', $slug)->where('id', '!=', $temporaryModule->id)->exists()) {
@@ -3095,12 +3251,100 @@ class TemporaryModuleController extends Controller
 
     public function destroy(int $module): RedirectResponse
     {
-        $temporaryModule = TemporaryModule::query()->findOrFail($module);
-        $temporaryModule->delete();
+        $temporaryModule = TemporaryModule::query()
+            ->with('fields:id,temporary_module_id,key,type')
+            ->findOrFail($module);
+
+        $this->entryDataService->clearModuleEntriesData($temporaryModule);
+        DB::transaction(function () use ($temporaryModule): void {
+            $this->forceDeleteTemporaryModuleShell($temporaryModule);
+        });
 
         return redirect()
             ->route('temporary-modules.admin.index')
-            ->with('status', 'Módulo temporal eliminado. Los registros capturados se conservaron.');
+            ->with('status', 'Módulo temporal eliminado permanentemente.');
+    }
+
+    public function destroyProgress(Request $request, int $module): JsonResponse
+    {
+        abort_unless($request->user()?->can('Modulos-Temporales-Admin'), 403);
+
+        $temporaryModule = TemporaryModule::query()
+            ->with('fields:id,temporary_module_id,key,type')
+            ->findOrFail($module);
+
+        $validated = $request->validate([
+            'total' => ['nullable', 'integer', 'min:0'],
+            'batch_size' => ['nullable', 'integer', 'min:25', 'max:500'],
+        ]);
+
+        $batchSize = (int) ($validated['batch_size'] ?? 500);
+        $remainingBefore = TemporaryModuleEntry::query()
+            ->where('temporary_module_id', $temporaryModule->id)
+            ->count();
+        $total = max((int) ($validated['total'] ?? 0), $remainingBefore);
+
+        $entries = TemporaryModuleEntry::query()
+            ->where('temporary_module_id', $temporaryModule->id)
+            ->select(['id', 'temporary_module_id', 'data'])
+            ->orderBy('id')
+            ->limit($batchSize)
+            ->get();
+
+        foreach ($entries as $entry) {
+            $this->entryDataService->deleteEntryAndFiles($entry, $temporaryModule);
+        }
+
+        $remainingAfter = TemporaryModuleEntry::query()
+            ->where('temporary_module_id', $temporaryModule->id)
+            ->count();
+
+        if ($remainingAfter <= 0) {
+            DB::transaction(function () use ($temporaryModule): void {
+                $this->forceDeleteTemporaryModuleShell($temporaryModule);
+            });
+
+            return response()->json([
+                'success' => true,
+                'done' => true,
+                'total' => $total,
+                'deleted' => $total,
+                'remaining' => 0,
+                'progress' => 100,
+                'message' => 'Módulo eliminado permanentemente.',
+            ]);
+        }
+
+        $deleted = max(0, $total - $remainingAfter);
+        $progress = $total > 0
+            ? (int) min(99, floor(($deleted / $total) * 100))
+            : 99;
+
+        return response()->json([
+            'success' => true,
+            'done' => false,
+            'total' => $total,
+            'deleted' => $deleted,
+            'remaining' => $remainingAfter,
+            'progress' => $progress,
+            'message' => 'Eliminando registros del módulo...',
+        ]);
+    }
+
+    private function forceDeleteTemporaryModuleShell(TemporaryModule $temporaryModule): void
+    {
+        TemporaryModuleUserExportSetting::query()
+            ->where('temporary_module_id', $temporaryModule->id)
+            ->delete();
+        TemporaryModuleActionAuthorization::query()
+            ->where('temporary_module_id', $temporaryModule->id)
+            ->delete();
+        TemporaryModuleEditAuthorization::query()
+            ->where('temporary_module_id', $temporaryModule->id)
+            ->delete();
+
+        $temporaryModule->targetUsers()->detach();
+        $temporaryModule->forceDelete();
     }
 
     public function clearEntries(int $module): RedirectResponse
@@ -3139,17 +3383,34 @@ class TemporaryModuleController extends Controller
 
         $temporaryModule = TemporaryModule::query()->findOrFail($module);
         $validated = $request->validate([
-            'discard_uid' => ['required', 'string', 'max:120'],
+            'discard_uid' => ['nullable', 'string', 'max:120'],
+            'discard_uids' => ['nullable', 'array', 'max:2000'],
+            'discard_uids.*' => ['string', 'max:120'],
             'municipio_id' => ['required', 'integer', 'exists:municipios,id'],
+            'compact_response' => ['nullable', 'boolean'],
         ]);
 
         try {
-            $result = $this->adminSeedService->registerDiscardedSeedRow(
-                $temporaryModule,
-                $validated['discard_uid'],
-                (int) $validated['municipio_id'],
-                (int) $request->user()->id,
-            );
+            $discardUids = array_values(array_filter(array_map('strval', (array) ($validated['discard_uids'] ?? []))));
+            if ($discardUids !== []) {
+                $result = $this->adminSeedService->registerDiscardedSeedRows(
+                    $temporaryModule,
+                    $discardUids,
+                    (int) $validated['municipio_id'],
+                    (int) $request->user()->id,
+                );
+            } else {
+                $discardUid = trim((string) ($validated['discard_uid'] ?? ''));
+                if ($discardUid === '') {
+                    throw ValidationException::withMessages(['discard_uid' => 'Selecciona una fila del log.']);
+                }
+                $result = $this->adminSeedService->registerDiscardedSeedRow(
+                    $temporaryModule,
+                    $discardUid,
+                    (int) $validated['municipio_id'],
+                    (int) $request->user()->id,
+                );
+            }
         } catch (ValidationException $e) {
             return response()->json([
                 'message' => 'No se pudo registrar la fila.',
@@ -3157,12 +3418,119 @@ class TemporaryModuleController extends Controller
             ], 422);
         }
 
+        $created = (int) ($result['created'] ?? 1);
+
         return response()->json([
             'ok' => true,
-            'message' => 'Registro creado correctamente.',
-            'entry_id' => $result['entry']->id,
-            'seed_discard_log' => $result['seed_discard_log'],
+            'message' => $created === 1 ? 'Registro creado correctamente.' : $created.' registros creados correctamente.',
+            'entry_id' => $result['entry']->id ?? null,
+            'created' => $created,
+            'seed_discard_log' => ! empty($validated['compact_response']) ? null : $result['seed_discard_log'],
         ]);
+    }
+
+    public function seedDiscardLogPage(Request $request, int $module): JsonResponse
+    {
+        abort_unless($request->user() && Gate::forUser($request->user())->allows('modulos-temporales-admin-ver'), 403);
+
+        $temporaryModule = TemporaryModule::query()->findOrFail($module);
+        $validated = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $page = max(1, (int) ($validated['page'] ?? 1));
+        $perPage = max(1, min(100, (int) ($validated['per_page'] ?? 20)));
+        $log = is_array($temporaryModule->seed_discard_log ?? null) ? $temporaryModule->seed_discard_log : [];
+        $items = array_values(array_filter($log, static function ($item): bool {
+            return is_array($item) && (($item['log_type'] ?? 'seed_discard') === 'seed_discard');
+        }));
+
+        $total = count($items);
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $lastPage);
+        $slice = array_slice($items, ($page - 1) * $perPage, $perPage);
+
+        return response()->json([
+            'ok' => true,
+            'items' => $slice,
+            'groups' => $this->buildSeedDiscardGroups($items),
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => $lastPage,
+                'from' => $total === 0 ? 0 : (($page - 1) * $perPage) + 1,
+                'to' => min($total, $page * $perPage),
+            ],
+        ]);
+    }
+
+    /**
+     * @param  list<array<string,mixed>>  $items
+     * @return list<array<string,mixed>>
+     */
+    private function buildSeedDiscardGroups(array $items): array
+    {
+        $groups = [];
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $reason = (string) ($item['reason'] ?? '');
+            $uid = trim((string) ($item['discard_uid'] ?? ''));
+            $payload = $item['entry_payload'] ?? null;
+            if ($uid === '' || ! str_starts_with($reason, 'Municipio no resuelto') || ! is_array($payload) || $payload === []) {
+                continue;
+            }
+            $label = trim((string) ($item['municipio'] ?? ''));
+            if ($label === '') {
+                continue;
+            }
+            $key = $this->normalizeSeedDiscardGroupKey($label);
+            if ($key === '') {
+                continue;
+            }
+            if (! isset($groups[$key])) {
+                $groups[$key] = [
+                    'key' => $key,
+                    'label' => $label,
+                    'count' => 0,
+                    'first_row' => $item['row'] ?? null,
+                    'last_row' => $item['row'] ?? null,
+                    'discard_uids' => [],
+                    'suggestions' => is_array($item['municipio_suggestions'] ?? null) ? $item['municipio_suggestions'] : [],
+                    'capped' => false,
+                ];
+            }
+            $groups[$key]['count']++;
+            $groups[$key]['last_row'] = $item['row'] ?? $groups[$key]['last_row'];
+            if (count($groups[$key]['discard_uids']) < 2000) {
+                $groups[$key]['discard_uids'][] = $uid;
+            } else {
+                $groups[$key]['capped'] = true;
+            }
+            if (($groups[$key]['suggestions'] ?? []) === [] && is_array($item['municipio_suggestions'] ?? null)) {
+                $groups[$key]['suggestions'] = $item['municipio_suggestions'];
+            }
+        }
+
+        $out = array_values(array_filter($groups, static fn (array $group): bool => (int) ($group['count'] ?? 0) > 1));
+        usort($out, static fn (array $a, array $b): int => ((int) ($b['count'] ?? 0)) <=> ((int) ($a['count'] ?? 0)));
+
+        return array_slice($out, 0, 100);
+    }
+
+    private function normalizeSeedDiscardGroupKey(string $value): string
+    {
+        $value = trim(mb_strtoupper($value, 'UTF-8'));
+        $value = strtr($value, [
+            'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ü' => 'U', 'Ñ' => 'N',
+        ]);
+        $value = preg_replace('/\s+/', ' ', $value) ?: $value;
+        $value = preg_replace('/\b0+(\d+)\b/', '$1', $value) ?: $value;
+
+        return trim($value);
     }
 
     public function resolveOptionNormalizationLog(Request $request, int $module): JsonResponse
@@ -3246,7 +3614,7 @@ class TemporaryModuleController extends Controller
 
     public function searchSeedDiscardMunicipios(Request $request, int $module): JsonResponse
     {
-        abort_unless(auth()->user()?->can('Modulos-Temporales-Admin'), 403);
+        abort_unless($request->user() && Gate::forUser($request->user())->allows('modulos-temporales-admin-ver'), 403);
         TemporaryModule::query()->findOrFail($module);
 
         $validated = $request->validate([
@@ -3557,13 +3925,16 @@ class TemporaryModuleController extends Controller
 
     public function exportPreviewStructure(Request $request, int $module): \Illuminate\Http\JsonResponse
     {
-        $temporaryModule = TemporaryModule::query()->with('fields')->findOrFail($module);
+        $temporaryModule = TemporaryModule::query()->with('fields')->withCount('entries')->findOrFail($module);
         abort_unless($request->user()->can('Modulos-Temporales-Admin'), 403);
 
         $exportColumns = $this->getExportColumnsForPreview($temporaryModule);
         $sortDirection = $this->resolveMicrorregionSortDirection((string) $request->query('microrregion_sort', 'asc'));
 
         $maxWidths = [];
+        $entriesCount = (int) ($temporaryModule->entries_count ?? 0);
+        $previewLimit = $entriesCount > 500 ? 100 : 500;
+
         $entries = $temporaryModule->entries()
             ->withoutGlobalScopes()
             ->leftJoin('microrregiones', 'microrregiones.id', '=', 'temporary_module_entries.microrregion_id')
@@ -3579,6 +3950,7 @@ class TemporaryModuleController extends Controller
                 'temporary_module_entries.created_at',
                 'users.name as user_name',
             ])
+            ->limit($previewLimit)
             ->get();
         foreach ($exportColumns as $col) {
             if (($col['is_image'] ?? false)) {
@@ -3655,6 +4027,9 @@ class TemporaryModuleController extends Controller
                 'created_at_time' => optional($e->created_at)?->timezone(config('app.timezone'))->format('H:i') ?? '',
                 'registered_user' => (string) ($e->user_name ?? ''),
             ])->values()->all(),
+            'entries_count' => $entriesCount,
+            'preview_limit' => $previewLimit,
+            'preview_limited' => $entriesCount > $previewLimit,
             'microrregion_meta' => $microrregionMeta,
             'microrregion_sort' => $sortDirection,
         ]);

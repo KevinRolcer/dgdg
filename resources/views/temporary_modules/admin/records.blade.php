@@ -104,14 +104,13 @@
                                 >
                                     <i class="fa-solid fa-file-excel"></i>
                                 </button>
-                                @if (!is_null($module->seed_discard_log))
-                                    <script type="application/json" id="tm-seed-discard-{{ $module->id }}">{!! json_encode($module->seed_discard_log ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}</script>
+                                @if (!empty($module->has_seed_discard_log))
                                     <button
                                         type="button"
                                         class="tm-btn tm-btn-secondary"
                                         data-tm-seed-log-open
                                         data-module-name="{{ e($module->name) }}"
-                                        data-json-id="tm-seed-discard-{{ $module->id }}"
+                                        data-log-url="{{ route('temporary-modules.admin.seed-discard-log', $module->id) }}"
                                         data-register-url="{{ route('temporary-modules.admin.seed-discard-register', $module->id) }}"
                                         data-search-url="{{ route('temporary-modules.admin.seed-discard-search-municipios', $module->id) }}"
                                         title="Log de descartados"

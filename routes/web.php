@@ -170,6 +170,9 @@ Route::middleware('auth')->group(function () {
             Route::post('/semilla-preview', [TemporaryModuleController::class, 'seedPreview'])->middleware('can:Modulos-Temporales-Admin')->name('temporary-modules.admin.seed-preview');
             Route::post('/semilla-analizar-opciones', [TemporaryModuleController::class, 'seedAnalyzeOptions'])->middleware('can:Modulos-Temporales-Admin')->name('temporary-modules.admin.seed-analyze-options');
             Route::post('/semilla-guardar', [TemporaryModuleController::class, 'seedStore'])->middleware('can:Modulos-Temporales-Admin')->name('temporary-modules.admin.seed-store');
+            Route::post('/semilla-lote/{module}', [TemporaryModuleController::class, 'seedProcessBatch'])->middleware('can:Modulos-Temporales-Admin')->name('temporary-modules.admin.seed-batch');
+            Route::post('/semilla-finalizar/{module}', [TemporaryModuleController::class, 'seedFinalize'])->middleware('can:Modulos-Temporales-Admin')->name('temporary-modules.admin.seed-finalize');
+            Route::post('/semilla-cancelar/{module}', [TemporaryModuleController::class, 'seedCancel'])->middleware('can:Modulos-Temporales-Admin')->name('temporary-modules.admin.seed-cancel');
             Route::get('/export-status/{exportRequest}', [TemporaryModuleController::class, 'exportStatus'])
                 ->where('exportRequest', '[a-f0-9\-]+')
                 ->name('temporary-modules.admin.export-status');
@@ -265,13 +268,17 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('module')
                 ->middleware(['can:Modulos-Temporales-Admin', 'throttle:60,1'])
                 ->name('temporary-modules.admin.seed-discard-register');
+            Route::get('/{module}/log-semilla', [TemporaryModuleController::class, 'seedDiscardLogPage'])
+                ->whereNumber('module')
+                ->middleware(['can:modulos-temporales-admin-ver', 'throttle:120,1'])
+                ->name('temporary-modules.admin.seed-discard-log');
             Route::post('/{module}/resolver-log-opciones', [TemporaryModuleController::class, 'resolveOptionNormalizationLog'])
                 ->whereNumber('module')
                 ->middleware(['can:Modulos-Temporales-Admin', 'throttle:120,1'])
                 ->name('temporary-modules.admin.option-normalization.resolve');
             Route::get('/{module}/buscar-municipios-log-semilla', [TemporaryModuleController::class, 'searchSeedDiscardMunicipios'])
                 ->whereNumber('module')
-                ->middleware(['can:Modulos-Temporales-Admin', 'throttle:120,1'])
+                ->middleware(['can:modulos-temporales-admin-ver', 'throttle:120,1'])
                 ->name('temporary-modules.admin.seed-discard-search-municipios');
             Route::get('/{module}/analisis-preview', [TemporaryModuleController::class, 'analysisPreviewJson'])
                 ->whereNumber('module')
@@ -294,6 +301,10 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')
                 ->name('temporary-modules.admin.clear-entries');
+            Route::post('/{module}/eliminar-progreso', [TemporaryModuleController::class, 'destroyProgress'])
+                ->whereNumber('module')
+                ->middleware('can:Modulos-Temporales-Admin')
+                ->name('temporary-modules.admin.destroy-progress');
             Route::delete('/{module}', [TemporaryModuleController::class, 'destroy'])
                 ->whereNumber('module')
                 ->middleware('can:Modulos-Temporales-Admin')

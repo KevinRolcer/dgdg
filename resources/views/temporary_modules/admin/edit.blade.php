@@ -22,7 +22,6 @@
             </div>
             <div class="tm-inline-actions">
                 @if (!empty($seedDiscardLog))
-                    <script type="application/json" id="tm-seed-discard-edit">{!! json_encode($seedDiscardLog, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}</script>
                     <button type="button" class="tm-btn tm-btn-secondary" id="tmEditSeedLogBtn" data-module-name="{{ e($temporaryModule->name) }}">Log (filas omitidas)</button>
                 @endif
                 @if (!empty($optionNormalizationLog))
@@ -41,6 +40,7 @@
             role="dialog"
             aria-modal="true"
             data-register-url="{{ route('temporary-modules.admin.seed-discard-register', $temporaryModule->id) }}"
+            data-log-url="{{ route('temporary-modules.admin.seed-discard-log', $temporaryModule->id) }}"
             data-search-url="{{ route('temporary-modules.admin.seed-discard-search-municipios', $temporaryModule->id) }}"
             data-csrf-token="{{ csrf_token() }}"
         >

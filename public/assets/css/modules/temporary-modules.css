@@ -5796,6 +5796,47 @@ html.theme-dark .tm-export-personalize-preview .tm-export-preview-fecha-corte {
 .tm-seed-log-no-sug {
     font-size: 0.76rem;
 }
+.tm-seed-log-group-head td,
+.tm-seed-log-onebyone-head td {
+    background: color-mix(in srgb, var(--clr-primary) 8%, transparent);
+    color: var(--clr-text-main);
+    padding: 10px 12px !important;
+}
+.tm-seed-log-group-box {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(240px, 320px) auto;
+    gap: 12px;
+    align-items: start;
+    padding: 10px;
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+    background: var(--clr-card);
+}
+.tm-seed-log-group-controls {
+    min-width: 0;
+}
+.tm-seed-log-row-highlight {
+    outline: 2px solid var(--clr-primary);
+    outline-offset: -2px;
+    background: color-mix(in srgb, var(--clr-primary) 10%, transparent);
+}
+.tm-seed-log-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 8px 4px;
+}
+.tm-seed-log-pager span {
+    color: var(--clr-text-light);
+    font-size: 0.82rem;
+}
+@media (max-width: 760px) {
+    .tm-seed-log-group-box {
+        grid-template-columns: 1fr;
+    }
+}
 .tm-table.tm-table-sm th,
 .tm-table.tm-table-sm td {
     padding: 6px 8px;
@@ -8632,4 +8673,132 @@ html.theme-dark .tm-bulk-sheet-img-hint {
 .tm-input--large {
     font-weight: 700;
     font-size: 0.95rem;
+}
+
+/* Barra de progreso para carga diferida por lotes */
+.tm-seed-progress-wrap {
+    margin-top: 14px;
+    padding: 14px 16px;
+    border: 1px solid #d6dde6;
+    border-radius: 10px;
+    background: #f7fafd;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.tm-seed-progress-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+.tm-seed-progress-head strong { font-size: 0.95rem; color: #1f2d3d; }
+.tm-seed-progress-pct {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: #1158cc;
+    font-size: 0.95rem;
+}
+.tm-seed-progress-track {
+    width: 100%;
+    height: 10px;
+    background: #e5ebf2;
+    border-radius: 999px;
+    overflow: hidden;
+}
+.tm-seed-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #1158cc 0%, #2c8eff 100%);
+    border-radius: 999px;
+    transition: width 0.25s ease;
+}
+.tm-seed-progress-detail {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: #4a5b6d;
+    font-variant-numeric: tabular-nums;
+}
+.tm-seed-progress-actions {
+    margin-top: 10px;
+    display: flex;
+    justify-content: flex-end;
+}
+.tm-seed-progress-wrap.is-error { border-color: #e0a3a3; background: #fff3f3; }
+.tm-seed-progress-wrap.is-error .tm-seed-progress-bar { background: #c0392b; }
+.tm-seed-progress-wrap.is-success { border-color: #9ed1a9; background: #f1faf2; }
+.tm-seed-progress-wrap.is-success .tm-seed-progress-bar { background: linear-gradient(90deg, #1f8a3a 0%, #45b46a 100%); }
+
+/* Bloque "Evento cifrado" en el formulario seed */
+.tm-seed-encrypted-box {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid #e6dccf;
+    border-radius: 8px;
+    background: #fffbf3;
+}
+.tm-seed-encrypted-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Barra de progreso en línea con el texto "Subiendo archivo" */
+.tm-seed-progress-detail-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+}
+.tm-seed-progress-detail-row .tm-seed-progress-track {
+    flex: 1;
+    min-width: 120px;
+}
+.tm-seed-progress-detail-row .tm-seed-progress-detail-label {
+    font-size: 0.82rem;
+    color: #4a5b6d;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.tm-delete-progress {
+    display: grid;
+    gap: 10px;
+    text-align: left;
+}
+.tm-delete-progress__module {
+    margin: 0;
+    font-weight: 700;
+    color: var(--tm-primary, #6f1d3b);
+    word-break: break-word;
+}
+.tm-delete-progress__bar {
+    width: 100%;
+    height: 12px;
+    border-radius: 999px;
+    background: #eceff3;
+    overflow: hidden;
+}
+.tm-delete-progress__bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #2f855a 0%, #48bb78 100%);
+    transition: width 0.18s ease;
+}
+.tm-delete-progress__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: #4a5568;
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+}
+.tm-delete-progress__meta strong {
+    color: #1f2937;
+}
+.tm-delete-progress__note {
+    color: #718096;
 }

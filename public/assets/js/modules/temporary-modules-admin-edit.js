@@ -690,27 +690,39 @@
             var btn = document.getElementById('tmEditSeedLogBtn');
             var modal = document.getElementById('tmSeedDiscardLogModalEdit');
             var jsonEl = document.getElementById('tm-seed-discard-edit');
-            if (!btn || !modal || !jsonEl || !window.tmSeedDiscardLog) return;
+            if (!btn || !modal || !window.tmSeedDiscardLog) return;
             var currentList = [];
             function openLog() {
-                try { currentList = JSON.parse(jsonEl.textContent || '[]'); } catch (e) { currentList = []; }
+                var logUrl = modal.getAttribute('data-log-url') || '';
+                try { currentList = jsonEl && jsonEl.textContent ? JSON.parse(jsonEl.textContent || '[]') : []; } catch (e) { currentList = []; }
                 if (!Array.isArray(currentList)) currentList = [];
                 document.getElementById('tmSeedDiscardLogModuleEdit').textContent = btn.getAttribute('data-module-name') || '';
                 var tbody = document.getElementById('tmSeedDiscardLogTbodyEdit');
                 var empty = document.getElementById('tmSeedDiscardLogEmptyEdit');
                 var wrap = document.getElementById('tmSeedDiscardLogTableWrapEdit');
-                if (currentList.length === 0) {
+                function renderPayload(payload) {
+                    var list = Array.isArray(payload && payload.items) ? payload.items : currentList;
+                    var groups = Array.isArray(payload && payload.groups) ? payload.groups : [];
+                    var pagination = payload && payload.pagination ? payload.pagination : null;
+                if (list.length === 0 && (!pagination || Number(pagination.total || 0) === 0)) {
                     empty.hidden = false;
                     wrap.hidden = true;
                     tbody.innerHTML = '';
                 } else {
                     empty.hidden = true;
                     wrap.hidden = false;
-                    window.tmSeedDiscardLog.renderRows(tbody, currentList, {
+                    window.tmSeedDiscardLog.renderRows(tbody, list, {
                         registerUrl: modal.getAttribute('data-register-url') || '',
                         searchUrl: modal.getAttribute('data-search-url') || '',
                         csrfToken: modal.getAttribute('data-csrf-token') || '',
                         jsonScriptEl: jsonEl,
+                        groups: groups,
+                        pagination: pagination,
+                        compactResponse: !!logUrl,
+                        onPageChange: loadPage,
+                        onAfterMutation: function () {
+                            loadPage(pagination && pagination.page ? pagination.page : 1);
+                        },
                         onUpdateList: function (newLog) {
                             currentList = newLog;
                         },
@@ -720,9 +732,35 @@
                         },
                     });
                 }
+                }
+                function loadPage(page) {
+                    if (!logUrl) {
+                        renderPayload({ items: currentList });
+                        return;
+                    }
+                    empty.hidden = true;
+                    wrap.hidden = false;
+                    tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
+                    var glue = logUrl.indexOf('?') === -1 ? '?' : '&';
+                    fetch(logUrl + glue + 'page=' + encodeURIComponent(String(page || 1)) + '&per_page=20', {
+                        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin'
+                    })
+                        .then(function (r) {
+                            if (!r.ok) {
+                                return Promise.reject(new Error('HTTP ' + r.status));
+                            }
+                            return r.json();
+                        })
+                        .then(renderPayload)
+                        .catch(function () {
+                            tbody.innerHTML = '<tr><td colspan="6">No se pudo cargar el log.</td></tr>';
+                        });
+                }
                 modal.classList.add('is-open');
                 modal.setAttribute('aria-hidden', 'false');
                 document.body.style.overflow = 'hidden';
+                loadPage(1);
             }
             function closeLog() {
                 modal.classList.remove('is-open');

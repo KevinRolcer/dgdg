@@ -92,6 +92,24 @@
                                 <input type="checkbox" name="is_indefinite" value="1" id="tmSeedIndef" @checked(old('is_indefinite'))> Indefinido
                             </label>
                         </div>
+
+                        {{-- Configuración de evento cifrado --}}
+                        <section class="tm-seed-encrypted-box">
+                            <div class="tm-seed-encrypted-head">
+                                <label class="tm-inline-check tm-seed-check">
+                                    <input type="hidden" name="is_encrypted_event" value="0">
+                                    <input type="checkbox" id="tmSeedEncryptedToggle" name="is_encrypted_event" value="1" @checked(old('is_encrypted_event'))>
+                                    Evento cifrado
+                                </label>
+                                <button type="button" class="tm-btn tm-btn-secondary tm-btn-sm" id="tmSeedEncryptedConfigBtn" style="{{ old('is_encrypted_event') ? '' : 'display:none;' }}">
+                                    <i class="fa-solid fa-lock" aria-hidden="true"></i> Configurar
+                                </button>
+                            </div>
+                            <p class="tm-help-text" style="margin:6px 0 0;font-size:0.82rem;">Cuando está activo, los registros existentes solo se editan con autorización del administrador y los PDF pueden salir con contraseña.</p>
+                            <input type="hidden" id="tmSeedEncryptedEditDuration" name="edit_permission_duration_hours" value="{{ old('edit_permission_duration_hours', 1) }}">
+                            <input type="hidden" id="tmSeedEncryptedPdfPassword" name="encrypted_pdf_password" value="">
+                            <input type="hidden" id="tmSeedEncryptedPdfPasswordConfirm" name="encrypted_pdf_password_confirmation" value="">
+                        </section>
                     </div>
 
                     <hr class="tm-seed-divider">
@@ -107,7 +125,7 @@
                                 <label class="tm-seed-label" id="tmSeedWrapMun">Municipio <span class="tm-seed-hint">(principal)</span>
                                     <select name="col_municipio" id="tmSeedColMun" class="tm-input"></select>
                                 </label>
-                                <label class="tm-seed-label" id="tmSeedWrapMr">Microregión <span class="tm-seed-hint" id="tmSeedMrHint">(opcional)</span>
+                                <label class="tm-seed-label" id="tmSeedWrapMr">Delegación / Microregión <span class="tm-seed-hint" id="tmSeedMrHint">(opcional)</span>
                                     <select name="col_microrregion" id="tmSeedColMr" class="tm-input"></select>
                                 </label>
                             </div>
@@ -140,6 +158,21 @@
                         <button type="submit" class="tm-btn tm-btn-primary tm-seed-submit" id="tmSeedSubmit" disabled>
                             <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> Crear módulo y registros
                         </button>
+                    </div>
+
+                    {{-- Barra de progreso para carga por lotes (oculta por defecto) --}}
+                    <div id="tmSeedProgressWrap" class="tm-seed-progress-wrap tm-hidden" aria-live="polite">
+                        <div class="tm-seed-progress-head">
+                            <strong id="tmSeedProgressTitle">Procesando registros…</strong>
+                            <span id="tmSeedProgressPct" class="tm-seed-progress-pct">0%</span>
+                        </div>
+                        <div class="tm-seed-progress-track">
+                            <div id="tmSeedProgressBar" class="tm-seed-progress-bar" style="width:0%"></div>
+                        </div>
+                        <div id="tmSeedProgressDetail" class="tm-seed-progress-detail">Subiendo archivo…</div>
+                        <div class="tm-seed-progress-actions">
+                            <button type="button" id="tmSeedProgressCancel" class="tm-btn tm-btn-secondary tm-btn-sm">Cancelar carga</button>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -81,7 +81,12 @@
                                         {{ $module->is_active ? 'Desactivar' : 'Activar' }}
                                     </button>
                                 </form>
-                                <form method="POST" action="{{ route('temporary-modules.admin.destroy', $module->id) }}" class="tm-inline-form" data-confirm-delete data-module-name="{{ $module->name }}">
+                                <form method="POST"
+                                      action="{{ route('temporary-modules.admin.destroy', $module->id) }}"
+                                      class="tm-inline-form"
+                                      data-confirm-delete
+                                      data-module-name="{{ $module->name }}"
+                                      data-delete-progress-url="{{ route('temporary-modules.admin.destroy-progress', $module->id) }}">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="tm-btn tm-btn-danger"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>

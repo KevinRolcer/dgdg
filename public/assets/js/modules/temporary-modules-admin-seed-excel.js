@@ -310,11 +310,25 @@ document.addEventListener('DOMContentLoaded', function () {
         colMun.innerHTML = opts;
         colMr.dataset.set = '';
         colMun.dataset.set = '';
+        let preferredDelegacionCol = null;
+        let fallbackDelegacionCol = null;
         headers.forEach(function (h) {
             const n = (h.label || '').toUpperCase();
             if (/MICRORREGION|MICRORREGI|MR\b/.test(n) && !colMr.dataset.set) { colMr.value = String(h.index); colMr.dataset.set = '1'; }
+            if (/NOMBRE.*DE\s+LA\s+DELEGACION|NOMBRE.*DELEGACI[ÓO]N|DELEGACI[ÓO]N.*NOMBRE/.test(n) && preferredDelegacionCol === null) {
+                preferredDelegacionCol = h.index;
+            } else if (/DELEGACION|DELEGACI[ÓO]N/.test(n) && fallbackDelegacionCol === null) {
+                fallbackDelegacionCol = h.index;
+            }
             if (/MUNICIPIO|MUNICIP/.test(n) && !colMun.dataset.set) { colMun.value = String(h.index); colMun.dataset.set = '1'; }
         });
+        if (!colMr.dataset.set && preferredDelegacionCol !== null) {
+            colMr.value = String(preferredDelegacionCol);
+            colMr.dataset.set = '1';
+        } else if (!colMr.dataset.set && fallbackDelegacionCol !== null) {
+            colMr.value = String(fallbackDelegacionCol);
+            colMr.dataset.set = '1';
+        }
         if (!colMr.dataset.set) colMr.value = '-1';
         if (!colMun.dataset.set && colMun.options.length) colMun.selectedIndex = 0;
         syncMrMunMode();
@@ -326,7 +340,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fieldMapRows.innerHTML = '';
         headers.forEach(function (h) {
             const norm = String(h.label || '').toUpperCase();
-            const isGeoColumn = /MICRORREGION|MICRORREGI|\bMR\b|MUNICIPIO|MUNICIP/.test(norm);
+            const isGeoColumn = /MICRORREGION|MICRORREGI|\bMR\b|MUNICIPIO|MUNICIP|DELEGACION|DELEGACI[ÓO]N/.test(norm);
             const isFolioColumn = /^N\s*[°#.]?$|^NO\.?$|^NUMERO$|^NÚMERO$/.test(norm.replace(/\s+/g, ''));
             const shouldCheck = !isGeoColumn && !isFolioColumn;
             const type = inferFieldType(h.label || '');
@@ -403,7 +417,7 @@ document.addEventListener('DOMContentLoaded', function () {
             previewWrap.classList.remove('tm-hidden');
             return;
         }
-        const visibleCols = Math.min(24, headers.length || 12);
+        const visibleCols = Math.min(60, headers.length || 12);
         let html = '<table class="tm-excel-preview-table"><thead><tr><th class="row-num">Fila</th>';
         for (let c = 0; c < visibleCols; c++) {
             const head = headers[c];
@@ -706,5 +720,461 @@ document.addEventListener('DOMContentLoaded', function () {
     expires.disabled = indef.checked;
     expires.required = !indef.checked;
 
-    document.getElementById('tmSeedForm').addEventListener('submit', function () { syncFieldColumns(); });
+    // ====================================================================
+    //  Configuración "Evento cifrado" (mismo UX que crear módulo normal)
+    // ====================================================================
+    const encryptedToggle = document.getElementById('tmSeedEncryptedToggle');
+    const encryptedConfigBtn = document.getElementById('tmSeedEncryptedConfigBtn');
+    const encryptedDurationInput = document.getElementById('tmSeedEncryptedEditDuration');
+    const encryptedPdfPassInput = document.getElementById('tmSeedEncryptedPdfPassword');
+    const encryptedPdfPassConfirmInput = document.getElementById('tmSeedEncryptedPdfPasswordConfirm');
+
+    function tmSeedToggleEncryptedConfig() {
+        if (encryptedConfigBtn) {
+            encryptedConfigBtn.style.display = (encryptedToggle && encryptedToggle.checked) ? '' : 'none';
+        }
+    }
+    if (encryptedToggle) encryptedToggle.addEventListener('change', tmSeedToggleEncryptedConfig);
+    if (encryptedConfigBtn) {
+        encryptedConfigBtn.addEventListener('click', function () {
+            if (typeof Swal === 'undefined') return;
+            Swal.fire({
+                title: 'Configurar evento cifrado',
+                html:
+                    '<label style="display:grid;gap:6px;text-align:left;margin-bottom:10px;"><span>Tiempo de edición autorizado</span><select id="tmSeedSwalDuration" class="swal2-select" style="width:100%;margin:0;"><option value="1">1 hora</option><option value="2">2 horas</option><option value="3">3 horas</option><option value="24">1 día</option></select></label>' +
+                    '<label style="display:grid;gap:6px;text-align:left;margin-bottom:10px;"><span>Contraseña para PDF</span><input id="tmSeedSwalPdfPass" type="password" class="swal2-input" style="width:100%;margin:0;" autocomplete="new-password"></label>' +
+                    '<label style="display:grid;gap:6px;text-align:left;"><span>Confirmar contraseña</span><input id="tmSeedSwalPdfPassConfirm" type="password" class="swal2-input" style="width:100%;margin:0;" autocomplete="new-password"></label>',
+                didOpen: function () {
+                    document.getElementById('tmSeedSwalDuration').value = encryptedDurationInput ? String(encryptedDurationInput.value || '1') : '1';
+                },
+                preConfirm: function () {
+                    const duration = document.getElementById('tmSeedSwalDuration').value || '1';
+                    const pass = document.getElementById('tmSeedSwalPdfPass').value || '';
+                    const confirm = document.getElementById('tmSeedSwalPdfPassConfirm').value || '';
+                    if (pass !== '' && pass.length < 4) {
+                        Swal.showValidationMessage('La contraseña debe tener al menos 4 caracteres.');
+                        return false;
+                    }
+                    if (pass !== confirm) {
+                        Swal.showValidationMessage('La confirmación no coincide.');
+                        return false;
+                    }
+                    return { duration: duration, pass: pass };
+                },
+                confirmButtonText: 'Guardar',
+                showCancelButton: true,
+                cancelButtonText: 'Cancelar'
+            }).then(function (result) {
+                if (!result.isConfirmed || !result.value) return;
+                if (encryptedDurationInput) encryptedDurationInput.value = result.value.duration;
+                if (encryptedPdfPassInput) encryptedPdfPassInput.value = result.value.pass || '';
+                if (encryptedPdfPassConfirmInput) encryptedPdfPassConfirmInput.value = result.value.pass || '';
+            });
+        });
+    }
+    tmSeedToggleEncryptedConfig();
+
+    // ====================================================================
+    //  Submit AJAX + procesamiento por lotes para archivos grandes (XLSX)
+    // ====================================================================
+    const seedForm = document.getElementById('tmSeedForm');
+    const progressWrap = document.getElementById('tmSeedProgressWrap');
+    const progressBar = document.getElementById('tmSeedProgressBar');
+    const progressPct = document.getElementById('tmSeedProgressPct');
+    const progressDetail = document.getElementById('tmSeedProgressDetail');
+    const progressTitle = document.getElementById('tmSeedProgressTitle');
+    const progressCancel = document.getElementById('tmSeedProgressCancel');
+    let deferredCancelUrl = null;
+    let deferredCancelled = false;
+    let tmSeedIsProcessing = false; // true mientras hay subida o lotes en curso
+
+    function setProcessingFlag(isOn) {
+        tmSeedIsProcessing = !!isOn;
+    }
+
+    // Advertencia nativa del navegador al cerrar / recargar / salir si hay
+    // proceso en curso. El usuario decide si confirma o no.
+    window.addEventListener('beforeunload', function (e) {
+        if (!tmSeedIsProcessing) return;
+        const msg = 'La carga del módulo está en curso. Si sales ahora se cancelará el proceso y se borrarán los registros parciales.';
+        e.preventDefault();
+        e.returnValue = msg; // Chrome / Firefox
+        return msg; // Safari
+    });
+
+    // Cuando el usuario confirma salir (pagehide), avisamos al backend para
+    // borrar archivo + módulo parcial. Usamos sendBeacon porque las
+    // peticiones normales se cancelan al cerrar pestaña.
+    window.addEventListener('pagehide', function () {
+        if (!tmSeedIsProcessing || !deferredCancelUrl) return;
+        try {
+            const fd = new FormData();
+            fd.append('_token', csrf);
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(deferredCancelUrl, fd);
+            } else {
+                // Fallback síncrono (poco común hoy en día)
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', deferredCancelUrl, false);
+                xhr.setRequestHeader('X-CSRF-TOKEN', csrf);
+                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                xhr.send(fd);
+            }
+        } catch (_) { /* ignora errores de cleanup */ }
+    });
+
+    function showProgress(title) {
+        if (!progressWrap) return;
+        progressWrap.classList.remove('tm-hidden', 'is-error', 'is-success');
+        if (progressTitle) progressTitle.textContent = title || 'Procesando registros…';
+        setProgress(0, 'Subiendo archivo…');
+    }
+    function setProgress(pct, detail) {
+        if (!progressBar || !progressPct) return;
+        const safe = Math.max(0, Math.min(100, Math.round(pct)));
+        progressBar.style.width = safe + '%';
+        progressPct.textContent = safe + '%';
+        if (progressDetail && typeof detail === 'string') progressDetail.textContent = detail;
+    }
+    function setProgressError(msg) {
+        if (!progressWrap) return;
+        progressWrap.classList.add('is-error');
+        progressWrap.classList.remove('is-success');
+        if (progressDetail) progressDetail.textContent = msg;
+        if (progressCancel) progressCancel.textContent = 'Cerrar';
+        setProcessingFlag(false);
+    }
+    function setProgressSuccess(msg) {
+        if (!progressWrap) return;
+        progressWrap.classList.add('is-success');
+        progressWrap.classList.remove('is-error');
+        setProgress(100, msg);
+        if (progressCancel) progressCancel.style.display = 'none';
+        setProcessingFlag(false);
+    }
+    function hideProgress() {
+        if (!progressWrap) return;
+        progressWrap.classList.add('tm-hidden');
+        progressWrap.classList.remove('is-error', 'is-success');
+    }
+
+    if (progressCancel) {
+        progressCancel.addEventListener('click', async function () {
+            if (progressCancel.textContent === 'Cerrar') {
+                hideProgress();
+                deferredCancelUrl = null;
+                if (submitBtn) submitBtn.disabled = false;
+                setProcessingFlag(false);
+                return;
+            }
+            if (!deferredCancelUrl) return;
+            if (!confirm('¿Cancelar la carga? Se borrarán los registros parciales.')) return;
+            deferredCancelled = true;
+            setProcessingFlag(false); // ya no preguntar al salir
+            try {
+                const fd = new FormData();
+                fd.append('_token', csrf);
+                await csrfFetch(deferredCancelUrl, { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+            } catch (_) {}
+            setProgressError('Carga cancelada por el usuario.');
+        });
+    }
+
+    async function postFormJson(url, formData) {
+        const res = await csrfFetch(url, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) {
+            const text = await res.text().catch(function () { return ''; });
+            if (!res.ok) throw new Error(text.substring(0, 300) || ('HTTP ' + res.status));
+            return { __nonJson: true, status: res.status, text: text };
+        }
+        const data = await res.json();
+        if (!res.ok) {
+            const msg = data && data.message ? data.message : ('HTTP ' + res.status);
+            throw new Error(msg);
+        }
+        return data;
+    }
+
+    /**
+     * POST con XMLHttpRequest para poder reportar progreso de subida en
+     * tiempo real (fetch() no expone xhr.upload.onprogress).
+     * onProgress recibe (loaded, totalHint) donde totalHint es e.total del XHR
+     * o 0 si no es computable (usar tamaño del archivo como respaldo).
+     * uploadTotalHint: tamaño del archivo (p. ej. file.size) para porcentaje
+     * fiable cuando lengthComputable es false o solo hay un evento al final.
+     */
+    function postFormJsonWithProgress(url, formData, onProgress, uploadTotalHint) {
+        return new Promise(function (resolve, reject) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+            xhr.setRequestHeader('Accept', 'application/json');
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.setRequestHeader('X-CSRF-TOKEN', csrf);
+            xhr.withCredentials = true;
+            const hint = typeof uploadTotalHint === 'number' && uploadTotalHint > 0 ? uploadTotalHint : 0;
+            xhr.upload.onloadstart = function () {
+                if (typeof onProgress === 'function') {
+                    onProgress(0, hint);
+                }
+            };
+            xhr.upload.onprogress = function (e) {
+                if (typeof onProgress === 'function') {
+                    const xhrTotal = e.lengthComputable && (e.total || 0) > 0 ? e.total : 0;
+                    const total = xhrTotal > 0 ? xhrTotal : hint;
+                    onProgress(e.loaded || 0, total);
+                }
+            };
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState !== 4) return;
+                const ct = xhr.getResponseHeader('Content-Type') || '';
+                if (!ct.includes('application/json')) {
+                    if (xhr.status === 0) {
+                        return reject(new Error('La conexión se interrumpió (red suspendida, equipo en reposo o pestaña en segundo plano). Reintenta sin cambiar de pestaña.'));
+                    }
+                    if (xhr.status === 419) {
+                        return reject(new Error('Tu sesión expiró. Recarga la página.'));
+                    }
+                    return reject(new Error(xhr.responseText.substring(0, 300) || ('HTTP ' + xhr.status)));
+                }
+                let data;
+                try {
+                    data = JSON.parse(xhr.responseText);
+                } catch (_) {
+                    return reject(new Error('Respuesta inválida del servidor.'));
+                }
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(data);
+                } else {
+                    reject(new Error(data && data.message ? data.message : ('HTTP ' + xhr.status)));
+                }
+            };
+            xhr.onerror = function () {
+                reject(new Error('Error de red: la conexión se cortó (p. ej. ERR_NETWORK_IO_SUSPENDED si el navegador suspendió la red).'));
+            };
+            xhr.ontimeout = function () { reject(new Error('La subida tardó demasiado (tiempo de espera agotado).')); };
+            xhr.timeout = 0;
+            xhr.send(formData);
+        });
+    }
+
+    function sleep(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    /**
+     * Fallos típicos de Chrome/Chromium: pestaña en segundo plano, suspensión,
+     * ERR_NETWORK_IO_SUSPENDED (no siempre llega al mensaje del Error).
+     */
+    function isRetryableSeedNetworkError(err) {
+        const msg = String(err && err.message ? err.message : err || '').toLowerCase();
+        if (!msg) return true;
+        if (msg.indexOf('abort') >= 0) return false;
+        if (msg.indexOf('sesión') >= 0 && msg.indexOf('expir') >= 0) return false;
+        if (msg.indexOf('respuesta inválida') >= 0) return false;
+        return (
+            msg.indexOf('no se pudo conectar') >= 0 ||
+            msg.indexOf('error de red') >= 0 ||
+            msg.indexOf('interrumpió') >= 0 ||
+            msg.indexOf('suspend') >= 0 ||
+            msg.indexOf('io_suspended') >= 0 ||
+            msg.indexOf('failed to fetch') >= 0 ||
+            msg.indexOf('networkerror') >= 0 ||
+            msg.indexOf('network changed') >= 0 ||
+            msg.indexOf('load failed') >= 0
+        );
+    }
+
+    function humanizeSeedUploadError(err) {
+        const base = err && err.message ? err.message : String(err);
+        if (!isRetryableSeedNetworkError(err)) {
+            return base;
+        }
+        return base + ' Conviene dejar esta pestaña al frente y evitar suspensión del equipo mientras se envía el archivo y el servidor prepara el módulo (varios minutos en archivos grandes).';
+    }
+
+    function formatBytes(bytes) {
+        if (!isFinite(bytes) || bytes <= 0) return '0 B';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    async function processBatchesLoop(deferred) {
+        deferredCancelUrl = deferred.cancel_url;
+        deferredCancelled = false;
+        const totalRows = parseInt(deferred.total_rows, 10) || 0; // 0 = desconocido
+        const batchUrl = deferred.batch_url;
+        let processedTotal = 0;
+        let hasMore = true;
+
+        if (progressTitle) progressTitle.textContent = 'Procesando registros…';
+        const initialDetail = totalRows > 0
+            ? ('Procesando 0 / ~' + totalRows + ' filas…')
+            : 'Procesando filas…';
+        setProgress(0, initialDetail);
+
+        while (hasMore) {
+            if (deferredCancelled) return;
+            const fd = new FormData();
+            fd.append('_token', csrf);
+            fd.append('batch_size', String(deferred.batch_size || 1000));
+            let result;
+            try {
+                result = await postFormJson(batchUrl, fd);
+            } catch (err) {
+                setProgressError('Error procesando lote: ' + (err && err.message ? err.message : err));
+                throw err;
+            }
+            processedTotal = parseInt(result.processed_total, 10) || processedTotal;
+            hasMore = !!result.has_more;
+            const stats = result.stats || {};
+
+            let pct;
+            let detail;
+            if (totalRows > 0) {
+                pct = Math.min(99, (processedTotal / totalRows) * 100);
+                detail = 'Procesando ' + processedTotal + ' / ~' + totalRows + ' filas · ' +
+                    'creados: ' + (stats.created || 0) + ' · ' +
+                    'descartados: ' + (stats.discarded || 0);
+            } else {
+                // Total desconocido: avance suave hacia 95% sin nunca llegar
+                pct = Math.min(95, 5 + (processedTotal / (processedTotal + 500)) * 95);
+                detail = 'Procesando ' + processedTotal + ' filas · ' +
+                    'creados: ' + (stats.created || 0) + ' · ' +
+                    'descartados: ' + (stats.discarded || 0);
+            }
+            setProgress(pct, detail);
+            if (!hasMore) break;
+        }
+        if (deferredCancelled) return;
+
+        // Finalizar
+        if (progressTitle) progressTitle.textContent = 'Finalizando…';
+        setProgress(100, 'Sincronizando delegados y cerrando módulo…');
+        const finFd = new FormData();
+        finFd.append('_token', csrf);
+        let finalResult;
+        try {
+            finalResult = await postFormJson(deferred.finalize_url, finFd);
+        } catch (err) {
+            setProgressError('Error al finalizar: ' + (err && err.message ? err.message : err));
+            throw err;
+        }
+        setProgressSuccess('¡Listo! ' + (finalResult.stats && finalResult.stats.created ? finalResult.stats.created : 0) + ' registro(s) creados. Redirigiendo…');
+        setTimeout(function () {
+            window.location.href = finalResult.redirect_url || deferred.redirect_url;
+        }, 900);
+    }
+
+    seedForm.addEventListener('submit', async function (ev) {
+        syncFieldColumns();
+
+        // Solo intercepta cuando hay un .xlsx (las únicas que soporta Spout).
+        const file = fileInput && fileInput.files && fileInput.files[0];
+        const isXlsx = file && /\.xlsx$/i.test(file.name);
+        if (!file || !isXlsx) {
+            // Submit nativo (XLS o sin archivo → flujo síncrono original).
+            return;
+        }
+
+        ev.preventDefault();
+        if (submitBtn) submitBtn.disabled = true;
+        setProcessingFlag(true); // activa la advertencia de "salir"
+
+        const totalBytes = file.size;
+        showProgress('Subiendo archivo…');
+        setProgress(0, 'Subiendo archivo… 0 / ' + formatBytes(totalBytes));
+
+        const progressCb = function (loaded, total) {
+            const knownTotal = total > 0 ? total : totalBytes;
+            const clampedLoaded = knownTotal > 0 ? Math.min(loaded, knownTotal) : loaded;
+            const rawPct = knownTotal > 0 ? (clampedLoaded / knownTotal) * 100 : 0;
+            const pct = knownTotal > 0 ? Math.min(99, rawPct) : 0;
+            let detail = 'Subiendo archivo… ' + formatBytes(clampedLoaded) + ' / ' + formatBytes(knownTotal);
+            if (knownTotal > 0 && clampedLoaded >= knownTotal) {
+                detail += ' · Esperando respuesta del servidor…';
+            }
+            setProgress(pct, detail);
+        };
+
+        let wakeLockHandle = null;
+        try {
+            try {
+                if (navigator.wakeLock && typeof navigator.wakeLock.request === 'function') {
+                    wakeLockHandle = await navigator.wakeLock.request('screen');
+                }
+            } catch (_) { /* no soportado o denegado */ }
+
+            const maxAttempts = 3;
+            let initial;
+            try {
+                for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                    if (attempt > 1) {
+                        if (progressTitle) progressTitle.textContent = 'Reintentando subida…';
+                        setProgress(0, 'Intento ' + attempt + ' de ' + maxAttempts + ' · Mantén esta pestaña visible…');
+                        await sleep(900 * attempt);
+                    }
+                    const fd = new FormData(seedForm);
+                    fd.set('defer_processing', '1');
+                    try {
+                        initial = await postFormJsonWithProgress(seedForm.action, fd, progressCb, totalBytes);
+                        break;
+                    } catch (err) {
+                        if (attempt < maxAttempts && isRetryableSeedNetworkError(err)) {
+                            continue;
+                        }
+                        throw err;
+                    }
+                }
+            } catch (err) {
+                setProgressError('Error: ' + humanizeSeedUploadError(err));
+                if (submitBtn) submitBtn.disabled = false;
+                return;
+            }
+
+            // Subida completa → reinicia barra para fase de procesamiento
+            if (progressTitle) progressTitle.textContent = 'Preparando módulo…';
+            setProgress(0, 'Archivo recibido. Preparando módulo…');
+
+            if (!initial || initial.__nonJson) {
+                setProgressError('Respuesta inesperada del servidor.');
+                if (submitBtn) submitBtn.disabled = false;
+                return;
+            }
+            if (initial.success === false) {
+                setProgressError(initial.message || 'No se pudo iniciar la carga.');
+                if (submitBtn) submitBtn.disabled = false;
+                return;
+            }
+
+            if (initial.deferred) {
+                try {
+                    await processBatchesLoop(initial);
+                } catch (_) {
+                    if (submitBtn) submitBtn.disabled = false;
+                }
+                return;
+            }
+
+            // No deferida (archivo pequeño) → si nos devolvieron redirect_url lo seguimos
+            setProcessingFlag(false);
+            if (initial.redirect_url) {
+                window.location.href = initial.redirect_url;
+                return;
+            }
+            window.location.reload();
+        } finally {
+            if (wakeLockHandle && typeof wakeLockHandle.release === 'function') {
+                wakeLockHandle.release().catch(function () {});
+            }
+        }
+    });
 });
