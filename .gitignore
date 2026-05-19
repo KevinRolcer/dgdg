@@ -11,7 +11,7 @@
 .env
 .env.*
 !.env.example
-
+.env.example
 # Archivos de sistema operativo
 .DS_Store
 Thumbs.db
