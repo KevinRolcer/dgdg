@@ -21,3 +21,6 @@ Thumbs.db
 
 # Artefactos temporales locales (debug/validaciones)
 /tools/_*
+
+# Respaldo local de cambios (no desplegar al servidor)
+/local-change-archive/
